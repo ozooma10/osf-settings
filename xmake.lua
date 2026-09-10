@@ -2,8 +2,8 @@
 includes("lib/commonlibsf")
 
 -- set project constants
-set_project("commonlibsf-template")
-set_version("0.0.0")
+set_project("OSF Settings Slim")
+set_version("1.0.0")
 set_license("GPL-3.0")
 set_languages("c++23")
 set_warnings("allextra")
@@ -11,14 +11,15 @@ set_warnings("allextra")
 -- add common rules
 add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
+add_rules("plugin.compile_commands.autoupdate", { outputdir = ".", lsp = "cpptools" })
 
 -- define targets
-target("commonlibsf-template")
+target("OSF Settings Slim")
     add_rules("commonlibsf.plugin", {
-        name = "commonlibsf-template",
-        author = "libxse",
-        description = "SFSE plugin template using CommonLibSF",
-        email = "user@site.com"
+        name = "OSF Settings Slim",
+        author = "ozooma10",
+        description = "Mod Settings",
+        email = "ozooma10@protonmail.com"
     })
 
     -- add src files
