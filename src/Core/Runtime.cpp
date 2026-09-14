@@ -33,7 +33,7 @@ namespace OSFSettings
                     ++settingCount;
                 }
             }
-            REX::INFO("Checkpoint 2: {} mod(s), {} setting(s), {} load error(s)", m_settings.Mods().size(), settingCount, m_settings.LoadErrors().size());
+            REX::INFO("Checkpoint 3: {} mod(s), {} setting(s), {} load error(s)", m_settings.Mods().size(), settingCount, m_settings.LoadErrors().size());
             m_initialized = true;
             return true;
         } catch (const std::exception& error) {
@@ -41,5 +41,13 @@ namespace OSFSettings
             if (auto logger = spdlog::default_logger()) logger->flush();
             return false;
         }
+    }
+
+    SettingsStore::SetResult Runtime::SetBool(std::string_view mod, std::string_view key, bool value)
+    {
+        auto result = m_settings.Set(mod, key, value);
+        if (result.ok) REX::INFO("Menu saved {} / {} = {}", mod, key, value);
+        else REX::ERROR("Menu could not save {} / {}: {}", mod, key, result.error);
+        return result;
     }
 }

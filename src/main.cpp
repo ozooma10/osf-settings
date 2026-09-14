@@ -8,6 +8,6 @@ SFSE_PLUGIN_PRELOAD(const SFSE::PreLoadInterface* a_sfse)
 
 SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 {
-	SFSE::Init(a_sfse, { .hook = false });
+	SFSE::Init(a_sfse, { .trampoline = true, .trampolineSize = 512, .hook = false });
 	return OSFSettings::Plugin::OnLoad();
 }

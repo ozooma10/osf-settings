@@ -9,6 +9,8 @@ namespace OSFSettings
     public:
         static Runtime& Get();
         bool Initialize();
+        const SettingsStore& Settings() const { return m_settings; }
+        SettingsStore::SetResult SetBool(std::string_view mod, std::string_view key, bool value);
     private:
         SettingsStore m_settings;
         bool m_initialized{ false };
