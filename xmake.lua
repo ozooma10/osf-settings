@@ -22,7 +22,10 @@ target("OSF Settings Slim")
     -- Use a shared target so building remains separate from explicit deployment.
     set_kind("shared")
     add_deps("commonlibsf")
-    set_installdir(path.join(os.projectdir(), "build", "stage"))
+    local mods = os.getenv("XSE_SF_MODS_PATH")
+    set_installdir(mods
+        and path.join(mods, "OSF Settings Slim")
+        or path.join(os.projectdir(), "build", "stage"))
 
     -- add src files
     add_files("src/**.cpp")
