@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "scrolling",
+  "title": "Scrolling test (development only)",
+  "groups": [
+    {
+      "id": "first",
+      "label": "First group",
+      "settings": [
+        { "key": "row01", "type": "bool", "label": "Test row 01", "hint": "First scrolling-test setting.", "default": true },
+        { "key": "row02", "type": "bool", "label": "Test row 02", "default": false },
+        { "key": "row03", "type": "bool", "label": "Test row 03", "default": true },
+        { "key": "row04", "type": "bool", "label": "Test row 04", "default": false },
+        { "key": "row05", "type": "bool", "label": "Test row 05", "default": true },
+        { "key": "row06", "type": "bool", "label": "Test row 06", "default": false },
+        { "key": "row07", "type": "bool", "label": "Test row 07", "default": true },
+        { "key": "row08", "type": "bool", "label": "Test row 08", "hint": "Down should skip the next group heading.", "default": false }
+      ]
+    },
+    {
+      "id": "second",
+      "label": "Second group",
+      "settings": [
+        { "key": "row09", "type": "bool", "label": "Test row 09", "hint": "Up should skip the previous group heading.", "default": true },
+        { "key": "row10", "type": "bool", "label": "Test row 10", "default": false },
+        { "key": "row11", "type": "bool", "label": "Test row 11", "default": true },
+        { "key": "row12", "type": "bool", "label": "Test row 12", "default": false },
+        { "key": "row13", "type": "bool", "label": "Test row 13", "default": true },
+        { "key": "row14", "type": "bool", "label": "Test row 14", "default": false },
+        { "key": "row15", "type": "bool", "label": "Test row 15", "default": true },
+        { "key": "row16", "type": "bool", "label": "Last test row 16", "hint": "The last setting must remain visible and editable at the bottom of the list.", "default": false }
+      ]
+    }
+  ]
+}
