@@ -10,9 +10,10 @@ namespace OSFSettings::Paths
 	bool Initialize()
 	{
 		const std::filesystem::path gamePath{ REX::FModule::GetExecutingModule().GetFileName() };
-		g_dataDir = gamePath.parent_path() / "Data" / "SFSE" / "Plugins" / "OSF" / "SettingsSlim";
+		g_dataDir = gamePath.parent_path() / "Data" / "SFSE" / "Plugins" / "OSF" / "Settings";
 		return true;
 	}
 
 	std::filesystem::path SchemasDir() { return g_dataDir / "schemas"; }
+	std::filesystem::path ValuesDir() { return g_dataDir / "values"; }
 }

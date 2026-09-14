@@ -8,10 +8,11 @@
 
 namespace OSFSettings
 {
-    void SettingsStore::LoadAll(const std::filesystem::path& schemaDir)
+    void SettingsStore::LoadAll(const std::filesystem::path& schemaDir, const std::filesystem::path& valuesDir)
     {
         m_mods.clear();
         m_loadErrors.clear();
+        m_valuesDir = valuesDir;
 
         std::error_code error;
         if (!std::filesystem::is_directory(schemaDir, error)) {
@@ -56,6 +57,7 @@ namespace OSFSettings
                         mod.values.emplace(setting.key, setting.defaultValue);
                     }
                 }
+                SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.values, m_loadErrors);
                 m_mods.push_back(std::move(mod));
             } catch (const std::exception& exception) {
                 m_loadErrors.push_back({ path, exception.what() });
@@ -72,5 +74,30 @@ namespace OSFSettings
             return std::nullopt;
         }
         return std::nullopt;
+    }
+
+    SettingsStore::SetResult SettingsStore::Set(std::string_view mod, std::string_view key, SettingValue value)
+    {
+        try {
+            for (auto& stored : m_mods) {
+                if (stored.schema.id != mod) continue;
+                const auto current = stored.values.find(key);
+                if (current == stored.values.end()) return { false, "unknown setting key" };
+                if (current->second == value) return { true, {} };
+
+                // Propose the edit in a copy. The live value changes only after saving.
+                auto proposed = stored.values;
+                proposed.find(key)->second = value;
+                std::string error;
+                if (!SettingsJson::SaveValues(m_valuesDir / (stored.schema.id + ".json"), proposed, error)) {
+                    return { false, std::move(error) };
+                }
+                stored.values.swap(proposed);
+                return { true, {} };
+            }
+            return { false, "unknown mod id" };
+        } catch (const std::exception& error) {
+            return { false, error.what() };
+        }
     }
 }

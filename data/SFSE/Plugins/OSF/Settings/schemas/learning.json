@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "learning",
+  "title": "Learning example",
+  "description": "One boolean, understood end to end.",
+  "groups": [
+    {
+      "id": "general",
+      "label": "General",
+      "settings": [
+        {
+          "key": "notifications",
+          "type": "bool",
+          "label": "Enable notifications",
+          "hint": "A learning example; no gameplay behavior is connected yet.",
+          "default": true
+        }
+      ]
+    }
+  ]
+}

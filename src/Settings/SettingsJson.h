@@ -7,6 +7,7 @@
 
 namespace OSFSettings::SettingsJson
 {
-    // JSON ends here: the rest of the plugin uses ModSchema and bool values.
     std::optional<ModSchema> ParseSchema(const nlohmann::json& document, std::string& error);
+    void LoadValues(const std::filesystem::path& path, SettingValues& values, std::vector<SettingsLoadError>& errors);
+    bool SaveValues(const std::filesystem::path& path, const SettingValues& values, std::string& error);
 }

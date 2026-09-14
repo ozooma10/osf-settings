@@ -20,20 +20,20 @@ namespace OSFSettings
             if (!Paths::Initialize()) return false;
             const auto schemaDir = Paths::SchemasDir();
             REX::INFO("Loading schemas from {}", schemaDir.string());
-            m_settings.LoadAll(schemaDir);
+            m_settings.LoadAll(schemaDir, Paths::ValuesDir());
 
             for (const auto& error : m_settings.LoadErrors()) {
-                REX::ERROR("Schema {}: {}", error.file.string(), error.message);
+                REX::ERROR("Settings {}: {}", error.file.string(), error.message);
             }
 
             std::size_t settingCount = 0;
             for (const auto& mod : m_settings.Mods()) {
                 for (const auto& [key, value] : mod.values) {
-                    REX::INFO("Loaded {} / {} = {} (schema default)", mod.schema.id, key, value);
+                    REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, value);
                     ++settingCount;
                 }
             }
-            REX::INFO("Checkpoint 1: {} mod(s), {} setting(s), {} load error(s)", m_settings.Mods().size(), settingCount, m_settings.LoadErrors().size());
+            REX::INFO("Checkpoint 2: {} mod(s), {} setting(s), {} load error(s)", m_settings.Mods().size(), settingCount, m_settings.LoadErrors().size());
             m_initialized = true;
             return true;
         } catch (const std::exception& error) {

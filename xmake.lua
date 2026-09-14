@@ -33,7 +33,7 @@ target("OSF Settings Slim")
     add_includedirs("src")
     add_packages("nlohmann_json")
     set_pcxxheader("src/pch.h")
-    add_installfiles("data/(SFSE/Plugins/OSF/SettingsSlim/schemas/*.json)")
+    add_installfiles("data/(SFSE/Plugins/OSF/Settings/schemas/*.json)")
 
 target("osfsettings-slim-tests")
     set_kind("binary")
