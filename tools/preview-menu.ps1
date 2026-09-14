@@ -29,15 +29,14 @@ New-Item -ItemType Directory -Force -Path $output | Out-Null
 
 function Build-Preview {
     & "$PSScriptRoot/build-scaleform.ps1"
-    $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output)
+    $suffix = if ($LargeText) { '_LRG' } else { '' }
+    $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output, '--menu', "$repo/build/scaleform/OSFSettingsMenu$suffix.raw.swf")
     if ($LargeText) { $prepareArgs += '--large' }
     & python -B "$PSScriptRoot/prepare-menu-preview.py" @prepareArgs @schemas
     if ($LASTEXITCODE -ne 0) { throw 'Could not prepare preview assets.' }
     $env:JAVA_HOME = Join-Path $repo 'external/temurin8'
     & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" '-use-network=false' '-debug=true' "-output=$output/PreviewHost.swf" "$repo/scaleform/preview/PreviewHost.as"
     if ($LASTEXITCODE -ne 0) { throw 'Could not compile the preview host.' }
-    $suffix = if ($LargeText) { '_LRG' } else { '' }
-    Copy-Item -LiteralPath "$repo/build/scaleform/OSFSettingsMenu$suffix.raw.swf" -Destination "$output/menu.swf" -Force
 }
 
 function Start-Preview {

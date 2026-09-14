@@ -85,7 +85,7 @@ package
         {
             if (event && String(event.target.url).indexOf("fonts_en.swf") >= 0) {
                 for each (var alias:String in fontNames) {
-                    Font.registerFont(domain.getDefinition(alias) as Class);
+                    Font.registerFont(event.target.applicationDomain.getDefinition(alias) as Class);
                 }
             }
             if (libraries.length == 0) { loadMenu(); return; }
@@ -95,11 +95,16 @@ package
             loader.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, ioFailed);
             loader.contentLoaderInfo.addEventListener(Event.COMPLETE, loadNext);
             loader.contentLoaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, failed);
-            loader.load(new URLRequest(url), new LoaderContext(false, domain));
+            // Shared font resources need not expose their AS3 classes to menus.
+            var libraryDomain:ApplicationDomain = url.indexOf("fonts_en.swf") >= 0 ? new ApplicationDomain(domain) : domain;
+            loader.load(new URLRequest(url), new LoaderContext(false, libraryDomain));
         }
 
         private function loadMenu():void
         {
+            if (domain.hasDefinition("$MAIN_Font_Bold") || domain.hasDefinition("$NB_Grotesk_Semibold")) {
+                throw new Error("Preview font classes leaked into the menu domain");
+            }
             var manager:Class = domain.getDefinition("Shared.AS3.Data.BSUIDataManager") as Class;
             var controls:Object = Object(manager).GetDataFromClient("ControlMapData");
             controls.data.uiController = 0;

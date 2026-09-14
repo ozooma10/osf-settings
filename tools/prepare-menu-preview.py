@@ -78,13 +78,27 @@ class InterfaceArchive:
         return data
 
 
-def prepare(archive_path, output, schema_paths, large):
+def prepare(archive_path, output, schema_paths, large, menu_path):
     archive = InterfaceArchive(archive_path)
     assets = output / "assets"
     assets.mkdir(parents=True, exist_ok=True)
     config = ET.Element("preview")
     libraries = ET.SubElement(config, "libraries")
     loaded = set()
+    font_families = {}
+
+    def text_font(data):
+        offset = 2 + (5 + 4 * (data[2] >> 3) + 7) // 8
+        flags = int.from_bytes(data[offset:offset + 2], "big")
+        offset += 2 + (2 if flags & 0x0100 else 0)
+        if flags & 0x0080:
+            # Ruffle treats DefineEditText.FontClass as a family name.
+            # Adapt authored fields without renaming the shared fonts.
+            end = data.index(0, offset)
+            family = font_families.get(data[offset:end])
+            if family:
+                data = data[:offset] + family + data[end:]
+        return data
 
     def library(name):
         name = name.lower()
@@ -97,6 +111,8 @@ def prepare(archive_path, output, schema_paths, large):
         prefix, tags = swf_tags(source)
         font_names = {}
         if name == "fonts_en.swf":
+            families = {struct.unpack_from("<H", data)[0]: data[5:5 + data[4]].rstrip(b"\0")
+                        for code, data in tags if code == 75}
             for code, data in tags:
                 if code == 76:
                     offset = 2
@@ -104,6 +120,7 @@ def prepare(archive_path, output, schema_paths, large):
                         symbol = struct.unpack_from("<H", data, offset)[0]
                         end = data.index(0, offset + 2)
                         font_names[symbol] = data[offset + 2:end]
+                        font_families[font_names[symbol]] = families[symbol]
                         offset = end + 1
             fonts = ET.SubElement(config, "fonts")
             for alias in font_names.values():
@@ -113,14 +130,10 @@ def prepare(archive_path, output, schema_paths, large):
             if code == 82:
                 start = data.index(0, 4) + 1
                 data = data[:start] + adapt_callbacks(data[start:])
-            # Scaleform resolves the exported $aliases through its font library.
-            # Register the same outlines under those names in ordinary Flash.
-            if code == 75 and font_names:
-                alias = font_names[struct.unpack_from("<H", data)[0]]
-                data = data[:4] + bytes([len(alias)]) + alias + data[5 + data[4]:]
-            if code == 88 and font_names:
-                alias = font_names[struct.unpack_from("<H", data)[0]]
-                data = data[:2] + alias + data[data.index(0, 2):]
+            # Keep the real font names. Renaming them to exported class names
+            # hides invalid TextFormat.font assignments in the production menu.
+            if code == 37:
+                data = text_font(data)
             if code in (57, 71):
                 url, symbols = data.split(b"\0", 1)
                 if code == 71:
@@ -137,6 +150,10 @@ def prepare(archive_path, output, schema_paths, large):
         print("Prepared", name)
 
     library("SettingsPanel_LRG.swf" if large else "SettingsPanel.swf")
+    source = menu_path.read_bytes()
+    prefix, tags = swf_tags(source)
+    tags = [(code, text_font(data) if code == 37 else data) for code, data in tags]
+    (output / "menu.swf").write_bytes(pack_swf(source, prefix, tags))
     rows = ET.SubElement(config, "rows")
     for path in schema_paths:
         schema = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -158,6 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--large", action="store_true")
+    parser.add_argument("--menu", type=Path, required=True)
     parser.add_argument("schemas", type=Path, nargs="+")
     args = parser.parse_args()
-    prepare(args.archive, args.output, args.schemas, args.large)
+    prepare(args.archive, args.output, args.schemas, args.large, args.menu)

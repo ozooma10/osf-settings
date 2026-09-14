@@ -8,6 +8,7 @@ package
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.geom.Matrix;
+    import flash.text.Font;
     import flash.text.TextField;
     import flash.ui.Keyboard;
     import flash.utils.ByteArray;
@@ -57,6 +58,8 @@ package
                 switch (step++) {
                 case 0:
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready");
+                    requireGlyphs("SELECTED SETTING");
+                    requireGlyphs("Auto-advance stages");
                     require(list.entryCount == 6, "playback has six settings");
                     require(list.selectedEntry.row.key == "autoAdvance", "first setting selected");
                     capture("default"); userEvent("Accept"); break;
@@ -104,6 +107,32 @@ package
             } catch (error:Error) {
                 menu.removeEventListener(Event.ENTER_FRAME, advance); trace("[verify] FAIL " + error);
             }
+        }
+        private function requireGlyphs(text:String):void
+        {
+            var field:TextField;
+            for (var i:int = 0; i < menu.numChildren; ++i) {
+                var candidate:TextField = menu.getChildAt(i) as TextField;
+                if (candidate && candidate.text == text) { field = candidate; break; }
+            }
+            require(field != null, "custom text present: " + text);
+            var embedded:Boolean = false;
+            for each (var font:Font in Font.enumerateFonts(false)) {
+                if (font.fontName == field.defaultTextFormat.font) embedded = true;
+            }
+            require(embedded, "custom text uses an embedded game font: " + text);
+            var first:BitmapData = new BitmapData(96, 96, true, 0);
+            var second:BitmapData = new BitmapData(96, 96, true, 0);
+            field.text = "M"; first.draw(field);
+            field.text = "I"; second.draw(field);
+            field.text = text;
+            var visible:Boolean = !first.getColorBoundsRect(0xFF000000, 0, false).isEmpty() &&
+                                  !second.getColorBoundsRect(0xFF000000, 0, false).isEmpty();
+            var difference:Object = first.compare(second);
+            var distinct:Boolean = difference is BitmapData;
+            if (distinct) BitmapData(difference).dispose();
+            first.dispose(); second.dispose();
+            require(visible && distinct, "custom font renders distinct glyphs: " + text);
         }
         private function findInput(container:DisplayObjectContainer):TextField
         {

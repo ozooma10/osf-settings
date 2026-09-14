@@ -1,6 +1,7 @@
 package
 {
     import flash.display.Graphics;
+    import flash.display.MovieClip;
     import flash.text.TextField;
     import flash.text.TextFormat;
 
@@ -20,17 +21,15 @@ package
         public static const ROW_HEIGHT:Number = CONFIG::largeText ? 96 : 78;
         public static const BODY_SIZE:Number = CONFIG::largeText ? 32 : 28;
 
-        public static function format(size:Number, color:uint, label:Boolean = false):TextFormat
-        {
-            var result:TextFormat = new TextFormat();
-            result.font = label ? "$MAIN_Font_Bold" : "$NB_Grotesk_Semibold";
-            result.size = size; result.color = color; return result;
-        }
         public static function field(text:String, x:Number, y:Number, width:Number, height:Number,
                                      size:Number, color:uint = WHITE, label:Boolean = false):TextField
         {
-            var result:TextField = new TextField(); result.embedFonts = true;
-            result.defaultTextFormat = format(size, color, label);
+            // Keep the DefineEditText font binding authored by build-scaleform.
+            var symbol:MovieClip = label ? new MenuLabelField() : new MenuBodyField();
+            var result:TextField = symbol.getChildAt(0) as TextField;
+            symbol.removeChild(result);
+            var format:TextFormat = new TextFormat(); format.size = size; format.color = color;
+            result.defaultTextFormat = format;
             result.text = text; result.textColor = color;
             result.x = x; result.y = y; result.width = width; result.height = height;
             result.selectable = false; result.mouseEnabled = false; return result;

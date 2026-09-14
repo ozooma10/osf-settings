@@ -68,7 +68,9 @@ package
         private function definition(name:String):Class
         {
             if (!initialized) startupPhase = "resolve " + name;
-            var result:Class = getDefinitionByName(name) as Class;
+            var result:Class;
+            try { result = getDefinitionByName(name) as Class; }
+            catch (error:Error) { throw new Error("Missing game class: " + name + ": " + error.toString()); }
             if (!result) throw new Error("Missing game class: " + name);
             return result;
         }
@@ -102,6 +104,7 @@ package
             background = create("FullBackground") as MovieClip;
             background.mouseEnabled = false; background.mouseChildren = false; addChild(background);
             types = definition("Shared.Components.SystemPanels.SettingsOptionListEntry");
+            startupPhase = "build authored menu text";
             var chrome:Sprite = new Sprite(); chrome.mouseEnabled = false; addChild(chrome);
             chrome.graphics.lineStyle(1, MenuStyle.LINE);
             chrome.graphics.moveTo(MenuStyle.LEFT, 258); chrome.graphics.lineTo(MenuStyle.RIGHT, 258);
