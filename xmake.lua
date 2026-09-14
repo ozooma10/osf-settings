@@ -7,6 +7,8 @@ set_version("1.0.0")
 set_license("GPL-3.0")
 set_languages("c++23")
 set_warnings("allextra")
+set_encodings("utf-8")
+add_requires("nlohmann_json 3.12.0")
 
 -- add common rules
 add_rules("mode.debug", "mode.releasedbg")
@@ -15,6 +17,9 @@ add_rules("plugin.compile_commands.autoupdate", { outputdir = ".", lsp = "cpptoo
 
 -- define targets
 target("OSF Settings Slim")
+    set_basename("OSFSettingsSlim")
+    -- Learning builds stay local. Deployment requires an explicit xmake install.
+    set_values("commonlib.plugin.install", false)
     add_rules("commonlibsf.plugin", {
         name = "OSF Settings Slim",
         author = "ozooma10",
@@ -26,4 +31,14 @@ target("OSF Settings Slim")
     add_files("src/**.cpp")
     add_headerfiles("src/**.h")
     add_includedirs("src")
+    add_packages("nlohmann_json")
     set_pcxxheader("src/pch.h")
+    add_installfiles("data/(SFSE/Plugins/OSF/SettingsSlim/schemas/*.json)")
+
+target("osfsettings-slim-tests")
+    set_kind("binary")
+    set_default(false)
+    add_files("tests/native/settings_tests.cpp", "src/Settings/*.cpp")
+    add_includedirs("src")
+    add_packages("nlohmann_json")
+    set_rundir(os.projectdir())

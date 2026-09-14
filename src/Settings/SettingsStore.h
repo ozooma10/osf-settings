@@ -3,35 +3,22 @@
 #include "SettingsSchema.h"
 
 #include <filesystem>
+#include <optional>
 
 namespace OSFSettings
 {
     class SettingsStore
     {
     public:
-        void LoadAll(const std::filesystem::path& a_schemaDir, const std::filesystem::path& a_valuesDir);
-        
-        std::optional<SettingValue> GetValue(std::string_view a_mod, std::string_view a_key) const;
-        const ModSchema* GetSchema(std::string_view a_mod) const;
-        const SettingDefinition* GetSetting(std::string_view a_mod, std::string_view a_key) const;
-        std::optional<SettingType> GetSettingType(std::string_view  a_mod, std::string_view a_key) const;
+        void LoadAll(const std::filesystem::path& schemaDir);
+        std::optional<SettingValue> GetValue(std::string_view mod, std::string_view key) const;
 
-        bool Set(std::string_view a_mod, std::string_view a_key, const SettingValue& a_value);
+        // Borrowed views for startup logging; valid until the next LoadAll.
+        const std::vector<ModSettings>& Mods() const { return m_mods; }
+        const std::vector<SettingsLoadError>& LoadErrors() const { return m_loadErrors; }
+
     private:
-        struct StoredMod
-        {
-            ModSchema schema;
-            SettingValues values;
-            std::filesystem::path valuesPath;
-            bool dirty{};
-        };
-
-        void AddSchema(ModSchema schema);
-        StoredMod* FindMod(std::string_view id);
-        const StoredMod* FindMod(std::string_view id) const;
-
-        std::vector<StoredMod> m_mods;
+        std::vector<ModSettings> m_mods;
         std::vector<SettingsLoadError> m_loadErrors;
-        std::filesystem::path m_valuesDir;
     };
 }

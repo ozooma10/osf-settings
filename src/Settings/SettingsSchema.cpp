@@ -9,7 +9,7 @@ namespace OSFSettings
         {
             for(const auto& setting : group.settings)
             {
-                if(setting.type != SettingType::Note && setting.key == key) {
+                if (setting.key == key) {
                     return &setting;
                 }
             }

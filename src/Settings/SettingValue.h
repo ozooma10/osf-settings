@@ -2,10 +2,10 @@
 
 #include <map>
 #include <string>
-#include <variant>
 
 namespace OSFSettings
 {
-    using SettingValue = std::variant<bool, std::int64_t, double, std::string>;
+    // A setting has exactly one supported value type in this milestone.
+    using SettingValue = bool;
     using SettingValues = std::map<std::string, SettingValue, std::less<>>;
 }
