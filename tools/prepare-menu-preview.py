@@ -140,13 +140,13 @@ def prepare(archive_path, output, schema_paths, large):
     rows = ET.SubElement(config, "rows")
     for path in schema_paths:
         schema = json.loads(path.read_text(encoding="utf-8-sig"))
-        ET.SubElement(rows, "row", header="true", title=schema["title"])
         for group in schema["groups"]:
-            ET.SubElement(rows, "row", header="true", title=group["label"])
             for setting in group["settings"]:
                 if setting["type"] != "bool" or not isinstance(setting["default"], bool):
                     raise ValueError(f"Preview supports boolean settings only: {path}")
-                ET.SubElement(rows, "row", header="false", mod=schema["id"], key=setting["key"],
+                ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
+                              modDescription=schema.get("description", ""),
+                              group=group["id"], groupTitle=group["label"], key=setting["key"],
                               title=setting["label"], hint=setting.get("hint", ""),
                               value=str(setting["default"]).lower())
     ET.indent(config)

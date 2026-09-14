@@ -43,6 +43,10 @@ package
             loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, failed);
             stage.addEventListener(KeyboardEvent.KEY_DOWN, key, true, 100);
             stage.addEventListener(KeyboardEvent.KEY_UP, key, true, 100);
+            // With no focused child (including a startup failure), Stage is the
+            // event target and Flash does not invoke its capture listeners.
+            stage.addEventListener(KeyboardEvent.KEY_DOWN, key, false, 100);
+            stage.addEventListener(KeyboardEvent.KEY_UP, key, false, 100);
             caption.defaultTextFormat = new TextFormat("_sans", 18, 0x9EA9B0);
             caption.x = 160; caption.y = 1045; caption.width = 1600; caption.height = 30;
             caption.text = "RUFFLE PREVIEW    |    E / Enter: toggle    |    Tab / Esc: back    |    F5: reset    |    Values stay in memory";
@@ -69,7 +73,8 @@ package
             for each (var library:XML in config.libraries.library) libraries.push(String(library.@url));
             for each (var font:XML in config.fonts.font) fontNames.push(String(font.@name));
             for each (var row:XML in config.rows.row) {
-                rows.push({header:String(row.@header) == "true", title:String(row.@title),
+                rows.push({modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
+                    group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
                     value:String(row.@value) == "true", defaultValue:String(row.@value) == "true"});
             }
@@ -100,7 +105,8 @@ package
             controls.data.uiController = 0;
             controls.data.vMappedEvents = [
                 {strUserEventName:"Accept", strButtonName:"E", aButtonName:["E"], sContextName:"BasicMenuNav"},
-                {strUserEventName:"Cancel", strButtonName:"Tab", aButtonName:["Tab"], sContextName:"BasicMenuNav"}
+                {strUserEventName:"Cancel", strButtonName:"Tab", aButtonName:["Tab"], sContextName:"BasicMenuNav"},
+                {strUserEventName:"YButton", strButtonName:"B", aButtonName:["B"], sContextName:"BasicMenuNav"}
             ];
             controls.SetReady(true);
             var loader:Loader = new Loader(); loaders.push(loader);
@@ -119,6 +125,7 @@ package
             menu.onCodeObjCreate();
             setChildIndex(message, numChildren - 1);
             setChildIndex(caption, numChildren - 1);
+            if (loaderInfo.parameters.verify == "true") new PreviewChecks(menu as MovieClip);
         }
 
         private function getRows():Array
@@ -137,7 +144,7 @@ package
         private function setBool(mod:String, key:String, value:Boolean):Object
         {
             for each (var row:Object in rows) {
-                if (!row.header && row.mod == mod && row.key == key) {
+                if (row.mod == mod && row.key == key) {
                     row.value = value; trace("[preview] " + mod + "/" + key + " = " + value);
                     return {ok:true, error:""};
                 }
@@ -166,7 +173,7 @@ package
             }
             var name:String = event.keyCode == Keyboard.ENTER || event.keyCode == Keyboard.E ? "Accept" :
                 event.keyCode == Keyboard.TAB || event.keyCode == Keyboard.ESCAPE ? "Cancel" : "";
-            if (name && menu) {
+            if (name && menu && !(stage.focus is TextField && TextField(stage.focus).type == "input")) {
                 event.stopImmediatePropagation(); event.preventDefault();
                 menu.ProcessUserEvent(name, event.type == KeyboardEvent.KEY_DOWN);
             }

@@ -4,6 +4,7 @@ param(
     [string]$InterfaceArchive = 'C:/Program Files (x86)/Steam/steamapps/common/Starfield/Data/Starfield - Interface.ba2',
     [switch]$LargeText,
     [switch]$Scrolling,
+    [switch]$Design,
     [switch]$BuildOnly,
     [switch]$Watch,
     [ValidateRange(640, 7680)][int]$Width = 1280,
@@ -17,6 +18,7 @@ $flex = Join-Path $repo 'external/flex'
 $compiler = Join-Path $flex 'bin/mxmlc.bat'
 $player = Join-Path $flex 'frameworks/libs/player/10.3/playerglobal.swc'
 $schemas = @((Join-Path $repo 'data/SFSE/Plugins/OSF/Settings/schemas/learning.json'))
+if ($Design) { $schemas = @((Join-Path $repo 'tests/menu/design.json')) }
 if ($Scrolling) { $schemas += Join-Path $repo 'tests/menu/scrolling.json' }
 if ($Watch -and $BuildOnly) { throw 'Use either -Watch or -BuildOnly.' }
 if (-not (Test-Path -LiteralPath $InterfaceArchive)) { throw "Interface archive missing: $InterfaceArchive. Supply -InterfaceArchive with your installation's path." }

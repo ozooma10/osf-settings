@@ -18,14 +18,11 @@ add_rules("plugin.compile_commands.autoupdate", { outputdir = ".", lsp = "cpptoo
 -- define targets
 target("OSF Settings Slim")
     set_basename("OSFSettingsSlim")
-    -- Learning builds stay local. Deployment requires an explicit xmake install.
-    set_values("commonlib.plugin.install", false)
-    add_rules("commonlibsf.plugin", {
-        name = "OSF Settings Slim",
-        author = "ozooma10",
-        description = "Mod Settings",
-        email = "ozooma10@protonmail.com"
-    })
+    -- This pinned CommonLibSF's plugin rule auto-installs unconditionally.
+    -- Use a shared target so building remains separate from explicit deployment.
+    set_kind("shared")
+    add_deps("commonlibsf")
+    set_installdir(path.join(os.projectdir(), "build", "stage"))
 
     -- add src files
     add_files("src/**.cpp")
@@ -33,7 +30,23 @@ target("OSF Settings Slim")
     add_includedirs("src")
     add_packages("nlohmann_json")
     set_pcxxheader("src/pch.h")
-    add_installfiles("data/(SFSE/Plugins/OSF/Settings/schemas/*.json)")
+    before_build(function(target)
+        os.execv("pwsh", { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-scaleform.ps1") })
+    end)
+    on_install(function(target)
+        local install = target:installdir()
+        local plugins = path.join(install, "SFSE", "Plugins")
+        local interface = path.join(install, "Interface")
+        os.mkdir(plugins)
+        os.mkdir(interface)
+        os.cp(target:targetfile(), path.join(plugins, "OSFSettingsSlim.dll"))
+        if os.isfile(target:symbolfile()) then os.cp(target:symbolfile(), plugins) end
+        os.cp(path.join(os.projectdir(), "data", "SFSE", "Plugins", "OSF"), plugins)
+        for _, suffix in ipairs({ "", "_LRG" }) do
+            local movie = "OSFSettingsMenu" .. suffix .. ".swf"
+            os.cp(path.join(os.projectdir(), "build", "scaleform", movie), path.join(interface, movie))
+        end
+    end)
 
 target("osfsettings-slim-tests")
     set_kind("binary")

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "design-preview",
+  "title": "OSF Director",
+  "description": "A development fixture for the refined menu layout. These settings only change the preview.",
+  "groups": [
+    {
+      "id": "playback",
+      "label": "Playback",
+      "settings": [
+        { "key": "autoAdvance", "type": "bool", "label": "Auto-advance stages", "hint": "Automatically move to the next stage when its duration ends. Turn this off to advance stages manually.", "default": true },
+        { "key": "loopFinal", "type": "bool", "label": "Loop final stage", "hint": "Keep the final stage playing until you choose to end the scene.", "default": false },
+        { "key": "notifications", "type": "bool", "label": "Scene notifications", "hint": "Show a brief notification when a scene starts or finishes.", "default": true },
+        { "key": "lockMovement", "type": "bool", "label": "Lock movement", "hint": "Keep the player in place while the scene is running.", "default": true },
+        { "key": "smoothTransitions", "type": "bool", "label": "Smooth transitions", "hint": "Blend between stages for a more natural transition.", "default": true },
+        { "key": "restoreView", "type": "bool", "label": "Restore view after playback", "hint": "Return to your previous camera view when the scene ends.", "default": true }
+      ]
+    },
+    {
+      "id": "camera",
+      "label": "Camera",
+      "settings": [
+        { "key": "freeCamera", "type": "bool", "label": "Free camera", "hint": "Move the camera independently during playback.", "default": false },
+        { "key": "hideHUD", "type": "bool", "label": "Hide HUD during scenes", "hint": "Keep the scene clear of interface elements.", "default": true }
+      ]
+    },
+    {
+      "id": "controls",
+      "label": "Controls",
+      "settings": [
+        { "key": "hotkeys", "type": "bool", "label": "Enable playback shortcuts", "hint": "Use keyboard shortcuts to advance or end playback.", "default": true }
+      ]
+    },
+    {
+      "id": "advanced",
+      "label": "Advanced",
+      "settings": [
+        { "key": "debug", "type": "bool", "label": "Diagnostic logging", "hint": "Include additional details in the log while troubleshooting a scene.", "default": false }
+      ]
+    }
+  ]
+}

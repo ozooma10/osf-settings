@@ -70,24 +70,17 @@ namespace OSFSettings
         case Function::GetRows:
             root->CreateArray(params.ret);
             for (const auto& mod : runtime.Settings().Mods()) {
-                RE::Scaleform::GFx::Value heading;
-                root->CreateObject(&heading);
-                heading.SetMember("header", RE::Scaleform::GFx::Value(true));
-                Text(heading, "title", mod.schema.title);
-                params.ret->PushBack(heading);
                 for (const auto& group : mod.schema.groups) {
-                    RE::Scaleform::GFx::Value groupHeading;
-                    root->CreateObject(&groupHeading);
-                    groupHeading.SetMember("header", RE::Scaleform::GFx::Value(true));
-                    Text(groupHeading, "title", group.label);
-                    params.ret->PushBack(groupHeading);
                     for (const auto& setting : group.settings) {
                         const auto value = mod.values.find(setting.key);
                         if (value == mod.values.end()) continue;
                         RE::Scaleform::GFx::Value row;
                         root->CreateObject(&row);
-                        row.SetMember("header", RE::Scaleform::GFx::Value(false));
                         Text(row, "mod", mod.schema.id);
+                        Text(row, "modTitle", mod.schema.title);
+                        Text(row, "modDescription", mod.schema.description);
+                        Text(row, "group", group.id);
+                        Text(row, "groupTitle", group.label);
                         Text(row, "key", setting.key);
                         Text(row, "title", setting.label);
                         Text(row, "hint", setting.hint);
