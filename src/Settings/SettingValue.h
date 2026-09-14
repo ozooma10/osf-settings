@@ -1,0 +1,11 @@
+#pragma once
+
+#include <map>
+#include <string>
+#include <variant>
+
+namespace OSFSettings
+{
+    using SettingValue = std::variant<bool, std::int64_t, double, std::string>;
+    using SettingValues = std::map<std::string, SettingValue, std::less<>>;
+}
