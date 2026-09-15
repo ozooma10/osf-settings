@@ -29,7 +29,9 @@ namespace OSFSettings
             std::size_t settingCount = 0;
             for (const auto& mod : m_settings.Mods()) {
                 for (const auto& [key, value] : mod.values) {
-                    REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, std::get<bool>(value));
+                    std::visit([&](const auto& current) {
+                        REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current);
+                    }, value);
                     ++settingCount;
                 }
             }

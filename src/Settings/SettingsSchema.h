@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <filesystem>
@@ -9,16 +10,29 @@
 
 namespace OSFSettings
 {
-    enum class SettingType { Bool };
+    struct BoolDefinition
+    {
+        bool defaultValue{};
+    };
+
+    struct IntDefinition
+    {
+        std::int64_t defaultValue{};
+        std::optional<std::int64_t> minimum;
+        std::optional<std::int64_t> maximum;
+    };
 
     struct SettingDefinition
     {
         std::string key;
-        SettingType type{ SettingType::Bool };
-        SettingValue defaultValue{ false };
         std::string label;
         std::string hint;
+        std::variant<BoolDefinition, IntDefinition> definition;
+
+        SettingValue DefaultValue() const;
     };
+
+    bool IsValidValue(const SettingDefinition& setting, const SettingValue& value);
 
     struct SettingsGroup
     {

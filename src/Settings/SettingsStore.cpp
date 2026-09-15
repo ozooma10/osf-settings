@@ -54,10 +54,10 @@ namespace OSFSettings
                 mod.schema = std::move(*schema);
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& setting : group.settings) {
-                        mod.values.emplace(setting.key, setting.defaultValue);
+                        mod.values.emplace(setting.key, setting.DefaultValue());
                     }
                 }
-                SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.values, m_loadErrors);
+                SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
                 m_mods.push_back(std::move(mod));
             } catch (const std::exception& exception) {
                 m_loadErrors.push_back({ path, exception.what() });
@@ -82,9 +82,17 @@ namespace OSFSettings
             for (auto& stored : m_mods) {
                 if (stored.schema.id != mod) continue;
                 const auto current = stored.values.find(key);
-                if (current == stored.values.end()) return { false, "unknown setting key" };
-                if (current->second == value) return { true, {} };
-
+                const auto* setting = stored.schema.FindSetting(key);
+                if (current == stored.values.end() || !setting) {
+                    return { false, "unknown setting key" };
+                }
+                if (!IsValidValue(*setting, value)) {
+                    return { false, "value has the wrong type or is outside its bounds" };
+                }
+                if (current->second == value) {
+                    return { true, {} };
+                }
+                
                 // Propose the edit in a copy. The live value changes only after saving.
                 auto proposed = stored.values;
                 proposed.find(key)->second = value;

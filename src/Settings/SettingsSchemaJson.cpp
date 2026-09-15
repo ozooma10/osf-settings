@@ -24,6 +24,16 @@ namespace OSFSettings::SettingsJson
             return value;
         }
 
+        std::optional<std::int64_t> ReadInteger(const nlohmann::json& object, const char* key)
+        {
+            const auto field = object.find(key);
+            if (field == object.end()) return std::nullopt;
+            const auto value = DecodeValue(*field);
+            const auto* integer = value ? std::get_if<std::int64_t>(&*value) : nullptr;
+            Require(integer != nullptr, std::string(key) + " must be a signed 64-bit integer");
+            return *integer;
+        }
+
         std::string OptionalText(const nlohmann::json& object, const char* key, const std::string& fallback = {})
         {
             const auto field = object.find(key);
@@ -67,11 +77,21 @@ namespace OSFSettings::SettingsJson
                     SettingDefinition setting;
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
-                    Require(RequiredText(sourceSetting, "type") == "bool", "only type bool is supported: " + setting.key);
-                    setting.type = SettingType::Bool;
+                    const auto type = RequiredText(sourceSetting, "type");
+                    Require(type == "bool" || type == "int", "only types bool and int are supported: " + setting.key);
+                    if (type == "int") {
+                        IntDefinition definition;
+                        definition.minimum = ReadInteger(sourceSetting, "min");
+                        definition.maximum = ReadInteger(sourceSetting, "max");
+                        Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
+                        setting.definition = definition;
+                    }
                     const auto value = sourceSetting.find("default");
-                    Require(value != sourceSetting.end() && value->is_boolean(), "default must be a boolean: " + setting.key);
-                    setting.defaultValue = value->get<bool>();
+                    const auto decoded = value != sourceSetting.end() ? DecodeValue(*value) : std::nullopt;
+                    Require(decoded && IsValidValue(setting, *decoded), (type == "bool" ? "default must be a boolean: " : "default must be an integer within its bounds: ") + setting.key);
+                    std::visit([&](auto& definition) {
+                        definition.defaultValue = std::get<decltype(definition.defaultValue)>(*decoded);
+                    }, setting.definition);
                     setting.label = OptionalText(sourceSetting, "label", setting.key);
                     setting.hint = OptionalText(sourceSetting, "hint");
                     group.settings.push_back(std::move(setting));

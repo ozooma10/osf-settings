@@ -72,6 +72,8 @@ namespace OSFSettings
             for (const auto& mod : runtime.Settings().Mods()) {
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& setting : group.settings) {
+                        const auto* definition = std::get_if<BoolDefinition>(&setting.definition);
+                        if (!definition) continue;
                         const auto value = mod.values.find(setting.key);
                         if (value == mod.values.end()) continue;
                         RE::Scaleform::GFx::Value row;
@@ -85,7 +87,7 @@ namespace OSFSettings
                         Text(row, "title", setting.label);
                         Text(row, "hint", setting.hint);
                         row.SetMember("value", RE::Scaleform::GFx::Value(std::get<bool>(value->second)));
-                        row.SetMember("defaultValue", RE::Scaleform::GFx::Value(std::get<bool>(setting.defaultValue)));
+                        row.SetMember("defaultValue", RE::Scaleform::GFx::Value(definition->defaultValue));
                         params.ret->PushBack(row);
                     }
                 }

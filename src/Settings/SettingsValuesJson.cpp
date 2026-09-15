@@ -18,7 +18,7 @@
 
 namespace OSFSettings::SettingsJson
 {
-    void LoadValues(const std::filesystem::path& path, SettingValues& values, std::vector<SettingsLoadError>& errors)
+    void LoadValues(const std::filesystem::path& path, const ModSchema& schema, SettingValues& values, std::vector<SettingsLoadError>& errors)
     {
         try {
             // No saved file is normal on the first launch. Keep the defaults.
@@ -40,12 +40,16 @@ namespace OSFSettings::SettingsJson
 
             for (const auto& [key, value] : saved->items()) {
                 const auto current = values.find(key);
-                if (current == values.end()) continue; // Removed or unknown settings are ignored.
-                if (!value.is_boolean()) {
-                    errors.push_back({ path, "saved value must be a boolean: " + key });
+                const auto* setting = schema.FindSetting(key);
+                if (current == values.end() || !setting) {
+                    continue; // Removed or unknown settings are ignored.
+                }
+                const auto decoded = DecodeValue(value);
+                if (!decoded || !IsValidValue(*setting, *decoded)) {
+                    errors.push_back({ path, "saved value has the wrong type or is outside its bounds: " + key });
                     continue;
                 }
-                current->second = value.get<bool>();
+                current->second = *decoded;
             }
         } catch (const std::exception& error) {
             errors.push_back({ path, error.what() });
@@ -62,7 +66,7 @@ namespace OSFSettings::SettingsJson
         try {
             auto saved = nlohmann::json::object();
             for (const auto& [key, value] : values) {
-                saved[key] = std::get<bool>(value);
+                std::visit([&](const auto& current) { saved[key] = current; }, value);
             }
             const nlohmann::json document = { { "formatVersion", 1 }, { "values", saved } };
             const auto text = document.dump(2) + '\n';

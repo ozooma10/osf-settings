@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
 
@@ -66,14 +67,15 @@ namespace
         if (!schema) return;
         Check(schema->id == "learning" && schema->groups.size() == 1, "mod and group are loaded");
         const auto* setting = schema->FindSetting("notifications");
-        Check(setting && setting->type == OSFSettings::SettingType::Bool && std::get<bool>(setting->defaultValue) &&
-            setting->label == "Enable notifications", "boolean type, default, and label are loaded");
+        const auto* boolean = setting ? std::get_if<OSFSettings::BoolDefinition>(&setting->definition) : nullptr;
+        Check(boolean && boolean->defaultValue && setting->label == "Enable notifications",
+            "boolean definition, default, and label are loaded");
         Check(schema->FindSetting("unknown") == nullptr, "unknown definition is absent");
 
         auto document = example;
         document["groups"][0]["settings"][0]["default"] = false;
         auto parsed = OSFSettings::SettingsJson::ParseSchema(document, error);
-        Check(parsed && !std::get<bool>(parsed->groups[0].settings[0].defaultValue), "false is a valid default");
+        Check(parsed && !std::get<OSFSettings::BoolDefinition>(parsed->groups[0].settings[0].definition).defaultValue, "false is a valid default");
 
         document = example;
         document.erase("title");
@@ -105,10 +107,10 @@ namespace
         document["groups"][0]["settings"] = Json::object();
         Reject(document, "settings must be an array");
 
-        for (const auto* type : { "int", "float", "enum", "string", "key", "flags", "action", "note" }) {
+        for (const auto* type : { "float", "enum", "string", "key", "flags", "action", "note" }) {
             document = example;
             document["groups"][0]["settings"][0]["type"] = type;
-            Reject(document, "only type bool");
+            Reject(document, "only types bool and int");
         }
         for (const auto& value : { Json("true"), Json(1), Json(nullptr) }) {
             document = example;
@@ -128,6 +130,133 @@ namespace
         Reject(document, "duplicate group id");
         document["groups"][1]["id"] = "second";
         Reject(document, "duplicate setting key");
+    }
+
+    void TestIntegers(const Json& example)
+    {
+        auto schema = example;
+        schema["groups"][0]["settings"].push_back({ { "key", "notificationLimit" }, { "type", "int" },
+            { "label", "Notification limit" }, { "default", 3 }, { "min", 1 }, { "max", 10 } });
+        schema["groups"][0]["settings"].push_back({ { "key", "counter" }, { "type", "int" }, { "default", 0 } });
+        std::string error;
+        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
+        Check(parsed.has_value() && error.empty(), "a schema can mix booleans and integers");
+        if (!parsed) return;
+        const auto* limit = parsed->FindSetting("notificationLimit");
+        const auto* integer = limit ? std::get_if<OSFSettings::IntDefinition>(&limit->definition) : nullptr;
+        Check(integer && integer->defaultValue == 3 && integer->minimum == 1 && integer->maximum == 10,
+            "integer definition, default, and inclusive bounds are loaded");
+
+        const std::vector<Json> invalidDefaults{ true, 3.0, 3.5, "3", nullptr, 0, 11,
+            std::numeric_limits<std::uint64_t>::max() };
+        for (const auto& value : invalidDefaults) {
+            auto document = schema;
+            document["groups"][0]["settings"][1]["default"] = value;
+            Reject(document, "default must be an integer within its bounds");
+        }
+        auto document = schema;
+        document["groups"][0]["settings"][1].erase("default");
+        Reject(document, "default must be an integer within its bounds");
+        document = schema;
+        document["groups"][0]["settings"][1]["min"] = 11;
+        Reject(document, "min must not exceed max");
+        for (const auto* bound : { "min", "max" }) {
+            for (const auto& value : std::vector<Json>{ true, 1.0, "1", nullptr, std::numeric_limits<std::uint64_t>::max() }) {
+                document = schema;
+                document["groups"][0]["settings"][1][bound] = value;
+                Reject(document, std::string(bound) + " must be a signed 64-bit integer");
+            }
+        }
+        const std::int64_t exactValues[]{ std::numeric_limits<std::int64_t>::min(),
+            -9007199254740993LL, 0, 9007199254740993LL, std::numeric_limits<std::int64_t>::max() };
+        for (const auto value : exactValues) {
+            document = schema;
+            auto& setting = document["groups"][0]["settings"][1];
+            setting.erase("min"); setting.erase("max"); setting["default"] = value;
+            const auto unbounded = OSFSettings::SettingsJson::ParseSchema(Json::parse(document.dump()), error);
+            Check(unbounded && unbounded->FindSetting("notificationLimit")->DefaultValue() == SettingValue{ value },
+                "unbounded defaults preserve signed 64-bit integers, including values beyond double precision");
+        }
+        for (const auto* absent : { "min", "max" }) {
+            document = schema;
+            document["groups"][0]["settings"][1].erase(absent);
+            Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "each integer bound is optional");
+        }
+        document = schema;
+        document["groups"][0]["settings"][1]["min"] = 3;
+        document["groups"][0]["settings"][1]["max"] = 3;
+        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "equal bounds allow their one valid integer");
+
+        const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        const auto root = fs::current_path() / "build" / "tests" / "integers" / run;
+        const auto schemas = root / "schemas";
+        const auto values = root / "values";
+        const auto valuesFile = values / "learning.json";
+        const auto temporary = values / "learning.json.tmp";
+        fs::create_directories(schemas);
+        Write(schemas / "learning.json", schema.dump(2));
+        OSFSettings::SettingsStore store;
+        store.LoadAll(schemas, values);
+        Check(store.LoadErrors().empty() && store.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{3} } &&
+            store.GetValue("learning", "counter") == SettingValue{ std::int64_t{0} }, "integer defaults load without a saved file");
+        Check(store.Set("learning", "notificationLimit", std::int64_t{3}).ok && !fs::exists(values),
+            "setting the current integer does not write a file");
+        Check(!store.Set("learning", "notificationLimit", false).ok &&
+            !store.Set("learning", "notifications", std::int64_t{1}).ok && !fs::exists(values),
+            "boolean and integer settings reject each other's value types without writing");
+
+        OSFSettings::SettingsStore restarted;
+        for (const std::int64_t value : { 1, 10, 7 }) {
+            Check(store.Set("learning", "notificationLimit", value).ok, "integer edits accept both bounds and an interior value");
+            restarted.LoadAll(schemas, values);
+            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationLimit") == SettingValue{ value },
+                "accepted integer edits survive reloading");
+        }
+        const auto committed = Read(valuesFile);
+        for (const auto value : { SettingValue{ true }, SettingValue{ std::int64_t{0} }, SettingValue{ std::int64_t{11} } }) {
+            const auto result = store.Set("learning", "notificationLimit", value);
+            Check(!result.ok && !result.error.empty() && Read(valuesFile) == committed &&
+                store.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} },
+                "invalid integer edits preserve both the live value and saved file");
+        }
+        fs::create_directory(temporary);
+        Check(!store.Set("learning", "notificationLimit", std::int64_t{4}).ok && Read(valuesFile) == committed &&
+            store.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} },
+            "a failed integer save preserves both the live value and saved file");
+        fs::remove(temporary); // Only the empty directory created by this test.
+
+        for (const auto value : exactValues) {
+            Check(store.Set("learning", "counter", value).ok, "the native store accepts the full signed 64-bit range");
+            restarted.LoadAll(schemas, values);
+            const auto saved = Json::parse(Read(valuesFile));
+            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "counter") == SettingValue{ value } &&
+                saved["values"]["counter"].is_number_integer() && saved["values"]["counter"].get<std::int64_t>() == value,
+                "JSON saving and loading preserve all integer bits");
+        }
+        Check(store.Set("learning", "notifications", false).ok, "booleans can still be saved in a mixed mod");
+        restarted.LoadAll(schemas, values);
+        Check(restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} } &&
+            restarted.GetValue("learning", "counter") == SettingValue{ std::numeric_limits<std::int64_t>::max() } &&
+            restarted.GetValue("learning", "notifications") == SettingValue{ false }, "saving a boolean preserves neighboring integers");
+        Check(store.Set("learning", "notificationLimit", limit->DefaultValue()).ok, "an integer can reset through the normal save path");
+        restarted.LoadAll(schemas, values);
+        Check(restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{3} }, "the reset integer survives reload");
+
+        for (const auto& value : invalidDefaults) {
+            const Json saved = { { "formatVersion", 1 }, { "values", { { "notificationLimit", value }, { "notifications", false } } } };
+            Write(valuesFile, saved.dump());
+            restarted.LoadAll(schemas, values);
+            Check(restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{3} } &&
+                restarted.GetValue("learning", "notifications") == SettingValue{ false } &&
+                restarted.LoadErrors().size() == 1 && restarted.LoadErrors()[0].file == valuesFile &&
+                restarted.LoadErrors()[0].message.find("notificationLimit") != std::string::npos && Read(valuesFile) == saved.dump(),
+                "invalid saved integers retain defaults, report their key, and preserve valid neighbors and the file");
+        }
+        Write(valuesFile, Json{ { "formatVersion", 1 }, { "values", { { "notifications", false } } } }.dump());
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{3} },
+            "an integer missing from saved values retains its default");
+        std::cout << "Integer probe: default=3, bounds=1..10, exact signed 64-bit save/reload verified\n";
     }
 
     void TestStore(const Json& example, const fs::path& examplePath)
@@ -225,7 +354,7 @@ namespace
         Check(!fs::exists(temporary), "successful replacement leaves no temporary file");
         Check(store.GetValue("other", "notifications") == SettingValue{ true } && !fs::exists(values / "other.json"),
             "saving one mod does not change another mod");
-        Check(Read(schemas / "learning.json") == originalSchema && std::get<bool>(store.Mods()[0].schema.FindSetting("notifications")->defaultValue),
+        Check(Read(schemas / "learning.json") == originalSchema && std::get<bool>(store.Mods()[0].schema.FindSetting("notifications")->DefaultValue()),
             "saving changes neither the authored schema nor its in-memory default");
 
         OSFSettings::SettingsStore restarted;
@@ -336,6 +465,7 @@ int main(int argc, char** argv)
         TestSchema(example);
         TestStore(example, examplePath);
         TestPersistence(example);
+        TestIntegers(example);
         std::cout << checks - failures << '/' << checks << " checks passed\n";
         return failures == 0 ? 0 : 1;
     } catch (const std::exception& error) {
