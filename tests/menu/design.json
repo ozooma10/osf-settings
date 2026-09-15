@@ -28,7 +28,9 @@
       "id": "controls",
       "label": "Controls",
       "settings": [
-        { "key": "hotkeys", "type": "bool", "label": "Enable playback shortcuts", "hint": "Use keyboard shortcuts to advance or end playback.", "default": true }
+        { "key": "hotkeys", "type": "bool", "label": "Enable playback shortcuts", "hint": "Use keyboard shortcuts to advance or end playback.", "default": true },
+        { "key": "toggleKey", "type": "key", "label": "Toggle playback key", "hint": "Choose one keyboard key to toggle playback. This preview does not dispatch hotkeys.", "default": "F4", "allowUnbound": true },
+        { "key": "advanceKey", "type": "key", "label": "Advance stage key", "hint": "A required binding; this setting cannot be cleared.", "default": 13 }
       ]
     },
     {

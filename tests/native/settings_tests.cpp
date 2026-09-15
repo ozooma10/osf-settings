@@ -21,6 +21,7 @@
 #endif
 
 int TestSettingsService();
+int TestKeySettings();
 
 namespace
 {
@@ -88,6 +89,8 @@ namespace
             Status ResetMod(const char*) noexcept override { return Status::NotReady; }
             Status Subscribe(const char*, ChangedFn, void*, Subscription*) noexcept override { return Status::NotReady; }
             Status Unsubscribe(Subscription) noexcept override { return Status::NotReady; }
+            Status GetKey(const char*, const char*, std::uint32_t*) noexcept override { return Status::NotReady; }
+            Status SetKey(const char*, const char*, std::uint32_t) noexcept override { return Status::NotReady; }
         } provider;
 
         Client client;
@@ -219,10 +222,10 @@ namespace
         document["groups"][0]["settings"] = Json::object();
         Reject(document, "settings must be an array");
 
-        for (const auto* type : { "string", "key", "flags", "action", "note" }) {
+        for (const auto* type : { "string", "flags", "action", "note" }) {
             document = example;
             document["groups"][0]["settings"][0]["type"] = type;
-            Reject(document, "only types bool, int, float, and enum");
+            Reject(document, "only types bool, int, float, enum, and key");
         }
         for (const auto& value : { Json("true"), Json(1), Json(nullptr) }) {
             document = example;
@@ -577,7 +580,9 @@ namespace
     void TestEnums(const Json& example)
     {
         auto schema = example;
-        const auto modeIndex = schema["groups"][0]["settings"].size() - 1;
+        const auto& settings = schema["groups"][0]["settings"];
+        const auto modeEntry = std::ranges::find_if(settings, [](const Json& setting) { return setting["key"] == "notificationMode"; });
+        const auto modeIndex = static_cast<std::size_t>(std::distance(settings.begin(), modeEntry));
         std::string error;
         const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
         Check(parsed.has_value() && error.empty(), "a schema can mix enums with booleans, integers, and floats");
@@ -936,6 +941,7 @@ int main(int argc, char** argv)
         const auto example = nlohmann::json::parse(input);
         TestSDK();
         checks += TestSettingsService();
+        checks += TestKeySettings();
         TestSchema(example);
         TestStore(example, examplePath);
         TestPersistence(example);

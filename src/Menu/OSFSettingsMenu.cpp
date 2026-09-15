@@ -1,5 +1,7 @@
 #include "OSFSettingsMenu.h"
 #include "FloatSlider.h"
+#include "Input/KeyNames.h"
+#include <cmath>
 #include "Core/Runtime.h"
 #include <charconv>
 #include "RE/U/UI.h"
@@ -9,7 +11,8 @@ namespace OSFSettings
 {
     namespace
     {
-        enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed };
+        enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
+            SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -51,6 +54,11 @@ namespace OSFSettings
         RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
         RegisterNativeFunction("setFloat", static_cast<std::uint64_t>(Function::SetFloat));
         RegisterNativeFunction("setEnum", static_cast<std::uint64_t>(Function::SetEnum));
+        RegisterNativeFunction("setKey", static_cast<std::uint64_t>(Function::SetKey));
+        RegisterNativeFunction("beginKeyCapture", static_cast<std::uint64_t>(Function::BeginKeyCapture));
+        RegisterNativeFunction("pollKeyCapture", static_cast<std::uint64_t>(Function::PollKeyCapture));
+        RegisterNativeFunction("commitKeyCapture", static_cast<std::uint64_t>(Function::CommitKeyCapture));
+        RegisterNativeFunction("cancelKeyCapture", static_cast<std::uint64_t>(Function::CancelKeyCapture));
         RegisterNativeFunction("close", static_cast<std::uint64_t>(Function::Close));
         RegisterNativeFunction("startup", static_cast<std::uint64_t>(Function::Startup));
         RegisterNativeFunction("startupFailed", static_cast<std::uint64_t>(Function::StartupFailed));
@@ -78,6 +86,51 @@ namespace OSFSettings
             break;
         case Function::StartupFailed:
             OnStartupFailed(ArgString(params, 0));
+            break;
+        case Function::BeginKeyCapture: {
+            const auto mod = ArgString(params, 0);
+            const auto key = ArgString(params, 1);
+            const auto value = SettingsService::Get().GetValue(mod, key);
+            const bool ok = m_capture.GetSnapshot().state == KeyCapture::State::Idle && value && std::holds_alternative<KeyBinding>(*value);
+            if (ok) {
+                m_captureMod = mod;
+                m_captureKey = key;
+                m_capture.BeginCapture();
+            }
+            root->CreateObject(params.ret);
+            params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
+            break;
+        }
+        case Function::PollKeyCapture: {
+            const auto snapshot = m_capture.GetSnapshot();
+            const char* state = "idle";
+            switch (snapshot.state) {
+            case KeyCapture::State::WaitingForKey: state = "waiting"; break;
+            case KeyCapture::State::KeySelected: state = "candidate"; break;
+            case KeyCapture::State::ConfirmationRequested: state = "confirmed"; break;
+            case KeyCapture::State::Cancelled: state = "cancelled"; break;
+            default: break;
+            }
+            root->CreateObject(params.ret);
+            Text(*params.ret, "state", state);
+            Text(*params.ret, "name", KeyName(snapshot.selectedKeyCode));
+            params.ret->SetMember("keyCode", RE::Scaleform::GFx::Value(static_cast<double>(snapshot.selectedKeyCode)));
+            params.ret->SetMember("released", RE::Scaleform::GFx::Value(snapshot.selectedKeyReleased));
+            break;
+        }
+        case Function::CommitKeyCapture: {
+            const auto snapshot = m_capture.GetSnapshot();
+            const bool canSaveBinding = snapshot.selectedKeyReleased && (snapshot.state == KeyCapture::State::KeySelected || snapshot.state == KeyCapture::State::ConfirmationRequested);
+            const bool ok = canSaveBinding && runtime.SetValue(m_captureMod, m_captureKey, KeyBinding{ snapshot.selectedKeyCode }) == SettingsError::None;
+            if (ok) m_capture.EndCapture();
+            else m_capture.RetryConfirmation();
+            root->CreateObject(params.ret);
+            params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
+            Text(*params.ret, "error", ok ? "" : "Could not save this setting. Your previous value is unchanged.");
+            break;
+        }
+        case Function::CancelKeyCapture:
+            m_capture.EndCapture();
             break;
         case Function::GetRows:
             root->CreateArray(params.ret);
@@ -128,6 +181,15 @@ namespace OSFSettings
                                 row.SetMember("sliderScale", RE::Scaleform::GFx::Value(static_cast<double>(slider->scale)));
                                 row.SetMember("sliderSteps", RE::Scaleform::GFx::Value(static_cast<double>(slider->steps)));
                             }
+                        } else if (const auto* binding = std::get_if<KeyDefinition>(&setting.definition)) {
+                            Text(row, "type", "key");
+                            const auto keyCode = std::get<KeyBinding>(value->second).keyCode;
+                            row.SetMember("value", RE::Scaleform::GFx::Value(static_cast<double>(keyCode)));
+                            row.SetMember("defaultValue", RE::Scaleform::GFx::Value(static_cast<double>(binding->defaultValue.keyCode)));
+                            Text(row, "valueName", KeyName(keyCode));
+                            Text(row, "defaultName", KeyName(binding->defaultValue.keyCode));
+                            row.SetMember("editable", RE::Scaleform::GFx::Value(true));
+                            row.SetMember("allowUnbound", RE::Scaleform::GFx::Value(binding->allowUnbound));
                         } else if (const auto* enumeration = std::get_if<EnumDefinition>(&setting.definition)) {
                             Text(row, "type", "enum");
                             Text(row, "value", std::get<std::string>(value->second));
@@ -152,7 +214,8 @@ namespace OSFSettings
         case Function::SetBool:
         case Function::SetInt:
         case Function::SetFloat:
-        case Function::SetEnum: {
+        case Function::SetEnum:
+        case Function::SetKey: {
             auto result = SettingsError::InvalidArgument;
             if (params.argCount == 3 && params.args[0].IsString() && params.args[1].IsString()) {
                 if (function == Function::SetBool && params.args[2].IsBoolean()) {
@@ -165,6 +228,11 @@ namespace OSFSettings
                     result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetNumber());
                 } else if (function == Function::SetEnum && params.args[2].IsString()) {
                     result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), ArgString(params, 2));
+                } else if (function == Function::SetKey && params.args[2].IsNumber()) {
+                    const auto code = params.args[2].GetNumber();
+                    if (std::isfinite(code) && code == std::floor(code) && code >= 0 && code <= KeyBinding::Unbound) {
+                        result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), KeyBinding{ static_cast<std::uint32_t>(code) });
+                    }
                 }
             }
             root->CreateObject(params.ret);
@@ -175,6 +243,27 @@ namespace OSFSettings
             break;
         }
         }
+    }
+
+    bool OSFSettingsMenu::ShouldHandleEvent(const RE::InputEvent* event)
+    {
+        if (event && event->deviceType == RE::InputEvent::DeviceType::kKeyboard && event->eventType == RE::InputEvent::EventType::kButton &&
+            m_capture.ShouldConsumeKey(static_cast<std::uint32_t>(static_cast<const RE::ButtonEvent*>(event)->idCode))) return true;
+        return RE::GameMenuBase::ShouldHandleEvent(event);
+    }
+
+    // Keyboard idCode is a Win32 virtual-key code, passed through without scan-code conversion.
+    void OSFSettingsMenu::OnButtonEvent(const RE::ButtonEvent* event)
+    {
+        if (event && event->deviceType == RE::InputEvent::DeviceType::kKeyboard &&
+            m_capture.HandleKeyEvent(static_cast<std::uint32_t>(event->idCode), event->value > 0, event->heldDownSecs > 0)) return;
+        RE::GameMenuBase::OnButtonEvent(event);
+    }
+
+    void OSFSettingsMenu::OnRemovedFromMenuStack()
+    {
+        m_capture.ResetForMenuClose();
+        RE::GameMenuBase::OnRemovedFromMenuStack();
     }
 
     RE::Scaleform::Ptr<RE::IMenu> OSFSettingsMenu::Create()
@@ -204,6 +293,7 @@ namespace OSFSettings
 
     void OSFSettingsMenu::Close() 
     { 
+        m_capture.EndCapture();
         if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
             queue->AddMessage(RE::BSFixedString(MENU_NAME.data()), RE::UI_MESSAGE_TYPE::kHide); 
         }

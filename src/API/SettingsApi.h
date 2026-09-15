@@ -17,10 +17,12 @@ namespace OSFSettings::API
         Status GetInt(const char* mod, const char* key, std::int64_t* out) noexcept override;
         Status GetFloat(const char* mod, const char* key, double* out) noexcept override;
         Status GetEnum(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override;
+        Status GetKey(const char* mod, const char* key, std::uint32_t* out) noexcept override;
         Status SetBool(const char* mod, const char* key, bool value) noexcept override;
         Status SetInt(const char* mod, const char* key, std::int64_t value) noexcept override;
         Status SetFloat(const char* mod, const char* key, double value) noexcept override;
         Status SetEnum(const char* mod, const char* key, const char* value) noexcept override;
+        Status SetKey(const char* mod, const char* key, std::uint32_t value) noexcept override;
         Status Reset(const char* mod, const char* key) noexcept override;
         Status ResetMod(const char* mod) noexcept override;
         Status Subscribe(const char* mod, ChangedFn callback, void* user, Subscription* out) noexcept override;

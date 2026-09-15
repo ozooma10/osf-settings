@@ -42,12 +42,18 @@ namespace OSFSettings
         std::vector<EnumOption> options;
     };
 
+    struct KeyDefinition
+    {
+        KeyBinding defaultValue;
+        bool allowUnbound{};
+    };
+
     struct SettingDefinition
     {
         std::string key;
         std::string label;
         std::string hint;
-        std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition> definition;
+        std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition, KeyDefinition> definition;
 
         SettingValue DefaultValue() const;
     };

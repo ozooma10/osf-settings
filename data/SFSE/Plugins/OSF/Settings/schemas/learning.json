@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "learning",
   "title": "Learning example",
-  "description": "A boolean, an integer, a float, and an enum, understood end to end.",
+  "description": "A boolean, an integer, a float, an enum, and a keyboard binding, understood end to end.",
   "groups": [
     {
       "id": "general",
@@ -42,6 +42,14 @@
           "default": "normal",
           "options": ["quiet", "normal", "verbose"],
           "optionLabels": ["Quiet", "Normal", "Verbose"]
+        },
+        {
+          "key": "notificationKey",
+          "type": "key",
+          "label": "Notification key",
+          "hint": "Choose a keyboard key or clear the binding. A learning example; no gameplay behavior is connected yet.",
+          "default": "F4",
+          "allowUnbound": true
         }
       ]
     }

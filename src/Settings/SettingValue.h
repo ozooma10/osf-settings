@@ -7,6 +7,13 @@
 
 namespace OSFSettings
 {
-    using SettingValue = std::variant<bool, std::int64_t, double, std::string>;
+    struct KeyBinding
+    {
+        static constexpr std::uint32_t Unbound = 0xFF;
+        std::uint32_t keyCode{ Unbound }; // Starfield keyboard ButtonEvent::idCode (Win32 VK).
+        bool operator==(const KeyBinding&) const = default;
+    };
+
+    using SettingValue = std::variant<bool, std::int64_t, double, std::string, KeyBinding>;
     using SettingValues = std::map<std::string, SettingValue, std::less<>>;
 }

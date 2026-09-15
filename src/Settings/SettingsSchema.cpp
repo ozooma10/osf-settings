@@ -1,4 +1,5 @@
 #include "SettingsSchema.h"
+#include "Input/KeyNames.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +31,10 @@ namespace OSFSettings
         if (const auto* definition = std::get_if<EnumDefinition>(&setting.definition)) {
             const auto* option = std::get_if<std::string>(&value);
             return option && std::ranges::find(definition->options, *option, &EnumOption::value) != definition->options.end();
+        }
+        if (const auto* definition = std::get_if<KeyDefinition>(&setting.definition)) {
+            const auto* key = std::get_if<KeyBinding>(&value);
+            return key && (key->keyCode == KeyBinding::Unbound ? definition->allowUnbound : IsBindableKey(key->keyCode));
         }
         return std::holds_alternative<BoolDefinition>(setting.definition) && std::holds_alternative<bool>(value);
     }

@@ -58,6 +58,14 @@ package
         private var backButton:Object;
         private var buttonData:Object = {};
         private var pageHint:TextField;
+        private var clearButton:Object;
+        private var captureRow:Object;
+        private var capturePanel:Sprite;
+        private var captureTitle:TextField;
+        private var captureValue:TextField;
+        private var captureHint:TextField;
+        private var captureConfirm:Sprite;
+        private var captureReady:Boolean = false;
 
         public function OSFSettingsMenu()
         {
@@ -162,13 +170,36 @@ package
             bar.scaleX = 1.25; bar.scaleY = 1.25;
             acceptButton = button("TOGGLE", "Accept", accept);
             resetButton = button("RESET SETTING", "YButton", reset);
+            clearButton = button("CLEAR BINDING", "XButton", clearBinding);
             backButton = button("ALL MODS", "Cancel", back); bar.RefreshButtons();
+            capturePanel = new Sprite(); capturePanel.visible = false; addChild(capturePanel);
+            capturePanel.graphics.beginFill(MenuStyle.INK);
+            capturePanel.graphics.drawRect(MenuStyle.LEFT, 270, MenuStyle.RIGHT - MenuStyle.LEFT, 630);
+            capturePanel.graphics.endFill();
+            captureTitle = MenuStyle.field("", 260, 355, 1400, 80, CONFIG::largeText ? 42 : 36);
+            captureValue = MenuStyle.field("", 260, 490, 1400, 90, CONFIG::largeText ? 64 : 56, MenuStyle.ACCENT);
+            captureHint = MenuStyle.field("", 260, 640, 1400, 160, CONFIG::largeText ? 32 : 28, MenuStyle.MUTED);
+            captureHint.multiline = true; captureHint.wordWrap = true;
+            capturePanel.addChild(captureTitle); capturePanel.addChild(captureValue); capturePanel.addChild(captureHint);
+            captureConfirm = captureButton("CONFIRM BINDING (ENTER)", 260, 470, function(event:MouseEvent):void { confirmBinding(); });
+            captureButton("CANCEL (ESC)", 770, 300, function(event:MouseEvent):void { finishBinding(true); });
             menuStage.stageFocusRect = false;
             menuStage.addEventListener(Event.RESIZE, resizeBackground); resizeBackground();
+            menuStage.addEventListener(Event.DEACTIVATE, focusLost);
             menuStage.addEventListener(KeyboardEvent.KEY_DOWN, keyDown, true, 50);
             menuStage.addEventListener(KeyboardEvent.KEY_UP, keyUp, true, 50);
             menuStage.addEventListener(MouseEvent.MOUSE_DOWN, mouseFocus, true);
             addEventListener(Event.ENTER_FRAME, advance);
+        }
+        private function captureButton(text:String, x:Number, width:Number, callback:Function):Sprite
+        {
+            var result:Sprite = new Sprite(); result.x = x; result.y = 805;
+            result.graphics.lineStyle(1, MenuStyle.MUTED); result.graphics.beginFill(MenuStyle.ROW);
+            result.graphics.drawRect(0, 0, width, 60); result.graphics.endFill();
+            var field:TextField = MenuStyle.field(text, 16, 12, width - 32, 40, 25, MenuStyle.WHITE, true);
+            result.addChild(field); result.mouseChildren = false; result.buttonMode = true;
+            result.addEventListener(MouseEvent.CLICK, callback); capturePanel.addChild(result);
+            return result;
         }
         private function button(text:String, eventName:String, callback:Function):Object
         {
@@ -265,12 +296,12 @@ package
         }
         private function tabClicked(event:MouseEvent):void
         {
-            if (requestedRefresh || dragging()) return;
+            if (captureRow || requestedRefresh || dragging()) return;
             groupID = event.currentTarget.name; populate(); drawTabs();
         }
         private function changePage(direction:int):void
         {
-            if (!modID || groups.length < 2 || requestedRefresh || dragging()) return;
+            if (captureRow || !modID || groups.length < 2 || requestedRefresh || dragging()) return;
             for (var i:int = 0; i < groups.length; ++i) {
                 if (groups[i].id == groupID) {
                     groupID = groups[(i + direction + groups.length) % groups.length].id;
@@ -287,15 +318,16 @@ package
             detailHint.height = Math.max(64, 630 - detailHint.y);
             detailHint.text = row ? String(row.hint || "") : ""; detailHint.scrollV = 1;
             defaultLabel.text = modID ? "DEFAULT" : "SETTINGS";
-            defaultValue.x = row && row.type == "enum" ? 1434 : 1674;
-            defaultValue.width = row && row.type == "enum" ? 410 : 170;
+            defaultValue.x = row && (row.type == "enum" || row.type == "key") ? 1434 : 1674;
+            defaultValue.width = row && (row.type == "enum" || row.type == "key") ? 410 : 170;
             MenuStyle.fit(defaultValue, row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
-            resetButton.Visible = Boolean(modID && row && row.editable);
-            buttonData.Accept.sButtonText = !modID ? "OPEN" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
-            buttonData.Cancel.sButtonText = modID ? "ALL MODS" : "BACK";
+            resetButton.Visible = Boolean(!captureRow && modID && row && row.editable);
+            clearButton.Visible = Boolean(!captureRow && modID && row && row.type == "key" && row.allowUnbound && Number(row.value) != 255);
+            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : !modID ? "OPEN" : row && row.type == "key" ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
+            buttonData.Cancel.sButtonText = captureRow ? "CANCEL" : modID ? "ALL MODS" : "BACK";
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-            acceptButton.Visible = Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum"))); bar.RefreshButtons();
+            acceptButton.Visible = captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key"))); bar.RefreshButtons();
         }
         private function scrollDescription(event:MouseEvent):void
         {
@@ -306,11 +338,13 @@ package
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
         {
+            if (captureRow) { confirmBinding(); return; }
             if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
             var row:Object = current(); if (!row) return;
             if (!modID) { modID = row.mod; groupID = ""; refresh(false); }
             else if (row.type == "bool") options.OnEntryPressed();
+            else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "enum" && row.editable) {
                 var clip:Object = options.FindClipForEntry(options.selectedIndex);
                 if (clip) clip.LargeStepper_mc.PressHandler();
@@ -318,13 +352,14 @@ package
         }
         private function reset():void
         {
+            if (captureRow) return;
             var row:Object = current();
             if (!dragging() && modID && row && row.editable && row.value != row.defaultValue) edit(row, row.defaultValue);
         }
         private function valueChanged(event:Event):void
         {
             event.stopPropagation();
-            if (refreshing) return;
+            if (refreshing || captureRow) return;
             var data:Object = Object(event).params;
             var item:Object = options.GetDataForEntry(int(data.id));
             if (!modID || !item || !item.row.editable) return;
@@ -350,14 +385,19 @@ package
             if (row.type == "float") result = BGSCodeObj.setFloat(row.mod, row.key, Number(value));
             else if (row.type == "int") result = BGSCodeObj.setInt(row.mod, row.key, String(value));
             else if (row.type == "enum") result = BGSCodeObj.setEnum(row.mod, row.key, String(value));
+            else if (row.type == "key") result = BGSCodeObj.setKey(row.mod, row.key, Number(value));
             else result = BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
-            if (result && result.ok) { row.value = value; describe(); }
+            if (result && result.ok) {
+                if (row.type == "key") row.valueName = NumericSetting.text(row, value);
+                row.value = value; describe();
+            }
             status.text = result && result.ok ? "Changes apply automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.";
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
             requestedRefresh = true;
         }
         private function back():void
         {
+            if (captureRow) { finishBinding(true); return; }
             if (closing || dragging() || requestedRefresh) return;
             if (modID) { modID = ""; groupID = ""; refresh(false); return; }
             closing = true; options.disableInput = true; BGSCodeObj.close();
@@ -365,12 +405,18 @@ package
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (!initialized || closing) return false;
+            if (captureRow) {
+                if (pressed && name == "Cancel") finishBinding(true);
+                else if (pressed && name == "Accept") confirmBinding();
+                return true;
+            }
             if (bar.ProcessUserEvent(name, pressed)) return true;
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
             return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
         }
         private function mouseFocus(event:MouseEvent):void
         {
+            if (captureRow) return;
             if (!initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
             if (!target || !MovieClip(options).contains(target)) return;
@@ -382,8 +428,10 @@ package
         }
         private function keyDown(event:KeyboardEvent):void
         {
+            if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
             if (event.keyCode == Keyboard.B) reset();
+            else if (event.keyCode == Keyboard.X && current() && current().type == "key") clearBinding();
             else if (event.keyCode == 219) changePage(-1); // [ and ] also expose tabs without a mouse.
             else if (event.keyCode == 221) changePage(1);
             else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {
@@ -402,7 +450,7 @@ package
         }
         private function keyUp(event:KeyboardEvent):void
         {
-            if (event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
+            if (captureRow || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
         }
         private function dragging():Boolean
         {
@@ -417,8 +465,65 @@ package
         private function advance(event:Event):void
         {
             ++frame; if (!initialized || closing) return;
+            if (captureRow) { pollBinding(); return; }
             if (requestedRefresh && !dragging()) refresh();
             decorate();
+        }
+        private function clearBinding():void
+        {
+            var row:Object = current();
+            if (!captureRow && modID && row && row.type == "key" && row.allowUnbound) edit(row, 255);
+        }
+        private function beginBinding(row:Object):void
+        {
+            var result:Object = BGSCodeObj.beginKeyCapture(row.mod, row.key);
+            if (!result || !result.ok) { status.text = "Could not start key capture."; return; }
+            captureRow = row; captureReady = false;
+            options.disableInput = true;
+            MovieClip(options).mouseEnabled = false; MovieClip(options).mouseChildren = false;
+            menuStage.focus = null;
+            capturePanel.visible = true;
+            MovieClip(bar).visible = false; pageHint.visible = false; captureConfirm.visible = false;
+            MenuStyle.fit(captureTitle, "CHANGE BINDING: " + row.title);
+            captureValue.text = "PRESS A KEY";
+            captureHint.text = "Press one keyboard key. Escape cancels.\nCurrent binding: " + NumericSetting.text(row, row.value);
+            status.text = "Choose a key, then confirm it to save.";
+            status.textColor = MenuStyle.MUTED;
+            describe();
+        }
+        private function pollBinding():void
+        {
+            var state:Object = BGSCodeObj.pollKeyCapture();
+            if (!state || state.state == "cancelled" || state.state == "idle") { finishBinding(true); return; }
+            if (state.state == "candidate" || state.state == "confirmed") {
+                captureValue.text = state.name;
+                captureHint.text = state.released ? "Press Enter or choose CONFIRM BINDING to save.\nEscape cancels and keeps your previous binding." : "Release the key before confirming.\nEscape cancels and keeps your previous binding.";
+                if (captureReady != Boolean(state.released)) { captureReady = Boolean(state.released); captureConfirm.visible = captureReady; describe(); }
+                if (state.state == "confirmed") confirmBinding();
+            }
+        }
+        private function confirmBinding():void
+        {
+            if (!captureRow || !captureReady) return;
+            var result:Object = BGSCodeObj.commitKeyCapture();
+            if (result && result.ok) { finishBinding(false); return; }
+            status.text = result && result.error ? result.error : "Could not save this setting. Your previous value is unchanged.";
+            status.textColor = MenuStyle.ACCENT;
+        }
+        private function focusLost(event:Event):void
+        {
+            if (captureRow) finishBinding(true);
+        }
+        private function finishBinding(cancel:Boolean):void
+        {
+            if (cancel) BGSCodeObj.cancelKeyCapture();
+            captureRow = null; captureReady = false; capturePanel.visible = false;
+            MovieClip(bar).visible = true; pageHint.visible = true;
+            MovieClip(options).mouseEnabled = true; MovieClip(options).mouseChildren = true;
+            activationFrame = frame;
+            status.text = cancel ? "Binding unchanged." : "Changes apply automatically.";
+            status.textColor = MenuStyle.MUTED;
+            refresh();
         }
         private function decorate():void
         {
@@ -475,8 +580,10 @@ package
         private function removed(event:Event):void
         {
             if (event.target != this) return;
+            if (captureRow) BGSCodeObj.cancelKeyCapture();
             if (menuStage) {
                 menuStage.removeEventListener(Event.RESIZE, resizeBackground);
+                menuStage.removeEventListener(Event.DEACTIVATE, focusLost);
                 menuStage.removeEventListener(KeyboardEvent.KEY_DOWN, keyDown, true);
                 menuStage.removeEventListener(KeyboardEvent.KEY_UP, keyUp, true);
                 menuStage.removeEventListener(MouseEvent.MOUSE_DOWN, mouseFocus, true);

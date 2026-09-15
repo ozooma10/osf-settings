@@ -8,8 +8,9 @@
 namespace OSFSettings::API
 {
     // Packed major.minor ABI versions, independent of the plugin release version.
-    // Within a major, existing slots/signatures/status values are frozen. New methods may only be appended with a minor bump and gated by Client::Has.
+    // The initial contract stays at 1.0 until launch. After launch, existing slots, signatures and status values are frozen; additions require a minor bump.
     inline constexpr std::uint32_t kVersion = 0x00010000u;
+    inline constexpr std::uint32_t kUnboundKey = 0xFF; // Allowed only when the schema permits unbinding.
     inline constexpr std::uint32_t kBaseVersion = 0x00010000u;
     inline constexpr wchar_t kModuleName[] = L"OSFSettings.dll";
     inline constexpr char kRequestExportName[] = "OSFSettings_RequestAPI";
@@ -66,6 +67,12 @@ namespace OSFSettings::API
         // Outside a callback, successful unsubscribe waits for that callback to finish.
         // Inside a callback, it prevents future calls; keep user alive until return.
         virtual Status Unsubscribe(Subscription subscription) noexcept = 0;
+
+        // Native Starfield keyboard virtual-key codes (Win32 VK), with kUnboundKey for unbound.
+        // Schema defaults may use names such as "F4"; reads and writes always use resolved codes.
+        // Keys are a distinct setting type; failed reads preserve *out.
+        virtual Status GetKey(const char* mod, const char* key, std::uint32_t* out) noexcept = 0;
+        virtual Status SetKey(const char* mod, const char* key, std::uint32_t value) noexcept = 0;
 
     protected:
         ~ISettings() = default;
@@ -138,6 +145,15 @@ namespace OSFSettings::API
                 out.swap(buffer);
             }
             return status;
+        }
+
+        Status GetKey(const char* mod, const char* key, std::uint32_t* out) const noexcept
+        {
+            return m_api ? m_api->GetKey(mod, key, out) : Status::NotReady;
+        }
+        Status SetKey(const char* mod, const char* key, std::uint32_t value) const noexcept
+        {
+            return m_api ? m_api->SetKey(mod, key, value) : Status::NotReady;
         }
 
         Status SetBool(const char* mod, const char* key, bool value) const noexcept

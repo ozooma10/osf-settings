@@ -1,14 +1,55 @@
 """Prepare local Starfield libraries and schema defaults for the Ruffle host."""
 
 import argparse
+from functools import cache
 import json
 import math
 from pathlib import Path, PurePosixPath
+import re
 import struct
 import xml.etree.ElementTree as ET
 import zlib
 
 from preview_abc import adapt_callbacks
+
+
+@cache
+def virtual_key_names():
+    # The offline preview reads the same enum used by native magic_enum reflection.
+    header = Path(__file__).resolve().parents[1] / "lib/commonlibsf/lib/commonlib-shared/include/REX/W32/USER32.h"
+    source = header.read_text(encoding="utf-8")
+    enum = re.search(r"\benum\s+VK\s*:\s*std::uint32_t\s*\{([^}]+)\}", source)
+    if enum is None:
+        raise ValueError("Cannot find CommonLib's VK enum for the preview")
+    names = {}
+    for declaration in enum[1].split(","):
+        if not declaration.strip():
+            continue
+        field = re.fullmatch(r"\s*(VK_\w+)\s*=\s*(0x[0-9a-fA-F]+|VK_\w+)\s*", declaration)
+        if field is None:
+            raise ValueError(f"Unsupported VK enum declaration: {declaration.strip()}")
+        names[field[1]] = names[field[2]] if field[2].startswith("VK_") else int(field[2], 16)
+    return names
+
+
+def key_default(value, allow_unbound=False):
+    # Match KeyCodeFromName's stable schema aliases; runtime and preview rows stay numeric.
+    if isinstance(value, str):
+        name = value.upper() if value.isascii() else ""
+        name = name.removeprefix("VK_")
+        aliases = {
+            "BACKSPACE": "BACK", "ENTER": "RETURN", "CAPSLOCK": "CAPITAL",
+            "PAGEUP": "PRIOR", "PAGEDOWN": "NEXT", "PRINTSCREEN": "SNAPSHOT",
+            "SCROLLLOCK": "SCROLL", "LCTRL": "LCONTROL", "RCTRL": "RCONTROL",
+            "LALT": "LMENU", "RALT": "RMENU",
+            "NUMPADMULTIPLY": "MULTIPLY", "NUMPADADD": "ADD", "NUMPADSUBTRACT": "SUBTRACT",
+            "NUMPADDECIMAL": "DECIMAL", "NUMPADDIVIDE": "DIVIDE",
+        }
+        value = 255 if name == "UNBOUND" else virtual_key_names().get("VK_" + aliases.get(name, name))
+    if (type(value) is not int or type(allow_unbound) is not bool or
+            not (value == 255 and allow_unbound or 0 < value < 255 and value not in (1, 2, 4, 5, 6, 27))):
+        raise ValueError("Invalid keyboard virtual-key code or key name")
+    return value
 
 
 def swf_tags(source):
@@ -198,8 +239,15 @@ def prepare(archive_path, output, schema_paths, large, menu_path):
                             any(not isinstance(label, str) for label in labels)):
                         raise ValueError(f"Invalid preview enum labels: {path}")
                     attributes.update(value=default, editable=str(len(options) > 1).lower())
+                elif kind == "key":
+                    allow_unbound = setting.get("allowUnbound", False)
+                    try:
+                        default = key_default(default, allow_unbound)
+                    except ValueError as error:
+                        raise ValueError(f"Invalid preview key default: {path} / {setting['key']}") from error
+                    attributes.update(value=str(default), allowUnbound=str(allow_unbound).lower())
                 elif kind != "bool" or type(default) is not bool:
-                    raise ValueError(f"Preview supports boolean, integer, float, and enum settings only: {path}")
+                    raise ValueError(f"Preview supports boolean, integer, float, enum, and key settings only: {path}")
                 row = ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
                               modDescription=schema.get("description", ""),
                               group=group["id"], groupTitle=group["label"], key=setting["key"],

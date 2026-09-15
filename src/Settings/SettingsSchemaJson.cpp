@@ -1,4 +1,5 @@
 #include "SettingsJson.h"
+#include "Input/KeyNames.h"
 
 #include <algorithm>
 #include <set>
@@ -49,6 +50,16 @@ namespace OSFSettings::SettingsJson
             Require(field->is_string(), std::string(key) + " must be a string");
             return field->get<std::string>();
         }
+
+        std::optional<SettingValue> DecodeDefault(const nlohmann::json& value, const SettingDefinition& setting)
+        {
+            if (std::holds_alternative<KeyDefinition>(setting.definition) && value.is_string()) {
+                const auto code = KeyCodeFromName(value.get_ref<const std::string&>());
+                if (!code) return std::nullopt;
+                return KeyBinding{ *code };
+            }
+            return DecodeValue(value, setting);
+        }
     }
 
     std::optional<ModSchema> ParseSchema(const nlohmann::json& document, std::string& error)
@@ -85,7 +96,7 @@ namespace OSFSettings::SettingsJson
                     Require(setting.key.find('\0') == std::string::npos, "setting key must not contain NUL");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
                     const auto type = RequiredText(sourceSetting, "type");
-                    Require(type == "bool" || type == "int" || type == "float" || type == "enum", "only types bool, int, float, and enum are supported: " + setting.key);
+                    Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key", "only types bool, int, float, enum, and key are supported: " + setting.key);
                     std::string defaultError = "default must be a boolean: ";
                     if (type == "int") {
                         defaultError = "default must be an integer within its bounds: ";
@@ -102,6 +113,13 @@ namespace OSFSettings::SettingsJson
                         definition.step = ReadFloat(sourceSetting, "step").value_or(0.1);
                         Require(definition.step > 0.0, "step must be positive: " + setting.key);
                         Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
+                        setting.definition = definition;
+                    } else if (type == "key") {
+                        defaultError = "default must be a keyboard virtual-key integer or recognized key name (255/UNBOUND only with allowUnbound): ";
+                        KeyDefinition definition;
+                        const auto unbound = sourceSetting.find("allowUnbound");
+                        Require(unbound == sourceSetting.end() || unbound->is_boolean(), "allowUnbound must be a boolean: " + setting.key);
+                        definition.allowUnbound = unbound != sourceSetting.end() && unbound->get<bool>();
                         setting.definition = definition;
                     } else if (type == "enum") {
                         defaultError = "default must be a string matching an option: ";
@@ -129,7 +147,7 @@ namespace OSFSettings::SettingsJson
                         setting.definition = std::move(definition);
                     }
                     const auto value = sourceSetting.find("default");
-                    const auto decoded = value != sourceSetting.end() ? DecodeValue(*value, setting) : std::nullopt;
+                    const auto decoded = value != sourceSetting.end() ? DecodeDefault(*value, setting) : std::nullopt;
                     Require(decoded && IsValidValue(setting, *decoded), defaultError + setting.key);
                     std::visit([&](auto& definition) {
                         definition.defaultValue = std::get<decltype(definition.defaultValue)>(*decoded);

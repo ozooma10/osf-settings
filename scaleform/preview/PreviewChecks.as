@@ -75,7 +75,7 @@ package
                     require(list.entryCount == 2 && list.selectedEntry.row.key == "freeCamera", "camera tab filters settings");
                     key(221); break;
                 case 4:
-                    require(list.entryCount == 1 && list.selectedEntry.row.key == "hotkeys", "keyboard changes group");
+                    require(list.entryCount == 3 && list.selectedEntry.row.key == "hotkeys", "keyboard changes group");
                     key(221); break;
                 case 5:
                     require(list.entryCount == 1 && list.selectedEntry.row.key == "debug", "advanced tab reachable");
@@ -103,6 +103,85 @@ package
                 case 11:
                     require(list.selectedEntry.row.value == true, "save failure preserves previous value");
                     Object(menu).BGSCodeObj.setBool = setter;
+                    findNamed(menu, "controls").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 12:
+                    list.selectedIndex = 1; userEvent("Accept"); break;
+                case 13:
+                    require(list.disableInput && Object(menu).BGSCodeObj.pollKeyCapture().state == "waiting", "key capture disables list input");
+                    capture("key-waiting");
+                    Object(menu).BGSCodeObj.previewKey(116, true); break;
+                case 14:
+                    userEvent("Accept");
+                    require(list.selectedEntry.row.value == 115, "held candidate cannot be confirmed");
+                    Object(menu).BGSCodeObj.previewKey(116, false); break;
+                case 15:
+                    capture("key-confirm");
+                    findNamed(menu, "camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    require(list.selectedEntry.row.key == "toggleKey", "capture blocks tab changes");
+                    Object(menu).BGSCodeObj.previewKey(13, true);
+                    Object(menu).BGSCodeObj.previewKey(13, false); break;
+                case 16:
+                    require(list.selectedEntry.row.value == 116 && !list.disableInput, "confirmed key saved and list input restored");
+                    userEvent("YButton"); break;
+                case 17:
+                    require(list.selectedEntry.row.value == 115, "key reset restores default");
+                    userEvent("XButton"); break;
+                case 18:
+                    require(list.selectedEntry.row.value == 255, "optional key can be cleared");
+                    capture("key-unbound"); userEvent("YButton"); break;
+                case 19:
+                    list.selectedIndex = 2; userEvent("XButton");
+                    require(list.selectedEntry.row.value == 13, "required key cannot be cleared");
+                    userEvent("Accept"); break;
+                case 20:
+                    Object(menu).BGSCodeObj.previewKey(9, true);
+                    Object(menu).BGSCodeObj.previewKey(9, false); break;
+                case 21:
+                    require(Object(menu).BGSCodeObj.pollKeyCapture().name == "Tab" && list.disableInput, "Tab is captured instead of navigating back");
+                    Object(menu).BGSCodeObj.previewKey(27, true);
+                    Object(menu).BGSCodeObj.previewKey(27, false); break;
+                case 22:
+                    require(list.selectedEntry.row.value == 13 && !list.disableInput, "Escape preserves previous binding");
+                    list.selectedIndex = 1; userEvent("Accept"); break;
+                case 23:
+                    Object(menu).BGSCodeObj.previewKey(13, true);
+                    Object(menu).BGSCodeObj.previewKey(13, true); break;
+                case 24:
+                    require(list.selectedEntry.row.value == 115 && list.disableInput, "held Enter does not save itself");
+                    Object(menu).BGSCodeObj.previewKey(13, false); break;
+                case 25:
+                    setter = Object(menu).BGSCodeObj.setKey;
+                    Object(menu).BGSCodeObj.setKey = function(mod:String, key:String, value:Number):Object {
+                        return {ok:false, error:"Could not save this setting. Your previous value is unchanged."};
+                    };
+                    Object(menu).BGSCodeObj.previewKey(13, true);
+                    Object(menu).BGSCodeObj.previewKey(13, false); break;
+                case 26:
+                    require(list.selectedEntry.row.value == 115 && list.disableInput, "failed key save preserves binding and candidate");
+                    capture("key-save-failed");
+                    Object(menu).BGSCodeObj.setKey = setter;
+                    userEvent("Accept"); break;
+                case 27:
+                    require(list.selectedEntry.row.value == 13 && !list.disableInput, "failed key save can be retried");
+                    userEvent("Accept"); break;
+                case 28:
+                    Object(menu).BGSCodeObj.previewKey(32, true);
+                    Object(menu).BGSCodeObj.previewKey(32, false); break;
+                case 29:
+                    userEvent("Accept"); break;
+                case 30:
+                    require(list.selectedEntry.row.value == 32 && list.selectedEntry.row.valueName == "Space",
+                        "Space keeps its virtual-key identity and display label");
+                    userEvent("Accept"); break;
+                case 31:
+                    Object(menu).BGSCodeObj.previewKey(179, true);
+                    Object(menu).BGSCodeObj.previewKey(179, false); break;
+                case 32:
+                    userEvent("Accept"); break;
+                case 33:
+                    require(list.selectedEntry.row.value == 179 && list.selectedEntry.row.valueName == "Key 0xB3",
+                        "unlisted key stays bindable with a fallback display label");
+                    capture("key-fallback");
                     menu.removeEventListener(Event.ENTER_FRAME, advance);
                     trace("[verify] PASS"); break;
                 }

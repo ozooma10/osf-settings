@@ -30,6 +30,10 @@ package
         private var menu:Object;
         private var message:TextField = new TextField();
         private var caption:TextField = new TextField();
+        private var captureState:Object = {state:"idle", keyCode:255, name:"", released:false};
+        private var captureMod:String;
+        private var captureKey:String;
+        private var held:Object = {};
 
         public function PreviewHost()
         {
@@ -74,7 +78,7 @@ package
             for each (var font:XML in config.fonts.font) fontNames.push(String(font.@name));
             for each (var row:XML in config.rows.row) {
                 var value:*;
-                if (String(row.@type) == "float") value = Number(row.@value);
+                if (String(row.@type) == "float" || String(row.@type) == "key") value = Number(row.@value);
                 else if (String(row.@type) == "int" || String(row.@type) == "enum") value = String(row.@value);
                 else value = String(row.@value) == "true";
                 var choices:Array = [];
@@ -82,8 +86,10 @@ package
                 rows.push({modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
                     group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
-                    type:String(row.@type), editable:String(row.@editable) == "true",
+                    type:String(row.@type), editable:String(row.@editable) == "true", allowUnbound:String(row.@allowUnbound) == "true",
                     minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value, options:choices,
+                    valueName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",
+                    defaultName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",
                     decimals:int(row.@decimals), sliderMinimum:Number(row.@sliderMinimum), sliderMaximum:Number(row.@sliderMaximum),
                     sliderStep:Number(row.@sliderStep), sliderScale:Number(row.@sliderScale), sliderSteps:Number(row.@sliderSteps)});
             }
@@ -120,7 +126,8 @@ package
             controls.data.vMappedEvents = [
                 {strUserEventName:"Accept", strButtonName:"E", aButtonName:["E"], sContextName:"BasicMenuNav"},
                 {strUserEventName:"Cancel", strButtonName:"Tab", aButtonName:["Tab"], sContextName:"BasicMenuNav"},
-                {strUserEventName:"YButton", strButtonName:"B", aButtonName:["B"], sContextName:"BasicMenuNav"}
+                {strUserEventName:"YButton", strButtonName:"B", aButtonName:["B"], sContextName:"BasicMenuNav"},
+                {strUserEventName:"XButton", strButtonName:"X", aButtonName:["X"], sContextName:"BasicMenuNav"}
             ];
             controls.SetReady(true);
             var loader:Loader = new Loader(); loaders.push(loader);
@@ -134,7 +141,10 @@ package
         {
             menu = event.target.content;
             menu.BGSCodeObj = {getRows:getRows, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, close:closeMenu,
-                startup:startup, startupFailed:report};
+                startup:startup, startupFailed:report, setKey:setKey,
+                beginKeyCapture:beginKeyCapture, pollKeyCapture:function():Object { return captureState; },
+                commitKeyCapture:commitKeyCapture, cancelKeyCapture:function():void { captureState.state = "idle"; },
+                previewKey:captureButton};
             addChild(menu as MovieClip);
             menu.onCodeObjCreate();
             setChildIndex(message, numChildren - 1);
@@ -207,6 +217,62 @@ package
             return {ok:false, error:"Invalid preview enum setting."};
         }
 
+        private function setKey(mod:String, key:String, value:Number):Object
+        {
+            for each (var row:Object in rows) {
+                if (row.mod == mod && row.key == key && row.type == "key" && isFinite(value) && value == Math.floor(value) && (value == 255 ? row.allowUnbound : bindableKey(value))) {
+                    row.value = value; row.valueName = previewKeyName(uint(value)); return {ok:true};
+                }
+            }
+            return {ok:false, error:"Invalid preview key setting."};
+        }
+        private function beginKeyCapture(mod:String, key:String):Object
+        {
+            captureMod = mod; captureKey = key;
+            captureState = {state:"waiting", keyCode:255, name:"", released:false};
+            return {ok:true};
+        }
+        private function commitKeyCapture():Object
+        {
+            if (!captureState.released || (captureState.state != "candidate" && captureState.state != "confirmed")) return {ok:false};
+            var result:Object = menu.BGSCodeObj.setKey(captureMod, captureKey, captureState.keyCode);
+            captureState.state = result.ok ? "idle" : "candidate";
+            return result;
+        }
+        private function bindableKey(code:Number):Boolean
+        {
+            return code > 0 && code < 255 && code != 1 && code != 2 && code != 4 && code != 5 && code != 6 && code != 27;
+        }
+        private function captureButton(code:uint, down:Boolean):void
+        {
+            var repeat:Boolean = Boolean(held[code]); held[code] = down;
+            if (captureState.state == "idle") return;
+            if (!down) { if (code == captureState.keyCode) captureState.released = true; return; }
+            if (repeat) return;
+            if (code == 27) captureState.state = "cancelled";
+            else if (captureState.state == "waiting" && bindableKey(code)) {
+                captureState.keyCode = code; captureState.name = previewKeyName(code); captureState.state = "candidate";
+            }
+            else if (captureState.state == "candidate" && captureState.released && code == 13) captureState.state = "confirmed";
+        }
+        // Adapt Flash modifier locations to Starfield's Win32 virtual-key identities.
+        private function previewKeyCode(event:KeyboardEvent):uint
+        {
+            if (event.keyCode == 16) return event.keyLocation == 2 ? 161 : 160;
+            if (event.keyCode == 17) return event.keyLocation == 2 ? 163 : 162;
+            if (event.keyCode == 18) return event.keyLocation == 2 ? 165 : 164;
+            return event.keyCode;
+        }
+        // Preview labels only; native labels come from Windows. This never gates capture.
+        private function previewKeyName(code:uint):String
+        {
+            if (code >= 65 && code <= 90 || code >= 48 && code <= 57) return String.fromCharCode(code);
+            if (code >= 112 && code <= 135) return "F" + (code - 111);
+            if (code >= 96 && code <= 105) return "Numpad" + (code - 96);
+            var names:Object = {8:"Backspace",9:"Tab",13:"Enter",19:"Pause",20:"CapsLock",27:"Escape",32:"Space",
+                160:"Left Shift",161:"Right Shift",162:"Left Ctrl",163:"Right Ctrl",164:"Left Alt",165:"Right Alt",255:"UNBOUND"};
+            return names[code] || "Key 0x" + code.toString(16).toUpperCase();
+        }
         private function startup(phase:String):void
         {
             trace("[preview] " + phase);
@@ -221,6 +287,11 @@ package
 
         private function key(event:KeyboardEvent):void
         {
+            var binding:uint = previewKeyCode(event);
+            if (captureState.state != "idle" || held[binding]) {
+                captureButton(binding, event.type == KeyboardEvent.KEY_DOWN);
+                event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
             if (event.keyCode == Keyboard.F5) {
                 event.stopImmediatePropagation(); event.preventDefault();
                 if (event.type == KeyboardEvent.KEY_UP) restart();
@@ -231,6 +302,8 @@ package
             if (name && menu) {
                 event.stopImmediatePropagation(); event.preventDefault();
                 menu.ProcessUserEvent(name, event.type == KeyboardEvent.KEY_DOWN);
+                // Opening Accept has already been delivered. Ignore its repeats until release.
+                if (captureState.state == "waiting" && event.type == KeyboardEvent.KEY_DOWN) held[binding] = true;
             }
         }
 

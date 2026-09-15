@@ -21,7 +21,7 @@ namespace OSFSettings::Plugin
 
     bool OnLoad()
     {
-        const auto* messaging = SFSE::GetMessagingInterface();
-        return messaging && messaging->RegisterListener(OnMessage) && Runtime::Get().Initialize();
+        const auto* messaging = SFSE::GetMessagingInterface() && Runtime::Get().Initialize();
+        return messaging && messaging->RegisterListener(OnMessage);
     }
 }

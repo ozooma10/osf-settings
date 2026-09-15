@@ -64,6 +64,20 @@ namespace OSFSettings::API
         return Status::Ok;
     }
 
+    Status SettingsApi::GetKey(const char* mod, const char* key, std::uint32_t* out) noexcept
+    {
+        if (!out) return Status::InvalidArgument;
+        KeyBinding binding;
+        const auto status = Read(mod, key, &binding);
+        if (status == Status::Ok) *out = binding.keyCode;
+        return status;
+    }
+
+    Status SettingsApi::SetKey(const char* mod, const char* key, std::uint32_t value) noexcept
+    {
+        return Write(mod, key, KeyBinding{ value });
+    }
+
     template <class T>
     Status SettingsApi::Write(const char* mod, const char* key, T value) noexcept
     {

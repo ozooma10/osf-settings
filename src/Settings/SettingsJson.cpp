@@ -44,6 +44,11 @@ namespace OSFSettings::SettingsJson
         if (std::holds_alternative<EnumDefinition>(setting.definition) && value.is_string()) {
             return value.get<std::string>();
         }
+        if (std::holds_alternative<KeyDefinition>(setting.definition)) {
+            if (const auto code = DecodeInteger(value); code && *code >= 0 && *code <= KeyBinding::Unbound) {
+                return KeyBinding{ static_cast<std::uint32_t>(*code) };
+            }
+        }
         return std::nullopt;
     }
 }

@@ -38,6 +38,12 @@ package
         public static function text(row:Object, value:*):String
         {
             if (row.type == "bool") return value ? "ON" : "OFF";
+            if (row.type == "key") {
+                if (Number(value) == 255) return "UNBOUND";
+                if (value == row.value && row.valueName) return String(row.valueName);
+                if (value == row.defaultValue && row.defaultName) return String(row.defaultName);
+                return "Key 0x" + uint(value).toString(16).toUpperCase();
+            }
             if (row.type == "float" && row.decimals >= 0) {
                 var fixed:String = Number(value).toFixed(int(row.decimals));
                 // Preserve an off-step saved value or default in the display.

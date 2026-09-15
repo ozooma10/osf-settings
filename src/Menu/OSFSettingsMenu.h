@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RE/G/GameMenuBase.h"
+#include "Input/KeyCapture.h"
 
 namespace OSFSettings
 {
@@ -20,6 +21,9 @@ namespace OSFSettings
         bool UseEventDispatcher() override { return true; }
         void MapCodeObjectFunctions() override;
         void Call(const RE::Scaleform::GFx::FunctionHandler::Params& params) noexcept override;
+        bool ShouldHandleEvent(const RE::InputEvent* event) override;
+        void OnButtonEvent(const RE::ButtonEvent* event) override;
+        void OnRemovedFromMenuStack() override;
 
         static bool Register();
         static void Open();
@@ -28,5 +32,8 @@ namespace OSFSettings
         void Close();
         void OnStartupFailed(std::string_view message);
         static RE::Scaleform::Ptr<RE::IMenu> Create();
+        KeyCapture m_capture;
+        std::string m_captureMod;
+        std::string m_captureKey;
     };
 }
