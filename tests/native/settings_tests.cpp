@@ -19,6 +19,7 @@ namespace
 {
     namespace fs = std::filesystem;
     using Json = nlohmann::json;
+    using OSFSettings::SettingValue;
     int checks{};
     int failures{};
 
@@ -65,13 +66,14 @@ namespace
         if (!schema) return;
         Check(schema->id == "learning" && schema->groups.size() == 1, "mod and group are loaded");
         const auto* setting = schema->FindSetting("notifications");
-        Check(setting && setting->defaultValue && setting->label == "Enable notifications", "boolean default and label are loaded");
+        Check(setting && setting->type == OSFSettings::SettingType::Bool && std::get<bool>(setting->defaultValue) &&
+            setting->label == "Enable notifications", "boolean type, default, and label are loaded");
         Check(schema->FindSetting("unknown") == nullptr, "unknown definition is absent");
 
         auto document = example;
         document["groups"][0]["settings"][0]["default"] = false;
         auto parsed = OSFSettings::SettingsJson::ParseSchema(document, error);
-        Check(parsed && !parsed->groups[0].settings[0].defaultValue, "false is a valid default");
+        Check(parsed && !std::get<bool>(parsed->groups[0].settings[0].defaultValue), "false is a valid default");
 
         document = example;
         document.erase("title");
@@ -153,21 +155,21 @@ namespace
         store.LoadAll(schemas, values);
         Check(store.Mods().size() == 1 && store.LoadErrors().size() == 3,
             "valid schemas survive malformed, unsupported, and mismatched neighboring files");
-        Check(store.GetValue("learning", "notifications") == std::optional<bool>(true), "the store owns the true default");
+        Check(store.GetValue("learning", "notifications") == SettingValue{ true }, "the store owns the true default");
         Check(!store.GetValue("missing", "notifications").has_value(), "unknown mod returns no value");
         Check(!store.GetValue("learning", "missing").has_value(), "unknown key returns no value");
         Check(!store.GetValue("learning", "Notifications").has_value(), "setting keys are case-sensitive");
 
         auto ownedCopy = store.GetValue("learning", "notifications");
         ownedCopy = false;
-        Check(ownedCopy == false && store.GetValue("learning", "notifications") == true,
+        Check(ownedCopy == SettingValue{ false } && store.GetValue("learning", "notifications") == SettingValue{ true },
             "changing a returned copy does not edit the store");
 
         document = example;
         document["groups"][0]["settings"][0]["default"] = false;
         Write(schemas / "learning.json", document.dump());
         store.LoadAll(schemas, values);
-        Check(store.Mods().size() == 1 && store.GetValue("learning", "notifications") == false,
+        Check(store.Mods().size() == 1 && store.GetValue("learning", "notifications") == SettingValue{ false },
             "reloading replaces defaults without duplicating mods; false is not a missing value");
 
         store.LoadAll(root / "missing", values);
@@ -177,10 +179,10 @@ namespace
         Check(store.Mods().empty() && store.LoadErrors().size() == 1, "a file is not accepted as the schema directory");
 
         store.LoadAll(examplePath.parent_path(), values);
-        Check(store.LoadErrors().empty() && store.GetValue("learning", "notifications") == true,
+        Check(store.LoadErrors().empty() && store.GetValue("learning", "notifications") == SettingValue{ true },
             "the actual shipped schema loads through the production store");
         if (const auto value = store.GetValue("learning", "notifications")) {
-            std::cout << "Schema probe: learning / notifications = " << std::boolalpha << *value << " (schema default)\n";
+            std::cout << "Schema probe: learning / notifications = " << std::boolalpha << std::get<bool>(*value) << " (schema default)\n";
         }
     }
 
@@ -203,7 +205,7 @@ namespace
 
         OSFSettings::SettingsStore store;
         store.LoadAll(schemas, values);
-        Check(store.LoadErrors().empty() && store.GetValue("learning", "notifications") == true,
+        Check(store.LoadErrors().empty() && store.GetValue("learning", "notifications") == SettingValue{ true },
             "missing saved values use schema defaults without an error");
         Check(!fs::exists(values), "loading does not create values files or directories");
         const auto missingMod = store.Set("missing", "notifications", false);
@@ -215,38 +217,38 @@ namespace
             "setting the current value succeeds without a disk write");
 
         const auto disabled = store.Set("learning", "notifications", false);
-        Check(disabled.ok && disabled.error.empty() && store.GetValue("learning", "notifications") == false,
+        Check(disabled.ok && disabled.error.empty() && store.GetValue("learning", "notifications") == SettingValue{ false },
             "a successful save publishes the new boolean");
         const auto saved = Json::parse(Read(valuesFile));
         Check(saved["formatVersion"] == 1 && saved["values"]["notifications"] == false && saved["values"]["quiet"] == false,
             "the values file contains the version and all current booleans for this mod");
         Check(!fs::exists(temporary), "successful replacement leaves no temporary file");
-        Check(store.GetValue("other", "notifications") == true && !fs::exists(values / "other.json"),
+        Check(store.GetValue("other", "notifications") == SettingValue{ true } && !fs::exists(values / "other.json"),
             "saving one mod does not change another mod");
-        Check(Read(schemas / "learning.json") == originalSchema && store.Mods()[0].schema.FindSetting("notifications")->defaultValue,
+        Check(Read(schemas / "learning.json") == originalSchema && std::get<bool>(store.Mods()[0].schema.FindSetting("notifications")->defaultValue),
             "saving changes neither the authored schema nor its in-memory default");
 
         OSFSettings::SettingsStore restarted;
         restarted.LoadAll(schemas, values);
-        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == false,
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == SettingValue{ false },
             "a fresh store reads the saved false override");
         std::cout << "Persistence probe: default=true, saved=" << std::boolalpha << saved["values"]["notifications"].get<bool>()
-                  << ", reloaded=" << restarted.GetValue("learning", "notifications").value() << '\n';
+                  << ", reloaded=" << std::get<bool>(restarted.GetValue("learning", "notifications").value()) << '\n';
 
         Check(store.Set("learning", "quiet", true).ok && store.Set("other", "notifications", false).ok,
             "other settings and mods can be saved independently");
         restarted.LoadAll(schemas, values);
-        Check(restarted.GetValue("learning", "notifications") == false && restarted.GetValue("learning", "quiet") == true &&
-            restarted.GetValue("other", "notifications") == false && restarted.GetValue("other", "quiet") == false,
+        Check(restarted.GetValue("learning", "notifications") == SettingValue{ false } && restarted.GetValue("learning", "quiet") == SettingValue{ true } &&
+            restarted.GetValue("other", "notifications") == SettingValue{ false } && restarted.GetValue("other", "quiet") == SettingValue{ false },
             "saving another key preserves its neighbor and keeps mod values separate");
         Check(store.Set("learning", "notifications", true).ok, "a value can be changed back to true");
         restarted.LoadAll(schemas, values);
-        Check(restarted.GetValue("learning", "notifications") == true, "a saved true value also survives reload");
+        Check(restarted.GetValue("learning", "notifications") == SettingValue{ true }, "a saved true value also survives reload");
 
         // A leftover temporary file from an interrupted write is never loaded.
         Write(temporary, "incomplete write");
         restarted.LoadAll(schemas, values);
-        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == true,
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == SettingValue{ true },
             "reload uses the committed file and ignores a leftover temporary file");
         Check(store.Set("learning", "notifications", false).ok && !fs::exists(temporary),
             "the next successful edit replaces a stale temporary file");
@@ -254,7 +256,7 @@ namespace
         const auto committed = Read(valuesFile);
         fs::create_directory(temporary); // Force failure before the temporary file can be opened.
         const auto failedOpen = store.Set("learning", "notifications", true);
-        Check(!failedOpen.ok && !failedOpen.error.empty() && store.GetValue("learning", "notifications") == false,
+        Check(!failedOpen.ok && !failedOpen.error.empty() && store.GetValue("learning", "notifications") == SettingValue{ false },
             "failure to open the temporary file rejects the edit");
         Check(Read(valuesFile) == committed && fs::is_directory(temporary), "failed open preserves the saved file and the pre-existing blocker");
         fs::remove(temporary); // Only the empty directory created by this test.
@@ -266,7 +268,7 @@ namespace
         if (locked != INVALID_HANDLE_VALUE) {
             const auto failedReplace = store.Set("learning", "notifications", true);
             ::CloseHandle(locked);
-            Check(!failedReplace.ok && !failedReplace.error.empty() && store.GetValue("learning", "notifications") == false,
+            Check(!failedReplace.ok && !failedReplace.error.empty() && store.GetValue("learning", "notifications") == SettingValue{ false },
                 "failed atomic replacement leaves the live value unchanged");
             Check(Read(valuesFile) == committed && !fs::exists(temporary),
                 "failed atomic replacement preserves the old file and cleans up its temporary file");
@@ -278,21 +280,21 @@ namespace
         Write(blocked, "this is a file, not a directory");
         restarted.LoadAll(schemas, blocked / "values");
         const auto failedDirectory = restarted.Set("learning", "notifications", false);
-        Check(!failedDirectory.ok && !failedDirectory.error.empty() && restarted.GetValue("learning", "notifications") == true,
+        Check(!failedDirectory.ok && !failedDirectory.error.empty() && restarted.GetValue("learning", "notifications") == SettingValue{ true },
             "failure to create the values directory preserves the live default");
 
         const Json mixed = { { "formatVersion", 1 }, { "values", { { "notifications", "false" }, { "quiet", true }, { "removed", 123 } } } };
         Write(valuesFile, mixed.dump());
         restarted.LoadAll(schemas, values);
-        Check(restarted.GetValue("learning", "notifications") == true && restarted.GetValue("learning", "quiet") == true &&
+        Check(restarted.GetValue("learning", "notifications") == SettingValue{ true } && restarted.GetValue("learning", "quiet") == SettingValue{ true } &&
             !restarted.GetValue("learning", "removed").has_value(), "only known, correctly typed saved values override defaults");
         Check(restarted.LoadErrors().size() == 1 && restarted.LoadErrors()[0].file == valuesFile &&
             restarted.LoadErrors()[0].message.find("notifications") != std::string::npos,
             "a wrong-type saved boolean reports its path and key");
         Write(valuesFile, Json{ { "formatVersion", 1 }, { "values", { { "quiet", true } } } }.dump());
         restarted.LoadAll(schemas, values);
-        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == true &&
-            restarted.GetValue("learning", "quiet") == true, "settings absent from a saved file keep their defaults");
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == SettingValue{ true } &&
+            restarted.GetValue("learning", "quiet") == SettingValue{ true }, "settings absent from a saved file keep their defaults");
 
         const std::vector<Json> invalidFiles{
             Json::array(), Json::object(),
@@ -306,19 +308,19 @@ namespace
         for (const auto& invalid : invalidFiles) {
             Write(valuesFile, invalid.dump());
             restarted.LoadAll(schemas, values);
-            Check(restarted.GetValue("learning", "notifications") == true && restarted.LoadErrors().size() == 1 &&
-                restarted.GetValue("other", "notifications") == false && Read(valuesFile) == invalid.dump(),
+            Check(restarted.GetValue("learning", "notifications") == SettingValue{ true } && restarted.LoadErrors().size() == 1 &&
+                restarted.GetValue("other", "notifications") == SettingValue{ false } && Read(valuesFile) == invalid.dump(),
                 "invalid values documents retain defaults and other mods without rewriting the file");
         }
 
         Write(valuesFile, "{ malformed json");
         restarted.LoadAll(schemas, values);
-        Check(restarted.GetValue("learning", "notifications") == true && restarted.LoadErrors().size() == 1 && Read(valuesFile) == "{ malformed json",
+        Check(restarted.GetValue("learning", "notifications") == SettingValue{ true } && restarted.LoadErrors().size() == 1 && Read(valuesFile) == "{ malformed json",
             "malformed saved JSON is reported and preserved on load");
         Check(restarted.Set("learning", "notifications", false).ok, "an explicit valid edit can replace a malformed saved file");
         OSFSettings::SettingsStore recovered;
         recovered.LoadAll(schemas, values);
-        Check(recovered.LoadErrors().empty() && recovered.GetValue("learning", "notifications") == false,
+        Check(recovered.LoadErrors().empty() && recovered.GetValue("learning", "notifications") == SettingValue{ false },
             "the recovered file reloads without errors");
     }
 }

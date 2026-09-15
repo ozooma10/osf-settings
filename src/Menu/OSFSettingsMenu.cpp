@@ -84,8 +84,8 @@ namespace OSFSettings
                         Text(row, "key", setting.key);
                         Text(row, "title", setting.label);
                         Text(row, "hint", setting.hint);
-                        row.SetMember("value", RE::Scaleform::GFx::Value(value->second));
-                        row.SetMember("defaultValue", RE::Scaleform::GFx::Value(setting.defaultValue));
+                        row.SetMember("value", RE::Scaleform::GFx::Value(std::get<bool>(value->second)));
+                        row.SetMember("defaultValue", RE::Scaleform::GFx::Value(std::get<bool>(setting.defaultValue)));
                         params.ret->PushBack(row);
                     }
                 }

@@ -60,7 +60,11 @@ namespace OSFSettings::SettingsJson
         bool ownsTemporary = false;
 
         try {
-            const nlohmann::json document = { { "formatVersion", 1 }, { "values", values } };
+            auto saved = nlohmann::json::object();
+            for (const auto& [key, value] : values) {
+                saved[key] = std::get<bool>(value);
+            }
+            const nlohmann::json document = { { "formatVersion", 1 }, { "values", saved } };
             const auto text = document.dump(2) + '\n';
             if (!path.parent_path().empty()) std::filesystem::create_directories(path.parent_path());
 

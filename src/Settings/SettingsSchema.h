@@ -9,10 +9,13 @@
 
 namespace OSFSettings
 {
+    enum class SettingType { Bool };
+
     struct SettingDefinition
     {
         std::string key;
-        bool defaultValue{};
+        SettingType type{ SettingType::Bool };
+        SettingValue defaultValue{ false };
         std::string label;
         std::string hint;
     };

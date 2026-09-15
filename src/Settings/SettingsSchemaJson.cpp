@@ -68,6 +68,7 @@ namespace OSFSettings::SettingsJson
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
                     Require(RequiredText(sourceSetting, "type") == "bool", "only type bool is supported: " + setting.key);
+                    setting.type = SettingType::Bool;
                     const auto value = sourceSetting.find("default");
                     Require(value != sourceSetting.end() && value->is_boolean(), "default must be a boolean: " + setting.key);
                     setting.defaultValue = value->get<bool>();
