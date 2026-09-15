@@ -62,9 +62,22 @@ namespace OSFSettings::SettingsJson
         error.clear();
         auto temporary = path;
         temporary += ".tmp";
-        bool ownsTemporary = false;
 
         try {
+            // Clean up before entering the handler, even if formatting the error fails.
+            struct Cleanup
+            {
+                const std::filesystem::path& path;
+                bool owned{};
+                ~Cleanup()
+                {
+                    if (owned) {
+                        std::error_code ignored;
+                        std::filesystem::remove(path, ignored);
+                    }
+                }
+            } cleanup{ temporary };
+
             auto saved = nlohmann::json::object();
             for (const auto& [key, value] : values) {
                 if (const auto* number = std::get_if<double>(&value); number && !std::isfinite(*number)) {
@@ -79,7 +92,7 @@ namespace OSFSettings::SettingsJson
             {
                 std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
                 if (!output) throw std::runtime_error("cannot open temporary values file");
-                ownsTemporary = true;
+                cleanup.owned = true;
                 output << text;
                 output.close();
                 if (!output) throw std::runtime_error("cannot finish writing temporary values file");
@@ -90,14 +103,10 @@ namespace OSFSettings::SettingsJson
                 const auto code = static_cast<int>(::GetLastError());
                 throw std::runtime_error("cannot replace values file: " + std::system_category().message(code));
             }
-            
+            cleanup.owned = false;
             return true;
         } catch (const std::exception& exception) {
             error = path.string() + ": " + exception.what();
-            if (ownsTemporary) {
-                std::error_code ignored;
-                std::filesystem::remove(temporary, ignored);
-            }
             return false;
         }
     }

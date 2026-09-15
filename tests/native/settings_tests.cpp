@@ -20,6 +20,8 @@
 #include <Windows.h>
 #endif
 
+int TestSettingsService();
+
 namespace
 {
     namespace fs = std::filesystem;
@@ -49,6 +51,9 @@ namespace
         struct Provider final : ISettings
         {
             bool ready{};
+            std::string enumValue{ "quiet" };
+            std::string nextEnumValue;
+            Status enumCopyStatus{ Status::Ok };
             bool IsReady() noexcept override { return ready; }
             Status GetBool(const char*, const char*, bool* out) noexcept override
             {
@@ -58,7 +63,23 @@ namespace
             }
             Status GetInt(const char*, const char*, std::int64_t*) noexcept override { return Status::NotReady; }
             Status GetFloat(const char*, const char*, double*) noexcept override { return Status::NotReady; }
-            Status GetEnum(const char*, const char*, char*, std::uint32_t, std::uint32_t*) noexcept override { return Status::NotReady; }
+            Status GetEnum(const char*, const char*, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override
+            {
+                if (!ready) return Status::NotReady;
+                if (out && enumCopyStatus != Status::Ok) return enumCopyStatus;
+                *required = static_cast<std::uint32_t>(enumValue.size() + 1);
+                if (!out) {
+                    if (!nextEnumValue.empty()) {
+                        enumValue.swap(nextEnumValue);
+                        nextEnumValue.clear();
+                    }
+                    return Status::BufferTooSmall;
+                }
+                if (capacity < *required) return Status::BufferTooSmall;
+                enumValue.copy(out, enumValue.size());
+                out[enumValue.size()] = '\0';
+                return Status::Ok;
+            }
             Status SetBool(const char*, const char*, bool) noexcept override { return Status::SaveFailed; }
             Status SetInt(const char*, const char*, std::int64_t) noexcept override { return Status::NotReady; }
             Status SetFloat(const char*, const char*, double) noexcept override { return Status::NotReady; }
@@ -74,6 +95,7 @@ namespace
         std::uint32_t required = 42;
         Subscription subscription = 17;
         char text[] = "unchanged";
+        std::string mode = "unchanged";
         Check(!client && !client.IsReady() && !client.Raw() && client.Version() == 0 && !client.Has(kBaseVersion),
             "a new SDK client has no service");
         Check(client.GetBool("learning", "notifications", &enabled) == Status::NotReady && !enabled &&
@@ -81,17 +103,33 @@ namespace
             std::string_view(text) == "unchanged" && required == 42 &&
             client.Subscribe("learning", nullptr, nullptr, &subscription) == Status::NotReady && subscription == 17,
             "detached SDK reads and subscriptions preserve caller outputs");
+        Check(client.GetEnum("learning", "mode", mode) == Status::NotReady && mode == "unchanged",
+            "detached SDK string reads preserve the caller's string");
 
         Check(client.Attach(&provider, 0x00010001u) && client && client.Raw() == &provider &&
             client.Version() == 0x00010001u && client.Has(kBaseVersion) && !client.Has(0x00010002u) && !client.IsReady(),
             "SDK attachment accepts a newer compatible minor independently of readiness");
         Check(client.GetBool("learning", "notifications", &enabled) == Status::NotReady && !enabled,
             "an attached SDK client preserves provider readiness failures");
+        Check(client.GetEnum("learning", "mode", mode) == Status::NotReady && mode == "unchanged",
+            "SDK string reads preserve output when the provider is not ready");
         provider.ready = true;
         Check(client.IsReady() && client.GetBool("learning", "notifications", &enabled) == Status::Ok && enabled,
             "an SDK client observes provider readiness and current values");
         Check(client.SetBool("learning", "notifications", false) == Status::SaveFailed,
             "SDK writes preserve a provider save failure");
+        Check(client.GetEnum("learning", "mode", mode) == Status::Ok && mode == "quiet",
+            "SDK string reads exclude the terminating NUL");
+        provider.nextEnumValue = std::string(80, 'x');
+        Check(client.GetEnum("learning", "mode", mode) == Status::Ok && mode == std::string(80, 'x'),
+            "SDK string reads retry when the value grows after the size query");
+        provider.nextEnumValue = "quiet";
+        Check(client.GetEnum("learning", "mode", mode) == Status::Ok && mode == "quiet",
+            "SDK string reads use the actual length when the value shrinks after the size query");
+        provider.enumCopyStatus = Status::UnknownSetting;
+        Check(client.GetEnum("learning", "mode", mode) == Status::UnknownSetting && mode == "quiet",
+            "SDK string reads preserve output when copying fails after a successful size query");
+        provider.enumCopyStatus = Status::Ok;
 
         Check(!client.Attach(&provider, 0x00020000u) && !client && !client.Raw() && client.Version() == 0,
             "incompatible SDK attachment clears an existing service");
@@ -897,6 +935,7 @@ int main(int argc, char** argv)
         if (!input) throw std::runtime_error("cannot open example schema: " + examplePath.string());
         const auto example = nlohmann::json::parse(input);
         TestSDK();
+        checks += TestSettingsService();
         TestSchema(example);
         TestStore(example, examplePath);
         TestPersistence(example);

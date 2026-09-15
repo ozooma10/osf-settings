@@ -19,7 +19,7 @@ namespace OSFSettings
         void PostCreate() override;
         bool UseEventDispatcher() override { return true; }
         void MapCodeObjectFunctions() override;
-        void Call(const RE::Scaleform::GFx::FunctionHandler::Params& params) override;
+        void Call(const RE::Scaleform::GFx::FunctionHandler::Params& params) noexcept override;
 
         static bool Register();
         static void Open();

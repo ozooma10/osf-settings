@@ -61,9 +61,7 @@ namespace OSFSettings::SettingsJson
 
             ModSchema mod;
             mod.id = RequiredText(document, "id");
-            Require(mod.id != "." && mod.id != ".." && std::ranges::all_of(mod.id, [](char c) {
-                return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
-            }), "mod id must use lowercase ASCII letters, digits, dots, underscores, or hyphens");
+            Require(IsValidModId(mod.id), "mod id must use lowercase ASCII letters, digits, dots, underscores, or hyphens");
             mod.title = OptionalText(document, "title", mod.id);
             mod.description = OptionalText(document, "description");
 
@@ -84,6 +82,7 @@ namespace OSFSettings::SettingsJson
                     Require(sourceSetting.is_object(), "each setting must be an object");
                     SettingDefinition setting;
                     setting.key = RequiredText(sourceSetting, "key");
+                    Require(setting.key.find('\0') == std::string::npos, "setting key must not contain NUL");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
                     const auto type = RequiredText(sourceSetting, "type");
                     Require(type == "bool" || type == "int" || type == "float" || type == "enum", "only types bool, int, float, and enum are supported: " + setting.key);
@@ -117,6 +116,7 @@ namespace OSFSettings::SettingsJson
                             Require(sourceOption.is_string() && !sourceOption.get_ref<const std::string&>().empty(), "each option must be a non-empty string: " + setting.key);
                             EnumOption option;
                             option.value = sourceOption.get<std::string>();
+                            Require(option.value.find('\0') == std::string::npos, "option value must not contain NUL: " + setting.key);
                             Require(optionValues.insert(option.value).second, "duplicate option: " + setting.key + " / " + option.value);
                             option.label = option.value;
                             if (labels != sourceSetting.end()) {

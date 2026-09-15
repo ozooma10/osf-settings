@@ -1,11 +1,9 @@
-// V1 interface specification. The Slim DLL does not implement this export yet.
-// Windows x64 ABI; see ../docs/API.md for ownership, threading, and result rules.
+// OSF Settings native service.
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include "REX/W32/KERNEL32.h"
-
-static_assert(sizeof(void*) == 8, "OSFSettings requires x64");
 
 namespace OSFSettings::API
 {
@@ -39,6 +37,8 @@ namespace OSFSettings::API
 
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
     // String pointers are borrowed only for this callback; user belongs to the caller.
+    // Mods handle their own exceptions; none may escape the callback.
+    // Callbacks run serially from an SFSE task; this API does not guarantee the main thread. schedule thread-sensitive game work appropriately.
     using ChangedFn = void (*)(const char* mod, const char* key, void* user) noexcept;
 
     struct ISettings
@@ -107,7 +107,6 @@ namespace OSFSettings::API
         [[nodiscard]] ISettings* Raw() const noexcept { return m_api; }
         [[nodiscard]] bool IsReady() const noexcept { return m_api && m_api->IsReady(); }
 
-        // Detached calls return NotReady and leave outputs unchanged.
         Status GetBool(const char* mod, const char* key, bool* out) const noexcept
         {
             return m_api ? m_api->GetBool(mod, key, out) : Status::NotReady;
@@ -123,6 +122,21 @@ namespace OSFSettings::API
         Status GetEnum(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) const noexcept
         {
             return m_api ? m_api->GetEnum(mod, key, out, capacity, required) : Status::NotReady;
+        }
+        Status GetEnum(const char* mod, const char* key, std::string& out) const noexcept
+        {
+            std::string buffer;
+            std::uint32_t required{};
+            auto status = GetEnum(mod, key, nullptr, 0, &required);
+            while (status == Status::BufferTooSmall) {
+                buffer.resize(required);
+                status = GetEnum(mod, key, buffer.data(), static_cast<std::uint32_t>(buffer.size()), &required);
+            }
+            if (status == Status::Ok) {
+                buffer.resize(required - 1); // Exclude the terminating NUL.
+                out.swap(buffer);
+            }
+            return status;
         }
 
         Status SetBool(const char* mod, const char* key, bool value) const noexcept

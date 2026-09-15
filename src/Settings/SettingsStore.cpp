@@ -76,36 +76,71 @@ namespace OSFSettings
         return std::nullopt;
     }
 
+    const ModSettings* SettingsStore::FindMod(std::string_view mod) const
+    {
+        const auto found = std::ranges::find(m_mods, mod, [](const auto& stored) { return std::string_view(stored.schema.id); });
+        return found != m_mods.end() ? &*found : nullptr;
+    }
+
+    SettingsStore::SetResult SettingsStore::Commit(ModSettings& mod, SettingValues proposed)
+    {
+        if (mod.values == proposed) return { true, {} };
+        std::string error;
+        if (!SettingsJson::SaveValues(m_valuesDir / (mod.schema.id + ".json"), proposed, error)) {
+            return { false, std::move(error), Error::SaveFailed };
+        }
+        mod.values.swap(proposed);
+        return { true, {}, Error::None, true };
+    }
+
     SettingsStore::SetResult SettingsStore::Set(std::string_view mod, std::string_view key, SettingValue value)
     {
-        try {
-            for (auto& stored : m_mods) {
-                if (stored.schema.id != mod) continue;
-                const auto current = stored.values.find(key);
-                const auto* setting = stored.schema.FindSetting(key);
-                if (current == stored.values.end() || !setting) {
-                    return { false, "unknown setting key" };
-                }
-                if (!IsValidValue(*setting, value)) {
-                    return { false, "value does not match the setting's type, bounds, or options" };
-                }
-                if (current->second == value) {
-                    return { true, {} };
-                }
-                
-                // Propose the edit in a copy. The live value changes only after saving.
-                auto proposed = stored.values;
-                proposed.find(key)->second = value;
-                std::string error;
-                if (!SettingsJson::SaveValues(m_valuesDir / (stored.schema.id + ".json"), proposed, error)) {
-                    return { false, std::move(error) };
-                }
-                stored.values.swap(proposed);
+        for (auto& stored : m_mods) {
+            if (stored.schema.id != mod) continue;
+            const auto current = stored.values.find(key);
+            const auto* setting = stored.schema.FindSetting(key);
+            if (current == stored.values.end() || !setting) {
+                return { false, "unknown setting key", Error::UnknownSetting };
+            }
+            if (current->second.index() != value.index()) {
+                return { false, "value does not match the setting's type", Error::TypeMismatch };
+            }
+            if (!IsValidValue(*setting, value)) {
+                return { false, "value does not match the setting's type, bounds, or options", Error::InvalidValue };
+            }
+            if (current->second == value) {
                 return { true, {} };
             }
-            return { false, "unknown mod id" };
-        } catch (const std::exception& error) {
-            return { false, error.what() };
+
+            // Propose the edit in a copy. The live value changes only after saving.
+            auto proposed = stored.values;
+            proposed.find(key)->second = value;
+            return Commit(stored, std::move(proposed));
         }
+        return { false, "unknown mod id", Error::UnknownMod };
+    }
+
+    SettingsStore::SetResult SettingsStore::Reset(std::string_view mod, std::string_view key)
+    {
+        const auto* stored = FindMod(mod);
+        if (!stored) return { false, "unknown mod id", Error::UnknownMod };
+        const auto* setting = stored->schema.FindSetting(key);
+        if (!setting) return { false, "unknown setting key", Error::UnknownSetting };
+        return Set(mod, key, setting->DefaultValue());
+    }
+
+    SettingsStore::SetResult SettingsStore::ResetMod(std::string_view mod)
+    {
+        for (auto& stored : m_mods) {
+            if (stored.schema.id != mod) continue;
+            SettingValues proposed;
+            for (const auto& group : stored.schema.groups) {
+                for (const auto& setting : group.settings) {
+                    proposed.emplace(setting.key, setting.DefaultValue());
+                }
+            }
+            return Commit(stored, std::move(proposed));
+        }
+        return { false, "unknown mod id", Error::UnknownMod };
     }
 }

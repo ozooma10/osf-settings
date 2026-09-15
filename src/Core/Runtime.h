@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Settings/SettingsStore.h"
+#include "Settings/SettingsService.h"
 
 namespace OSFSettings
 {
@@ -8,11 +8,10 @@ namespace OSFSettings
     {
     public:
         static Runtime& Get();
-        bool Initialize();
-        const SettingsStore& Settings() const { return m_settings; }
-        SettingsStore::SetResult SetValue(std::string_view mod, std::string_view key, SettingValue value);
+        bool Initialize() noexcept;
+        std::vector<ModSettings> Settings() const { return SettingsService::Get().Snapshot(); }
+        SettingsError SetValue(std::string_view mod, std::string_view key, SettingValue value);
     private:
-        SettingsStore m_settings;
         bool m_initialized{ false };
     };
 }

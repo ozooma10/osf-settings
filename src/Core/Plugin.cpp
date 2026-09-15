@@ -3,8 +3,6 @@
 #include "Input/PauseMenu.h"
 #include "Menu/OSFSettingsMenu.h"
 
-#include <exception>
-
 namespace OSFSettings::Plugin
 {
     namespace
@@ -15,7 +13,7 @@ namespace OSFSettings::Plugin
 
             if(message->type == SFSE::MessagingInterface::kPostPostDataLoad) {
                 const bool available = OSFSettingsMenu::Register() && PauseMenu::Install();
-                REX::INFO("[kPostPostDataLoad] Slim menu integration available={}", available);
+                REX::INFO("[kPostPostDataLoad] Settings menu integration available={}", available);
             } 
      
         }
@@ -23,10 +21,7 @@ namespace OSFSettings::Plugin
 
     bool OnLoad()
     {
-        if (!Runtime::Get().Initialize()) {
-            return false;
-        }
         const auto* messaging = SFSE::GetMessagingInterface();
-        return messaging && messaging->RegisterListener(OnMessage);
+        return messaging && messaging->RegisterListener(OnMessage) && Runtime::Get().Initialize();
     }
 }

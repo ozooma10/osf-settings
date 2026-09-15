@@ -52,6 +52,7 @@ namespace OSFSettings
         SettingValue DefaultValue() const;
     };
 
+    bool IsValidModId(std::string_view id);
     bool IsValidValue(const SettingDefinition& setting, const SettingValue& value);
 
     struct SettingsGroup

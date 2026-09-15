@@ -62,7 +62,7 @@ namespace OSFSettings
         Close();
     }
 
-    void OSFSettingsMenu::Call(const RE::Scaleform::GFx::FunctionHandler::Params& params)
+    void OSFSettingsMenu::Call(const RE::Scaleform::GFx::FunctionHandler::Params& params) noexcept
     {
         if (!params.ret || !params.movie || !params.movie->asMovieRoot) return;
         
@@ -81,7 +81,7 @@ namespace OSFSettings
             break;
         case Function::GetRows:
             root->CreateArray(params.ret);
-            for (const auto& mod : runtime.Settings().Mods()) {
+            for (const auto& mod : runtime.Settings()) {
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& setting : group.settings) {
                         const auto value = mod.values.find(setting.key);
@@ -153,7 +153,7 @@ namespace OSFSettings
         case Function::SetInt:
         case Function::SetFloat:
         case Function::SetEnum: {
-            SettingsStore::SetResult result{ false, "invalid edit arguments" };
+            auto result = SettingsError::InvalidArgument;
             if (params.argCount == 3 && params.args[0].IsString() && params.args[1].IsString()) {
                 if (function == Function::SetBool && params.args[2].IsBoolean()) {
                     result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetBoolean());
@@ -168,9 +168,10 @@ namespace OSFSettings
                 }
             }
             root->CreateObject(params.ret);
-            params.ret->SetMember("ok", RE::Scaleform::GFx::Value(result.ok));
+            const bool ok = result == SettingsError::None;
+            params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
             // Detailed file errors go to the log. The player gets an actionable message.
-            Text(*params.ret, "error", result.ok ? "" : "Could not save this setting. Your previous value is unchanged.");
+            Text(*params.ret, "error", ok ? "" : "Could not save this setting. Your previous value is unchanged.");
             break;
         }
         }

@@ -5,6 +5,13 @@
 
 namespace OSFSettings
 {
+    bool IsValidModId(std::string_view id)
+    {
+        return !id.empty() && id != "." && id != ".." && std::ranges::all_of(id, [](char c) {
+            return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+        });
+    }
+
     SettingValue SettingDefinition::DefaultValue() const
     {
         return std::visit([](const auto& data) -> SettingValue { return data.defaultValue; }, definition);

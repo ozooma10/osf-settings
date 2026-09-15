@@ -1,8 +1,6 @@
 #include "Runtime.h"
+#include "SettingsDispatcher.h"
 #include "Utils/Paths.h"
-
-#include <exception>
-#include <spdlog/spdlog.h>
 
 namespace OSFSettings
 {
@@ -12,46 +10,49 @@ namespace OSFSettings
         return instance;
     }
 
-    bool Runtime::Initialize()
+    bool Runtime::Initialize() noexcept
     {
         if (m_initialized) return true;
 
-        try {
-            if (!Paths::Initialize()) return false;
-            const auto schemaDir = Paths::SchemasDir();
-            REX::INFO("Loading schemas from {}", schemaDir.string());
-            m_settings.LoadAll(schemaDir, Paths::ValuesDir());
+        if (!Paths::Initialize()) return false;
+        const auto schemaDir = Paths::SchemasDir();
+        REX::INFO("Loading schemas from {}", schemaDir.string());
+        auto& settings = SettingsService::Get();
+        settings.Load(schemaDir, Paths::ValuesDir());
+        const auto errors = settings.LoadErrors();
+        const auto mods = settings.Snapshot();
 
-            for (const auto& error : m_settings.LoadErrors()) {
-                REX::ERROR("Settings {}: {}", error.file.string(), error.message);
-            }
+        for (const auto& error : errors) {
+            REX::ERROR("Settings {}: {}", error.file.string(), error.message);
+        }
 
-            std::size_t settingCount = 0;
-            for (const auto& mod : m_settings.Mods()) {
-                for (const auto& [key, value] : mod.values) {
-                    std::visit([&](const auto& current) {
-                        REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current);
-                    }, value);
-                    ++settingCount;
-                }
+        std::size_t settingCount = 0;
+        for (const auto& mod : mods) {
+            for (const auto& [key, value] : mod.values) {
+                std::visit([&](const auto& current) {
+                    REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current);
+                }, value);
+                ++settingCount;
             }
-            REX::INFO("Checkpoint 3: {} mod(s), {} setting(s), {} load error(s)", m_settings.Mods().size(), settingCount, m_settings.LoadErrors().size());
-            m_initialized = true;
-            return true;
-        } catch (const std::exception& error) {
-            REX::ERROR("OSF Settings Slim initialization failed: {}", error.what());
-            if (auto logger = spdlog::default_logger()) logger->flush();
+        }
+        REX::INFO("OSF Settings Loaded: {} mod(s), {} setting(s), {} load error(s)", mods.size(), settingCount, errors.size());
+        if (!SettingsDispatcher::Install()) {
+            REX::ERROR("Settings notification dispatcher is unavailable");
             return false;
         }
+        settings.Start();
+        m_initialized = true;
+        return true;
     }
 
-    SettingsStore::SetResult Runtime::SetValue(std::string_view mod, std::string_view key, SettingValue value)
+    SettingsError Runtime::SetValue(std::string_view mod, std::string_view key, SettingValue value)
     {
-        auto result = m_settings.Set(mod, key, value);
-        if (result.ok) {
-            std::visit([&](const auto& current) { REX::INFO("Menu saved {} / {} = {}", mod, key, current); }, value);
+        const auto result = SettingsService::Get().SetValue(mod, key, value);
+        if (result == SettingsError::None) {
+            std::visit([&](const auto& current) { REX::INFO("OSF Settings saved {} / {} = {}", mod, key, current); }, value);
+        } else {
+            REX::ERROR("OSF Settings could not save {} / {}: status {}", mod, key, static_cast<std::uint32_t>(result));
         }
-        else REX::ERROR("Menu could not save {} / {}: {}", mod, key, result.error);
         return result;
     }
 }
