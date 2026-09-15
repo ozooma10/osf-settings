@@ -87,7 +87,7 @@ namespace OSFSettings
                     return { false, "unknown setting key" };
                 }
                 if (!IsValidValue(*setting, value)) {
-                    return { false, "value has the wrong type or is outside its bounds" };
+                    return { false, "value does not match the setting's type, bounds, or options" };
                 }
                 if (current->second == value) {
                     return { true, {} };

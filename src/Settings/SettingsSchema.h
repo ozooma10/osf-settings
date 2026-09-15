@@ -30,12 +30,24 @@ namespace OSFSettings
         double step{ 0.1 }; // Editor increment; stored values need not lie on this grid.
     };
 
+    struct EnumOption
+    {
+        std::string value;
+        std::string label;
+    };
+
+    struct EnumDefinition
+    {
+        std::string defaultValue;
+        std::vector<EnumOption> options;
+    };
+
     struct SettingDefinition
     {
         std::string key;
         std::string label;
         std::string hint;
-        std::variant<BoolDefinition, IntDefinition, FloatDefinition> definition;
+        std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition> definition;
 
         SettingValue DefaultValue() const;
     };

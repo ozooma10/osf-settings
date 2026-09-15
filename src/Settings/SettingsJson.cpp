@@ -41,6 +41,9 @@ namespace OSFSettings::SettingsJson
                 return *number;
             }
         }
+        if (std::holds_alternative<EnumDefinition>(setting.definition) && value.is_string()) {
+            return value.get<std::string>();
+        }
         return std::nullopt;
     }
 }

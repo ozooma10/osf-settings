@@ -47,7 +47,7 @@ namespace OSFSettings::SettingsJson
                 }
                 const auto decoded = DecodeValue(value, *setting);
                 if (!decoded || !IsValidValue(*setting, *decoded)) {
-                    errors.push_back({ path, "saved value has the wrong type or is outside its bounds: " + key });
+                    errors.push_back({ path, "saved value does not match the setting's type, bounds, or options: " + key });
                     continue;
                 }
                 current->second = *decoded;

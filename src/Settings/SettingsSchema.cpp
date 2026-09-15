@@ -1,5 +1,6 @@
 #include "SettingsSchema.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace OSFSettings
@@ -18,6 +19,10 @@ namespace OSFSettings
         if (const auto* definition = std::get_if<FloatDefinition>(&setting.definition)) {
             const auto* number = std::get_if<double>(&value);
             return number && std::isfinite(*number) && (!definition->minimum || *number >= *definition->minimum) && (!definition->maximum || *number <= *definition->maximum);
+        }
+        if (const auto* definition = std::get_if<EnumDefinition>(&setting.definition)) {
+            const auto* option = std::get_if<std::string>(&value);
+            return option && std::ranges::find(definition->options, *option, &EnumOption::value) != definition->options.end();
         }
         return std::holds_alternative<BoolDefinition>(setting.definition) && std::holds_alternative<bool>(value);
     }

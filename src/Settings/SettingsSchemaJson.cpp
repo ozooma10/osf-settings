@@ -86,7 +86,7 @@ namespace OSFSettings::SettingsJson
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
                     const auto type = RequiredText(sourceSetting, "type");
-                    Require(type == "bool" || type == "int" || type == "float", "only types bool, int, and float are supported: " + setting.key);
+                    Require(type == "bool" || type == "int" || type == "float" || type == "enum", "only types bool, int, float, and enum are supported: " + setting.key);
                     std::string defaultError = "default must be a boolean: ";
                     if (type == "int") {
                         defaultError = "default must be an integer within its bounds: ";
@@ -104,6 +104,29 @@ namespace OSFSettings::SettingsJson
                         Require(definition.step > 0.0, "step must be positive: " + setting.key);
                         Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
                         setting.definition = definition;
+                    } else if (type == "enum") {
+                        defaultError = "default must be a string matching an option: ";
+                        EnumDefinition definition;
+                        const auto options = sourceSetting.find("options");
+                        Require(options != sourceSetting.end() && options->is_array() && !options->empty(), "options must be a non-empty array: " + setting.key);
+                        const auto labels = sourceSetting.find("optionLabels");
+                        Require(labels == sourceSetting.end() || (labels->is_array() && labels->size() == options->size()), "optionLabels must be an array with one label per option: " + setting.key);
+                        std::set<std::string> optionValues;
+                        for (std::size_t index = 0; index < options->size(); ++index) {
+                            const auto& sourceOption = (*options)[index];
+                            Require(sourceOption.is_string() && !sourceOption.get_ref<const std::string&>().empty(), "each option must be a non-empty string: " + setting.key);
+                            EnumOption option;
+                            option.value = sourceOption.get<std::string>();
+                            Require(optionValues.insert(option.value).second, "duplicate option: " + setting.key + " / " + option.value);
+                            option.label = option.value;
+                            if (labels != sourceSetting.end()) {
+                                const auto& label = (*labels)[index];
+                                Require(label.is_string(), "each option label must be a string: " + setting.key);
+                                if (!label.get_ref<const std::string&>().empty()) option.label = label.get<std::string>();
+                            }
+                            definition.options.push_back(std::move(option));
+                        }
+                        setting.definition = std::move(definition);
                     }
                     const auto value = sourceSetting.find("default");
                     const auto decoded = value != sourceSetting.end() ? DecodeValue(*value, setting) : std::nullopt;

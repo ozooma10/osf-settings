@@ -109,10 +109,10 @@ namespace
         document["groups"][0]["settings"] = Json::object();
         Reject(document, "settings must be an array");
 
-        for (const auto* type : { "enum", "string", "key", "flags", "action", "note" }) {
+        for (const auto* type : { "string", "key", "flags", "action", "note" }) {
             document = example;
             document["groups"][0]["settings"][0]["type"] = type;
-            Reject(document, "only types bool, int, and float");
+            Reject(document, "only types bool, int, float, and enum");
         }
         for (const auto& value : { Json("true"), Json(1), Json(nullptr) }) {
             document = example;
@@ -464,6 +464,166 @@ namespace
         std::cout << "Float probe: default=0.75, bounds=0..1, finite validation and decimal save/reload verified\n";
     }
 
+    void TestEnums(const Json& example)
+    {
+        auto schema = example;
+        const auto modeIndex = schema["groups"][0]["settings"].size();
+        schema["groups"][0]["settings"].push_back({ { "key", "notificationMode" }, { "type", "enum" },
+            { "default", "normal" }, { "options", { "quiet", "normal", "verbose" } },
+            { "optionLabels", { "Quiet", "Normal", "Verbose" } } });
+        std::string error;
+        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
+        Check(parsed.has_value() && error.empty(), "a schema can mix enums with booleans, integers, and floats");
+        if (!parsed) return;
+        const auto* mode = parsed->FindSetting("notificationMode");
+        const auto* enumeration = mode ? std::get_if<OSFSettings::EnumDefinition>(&mode->definition) : nullptr;
+        Check(enumeration && enumeration->defaultValue == "normal" && mode->DefaultValue() == SettingValue{ std::string{"normal"} },
+            "enum defaults are stored as strings");
+        Check(enumeration && enumeration->options.size() == 3 &&
+            enumeration->options[0].value == "quiet" && enumeration->options[0].label == "Quiet" &&
+            enumeration->options[1].value == "normal" && enumeration->options[1].label == "Normal" &&
+            enumeration->options[2].value == "verbose" && enumeration->options[2].label == "Verbose",
+            "enum options preserve authored order and pair each value with its label");
+        if (!enumeration) return;
+
+        auto document = schema;
+        document["groups"][0]["settings"][modeIndex].erase("optionLabels");
+        auto decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
+        Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
+            "omitted option labels use the option values");
+        document = schema;
+        document["groups"][0]["settings"][modeIndex]["optionLabels"] = { "", "Same label", "Same label" };
+        decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
+        Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
+            "empty labels use the option value and display labels need not be unique");
+        document = schema;
+        auto& single = document["groups"][0]["settings"][modeIndex];
+        single.erase("optionLabels"); single["options"] = { "normal" };
+        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "an enum can have a single option");
+        single["options"] = { "normal", "Normal" };
+        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "enum option identities are case-sensitive");
+
+        document = schema;
+        document["groups"][0]["settings"][modeIndex].erase("options");
+        Reject(document, "options must be a non-empty array");
+        for (const auto& options : std::vector<Json>{ Json::array(), Json::object(), nullptr, true, 1, "quiet" }) {
+            document = schema;
+            document["groups"][0]["settings"][modeIndex]["options"] = options;
+            Reject(document, "options must be a non-empty array");
+        }
+        for (const auto& option : std::vector<Json>{ "", true, 1, 1.0, nullptr, Json::array(), Json::object() }) {
+            document = schema;
+            document["groups"][0]["settings"][modeIndex]["options"][0] = option;
+            Reject(document, "each option must be a non-empty string");
+        }
+        document = schema;
+        document["groups"][0]["settings"][modeIndex]["options"][0] = "normal";
+        Reject(document, "duplicate option");
+        for (const auto& labels : std::vector<Json>{ Json::array(), Json::array({ "Quiet", "Normal" }),
+            Json::array({ "Quiet", "Normal", "Verbose", "Extra" }), Json::object(), nullptr, true, "labels" }) {
+            document = schema;
+            document["groups"][0]["settings"][modeIndex]["optionLabels"] = labels;
+            Reject(document, "optionLabels must be an array with one label per option");
+        }
+        for (const auto& label : std::vector<Json>{ nullptr, true, 1, Json::array(), Json::object() }) {
+            document = schema;
+            document["groups"][0]["settings"][modeIndex]["optionLabels"][0] = label;
+            Reject(document, "each option label must be a string");
+        }
+        document = schema;
+        document["groups"][0]["settings"][modeIndex].erase("default");
+        Reject(document, "default must be a string matching an option");
+        const std::vector<Json> invalidValues{ true, 1, 1.0, nullptr, "", "Normal", "removed", Json::array(), Json::object() };
+        for (const auto& value : invalidValues) {
+            document = schema;
+            document["groups"][0]["settings"][modeIndex]["default"] = value;
+            Reject(document, "default must be a string matching an option");
+        }
+
+        const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        const auto root = fs::current_path() / "build" / "tests" / "enums" / run;
+        const auto schemas = root / "schemas";
+        const auto schemaFile = schemas / "learning.json";
+        const auto values = root / "values";
+        const auto valuesFile = values / "learning.json";
+        const auto temporary = values / "learning.json.tmp";
+        fs::create_directories(schemas);
+        Write(schemaFile, schema.dump(2));
+        OSFSettings::SettingsStore store;
+        store.LoadAll(schemas, values);
+        Check(store.LoadErrors().empty() && store.GetValue("learning", "notificationMode") == mode->DefaultValue(),
+            "enum defaults load without a saved file");
+        Check(store.Set("learning", "notificationMode", std::string{"normal"}).ok && !fs::exists(values),
+            "setting the current enum value does not write a file");
+        Check(!store.Set("learning", "notifications", std::string{"true"}).ok &&
+            !store.Set("learning", "notificationLimit", std::string{"3"}).ok &&
+            !store.Set("learning", "notificationVolume", std::string{"0.75"}).ok && !fs::exists(values),
+            "string storage for enums does not enable string coercion for other types");
+
+        OSFSettings::SettingsStore restarted;
+        for (const auto* value : { "quiet", "normal", "verbose" }) {
+            Check(store.Set("learning", "notificationMode", std::string{value}).ok, "each declared enum option can be selected");
+            restarted.LoadAll(schemas, values);
+            const auto saved = Json::parse(Read(valuesFile));
+            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ std::string{value} } &&
+                saved["values"]["notificationMode"].is_string() && saved["values"]["notificationMode"] == value,
+                "enum saving and reloading preserve the option string");
+        }
+        const auto committed = Read(valuesFile);
+        for (const auto& value : std::vector<SettingValue>{ true, std::int64_t{1}, 1.0,
+            std::string{}, std::string{"Normal"}, std::string{"removed"} }) {
+            const auto result = store.Set("learning", "notificationMode", value);
+            Check(!result.ok && !result.error.empty() && Read(valuesFile) == committed &&
+                store.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} },
+                "wrong types, display labels, and unknown enum values preserve the live value and saved file");
+        }
+        fs::create_directory(temporary);
+        Check(!store.Set("learning", "notificationMode", std::string{"quiet"}).ok && Read(valuesFile) == committed &&
+            store.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} },
+            "a failed enum save preserves the live value and saved file");
+        fs::remove(temporary); // Only the empty directory created by this test.
+        Check(store.Set("learning", "notificationMode", mode->DefaultValue()).ok, "an enum resets through the normal save path");
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == mode->DefaultValue(),
+            "the reset enum survives reload");
+        Check(store.Set("learning", "notificationMode", std::string{"verbose"}).ok &&
+            store.Set("learning", "notifications", false).ok && store.Set("learning", "notificationLimit", std::int64_t{7}).ok &&
+            store.Set("learning", "notificationVolume", 0.5).ok, "all four setting types can be saved together");
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} } &&
+            restarted.GetValue("learning", "notifications") == SettingValue{ false } &&
+            restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} } &&
+            restarted.GetValue("learning", "notificationVolume") == SettingValue{ 0.5 }, "mixed edits preserve neighboring values and types");
+
+        const auto savedSelection = Read(valuesFile);
+        document = schema;
+        auto& reordered = document["groups"][0]["settings"][modeIndex];
+        reordered["options"] = { "verbose", "quiet", "normal" };
+        reordered["optionLabels"] = { "Detailed", "Minimal", "Standard" };
+        Write(schemaFile, document.dump(2));
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} } &&
+            Read(valuesFile) == savedSelection, "reordering options and changing labels preserve the saved selection without rewriting it");
+        reordered["options"] = { "quiet", "normal" };
+        reordered.erase("optionLabels");
+        Write(schemaFile, document.dump(2));
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().size() == 1 && restarted.GetValue("learning", "notificationMode") == mode->DefaultValue() &&
+            restarted.GetValue("learning", "notifications") == SettingValue{ false } && Read(valuesFile) == savedSelection,
+            "a removed option falls back to the default and reports an error while preserving the file and valid neighbors");
+
+        Write(schemaFile, schema.dump(2));
+        for (const auto& value : invalidValues) {
+            const Json saved = { { "formatVersion", 1 }, { "values", { { "notificationMode", value }, { "notifications", false } } } };
+            Write(valuesFile, saved.dump());
+            restarted.LoadAll(schemas, values);
+            Check(restarted.GetValue("learning", "notificationMode") == mode->DefaultValue() &&
+                restarted.GetValue("learning", "notifications") == SettingValue{ false } && restarted.LoadErrors().size() == 1 &&
+                restarted.LoadErrors()[0].file == valuesFile && restarted.LoadErrors()[0].message.find("notificationMode") != std::string::npos &&
+                Read(valuesFile) == saved.dump(), "invalid saved enums retain defaults, report their path and key, and preserve valid neighbors and the file");
+        }
+    }
+
     void TestStore(const Json& example, const fs::path& examplePath)
     {
         // Keep generated fixtures under build so the walkthrough can inspect them.
@@ -672,6 +832,7 @@ int main(int argc, char** argv)
         TestPersistence(example);
         TestIntegers(example);
         TestFloats(example);
+        TestEnums(example);
         TestFloatSlider(example);
         std::cout << checks - failures << '/' << checks << " checks passed\n";
         return failures == 0 ? 0 : 1;

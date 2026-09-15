@@ -127,6 +127,8 @@ namespace OSFSettings
                                 row.SetMember("sliderScale", RE::Scaleform::GFx::Value(static_cast<double>(slider->scale)));
                                 row.SetMember("sliderSteps", RE::Scaleform::GFx::Value(static_cast<double>(slider->steps)));
                             }
+                        } else {
+                            continue; // Enum rows will be exposed with the choice editor.
                         }
                         params.ret->PushBack(row);
                     }
