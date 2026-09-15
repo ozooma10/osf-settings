@@ -9,7 +9,7 @@ namespace OSFSettings
 {
     namespace
     {
-        enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, Close, Startup, StartupFailed };
+        enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -50,6 +50,7 @@ namespace OSFSettings
         RegisterNativeFunction("setBool", static_cast<std::uint64_t>(Function::SetBool));
         RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
         RegisterNativeFunction("setFloat", static_cast<std::uint64_t>(Function::SetFloat));
+        RegisterNativeFunction("setEnum", static_cast<std::uint64_t>(Function::SetEnum));
         RegisterNativeFunction("close", static_cast<std::uint64_t>(Function::Close));
         RegisterNativeFunction("startup", static_cast<std::uint64_t>(Function::Startup));
         RegisterNativeFunction("startupFailed", static_cast<std::uint64_t>(Function::StartupFailed));
@@ -127,8 +128,21 @@ namespace OSFSettings
                                 row.SetMember("sliderScale", RE::Scaleform::GFx::Value(static_cast<double>(slider->scale)));
                                 row.SetMember("sliderSteps", RE::Scaleform::GFx::Value(static_cast<double>(slider->steps)));
                             }
-                        } else {
-                            continue; // Enum rows will be exposed with the choice editor.
+                        } else if (const auto* enumeration = std::get_if<EnumDefinition>(&setting.definition)) {
+                            Text(row, "type", "enum");
+                            Text(row, "value", std::get<std::string>(value->second));
+                            Text(row, "defaultValue", enumeration->defaultValue);
+                            row.SetMember("editable", RE::Scaleform::GFx::Value(enumeration->options.size() > 1));
+                            RE::Scaleform::GFx::Value options;
+                            root->CreateArray(&options);
+                            for (const auto& option : enumeration->options) {
+                                RE::Scaleform::GFx::Value choice;
+                                root->CreateObject(&choice);
+                                Text(choice, "value", option.value);
+                                Text(choice, "label", option.label);
+                                options.PushBack(choice);
+                            }
+                            row.SetMember("options", options);
                         }
                         params.ret->PushBack(row);
                     }
@@ -137,7 +151,8 @@ namespace OSFSettings
             break;
         case Function::SetBool:
         case Function::SetInt:
-        case Function::SetFloat: {
+        case Function::SetFloat:
+        case Function::SetEnum: {
             SettingsStore::SetResult result{ false, "invalid edit arguments" };
             if (params.argCount == 3 && params.args[0].IsString() && params.args[1].IsString()) {
                 if (function == Function::SetBool && params.args[2].IsBoolean()) {
@@ -148,6 +163,8 @@ namespace OSFSettings
                     }
                 } else if (function == Function::SetFloat && params.args[2].IsNumber()) {
                     result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetNumber());
+                } else if (function == Function::SetEnum && params.args[2].IsString()) {
+                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), ArgString(params, 2));
                 }
             }
             root->CreateObject(params.ret);

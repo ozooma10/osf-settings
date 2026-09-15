@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "learning",
   "title": "Learning example",
-  "description": "A boolean, an integer, and a float, understood end to end.",
+  "description": "A boolean, an integer, a float, and an enum, understood end to end.",
   "groups": [
     {
       "id": "general",
@@ -33,6 +33,15 @@
           "min": 0.0,
           "max": 1.0,
           "step": 0.05
+        },
+        {
+          "key": "notificationMode",
+          "type": "enum",
+          "label": "Notification mode",
+          "hint": "Choose how much detail notifications show. A learning example; no gameplay behavior is connected yet.",
+          "default": "normal",
+          "options": ["quiet", "normal", "verbose"],
+          "optionLabels": ["Quiet", "Normal", "Verbose"]
         }
       ]
     }

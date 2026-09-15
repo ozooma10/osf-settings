@@ -217,9 +217,9 @@ package
                 // The vanilla entry multiplies fValue by 100. Our slider stores integer offsets.
                 data.push({row:row, sText:html(String(row.title)), uID:data.length, bDisabled:false, bShowSpinner:false,
                     uCategory:0, bEnabled:!modID || row.editable, bSubSetting:false,
-                    uType:!modID ? types.SDT_LINK : slider ? types.SDT_SLIDER : row.type == "bool" ? types.SDT_CHECKBOX : types.SDT_LINK,
+                    uType:!modID ? types.SDT_LINK : slider ? types.SDT_SLIDER : row.type == "enum" ? types.SDT_LARGE_STEPPER : row.type == "bool" ? types.SDT_CHECKBOX : types.SDT_LINK,
                     sliderData:{fValue:slider ? NumericSetting.position(row) / 100 : 0, sDisplayValue:NumericSetting.text(row, row.value)},
-                    stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
+                    stepperData:{aStepperOptions:row.type == "enum" ? EnumSetting.labels(row) : [], uIndex:row.type == "enum" ? EnumSetting.index(row) : 0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
             }
             options.InitializeEntries(data);
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
@@ -287,12 +287,15 @@ package
             detailHint.height = Math.max(64, 630 - detailHint.y);
             detailHint.text = row ? String(row.hint || "") : ""; detailHint.scrollV = 1;
             defaultLabel.text = modID ? "DEFAULT" : "SETTINGS";
-            MenuStyle.fit(defaultValue, row ? modID ? NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
+            defaultValue.x = row && row.type == "enum" ? 1434 : 1674;
+            defaultValue.width = row && row.type == "enum" ? 410 : 170;
+            MenuStyle.fit(defaultValue, row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
+                NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
             resetButton.Visible = Boolean(modID && row && row.editable);
-            buttonData.Accept.sButtonText = modID ? "TOGGLE" : "OPEN";
+            buttonData.Accept.sButtonText = !modID ? "OPEN" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
             buttonData.Cancel.sButtonText = modID ? "ALL MODS" : "BACK";
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-            acceptButton.Visible = Boolean(row && (!modID || row.type == "bool")); bar.RefreshButtons();
+            acceptButton.Visible = Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum"))); bar.RefreshButtons();
         }
         private function scrollDescription(event:MouseEvent):void
         {
@@ -308,6 +311,10 @@ package
             var row:Object = current(); if (!row) return;
             if (!modID) { modID = row.mod; groupID = ""; refresh(false); }
             else if (row.type == "bool") options.OnEntryPressed();
+            else if (row.type == "enum" && row.editable) {
+                var clip:Object = options.FindClipForEntry(options.selectedIndex);
+                if (clip) clip.LargeStepper_mc.PressHandler();
+            }
         }
         private function reset():void
         {
@@ -322,7 +329,13 @@ package
             var item:Object = options.GetDataForEntry(int(data.id));
             if (!modID || !item || !item.row.editable) return;
             var row:Object = item.row;
-            if (row.type == "bool") edit(row, Number(data.value) != 0);
+            if (row.type == "enum") {
+                // The vanilla stepper reports a position; native storage owns the string value.
+                var index:Number = Number(data.value);
+                if (!requestedRefresh && isFinite(index) && index == Math.floor(index) && index >= 0 && index < row.options.length)
+                    edit(row, row.options[int(index)].value);
+            }
+            else if (row.type == "bool") edit(row, Number(data.value) != 0);
             else if (NumericSetting.isSlider(row)) {
                 // SettingsOptionListEntry reports BSSlider.value / 100.
                 edit(row, NumericSetting.atPosition(row, Number(data.value) * 100));
@@ -336,6 +349,7 @@ package
             var result:Object;
             if (row.type == "float") result = BGSCodeObj.setFloat(row.mod, row.key, Number(value));
             else if (row.type == "int") result = BGSCodeObj.setInt(row.mod, row.key, String(value));
+            else if (row.type == "enum") result = BGSCodeObj.setEnum(row.mod, row.key, String(value));
             else result = BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
             if (result && result.ok) { row.value = value; describe(); }
             status.text = result && result.ok ? "Changes apply automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.";
@@ -378,7 +392,10 @@ package
                     if (NumericSetting.isSlider(row)) {
                         var next:Number = NumericSetting.position(row) + (event.keyCode == Keyboard.RIGHT ? 1 : -1);
                         edit(row, NumericSetting.atPosition(row, next));
-                    } else edit(row, event.keyCode == Keyboard.RIGHT);
+                    } else if (row.type == "enum") {
+                        var clip:Object = options.FindClipForEntry(options.selectedIndex);
+                        if (clip) clip.onKeyDownHandler(event);
+                    } else if (row.type == "bool") edit(row, event.keyCode == Keyboard.RIGHT);
                 }
             } else return;
             event.stopImmediatePropagation(); event.preventDefault();
@@ -416,18 +433,28 @@ package
                 // colors must not recolor our text or selection bar.
                 var slider:Object = Object(clip).Slider_mc;
                 var showSlider:Boolean = modID != "" && NumericSetting.isSlider(item.row);
+                var stepper:Object = Object(clip).LargeStepper_mc;
+                var showStepper:Boolean = modID != "" && item.row.type == "enum" && item.row.editable;
                 clip.setChildIndex(view, 0);
                 for (var child:int = 0; child < clip.numChildren; ++child) {
                     var display:DisplayObject = clip.getChildAt(child);
-                    display.visible = display == view || (showSlider && display == slider);
+                    display.visible = display == view || (showSlider && display == slider) || (showStepper && display == stepper);
                 }
-                clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider;
+                clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider || showStepper;
                 if (showSlider) {
                     slider.x = 540; slider.y = (MenuStyle.ROW_HEIGHT - slider.height) / 2; slider.width = 330;
                     slider.maxValue = NumericSetting.steps(item.row);
                     slider.disableRounding = false; slider.mouseWheelValueChange = 1;
                     if (!slider.dragging) slider.value = NumericSetting.position(item.row);
                     slider.transform.colorTransform = Object(clip).itemIndex == options.selectedIndex ?
+                        new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
+                }
+                if (showStepper) {
+                    // Keep vanilla arrows and hit areas; SettingsRow draws the label in our font.
+                    stepper.textField.visible = false;
+                    stepper.x = 540; stepper.width = 450;
+                    stepper.y = (MenuStyle.ROW_HEIGHT - stepper.height) / 2;
+                    stepper.transform.colorTransform = Object(clip).itemIndex == options.selectedIndex ?
                         new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
                 }
                 var border:MovieClip = Object(clip).Border_mc;

@@ -467,10 +467,7 @@ namespace
     void TestEnums(const Json& example)
     {
         auto schema = example;
-        const auto modeIndex = schema["groups"][0]["settings"].size();
-        schema["groups"][0]["settings"].push_back({ { "key", "notificationMode" }, { "type", "enum" },
-            { "default", "normal" }, { "options", { "quiet", "normal", "verbose" } },
-            { "optionLabels", { "Quiet", "Normal", "Verbose" } } });
+        const auto modeIndex = schema["groups"][0]["settings"].size() - 1;
         std::string error;
         const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
         Check(parsed.has_value() && error.empty(), "a schema can mix enums with booleans, integers, and floats");

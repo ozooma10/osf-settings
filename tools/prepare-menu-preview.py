@@ -187,13 +187,27 @@ def prepare(archive_path, output, schema_paths, large, menu_path):
                     if maximum is not None:
                         attributes["maximum"] = str(maximum)
                     attributes.update(float_slider(minimum, maximum, step))
+                elif kind == "enum":
+                    options = setting.get("options")
+                    if (not isinstance(options, list) or not options or
+                            any(not isinstance(value, str) or not value for value in options) or
+                            len(set(options)) != len(options) or not isinstance(default, str) or default not in options):
+                        raise ValueError(f"Invalid preview enum options or default: {path}")
+                    labels = setting.get("optionLabels", options)
+                    if (not isinstance(labels, list) or len(labels) != len(options) or
+                            any(not isinstance(label, str) for label in labels)):
+                        raise ValueError(f"Invalid preview enum labels: {path}")
+                    attributes.update(value=default, editable=str(len(options) > 1).lower())
                 elif kind != "bool" or type(default) is not bool:
-                    raise ValueError(f"Preview supports boolean, integer, and float settings only: {path}")
-                ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
+                    raise ValueError(f"Preview supports boolean, integer, float, and enum settings only: {path}")
+                row = ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
                               modDescription=schema.get("description", ""),
                               group=group["id"], groupTitle=group["label"], key=setting["key"],
                               title=setting["label"], hint=setting.get("hint", ""),
                               **attributes)
+                if kind == "enum":
+                    for value, label in zip(options, labels):
+                        ET.SubElement(row, "option", value=value, label=label or value)
     ET.indent(config)
     ET.ElementTree(config).write(output / "preview.xml", encoding="utf-8", xml_declaration=True)
 
