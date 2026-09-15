@@ -19,7 +19,7 @@ package
     {
         private var menu:MovieClip;
         private var list:Object;
-        private var input:TextField;
+        private var playbackTab:DisplayObject;
         private var tick:int = 0;
         private var step:int = 0;
         private var setter:Function;
@@ -31,7 +31,6 @@ package
                 var child:Object = menu.getChildAt(i);
                 if ("selectedIndex" in child && "InitializeEntries" in child) list = child;
             }
-            input = findInput(menu);
             menu.addEventListener(Event.ENTER_FRAME, advance);
         }
         private function require(value:Boolean, message:String):void
@@ -43,13 +42,9 @@ package
         {
             Object(menu).ProcessUserEvent(name, true); Object(menu).ProcessUserEvent(name, false);
         }
-        private function key(code:uint, target:DisplayObject = null):void
+        private function key(code:uint):void
         {
-            (target || list).dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, true, 0, code));
-        }
-        private function search(text:String):void
-        {
-            menu.stage.focus = input; input.text = text; input.dispatchEvent(new Event(Event.CHANGE));
+            list.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, true, 0, code));
         }
         private function advance(event:Event):void
         {
@@ -62,27 +57,34 @@ package
                     requireGlyphs("Auto-advance stages");
                     require(list.entryCount == 6, "playback has six settings");
                     require(list.selectedEntry.row.key == "autoAdvance", "first setting selected");
+                    require(findInput(menu) == null, "menu has no text input");
+                    key(Keyboard.F);
+                    require(menu.stage.focus == list && !list.disableInput, "F leaves list input active");
+                    playbackTab = findNamed(menu, "playback");
+                    require(playbackTab != null, "playback tab present");
                     capture("default"); userEvent("Accept"); break;
                 case 1:
                     require(list.selectedEntry.row.value == false, "toggle saved and reread");
+                    require(findNamed(menu, "playback") == playbackTab, "toggle reuses tabs");
                     capture("changed"); key(Keyboard.B); break;
                 case 2:
                     require(list.selectedEntry.row.value == true, "reset restored schema default");
+                    require(findNamed(menu, "playback") == playbackTab, "reset reuses tabs");
                     findNamed(menu, "camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 3:
                     require(list.entryCount == 2 && list.selectedEntry.row.key == "freeCamera", "camera tab filters settings");
                     key(221); break;
                 case 4:
                     require(list.entryCount == 1 && list.selectedEntry.row.key == "hotkeys", "keyboard changes group");
-                    search("Diagnostic logging"); break;
+                    key(221); break;
                 case 5:
-                    require(list.entryCount == 1 && list.selectedEntry.row.key == "debug", "search spans this mod's groups");
-                    search("no such preview setting"); break;
+                    require(list.entryCount == 1 && list.selectedEntry.row.key == "debug", "advanced tab reachable");
+                    key(221); break;
                 case 6:
-                    require(list.entryCount == 0 && list.selectedIndex == -1, "empty search clears selection");
-                    key(Keyboard.ESCAPE, input); break;
+                    require(list.entryCount == 6 && list.selectedEntry.row.key == "autoAdvance", "next page wraps to playback");
+                    key(219); break;
                 case 7:
-                    require(list.entryCount == 1 && list.selectedEntry.row.key == "hotkeys", "cancel search restores page");
+                    require(list.entryCount == 1 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
                     userEvent("Cancel"); break;
                 case 8:
                     require(list.entryCount == 1 && list.selectedEntry.row.title == "OSF Director", "back opens mod list");

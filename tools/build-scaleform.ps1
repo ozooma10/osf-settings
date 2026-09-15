@@ -10,54 +10,70 @@ $player = Join-Path $flex 'frameworks\libs\player\10.3\playerglobal.swc'
 if (-not (Test-Path $compiler) -or -not (Test-Path $java) -or -not (Test-Path $player)) {
     throw 'Scaleform toolchain missing. Run pwsh tools/setup-scaleform.ps1.'
 }
-function Write-SwfTag([IO.BinaryWriter]$Writer, [int]$Code, [byte[]]$Data) {
-    $Writer.Write([uint16](($Code -shl 6) -bor [Math]::Min($Data.Length, 63)))
-    if ($Data.Length -ge 63) { $Writer.Write([uint32]$Data.Length) }
-    $Writer.Write($Data)
+function New-SwfData([scriptblock]$Content) {
+    $dataStream = [IO.MemoryStream]::new()
+    $dataWriter = [IO.BinaryWriter]::new($dataStream)
+    try {
+        & $Content $dataWriter
+        return ,$dataStream.ToArray()
+    } finally { $dataWriter.Dispose(); $dataStream.Dispose() }
+}
+function Write-SwfString([IO.BinaryWriter]$Writer, [string]$Value) {
+    $Writer.Write([Text.Encoding]::ASCII.GetBytes($Value)); $Writer.Write([byte]0)
+}
+function Write-SwfTag([IO.BinaryWriter]$Writer, [int]$Code, [scriptblock]$Content = {}) {
+    $data = New-SwfData $Content
+    $Writer.Write([uint16](($Code -shl 6) -bor [Math]::Min($data.Length, 63)))
+    if ($data.Length -ge 63) { $Writer.Write([uint32]$data.Length) }
+    $Writer.Write($data)
 }
 function New-TextSymbols {
     # DefineEditText.FontClass binds the shared font at movie load, as in vanilla.
     # These symbols contain no glyphs and need no AS3 font class lookup.
-    $stream = [IO.MemoryStream]::new(); $writer = [IO.BinaryWriter]::new($stream)
-    $fonts = @('$MAIN_Font_Bold', '$NB_Grotesk_Semibold')
-    $classes = @('MenuLabelField', 'MenuBodyField')
+    $bindings = @(
+        @{ TextID = 1; SpriteID = 3; Class = 'MenuLabelField'; Font = '$MAIN_Font_Bold' }
+        @{ TextID = 2; SpriteID = 4; Class = 'MenuBodyField'; Font = '$NB_Grotesk_Semibold' }
+    )
     # Signed 16-bit RECT: (0, 20000, 0, 2000) twips; AS3 sets each field's size.
     $bits = '10000' + ('0' * 16) + [Convert]::ToString(20000, 2).PadLeft(16, '0') + ('0' * 16) + [Convert]::ToString(2000, 2).PadLeft(16, '0')
     $bits = $bits.PadRight([int]([Math]::Ceiling($bits.Length / 8.0) * 8), '0')
     $rect = [byte[]]::new($bits.Length / 8)
     for ($i = 0; $i -lt $rect.Length; ++$i) { $rect[$i] = [Convert]::ToByte($bits.Substring($i * 8, 8), 2) }
-    for ($i = 0; $i -lt 2; ++$i) {
-        $data = [IO.MemoryStream]::new(); $field = [IO.BinaryWriter]::new($data)
-        $field.Write([uint16]($i + 1)); $field.Write($rect)
-        # HasText, ReadOnly, HasTextColor, HasFontClass, HasLayout, NoSelect, UseOutlines.
-        $field.Write([byte]0x8C); $field.Write([byte]0xB1)
-        $field.Write([Text.Encoding]::ASCII.GetBytes($fonts[$i])); $field.Write([byte]0)
-        $field.Write([uint16]560); $field.Write([uint32]::MaxValue)
-        $field.Write([byte]0) # left aligned
-        for ($j = 0; $j -lt 4; ++$j) { $field.Write([uint16]0) } # margins, indent, leading
-        $field.Write([byte]0); $field.Write([byte]0) # empty variable and initial text
-        Write-SwfTag $writer 37 $data.ToArray(); $field.Dispose(); $data.Dispose()
-
-        $data = [IO.MemoryStream]::new(); $place = [IO.BinaryWriter]::new($data)
-        $place.Write([byte]0x26); $place.Write([uint16]1); $place.Write([uint16]($i + 1))
-        $place.Write([byte]0) # identity matrix
-        $place.Write([Text.Encoding]::ASCII.GetBytes('textField')); $place.Write([byte]0)
-        $spriteData = [IO.MemoryStream]::new(); $sprite = [IO.BinaryWriter]::new($spriteData)
-        $sprite.Write([uint16]($i + 3)); $sprite.Write([uint16]1)
-        Write-SwfTag $sprite 26 $data.ToArray()
-        Write-SwfTag $sprite 1 @(); Write-SwfTag $sprite 0 @()
-        Write-SwfTag $writer 39 $spriteData.ToArray()
-        $place.Dispose(); $data.Dispose(); $sprite.Dispose(); $spriteData.Dispose()
-    }
-    $data = [IO.MemoryStream]::new(); $symbols = [IO.BinaryWriter]::new($data)
-    $symbols.Write([uint16]2)
-    for ($i = 0; $i -lt 2; ++$i) {
-        $symbols.Write([uint16]($i + 3))
-        $symbols.Write([Text.Encoding]::ASCII.GetBytes($classes[$i])); $symbols.Write([byte]0)
-    }
-    Write-SwfTag $writer 76 $data.ToArray(); $symbols.Dispose(); $data.Dispose()
-    $result = $stream.ToArray(); $writer.Dispose(); $stream.Dispose()
-    return ,$result
+    return ,(New-SwfData {
+        param($tags)
+        foreach ($binding in $bindings) {
+            Write-SwfTag $tags 37 { # DefineEditText
+                param($field)
+                $field.Write([uint16]$binding.TextID); $field.Write($rect)
+                # HasText, ReadOnly, HasTextColor, HasFontClass, HasLayout, NoSelect, UseOutlines.
+                $field.Write([byte]0x8C); $field.Write([byte]0xB1)
+                Write-SwfString $field $binding.Font
+                $field.Write([uint16]560); $field.Write([uint32]::MaxValue)
+                $field.Write([byte]0) # left aligned
+                for ($j = 0; $j -lt 4; ++$j) { $field.Write([uint16]0) } # margins, indent, leading
+                Write-SwfString $field ''; Write-SwfString $field '' # variable and initial text
+            }
+            Write-SwfTag $tags 39 { # DefineSprite
+                param($sprite)
+                $sprite.Write([uint16]$binding.SpriteID); $sprite.Write([uint16]1)
+                Write-SwfTag $sprite 26 { # PlaceObject2
+                    param($place)
+                    $place.Write([byte]0x26); $place.Write([uint16]1); $place.Write([uint16]$binding.TextID)
+                    $place.Write([byte]0) # identity matrix
+                    Write-SwfString $place 'textField'
+                }
+                Write-SwfTag $sprite 1; Write-SwfTag $sprite 0 # ShowFrame, End
+            }
+        }
+        Write-SwfTag $tags 76 { # SymbolClass
+            param($symbols)
+            $symbols.Write([uint16]$bindings.Count)
+            foreach ($binding in $bindings) {
+                $symbols.Write([uint16]$binding.SpriteID)
+                Write-SwfString $symbols $binding.Class
+            }
+        }
+    })
 }
 function Add-GameLibraries([string]$InputPath, [string]$OutputPath, [string]$SettingsLibrary) {
     # Vanilla PauseMenu uses zero-symbol ImportAssets2 tags to make the exported
@@ -94,15 +110,16 @@ function Add-GameLibraries([string]$InputPath, [string]$OutputPath, [string]$Set
     }
     if ($frameAt -lt 0) { throw 'Compiled SWF has no ShowFrame' }
     $textSymbols = New-TextSymbols
-    $imports = [IO.MemoryStream]::new()
-    $writer = [IO.BinaryWriter]::new($imports)
-    foreach ($library in @('fonts_en.swf', $SettingsLibrary)) {
-        $url = [Text.Encoding]::ASCII.GetBytes($library)
-        $writer.Write([uint16]((71 -shl 6) -bor ($url.Length + 5)))
-        $writer.Write($url); $writer.Write([byte]0)
-        $writer.Write([byte]1); $writer.Write([byte]0); $writer.Write([uint16]0)
+    $importBytes = New-SwfData {
+        param($imports)
+        foreach ($library in @('fonts_en.swf', $SettingsLibrary)) {
+            Write-SwfTag $imports 71 { # ImportAssets2
+                param($import)
+                Write-SwfString $import $library
+                $import.Write([byte]1); $import.Write([byte]0); $import.Write([uint16]0)
+            }
+        }
     }
-    $writer.Flush(); $importBytes = $imports.ToArray(); $writer.Dispose(); $imports.Dispose()
     foreach ($destination in @($InputPath, $OutputPath)) {
         # The preview uses the same authored symbols, with imports loaded by its host.
         $importsForFile = if ($destination -eq $OutputPath) { $importBytes } else { [byte[]]@() }

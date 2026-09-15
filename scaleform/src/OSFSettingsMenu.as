@@ -10,7 +10,6 @@ package
     import flash.geom.ColorTransform;
     import flash.geom.Rectangle;
     import flash.text.TextField;
-    import flash.text.TextFieldType;
     import flash.text.TextFormat;
     import flash.ui.Keyboard;
     import flash.utils.Dictionary;
@@ -34,7 +33,6 @@ package
         private var groups:Array = [];
         private var modID:String = "";
         private var groupID:String = "";
-        private var query:String = "";
         private var options:Object;
         private var types:Class;
         private var bar:Object;
@@ -50,9 +48,10 @@ package
         private var defaultValue:TextField;
         private var status:TextField;
         private var empty:TextField;
-        private var searchInput:TextField;
         private var tabs:Sprite = new Sprite();
         private var tabViewport:Sprite = new Sprite();
+        private var drawnPages:Array = [];
+        private var drawnGroupID:String = "";
         private var rowViews:Dictionary = new Dictionary(true);
         private var resetButton:Object;
         private var acceptButton:Object;
@@ -158,7 +157,6 @@ package
             empty = label("", MenuStyle.LEFT + 20, MenuStyle.LIST_TOP + 22, 970, 130, MenuStyle.BODY_SIZE, MenuStyle.MUTED);
             empty.multiline = true; empty.wordWrap = true;
             pageHint = label("[ / ]  CHANGE PAGE", MenuStyle.LEFT, 1005, 430, 38, 21, MenuStyle.MUTED, true);
-            buildSearch();
             bar = create("Shared.Components.ButtonControls.ButtonBar.ButtonBar");
             bar.x = MenuStyle.RIGHT; bar.y = 1008; addChild(bar as MovieClip); bar.Initialize(1, 38);
             bar.scaleX = 1.25; bar.scaleY = 1.25;
@@ -171,22 +169,6 @@ package
             menuStage.addEventListener(KeyboardEvent.KEY_UP, keyUp, true, 50);
             menuStage.addEventListener(MouseEvent.MOUSE_DOWN, mouseFocus, true);
             addEventListener(Event.ENTER_FRAME, advance);
-        }
-        private function buildSearch():void
-        {
-            var search:Sprite = new Sprite(); search.x = 1390; search.y = 78; addChild(search);
-            search.graphics.lineStyle(1.5, MenuStyle.MUTED); search.graphics.drawCircle(16, 20, 10);
-            search.graphics.moveTo(23, 27); search.graphics.lineTo(30, 34); search.graphics.drawRect(414, 3, 38, 40);
-            search.addChild(MenuStyle.field("F", 425, 9, 30, 35, 21, MenuStyle.MUTED, true));
-            searchInput = MenuStyle.field("", 44, 5, 350, 38, 23, MenuStyle.MUTED, true);
-            searchInput.type = TextFieldType.INPUT; searchInput.selectable = true; searchInput.mouseEnabled = true;
-            searchInput.maxChars = 80; searchInput.addEventListener(Event.CHANGE, searchChanged); search.addChild(searchInput);
-            var prompt:TextField = MenuStyle.field("SEARCH", 44, 5, 350, 38, 23, MenuStyle.MUTED, true);
-            search.addChild(prompt);
-            search.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void { menuStage.focus = searchInput; });
-            search.addEventListener(Event.ENTER_FRAME, function(event:Event):void {
-                prompt.visible = searchInput.text.length == 0 && menuStage.focus != searchInput;
-            });
         }
         private function button(text:String, eventName:String, callback:Function):Object
         {
@@ -230,8 +212,7 @@ package
             var scroll:int = preserve ? options.scrollPosition : 0;
             var data:Array = []; var source:Array = modID ? allRows : mods;
             for each (var row:Object in source) {
-                if (modID && (row.mod != modID || (!query && row.group != groupID))) continue;
-                if (query && (String(row.title) + " " + String(row.hint)).toLowerCase().indexOf(query) < 0) continue;
+                if (modID && (row.mod != modID || row.group != groupID)) continue;
                 data.push({row:row, sText:html(String(row.title)), uID:data.length, bDisabled:false, bShowSpinner:false,
                     uCategory:0, bEnabled:true, bSubSetting:false, uType:modID ? types.SDT_CHECKBOX : types.SDT_LINK,
                     sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0},
@@ -240,32 +221,37 @@ package
             options.InitializeEntries(data);
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
-            options.disableInput = menuStage.focus == searchInput;
-            if (!options.disableInput) menuStage.focus = options as MovieClip;
-            empty.text = data.length ? "" : query ? "No results. Try another search." : "No settings to display.";
+            options.disableInput = false; menuStage.focus = options as MovieClip;
+            empty.text = data.length ? "" : "No settings to display.";
             var title:String = "MOD SETTINGS"; var group:String = "ALL MODS";
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
             MenuStyle.fit(breadcrumb, modID ? "MOD SETTINGS   /   " + title.toUpperCase() : "MOD SETTINGS   /   ALL MODS");
             MenuStyle.fit(heading, title.toUpperCase());
-            section.text = query ? "SEARCH RESULTS" : group.toUpperCase();
+            section.text = group.toUpperCase();
             count.text = data.length + (modID ? data.length == 1 ? " SETTING" : " SETTINGS" : data.length == 1 ? " MOD" : " MODS");
             pageHint.visible = modID != "" && groups.length > 1;
             refreshing = false; describe(); decorate();
         }
         private function drawTabs():void
         {
+            var pages:Array = modID ? groups : [{id:"", title:"ALL MODS"}];
+            var unchanged:Boolean = groupID == drawnGroupID && pages.length == drawnPages.length;
+            for (var i:int = 0; unchanged && i < pages.length; ++i) {
+                unchanged = pages[i].id == drawnPages[i].id && pages[i].title == drawnPages[i].title;
+            }
+            if (unchanged) return;
+            drawnPages = pages; drawnGroupID = groupID;
             while (tabs.numChildren) tabs.removeChildAt(0);
             tabs.x = 0;
-            var pages:Array = modID ? groups : [{id:"", title:"ALL MODS"}];
             var x:Number = 0; var activeX:Number = 0; var activeWidth:Number = 0;
             for each (var page:Object in pages) {
                 var tab:Sprite = new Sprite(); tab.name = page.id; tab.x = x; tab.buttonMode = true;
                 var text:TextField = MenuStyle.field(String(page.title).toUpperCase(), 0, 10, 440, 42,
-                    CONFIG::largeText ? 29 : 25, page.id == groupID && !query ? MenuStyle.WHITE : MenuStyle.MUTED, true);
+                    CONFIG::largeText ? 29 : 25, page.id == groupID ? MenuStyle.WHITE : MenuStyle.MUTED, true);
                 text.width = Math.min(440, text.textWidth + 8); MenuStyle.fit(text, String(page.title).toUpperCase());
                 tab.graphics.beginFill(0, 0); tab.graphics.drawRect(0, 0, text.width + 34, 62); tab.graphics.endFill();
-                if (page.id == groupID && !query) {
+                if (page.id == groupID) {
                     tab.graphics.lineStyle(3, MenuStyle.WHITE); tab.graphics.moveTo(0, 62); tab.graphics.lineTo(text.width, 62);
                     activeX = x; activeWidth = text.width;
                 }
@@ -277,7 +263,7 @@ package
         private function tabClicked(event:MouseEvent):void
         {
             if (requestedRefresh) return;
-            groupID = event.currentTarget.name; clearSearch(); populate(); drawTabs();
+            groupID = event.currentTarget.name; populate(); drawTabs();
         }
         private function changePage(direction:int):void
         {
@@ -285,17 +271,9 @@ package
             for (var i:int = 0; i < groups.length; ++i) {
                 if (groups[i].id == groupID) {
                     groupID = groups[(i + direction + groups.length) % groups.length].id;
-                    clearSearch(); populate(); drawTabs(); return;
+                    populate(); drawTabs(); return;
                 }
             }
-        }
-        private function searchChanged(event:Event):void
-        {
-            query = searchInput.text.replace(/^\s+|\s+$/g, "").toLowerCase(); populate(); drawTabs();
-        }
-        private function clearSearch():void
-        {
-            searchInput.text = ""; query = ""; menuStage.focus = options as MovieClip;
         }
         private function current():Object { return options && options.selectedEntry ? options.selectedEntry.row : null; }
         private function describe():void
@@ -325,7 +303,7 @@ package
             if (closing || refreshing || requestedRefresh || activationFrame == frame || options.scrollbarScrolling) return;
             activationFrame = frame;
             var row:Object = current(); if (!row) return;
-            if (!modID) { modID = row.mod; groupID = ""; clearSearch(); refresh(false); }
+            if (!modID) { modID = row.mod; groupID = ""; refresh(false); }
             else options.OnEntryPressed();
         }
         private function reset():void
@@ -352,17 +330,12 @@ package
         private function back():void
         {
             if (closing || options.scrollbarScrolling || requestedRefresh) return;
-            if (query || menuStage.focus == searchInput) { clearSearch(); populate(); drawTabs(); return; }
             if (modID) { modID = ""; groupID = ""; refresh(false); return; }
             closing = true; options.disableInput = true; BGSCodeObj.close();
         }
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (!initialized || closing) return false;
-            if (menuStage.focus == searchInput) {
-                if (!pressed && name == "Cancel") back();
-                return true;
-            }
             return Boolean(bar.ProcessUserEvent(name, pressed));
         }
         private function mouseFocus(event:MouseEvent):void
@@ -379,17 +352,7 @@ package
         private function keyDown(event:KeyboardEvent):void
         {
             if (!initialized || closing || refreshing || requestedRefresh || options.scrollbarScrolling) return;
-            if (menuStage.focus == searchInput) {
-                options.disableInput = true;
-                if (event.keyCode == Keyboard.ENTER || event.keyCode == Keyboard.ESCAPE || event.keyCode == Keyboard.TAB) {
-                    event.preventDefault(); event.stopImmediatePropagation();
-                    if (event.keyCode == Keyboard.ESCAPE) { clearSearch(); populate(); drawTabs(); }
-                    else { menuStage.focus = options as MovieClip; options.disableInput = false; }
-                }
-                return;
-            }
-            if (event.keyCode == Keyboard.F) { menuStage.focus = searchInput; options.disableInput = true; }
-            else if (event.keyCode == Keyboard.B) reset();
+            if (event.keyCode == Keyboard.B) reset();
             else if (event.keyCode == 219) changePage(-1); // [ and ] also expose tabs without a mouse.
             else if (event.keyCode == 221) changePage(1);
             else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {

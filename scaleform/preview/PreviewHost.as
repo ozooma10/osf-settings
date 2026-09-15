@@ -178,7 +178,7 @@ package
             }
             var name:String = event.keyCode == Keyboard.ENTER || event.keyCode == Keyboard.E ? "Accept" :
                 event.keyCode == Keyboard.TAB || event.keyCode == Keyboard.ESCAPE ? "Cancel" : "";
-            if (name && menu && !(stage.focus is TextField && TextField(stage.focus).type == "input")) {
+            if (name && menu) {
                 event.stopImmediatePropagation(); event.preventDefault();
                 menu.ProcessUserEvent(name, event.type == KeyboardEvent.KEY_DOWN);
             }
