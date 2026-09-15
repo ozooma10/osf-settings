@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "learning",
   "title": "Learning example",
-  "description": "A boolean and an integer, understood end to end.",
+  "description": "A boolean, an integer, and a float, understood end to end.",
   "groups": [
     {
       "id": "general",
@@ -23,6 +23,16 @@
           "default": 3,
           "min": 1,
           "max": 10
+        },
+        {
+          "key": "notificationVolume",
+          "type": "float",
+          "label": "Notification volume",
+          "hint": "Choose a volume from 0.00 to 1.00 in steps of 0.05. A learning example; no gameplay behavior is connected yet.",
+          "default": 0.75,
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05
         }
       ]
     }

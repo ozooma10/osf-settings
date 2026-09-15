@@ -213,12 +213,12 @@ package
             var data:Array = []; var source:Array = modID ? allRows : mods;
             for each (var row:Object in source) {
                 if (modID && (row.mod != modID || row.group != groupID)) continue;
-                var slider:Boolean = modID != "" && row.type == "int" && row.editable;
+                var slider:Boolean = modID != "" && NumericSetting.isSlider(row);
                 // The vanilla entry multiplies fValue by 100. Our slider stores integer offsets.
                 data.push({row:row, sText:html(String(row.title)), uID:data.length, bDisabled:false, bShowSpinner:false,
                     uCategory:0, bEnabled:!modID || row.editable, bSubSetting:false,
                     uType:!modID ? types.SDT_LINK : slider ? types.SDT_SLIDER : row.type == "bool" ? types.SDT_CHECKBOX : types.SDT_LINK,
-                    sliderData:{fValue:slider ? (Number(row.value) - Number(row.minimum)) / 100 : 0, sDisplayValue:String(row.value)},
+                    sliderData:{fValue:slider ? NumericSetting.position(row) / 100 : 0, sDisplayValue:NumericSetting.text(row, row.value)},
                     stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
             }
             options.InitializeEntries(data);
@@ -287,7 +287,7 @@ package
             detailHint.height = Math.max(64, 630 - detailHint.y);
             detailHint.text = row ? String(row.hint || "") : ""; detailHint.scrollV = 1;
             defaultLabel.text = modID ? "DEFAULT" : "SETTINGS";
-            MenuStyle.fit(defaultValue, row ? modID ? row.type == "int" ? String(row.defaultValue) : row.defaultValue ? "ON" : "OFF" : String(row.count) : "");
+            MenuStyle.fit(defaultValue, row ? modID ? NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
             resetButton.Visible = Boolean(modID && row && row.editable);
             buttonData.Accept.sButtonText = modID ? "TOGGLE" : "OPEN";
             buttonData.Cancel.sButtonText = modID ? "ALL MODS" : "BACK";
@@ -323,11 +323,9 @@ package
             if (!modID || !item || !item.row.editable) return;
             var row:Object = item.row;
             if (row.type == "bool") edit(row, Number(data.value) != 0);
-            else if (row.type == "int") {
+            else if (NumericSetting.isSlider(row)) {
                 // SettingsOptionListEntry reports BSSlider.value / 100.
-                var next:Number = Math.round(Number(row.minimum) + Number(data.value) * 100);
-                next = Math.max(Number(row.minimum), Math.min(Number(row.maximum), next));
-                edit(row, String(next));
+                edit(row, NumericSetting.atPosition(row, Number(data.value) * 100));
             }
         }
         private function edit(row:Object, value:*):void
@@ -335,7 +333,10 @@ package
             if (closing || refreshing || options.scrollbarScrolling || !row.editable) return;
             activationFrame = frame;
             if (value == row.value) { requestedRefresh = true; return; }
-            var result:Object = row.type == "int" ? BGSCodeObj.setInt(row.mod, row.key, String(value)) : BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
+            var result:Object;
+            if (row.type == "float") result = BGSCodeObj.setFloat(row.mod, row.key, Number(value));
+            else if (row.type == "int") result = BGSCodeObj.setInt(row.mod, row.key, String(value));
+            else result = BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
             if (result && result.ok) { row.value = value; describe(); }
             status.text = result && result.ok ? "Changes apply automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.";
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
@@ -374,9 +375,9 @@ package
             else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {
                 var row:Object = current();
                 if (modID && row && row.editable) {
-                    if (row.type == "int") {
-                        var next:Number = Number(row.value) + (event.keyCode == Keyboard.RIGHT ? 1 : -1);
-                        edit(row, String(Math.max(Number(row.minimum), Math.min(Number(row.maximum), next))));
+                    if (NumericSetting.isSlider(row)) {
+                        var next:Number = NumericSetting.position(row) + (event.keyCode == Keyboard.RIGHT ? 1 : -1);
+                        edit(row, NumericSetting.atPosition(row, next));
                     } else edit(row, event.keyCode == Keyboard.RIGHT);
                 }
             } else return;
@@ -414,7 +415,7 @@ package
                 // Keep the vanilla hit area and behavior. Its authored timeline
                 // colors must not recolor our text or selection bar.
                 var slider:Object = Object(clip).Slider_mc;
-                var showSlider:Boolean = modID != "" && item.row.type == "int" && item.row.editable;
+                var showSlider:Boolean = modID != "" && NumericSetting.isSlider(item.row);
                 clip.setChildIndex(view, 0);
                 for (var child:int = 0; child < clip.numChildren; ++child) {
                     var display:DisplayObject = clip.getChildAt(child);
@@ -423,9 +424,9 @@ package
                 clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider;
                 if (showSlider) {
                     slider.x = 540; slider.y = (MenuStyle.ROW_HEIGHT - slider.height) / 2; slider.width = 330;
-                    slider.maxValue = Number(item.row.maximum) - Number(item.row.minimum);
+                    slider.maxValue = NumericSetting.steps(item.row);
                     slider.disableRounding = false; slider.mouseWheelValueChange = 1;
-                    if (!slider.dragging) slider.value = Number(item.row.value) - Number(item.row.minimum);
+                    if (!slider.dragging) slider.value = NumericSetting.position(item.row);
                     slider.transform.colorTransform = Object(clip).itemIndex == options.selectedIndex ?
                         new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
                 }

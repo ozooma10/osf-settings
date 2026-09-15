@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 from pathlib import Path, PurePosixPath
 import struct
 import xml.etree.ElementTree as ET
@@ -174,8 +175,20 @@ def prepare(archive_path, output, schema_paths, large, menu_path):
                         attributes["maximum"] = str(maximum)
                     attributes["editable"] = str(minimum is not None and maximum is not None and
                         -(2**53 - 1) <= minimum < maximum <= 2**53 - 1 and maximum - minimum <= 2**32 - 1).lower()
+                elif kind == "float":
+                    minimum, maximum, step = setting.get("min"), setting.get("max"), setting.get("step", 0.1)
+                    for field in ("default", "min", "max", "step"):
+                        if field in setting and (type(setting[field]) not in (int, float) or not math.isfinite(setting[field])):
+                            raise ValueError(f"Preview {field} must be a finite number: {path}")
+                    if step <= 0 or (minimum is not None and default < minimum) or (maximum is not None and default > maximum):
+                        raise ValueError(f"Invalid preview float bounds or step: {path}")
+                    if minimum is not None:
+                        attributes["minimum"] = str(minimum)
+                    if maximum is not None:
+                        attributes["maximum"] = str(maximum)
+                    attributes.update(float_slider(minimum, maximum, step))
                 elif kind != "bool" or type(default) is not bool:
-                    raise ValueError(f"Preview supports boolean and integer settings only: {path}")
+                    raise ValueError(f"Preview supports boolean, integer, and float settings only: {path}")
                 ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
                               modDescription=schema.get("description", ""),
                               group=group["id"], groupTitle=group["label"], key=setting["key"],
@@ -183,6 +196,40 @@ def prepare(archive_path, output, schema_paths, large, menu_path):
                               **attributes)
     ET.indent(config)
     ET.ElementTree(config).write(output / "preview.xml", encoding="utf-8", xml_declaration=True)
+
+
+def float_slider(minimum, maximum, step):
+    # Match the native FloatSlider coordinates used by the same menu SWF.
+    result = {"editable": "false", "decimals": "-1"}
+    if minimum is None or maximum is None or minimum >= maximum:
+        return result
+    minimum, maximum, step = float(minimum), float(maximum), float(step)
+    magnitude = max(abs(minimum), abs(maximum))
+    if step < math.nextafter(magnitude, math.inf) - magnitude:
+        return result
+    safe_integer = 2**53 - 1
+    for decimals in range(10):
+        scale = 10**decimals
+        coordinates = []
+        for value in (minimum, maximum, step):
+            scaled = value * scale
+            if not math.isfinite(scaled) or abs(scaled) > safe_integer:
+                break
+            integer = round(scaled)
+            if integer / scale != value:
+                break
+            coordinates.append(integer)
+        if len(coordinates) != 3 or coordinates[2] <= 0:
+            continue
+        low, high, increment = coordinates
+        span = high - low
+        count = (span - 1) // increment + 1
+        if span > safe_integer or count > 2**32 - 1:
+            return result
+        return {"editable": "true", "decimals": str(decimals), "sliderMinimum": str(low),
+                "sliderMaximum": str(high), "sliderStep": str(increment), "sliderScale": str(scale),
+                "sliderSteps": str(count)}
+    return result
 
 
 if __name__ == "__main__":

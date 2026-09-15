@@ -1,4 +1,5 @@
 #include "OSFSettingsMenu.h"
+#include "FloatSlider.h"
 #include "Core/Runtime.h"
 #include <charconv>
 #include "RE/U/UI.h"
@@ -8,7 +9,7 @@ namespace OSFSettings
 {
     namespace
     {
-        enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, Close, Startup, StartupFailed };
+        enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, Close, Startup, StartupFailed };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -48,6 +49,7 @@ namespace OSFSettings
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("setBool", static_cast<std::uint64_t>(Function::SetBool));
         RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
+        RegisterNativeFunction("setFloat", static_cast<std::uint64_t>(Function::SetFloat));
         RegisterNativeFunction("close", static_cast<std::uint64_t>(Function::Close));
         RegisterNativeFunction("startup", static_cast<std::uint64_t>(Function::Startup));
         RegisterNativeFunction("startupFailed", static_cast<std::uint64_t>(Function::StartupFailed));
@@ -111,8 +113,20 @@ namespace OSFSettings
                                 *integer.minimum >= -safeInteger && *integer.maximum <= safeInteger &&
                                 *integer.maximum - *integer.minimum <= 4294967295LL;
                             row.SetMember("editable", RE::Scaleform::GFx::Value(editable));
-                        } else {
-                            continue; // Float rows will be exposed with the decimal editor.
+                        } else if (const auto* floating = std::get_if<FloatDefinition>(&setting.definition)) {
+                            Text(row, "type", "float");
+                            row.SetMember("value", RE::Scaleform::GFx::Value(std::get<double>(value->second)));
+                            row.SetMember("defaultValue", RE::Scaleform::GFx::Value(floating->defaultValue));
+                            const auto slider = MakeFloatSlider(*floating);
+                            row.SetMember("editable", RE::Scaleform::GFx::Value(slider.has_value()));
+                            row.SetMember("decimals", RE::Scaleform::GFx::Value(slider ? slider->decimals : -1));
+                            if (slider) {
+                                row.SetMember("sliderMinimum", RE::Scaleform::GFx::Value(static_cast<double>(slider->minimum)));
+                                row.SetMember("sliderMaximum", RE::Scaleform::GFx::Value(static_cast<double>(slider->maximum)));
+                                row.SetMember("sliderStep", RE::Scaleform::GFx::Value(static_cast<double>(slider->step)));
+                                row.SetMember("sliderScale", RE::Scaleform::GFx::Value(static_cast<double>(slider->scale)));
+                                row.SetMember("sliderSteps", RE::Scaleform::GFx::Value(static_cast<double>(slider->steps)));
+                            }
                         }
                         params.ret->PushBack(row);
                     }
@@ -120,7 +134,8 @@ namespace OSFSettings
             }
             break;
         case Function::SetBool:
-        case Function::SetInt: {
+        case Function::SetInt:
+        case Function::SetFloat: {
             SettingsStore::SetResult result{ false, "invalid edit arguments" };
             if (params.argCount == 3 && params.args[0].IsString() && params.args[1].IsString()) {
                 if (function == Function::SetBool && params.args[2].IsBoolean()) {
@@ -129,6 +144,8 @@ namespace OSFSettings
                     if (const auto value = ParseInteger(ArgString(params, 2))) {
                         result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), *value);
                     }
+                } else if (function == Function::SetFloat && params.args[2].IsNumber()) {
+                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetNumber());
                 }
             }
             root->CreateObject(params.ret);

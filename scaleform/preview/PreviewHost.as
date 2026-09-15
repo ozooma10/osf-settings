@@ -73,12 +73,17 @@ package
             for each (var library:XML in config.libraries.library) libraries.push(String(library.@url));
             for each (var font:XML in config.fonts.font) fontNames.push(String(font.@name));
             for each (var row:XML in config.rows.row) {
-                var value:* = String(row.@type) == "int" ? String(row.@value) : String(row.@value) == "true";
+                var value:*;
+                if (String(row.@type) == "float") value = Number(row.@value);
+                else if (String(row.@type) == "int") value = String(row.@value);
+                else value = String(row.@value) == "true";
                 rows.push({modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
                     group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
                     type:String(row.@type), editable:String(row.@editable) == "true",
-                    minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value});
+                    minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value,
+                    decimals:int(row.@decimals), sliderMinimum:Number(row.@sliderMinimum), sliderMaximum:Number(row.@sliderMaximum),
+                    sliderStep:Number(row.@sliderStep), sliderScale:Number(row.@sliderScale), sliderSteps:Number(row.@sliderSteps)});
             }
             loadNext();
         }
@@ -126,7 +131,7 @@ package
         private function menuLoaded(event:Event):void
         {
             menu = event.target.content;
-            menu.BGSCodeObj = {getRows:getRows, setBool:setBool, setInt:setInt, close:closeMenu,
+            menu.BGSCodeObj = {getRows:getRows, setBool:setBool, setInt:setInt, setFloat:setFloat, close:closeMenu,
                 startup:startup, startupFailed:report};
             addChild(menu as MovieClip);
             menu.onCodeObjCreate();
@@ -171,6 +176,18 @@ package
                 }
             }
             return {ok:false, error:"Invalid preview integer setting."};
+        }
+
+        private function setFloat(mod:String, key:String, value:Number):Object
+        {
+            for each (var row:Object in rows) {
+                if (row.mod == mod && row.key == key && row.type == "float" && isFinite(value) &&
+                    (row.minimum == "" || value >= Number(row.minimum)) && (row.maximum == "" || value <= Number(row.maximum))) {
+                    row.value = value; trace("[preview] " + mod + "/" + key + " = " + value);
+                    return {ok:true, error:""};
+                }
+            }
+            return {ok:false, error:"Invalid preview float setting."};
         }
 
         private function startup(phase:String):void

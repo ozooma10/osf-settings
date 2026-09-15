@@ -1,4 +1,5 @@
 #include "Settings/SettingsJson.h"
+#include "Menu/FloatSlider.h"
 #include "Settings/SettingsStore.h"
 
 #include <chrono>
@@ -259,6 +260,49 @@ namespace
         std::cout << "Integer probe: default=3, bounds=1..10, exact signed 64-bit save/reload verified\n";
     }
 
+    void TestFloatSlider(const Json& example)
+    {
+        std::string error;
+        const auto schema = OSFSettings::SettingsJson::ParseSchema(example, error);
+        const auto* setting = schema ? schema->FindSetting("notificationVolume") : nullptr;
+        const auto* definition = setting ? std::get_if<OSFSettings::FloatDefinition>(&setting->definition) : nullptr;
+        Check(definition && definition->defaultValue == 0.75 && definition->step == 0.05, "the shipped float has its declared default and step");
+        if (!definition) return;
+        const auto slider = OSFSettings::MakeFloatSlider(*definition);
+        Check(slider && slider->minimum == 0 && slider->maximum == 100 && slider->step == 5 &&
+            slider->scale == 100 && slider->steps == 20 && slider->decimals == 2, "volume uses twenty exact 0.05 increments and two decimal places");
+        if (!slider) return;
+        for (std::uint32_t position = 0; position <= slider->steps; ++position) {
+            const double value = static_cast<double>(slider->minimum + position * slider->step) / static_cast<double>(slider->scale);
+            Check(OSFSettings::IsValidValue(*setting, SettingValue{value}) && value == static_cast<double>(position) / 20.0,
+                "every sample slider position is a valid canonical decimal, including both bounds");
+        }
+        const auto make = [](double minimum, double maximum, double step) {
+            OSFSettings::FloatDefinition value;
+            value.minimum = minimum; value.maximum = maximum; value.step = step;
+            return OSFSettings::MakeFloatSlider(value);
+        };
+        const auto negative = make(-0.15, 0.35, 0.1);
+        Check(negative && negative->minimum == -15 && negative->maximum == 35 && negative->step == 10 && negative->steps == 5,
+            "negative decimal offsets are preserved even when more precise than the step");
+        const auto partial = make(0.0, 1.0, 0.3);
+        Check(partial && partial->steps == 4 && partial->minimum + (partial->steps - 1) * partial->step == 9 && partial->maximum == 10,
+            "a non-divisible range ends with a shorter final step to its exact maximum");
+        Check(make(0.0, 0.07, 0.01)->steps == 7, "binary division noise does not add an eighth step");
+        Check(make(0.0, 1.0, 2.0)->steps == 1, "a step larger than the range still allows both endpoints");
+        Check(make(0.0, 0.000000005, 0.000000001)->steps == 5, "nine-place decimal steps are supported");
+        Check(make(0.0, 4294967295.0, 1.0)->steps == std::numeric_limits<std::uint32_t>::max(), "the vanilla uint32 step limit is supported");
+        Check(!make(0.0, 4294967296.0, 1.0), "ranges exceeding the vanilla step count remain read-only");
+        Check(!make(0.0, 1.0, 0.0000000001), "finer than nine-place decimal steps remain read-only");
+        Check(!make(-9007199254740991.0, 9007199254740991.0, 9007199254740991.0), "scaled spans must also fit AS3's exact integer range");
+        Check(!make(900719925474098.0, 900719925474099.0, 0.1), "steps smaller than double precision at the bounds remain read-only");
+        Check(!make(1.0, 1.0, 0.1) && !make(2.0, 1.0, 0.1), "fixed and reversed ranges do not create sliders");
+        Check(!make(0.0, 1.0, 0.0) && !make(0.0, 1.0, -1.0) && !make(0.0, 1.0, std::numeric_limits<double>::infinity()),
+            "invalid increments do not create sliders");
+        Check(!OSFSettings::MakeFloatSlider(OSFSettings::FloatDefinition{}), "unbounded floats do not create sliders");
+        Check(OSFSettings::IsValidValue(*setting, SettingValue{0.733}), "editor increments do not reject an existing off-step value");
+    }
+
     void TestFloats(const Json& example)
     {
         auto schema = example;
@@ -272,12 +316,17 @@ namespace
         if (!parsed) return;
         const auto* gain = parsed->FindSetting("gain");
         const auto* floating = gain ? std::get_if<OSFSettings::FloatDefinition>(&gain->definition) : nullptr;
-        Check(floating && floating->defaultValue == 0.75 && floating->minimum == 0.0 && floating->maximum == 1.0,
+        Check(floating && floating->defaultValue == 0.75 && floating->minimum == 0.0 && floating->maximum == 1.0 && floating->step == 0.1,
             "float definition, decimal default, and numeric inclusive bounds are loaded");
         if (!gain) return;
 
         const auto nan = std::numeric_limits<double>::quiet_NaN();
         const auto infinity = std::numeric_limits<double>::infinity();
+        for (const auto& step : std::vector<Json>{ 0, -0.1, true, "0.1", nullptr, nan, infinity, -infinity }) {
+            auto document = schema;
+            document["groups"][0]["settings"][gainIndex]["step"] = step;
+            Reject(document, "step must");
+        }
         const std::vector<Json> invalidDefaults{ true, "0.5", nullptr, -0.01, 1.01, Json::array(), Json::object(), nan, infinity, -infinity };
         for (const auto& value : invalidDefaults) {
             auto document = schema;
@@ -623,6 +672,7 @@ int main(int argc, char** argv)
         TestPersistence(example);
         TestIntegers(example);
         TestFloats(example);
+        TestFloatSlider(example);
         std::cout << checks - failures << '/' << checks << " checks passed\n";
         return failures == 0 ? 0 : 1;
     } catch (const std::exception& error) {

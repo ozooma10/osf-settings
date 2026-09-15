@@ -27,6 +27,7 @@ namespace OSFSettings
         double defaultValue{};
         std::optional<double> minimum;
         std::optional<double> maximum;
+        double step{ 0.1 }; // Editor increment; stored values need not lie on this grid.
     };
 
     struct SettingDefinition

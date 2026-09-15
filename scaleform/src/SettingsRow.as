@@ -24,8 +24,8 @@ package
         public function update(row:Object, selected:Boolean, modList:Boolean):void
         {
             var changed:Boolean = !modList && row.value != row.defaultValue;
-            var slider:Boolean = !modList && row.type == "int" && row.editable;
-            var signature:String = [row.title, row.value, row.type, row.editable, row.count, changed, selected, modList].join("|");
+            var slider:Boolean = !modList && NumericSetting.isSlider(row);
+            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, changed, selected, modList].join("|");
             if (signature == previous) return;
             previous = signature;
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
@@ -33,10 +33,10 @@ package
             graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.ROW_HEIGHT); graphics.endFill();
             title.textColor = color; value.textColor = color;
             title.width = slider ? 470 : 650;
-            value.x = slider ? 888 : row.type == "int" ? 694 : 776;
-            value.width = slider ? 100 : row.type == "int" ? 300 : 150;
+            value.x = slider ? 888 : NumericSetting.isNumeric(row) ? 694 : 776;
+            value.width = slider ? 100 : NumericSetting.isNumeric(row) ? 300 : 150;
             MenuStyle.fit(title, String(row.title));
-            MenuStyle.fit(value, modList ? String(row.count) : row.type == "int" ? String(row.value) : row.value ? "ON" : "OFF");
+            MenuStyle.fit(value, modList ? String(row.count) : NumericSetting.text(row, row.value));
             var center:Number = MenuStyle.ROW_HEIGHT / 2;
             graphics.lineStyle(2, selected ? 0x52636C : 0xA0B0B8);
             if (!modList && row.type == "bool") {

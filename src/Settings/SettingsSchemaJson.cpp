@@ -100,6 +100,8 @@ namespace OSFSettings::SettingsJson
                         FloatDefinition definition;
                         definition.minimum = ReadFloat(sourceSetting, "min");
                         definition.maximum = ReadFloat(sourceSetting, "max");
+                        definition.step = ReadFloat(sourceSetting, "step").value_or(0.1);
+                        Require(definition.step > 0.0, "step must be positive: " + setting.key);
                         Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
                         setting.definition = definition;
                     }
