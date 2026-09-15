@@ -22,12 +22,19 @@ namespace OSFSettings
         std::optional<std::int64_t> maximum;
     };
 
+    struct FloatDefinition
+    {
+        double defaultValue{};
+        std::optional<double> minimum;
+        std::optional<double> maximum;
+    };
+
     struct SettingDefinition
     {
         std::string key;
         std::string label;
         std::string hint;
-        std::variant<BoolDefinition, IntDefinition> definition;
+        std::variant<BoolDefinition, IntDefinition, FloatDefinition> definition;
 
         SettingValue DefaultValue() const;
     };

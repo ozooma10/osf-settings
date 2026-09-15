@@ -98,7 +98,7 @@ namespace OSFSettings
                             row.SetMember("value", RE::Scaleform::GFx::Value(std::get<bool>(value->second)));
                             row.SetMember("defaultValue", RE::Scaleform::GFx::Value(definition->defaultValue));
                             row.SetMember("editable", RE::Scaleform::GFx::Value(true));
-                        } else {
+                        } else if (std::holds_alternative<IntDefinition>(setting.definition)) {
                             const auto& integer = std::get<IntDefinition>(setting.definition);
                             Text(row, "type", "int");
                             Text(row, "value", std::to_string(std::get<std::int64_t>(value->second)));
@@ -111,6 +111,8 @@ namespace OSFSettings
                                 *integer.minimum >= -safeInteger && *integer.maximum <= safeInteger &&
                                 *integer.maximum - *integer.minimum <= 4294967295LL;
                             row.SetMember("editable", RE::Scaleform::GFx::Value(editable));
+                        } else {
+                            continue; // Float rows will be exposed with the decimal editor.
                         }
                         params.ret->PushBack(row);
                     }

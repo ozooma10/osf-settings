@@ -2,6 +2,7 @@
 #include "Settings/SettingsStore.h"
 
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -107,10 +108,10 @@ namespace
         document["groups"][0]["settings"] = Json::object();
         Reject(document, "settings must be an array");
 
-        for (const auto* type : { "float", "enum", "string", "key", "flags", "action", "note" }) {
+        for (const auto* type : { "enum", "string", "key", "flags", "action", "note" }) {
             document = example;
             document["groups"][0]["settings"][0]["type"] = type;
-            Reject(document, "only types bool and int");
+            Reject(document, "only types bool, int, and float");
         }
         for (const auto& value : { Json("true"), Json(1), Json(nullptr) }) {
             document = example;
@@ -256,6 +257,162 @@ namespace
         Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{3} },
             "an integer missing from saved values retains its default");
         std::cout << "Integer probe: default=3, bounds=1..10, exact signed 64-bit save/reload verified\n";
+    }
+
+    void TestFloats(const Json& example)
+    {
+        auto schema = example;
+        const auto gainIndex = schema["groups"][0]["settings"].size();
+        schema["groups"][0]["settings"].push_back({ { "key", "gain" }, { "type", "float" },
+            { "default", 0.75 }, { "min", 0 }, { "max", 1.0 } });
+        schema["groups"][0]["settings"].push_back({ { "key", "scale" }, { "type", "float" }, { "default", 0.0 } });
+        std::string error;
+        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
+        Check(parsed.has_value() && error.empty(), "a schema can mix booleans, integers, and floats");
+        if (!parsed) return;
+        const auto* gain = parsed->FindSetting("gain");
+        const auto* floating = gain ? std::get_if<OSFSettings::FloatDefinition>(&gain->definition) : nullptr;
+        Check(floating && floating->defaultValue == 0.75 && floating->minimum == 0.0 && floating->maximum == 1.0,
+            "float definition, decimal default, and numeric inclusive bounds are loaded");
+        if (!gain) return;
+
+        const auto nan = std::numeric_limits<double>::quiet_NaN();
+        const auto infinity = std::numeric_limits<double>::infinity();
+        const std::vector<Json> invalidDefaults{ true, "0.5", nullptr, -0.01, 1.01, Json::array(), Json::object(), nan, infinity, -infinity };
+        for (const auto& value : invalidDefaults) {
+            auto document = schema;
+            document["groups"][0]["settings"][gainIndex]["default"] = value;
+            Reject(document, "default must be a finite number within its bounds");
+        }
+        auto document = schema;
+        document["groups"][0]["settings"][gainIndex].erase("default");
+        Reject(document, "default must be a finite number within its bounds");
+        document = schema;
+        document["groups"][0]["settings"][gainIndex]["min"] = 2.0;
+        Reject(document, "min must not exceed max");
+        for (const auto* bound : { "min", "max" }) {
+            for (const auto& value : std::vector<Json>{ true, "1", nullptr, nan, infinity, -infinity }) {
+                document = schema;
+                document["groups"][0]["settings"][gainIndex][bound] = value;
+                Reject(document, std::string(bound) + " must be a finite number");
+            }
+            document = schema;
+            document["groups"][0]["settings"][gainIndex].erase(bound);
+            Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "each float bound is optional");
+        }
+        document = schema;
+        auto& fixed = document["groups"][0]["settings"][gainIndex];
+        fixed["min"] = 0.75; fixed["max"] = 0.75;
+        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "equal bounds allow their one valid float");
+        document = schema;
+        auto& negative = document["groups"][0]["settings"][gainIndex];
+        negative["default"] = -0.75; negative["min"] = -1; negative["max"] = -0.5;
+        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "float ranges and defaults can be negative");
+        for (const auto* literal : { "0", "1", "1.0", "1e0", "0.1" }) {
+            document = schema;
+            const auto value = Json::parse(literal);
+            document["groups"][0]["settings"][gainIndex]["default"] = value;
+            const auto decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
+            Check(decoded && decoded->FindSetting("gain")->DefaultValue() == SettingValue{ value.get<double>() },
+                "integer, decimal, and exponent JSON defaults become doubles for float definitions");
+        }
+        document = schema;
+        document["groups"][0]["settings"][gainIndex + 1]["default"] = std::numeric_limits<std::uint64_t>::max();
+        const auto wide = OSFSettings::SettingsJson::ParseSchema(document, error);
+        Check(wide && wide->FindSetting("scale")->DefaultValue() == SettingValue{ static_cast<double>(std::numeric_limits<std::uint64_t>::max()) },
+            "float JSON decoding is not limited by signed integer storage");
+
+        const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        const auto root = fs::current_path() / "build" / "tests" / "floats" / run;
+        const auto schemas = root / "schemas";
+        const auto values = root / "values";
+        const auto valuesFile = values / "learning.json";
+        const auto temporary = values / "learning.json.tmp";
+        fs::create_directories(schemas);
+        Write(schemas / "learning.json", schema.dump(2));
+        OSFSettings::SettingsStore store;
+        store.LoadAll(schemas, values);
+        Check(store.LoadErrors().empty() && store.GetValue("learning", "gain") == SettingValue{0.75} &&
+            store.GetValue("learning", "scale") == SettingValue{0.0}, "bounded and unbounded float defaults load without a saved file");
+        Check(store.Set("learning", "gain", 0.75).ok && !fs::exists(values), "setting the current float does not write a file");
+        Check(!store.Set("learning", "gain", true).ok && !store.Set("learning", "gain", std::int64_t{1}).ok &&
+            !store.Set("learning", "notifications", 1.0).ok && !store.Set("learning", "notificationLimit", 3.0).ok && !fs::exists(values),
+            "native edits require the declared variant type, even for integral doubles");
+
+        OSFSettings::SettingsStore restarted;
+        for (const double value : { 0.0, 1.0, 0.1, std::nextafter(0.1, 1.0), 0.625 }) {
+            Check(store.Set("learning", "gain", value).ok, "float edits accept both bounds and interior decimal values");
+            restarted.LoadAll(schemas, values);
+            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "gain") == SettingValue{value},
+                "accepted float edits survive reload without rounding to a nearby double");
+        }
+        const auto committed = Read(valuesFile);
+        for (const auto value : { SettingValue{true}, SettingValue{std::int64_t{1}}, SettingValue{std::nextafter(0.0, -1.0)},
+            SettingValue{std::nextafter(1.0, 2.0)}, SettingValue{nan}, SettingValue{infinity}, SettingValue{-infinity} }) {
+            const auto result = store.Set("learning", "gain", value);
+            Check(!result.ok && !result.error.empty() && Read(valuesFile) == committed &&
+                store.GetValue("learning", "gain") == SettingValue{0.625}, "invalid float edits preserve the live value and saved file");
+        }
+        for (const double value : { nan, infinity, -infinity }) {
+            Check(!store.Set("learning", "scale", value).ok, "unbounded float settings also reject non-finite edits");
+            Check(!OSFSettings::SettingsJson::SaveValues(valuesFile, { { "gain", value } }, error) &&
+                error.find("value must be finite: gain") != std::string::npos && Read(valuesFile) == committed && !fs::exists(temporary),
+                "serialization rejects non-finite doubles before JSON can replace them with null");
+        }
+        fs::create_directory(temporary);
+        Check(!store.Set("learning", "gain", 0.25).ok && Read(valuesFile) == committed &&
+            store.GetValue("learning", "gain") == SettingValue{0.625}, "a failed float save preserves the live value and saved file");
+        fs::remove(temporary); // Only the empty directory created by this test.
+
+        for (const double value : { -std::numeric_limits<double>::max(), std::numeric_limits<double>::max(),
+            std::numeric_limits<double>::min(), std::numeric_limits<double>::denorm_min(), -std::numeric_limits<double>::denorm_min(),
+            std::nextafter(1.0, 2.0), -0.125, 0.0, 0.1 }) {
+            Check(store.Set("learning", "scale", value).ok, "unbounded float edits accept finite extremes and small fractions");
+            restarted.LoadAll(schemas, values);
+            const auto saved = Json::parse(Read(valuesFile));
+            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "scale") == SettingValue{value} &&
+                saved["values"]["scale"].is_number_float() && saved["values"]["scale"].get<double>() == value,
+                "finite doubles round trip as JSON numbers, including subnormal values");
+        }
+        Check(store.Set("learning", "notifications", false).ok && store.Set("learning", "notificationLimit", std::int64_t{7}).ok,
+            "booleans and integers can still be edited beside floats");
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == SettingValue{false} &&
+            restarted.GetValue("learning", "notificationLimit") == SettingValue{std::int64_t{7}} &&
+            restarted.GetValue("learning", "gain") == SettingValue{0.625} && restarted.GetValue("learning", "scale") == SettingValue{0.1},
+            "saving boolean and integer neighbors preserves decimal values");
+        Check(store.Set("learning", "gain", gain->DefaultValue()).ok, "floats reset through the normal save path");
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "gain") == SettingValue{0.75}, "reset float defaults survive reload");
+
+        for (const auto* literal : { "0", "1", "1.0", "1e0", "0.1" }) {
+            const auto value = Json::parse(literal);
+            const Json saved = { { "formatVersion", 1 }, { "values", { { "gain", value } } } };
+            Write(valuesFile, saved.dump());
+            restarted.LoadAll(schemas, values);
+            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "gain") == SettingValue{value.get<double>()},
+                "saved JSON integer and decimal literals load as doubles for float settings");
+        }
+        for (const auto& value : std::vector<Json>{ true, "0.5", nullptr, -0.01, 1.01, Json::array(), Json::object() }) {
+            const Json saved = { { "formatVersion", 1 }, { "values", { { "gain", value }, { "notifications", false }, { "notificationLimit", 7 } } } };
+            Write(valuesFile, saved.dump());
+            restarted.LoadAll(schemas, values);
+            Check(restarted.GetValue("learning", "gain") == SettingValue{0.75} && restarted.GetValue("learning", "notifications") == SettingValue{false} &&
+                restarted.GetValue("learning", "notificationLimit") == SettingValue{std::int64_t{7}} && restarted.LoadErrors().size() == 1 &&
+                restarted.LoadErrors()[0].file == valuesFile && restarted.LoadErrors()[0].message.find("gain") != std::string::npos && Read(valuesFile) == saved.dump(),
+                "invalid saved floats retain defaults, report their key, and preserve valid neighbors and the file");
+        }
+        for (const auto* literal : { "NaN", "Infinity", "1e400" }) {
+            const auto saved = std::string("{\"formatVersion\":1,\"values\":{\"gain\":") + literal + "}}";
+            Write(valuesFile, saved);
+            restarted.LoadAll(schemas, values);
+            Check(restarted.GetValue("learning", "gain") == SettingValue{0.75} && restarted.LoadErrors().size() == 1 && Read(valuesFile) == saved,
+                "malformed or overflowing JSON numbers are rejected without rewriting the file");
+        }
+        Write(valuesFile, Json{ { "formatVersion", 1 }, { "values", { { "notifications", false } } } }.dump());
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "gain") == SettingValue{0.75}, "an absent saved float retains its default");
+        std::cout << "Float probe: default=0.75, bounds=0..1, finite validation and decimal save/reload verified\n";
     }
 
     void TestStore(const Json& example, const fs::path& examplePath)
@@ -465,6 +622,7 @@ int main(int argc, char** argv)
         TestStore(example, examplePath);
         TestPersistence(example);
         TestIntegers(example);
+        TestFloats(example);
         std::cout << checks - failures << '/' << checks << " checks passed\n";
         return failures == 0 ? 0 : 1;
     } catch (const std::exception& error) {

@@ -1,5 +1,6 @@
 #include "SettingsJson.h"
 
+#include <cmath>
 #include <fstream>
 #include <stdexcept>
 #include <system_error>
@@ -44,7 +45,7 @@ namespace OSFSettings::SettingsJson
                 if (current == values.end() || !setting) {
                     continue; // Removed or unknown settings are ignored.
                 }
-                const auto decoded = DecodeValue(value);
+                const auto decoded = DecodeValue(value, *setting);
                 if (!decoded || !IsValidValue(*setting, *decoded)) {
                     errors.push_back({ path, "saved value has the wrong type or is outside its bounds: " + key });
                     continue;
@@ -66,6 +67,9 @@ namespace OSFSettings::SettingsJson
         try {
             auto saved = nlohmann::json::object();
             for (const auto& [key, value] : values) {
+                if (const auto* number = std::get_if<double>(&value); number && !std::isfinite(*number)) {
+                    throw std::runtime_error("value must be finite: " + key);
+                }
                 std::visit([&](const auto& current) { saved[key] = current; }, value);
             }
             const nlohmann::json document = { { "formatVersion", 1 }, { "values", saved } };

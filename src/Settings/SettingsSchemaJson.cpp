@@ -28,10 +28,18 @@ namespace OSFSettings::SettingsJson
         {
             const auto field = object.find(key);
             if (field == object.end()) return std::nullopt;
-            const auto value = DecodeValue(*field);
-            const auto* integer = value ? std::get_if<std::int64_t>(&*value) : nullptr;
-            Require(integer != nullptr, std::string(key) + " must be a signed 64-bit integer");
-            return *integer;
+            const auto value = DecodeInteger(*field);
+            Require(value.has_value(), std::string(key) + " must be a signed 64-bit integer");
+            return value;
+        }
+
+        std::optional<double> ReadFloat(const nlohmann::json& object, const char* key)
+        {
+            const auto field = object.find(key);
+            if (field == object.end()) return std::nullopt;
+            const auto value = DecodeFloat(*field);
+            Require(value.has_value(), std::string(key) + " must be a finite number");
+            return value;
         }
 
         std::string OptionalText(const nlohmann::json& object, const char* key, const std::string& fallback = {})
@@ -78,17 +86,24 @@ namespace OSFSettings::SettingsJson
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
                     const auto type = RequiredText(sourceSetting, "type");
-                    Require(type == "bool" || type == "int", "only types bool and int are supported: " + setting.key);
+                    Require(type == "bool" || type == "int" || type == "float", "only types bool, int, and float are supported: " + setting.key);
                     if (type == "int") {
                         IntDefinition definition;
                         definition.minimum = ReadInteger(sourceSetting, "min");
                         definition.maximum = ReadInteger(sourceSetting, "max");
                         Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
                         setting.definition = definition;
+                    } else if (type == "float") {
+                        FloatDefinition definition;
+                        definition.minimum = ReadFloat(sourceSetting, "min");
+                        definition.maximum = ReadFloat(sourceSetting, "max");
+                        Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
+                        setting.definition = definition;
                     }
                     const auto value = sourceSetting.find("default");
-                    const auto decoded = value != sourceSetting.end() ? DecodeValue(*value) : std::nullopt;
-                    Require(decoded && IsValidValue(setting, *decoded), (type == "bool" ? "default must be a boolean: " : "default must be an integer within its bounds: ") + setting.key);
+                    const auto decoded = value != sourceSetting.end() ? DecodeValue(*value, setting) : std::nullopt;
+                    const std::string defaultError = type == "bool" ? "default must be a boolean: " : type == "int" ? "default must be an integer within its bounds: " : "default must be a finite number within its bounds: ";
+                    Require(decoded && IsValidValue(setting, *decoded), defaultError + setting.key);
                     std::visit([&](auto& definition) {
                         definition.defaultValue = std::get<decltype(definition.defaultValue)>(*decoded);
                     }, setting.definition);
