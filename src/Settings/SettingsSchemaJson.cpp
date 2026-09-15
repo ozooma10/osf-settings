@@ -87,13 +87,16 @@ namespace OSFSettings::SettingsJson
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
                     const auto type = RequiredText(sourceSetting, "type");
                     Require(type == "bool" || type == "int" || type == "float", "only types bool, int, and float are supported: " + setting.key);
+                    std::string defaultError = "default must be a boolean: ";
                     if (type == "int") {
+                        defaultError = "default must be an integer within its bounds: ";
                         IntDefinition definition;
                         definition.minimum = ReadInteger(sourceSetting, "min");
                         definition.maximum = ReadInteger(sourceSetting, "max");
                         Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
                         setting.definition = definition;
                     } else if (type == "float") {
+                        defaultError = "default must be a finite number within its bounds: ";
                         FloatDefinition definition;
                         definition.minimum = ReadFloat(sourceSetting, "min");
                         definition.maximum = ReadFloat(sourceSetting, "max");
@@ -102,7 +105,6 @@ namespace OSFSettings::SettingsJson
                     }
                     const auto value = sourceSetting.find("default");
                     const auto decoded = value != sourceSetting.end() ? DecodeValue(*value, setting) : std::nullopt;
-                    const std::string defaultError = type == "bool" ? "default must be a boolean: " : type == "int" ? "default must be an integer within its bounds: " : "default must be a finite number within its bounds: ";
                     Require(decoded && IsValidValue(setting, *decoded), defaultError + setting.key);
                     std::visit([&](auto& definition) {
                         definition.defaultValue = std::get<decltype(definition.defaultValue)>(*decoded);
