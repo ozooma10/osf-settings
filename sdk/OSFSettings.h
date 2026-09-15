@@ -7,10 +7,11 @@
 
 namespace OSFSettings::API
 {
-    // Packed major.minor service versions.
+    // Packed major.minor ABI versions, independent of the plugin release version.
+    // Within a major, existing slots/signatures/status values are frozen. New methods may only be appended with a minor bump and gated by Client::Has.
     inline constexpr std::uint32_t kVersion = 0x00010000u;
     inline constexpr std::uint32_t kBaseVersion = 0x00010000u;
-    inline constexpr wchar_t kModuleName[] = L"OSF Settings Slim.dll";
+    inline constexpr wchar_t kModuleName[] = L"OSFSettings.dll";
     inline constexpr char kRequestExportName[] = "OSFSettings_RequestAPI";
 
     constexpr bool Supports(std::uint32_t have, std::uint32_t need) noexcept
@@ -36,9 +37,7 @@ namespace OSFSettings::API
     using Subscription = std::uint64_t; // Zero is never a valid subscription.
 
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
-    // String pointers are borrowed only for this callback; user belongs to the caller.
-    // Mods handle their own exceptions; none may escape the callback.
-    // Callbacks run serially from an SFSE task; this API does not guarantee the main thread. schedule thread-sensitive game work appropriately.
+    // Callbacks run serially from an SFSE task; no main-thread guarantee.
     using ChangedFn = void (*)(const char* mod, const char* key, void* user) noexcept;
 
     struct ISettings
@@ -65,12 +64,14 @@ namespace OSFSettings::API
         // Subscribe before reading to avoid missing changes. Registration is allowed before readiness; the initial notification waits until the provider is ready.
         virtual Status Subscribe(const char* mod, ChangedFn callback, void* user, Subscription* out) noexcept = 0;
         // Outside a callback, successful unsubscribe waits for that callback to finish.
+        // Inside a callback, it prevents future calls; keep user alive until return.
         virtual Status Unsubscribe(Subscription subscription) noexcept = 0;
 
     protected:
         ~ISettings() = default;
     };
 
+    // Returns a borrowed process-lifetime interface, or nullptr for an unsupported  major/minor. outVersion is optional: actual ABI on success, zero on failure.
     using AcquireFn = void* (*)(std::uint32_t version, std::uint32_t* outVersion) noexcept;
 
     inline ISettings* RequestInterface(std::uint32_t version = kBaseVersion, std::uint32_t* outVersion = nullptr) noexcept
