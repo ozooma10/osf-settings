@@ -1,3 +1,4 @@
+#include "../../sdk/OSFSettings.h"
 #include "Settings/SettingsJson.h"
 #include "Menu/FloatSlider.h"
 #include "Settings/SettingsStore.h"
@@ -10,6 +11,7 @@
 #include <iterator>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <nlohmann/json.hpp>
 
 #ifdef _WIN32
@@ -33,6 +35,76 @@ namespace
             ++failures;
             std::cerr << "FAIL: " << message << '\n';
         }
+    }
+
+    void TestSDK()
+    {
+        using namespace OSFSettings::API;
+        static_assert(std::is_abstract_v<ISettings>);
+        static_assert(!std::is_destructible_v<ISettings>);
+        static_assert(Supports(0x00010001u, kBaseVersion));
+        static_assert(!Supports(kBaseVersion, 0x00010001u));
+        static_assert(!Supports(0x00020000u, kBaseVersion));
+
+        struct Provider final : ISettings
+        {
+            bool ready{};
+            bool IsReady() noexcept override { return ready; }
+            Status GetBool(const char*, const char*, bool* out) noexcept override
+            {
+                if (!ready) return Status::NotReady;
+                *out = true;
+                return Status::Ok;
+            }
+            Status GetInt(const char*, const char*, std::int64_t*) noexcept override { return Status::NotReady; }
+            Status GetFloat(const char*, const char*, double*) noexcept override { return Status::NotReady; }
+            Status GetEnum(const char*, const char*, char*, std::uint32_t, std::uint32_t*) noexcept override { return Status::NotReady; }
+            Status SetBool(const char*, const char*, bool) noexcept override { return Status::SaveFailed; }
+            Status SetInt(const char*, const char*, std::int64_t) noexcept override { return Status::NotReady; }
+            Status SetFloat(const char*, const char*, double) noexcept override { return Status::NotReady; }
+            Status SetEnum(const char*, const char*, const char*) noexcept override { return Status::NotReady; }
+            Status Reset(const char*, const char*) noexcept override { return Status::NotReady; }
+            Status ResetMod(const char*) noexcept override { return Status::NotReady; }
+            Status Subscribe(const char*, ChangedFn, void*, Subscription*) noexcept override { return Status::NotReady; }
+            Status Unsubscribe(Subscription) noexcept override { return Status::NotReady; }
+        } provider;
+
+        Client client;
+        bool enabled = false;
+        std::uint32_t required = 42;
+        Subscription subscription = 17;
+        char text[] = "unchanged";
+        Check(!client && !client.IsReady() && !client.Raw() && client.Version() == 0 && !client.Has(kBaseVersion),
+            "a new SDK client has no service");
+        Check(client.GetBool("learning", "notifications", &enabled) == Status::NotReady && !enabled &&
+            client.GetEnum("learning", "mode", text, sizeof(text), &required) == Status::NotReady &&
+            std::string_view(text) == "unchanged" && required == 42 &&
+            client.Subscribe("learning", nullptr, nullptr, &subscription) == Status::NotReady && subscription == 17,
+            "detached SDK reads and subscriptions preserve caller outputs");
+
+        Check(client.Attach(&provider, 0x00010001u) && client && client.Raw() == &provider &&
+            client.Version() == 0x00010001u && client.Has(kBaseVersion) && !client.Has(0x00010002u) && !client.IsReady(),
+            "SDK attachment accepts a newer compatible minor independently of readiness");
+        Check(client.GetBool("learning", "notifications", &enabled) == Status::NotReady && !enabled,
+            "an attached SDK client preserves provider readiness failures");
+        provider.ready = true;
+        Check(client.IsReady() && client.GetBool("learning", "notifications", &enabled) == Status::Ok && enabled,
+            "an SDK client observes provider readiness and current values");
+        Check(client.SetBool("learning", "notifications", false) == Status::SaveFailed,
+            "SDK writes preserve a provider save failure");
+
+        Check(!client.Attach(&provider, 0x00020000u) && !client && !client.Raw() && client.Version() == 0,
+            "incompatible SDK attachment clears an existing service");
+        client.Attach(&provider);
+        Check(!client.Attach(nullptr) && !client && client.Version() == 0,
+            "null SDK attachment clears an existing service");
+
+        std::uint32_t actual = 42;
+        Check(RequestInterface(kBaseVersion, &actual) == nullptr && actual == 0,
+            "SDK discovery reports a missing provider without loading it");
+        client.Attach(&provider);
+        Check(!client.Init() && !client && !client.Raw() && client.Version() == 0,
+            "failed SDK discovery clears an existing attachment");
     }
 
     void Reject(const Json& document, std::string_view expectedError)
@@ -824,6 +896,7 @@ int main(int argc, char** argv)
         std::ifstream input(examplePath);
         if (!input) throw std::runtime_error("cannot open example schema: " + examplePath.string());
         const auto example = nlohmann::json::parse(input);
+        TestSDK();
         TestSchema(example);
         TestStore(example, examplePath);
         TestPersistence(example);
