@@ -49,7 +49,7 @@ package
             stage.addEventListener(KeyboardEvent.KEY_UP, key, false, 100);
             caption.defaultTextFormat = new TextFormat("_sans", 18, 0x9EA9B0);
             caption.x = 160; caption.y = 1045; caption.width = 1600; caption.height = 30;
-            caption.text = "RUFFLE PREVIEW    |    E / Enter: toggle    |    Tab / Esc: back    |    F5: reset    |    Values stay in memory";
+            caption.text = "RUFFLE PREVIEW    |    E / Enter: toggle    |    Arrows: adjust    |    Tab / Esc: back    |    F5: reset    |    Values stay in memory";
             caption.mouseEnabled = false; addChild(caption);
             addEventListener(Event.ENTER_FRAME, previewLabels);
             restart();
@@ -73,10 +73,12 @@ package
             for each (var library:XML in config.libraries.library) libraries.push(String(library.@url));
             for each (var font:XML in config.fonts.font) fontNames.push(String(font.@name));
             for each (var row:XML in config.rows.row) {
+                var value:* = String(row.@type) == "int" ? String(row.@value) : String(row.@value) == "true";
                 rows.push({modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
                     group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
-                    value:String(row.@value) == "true", defaultValue:String(row.@value) == "true"});
+                    type:String(row.@type), editable:String(row.@editable) == "true",
+                    minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value});
             }
             loadNext();
         }
@@ -124,7 +126,7 @@ package
         private function menuLoaded(event:Event):void
         {
             menu = event.target.content;
-            menu.BGSCodeObj = {getRows:getRows, setBool:setBool, close:closeMenu,
+            menu.BGSCodeObj = {getRows:getRows, setBool:setBool, setInt:setInt, close:closeMenu,
                 startup:startup, startupFailed:report};
             addChild(menu as MovieClip);
             menu.onCodeObjCreate();
@@ -149,12 +151,26 @@ package
         private function setBool(mod:String, key:String, value:Boolean):Object
         {
             for each (var row:Object in rows) {
-                if (row.mod == mod && row.key == key) {
+                if (row.mod == mod && row.key == key && row.type == "bool") {
                     row.value = value; trace("[preview] " + mod + "/" + key + " = " + value);
                     return {ok:true, error:""};
                 }
             }
             return {ok:false, error:"Unknown preview setting."};
+        }
+
+        private function setInt(mod:String, key:String, value:String):Object
+        {
+            var number:Number = Number(value);
+            for each (var row:Object in rows) {
+                if (row.mod == mod && row.key == key && row.type == "int" && row.editable &&
+                    /^-?\d+$/.test(value) && isFinite(number) && number == Math.round(number) &&
+                    number >= Number(row.minimum) && number <= Number(row.maximum)) {
+                    row.value = String(number); trace("[preview] " + mod + "/" + key + " = " + row.value);
+                    return {ok:true, error:""};
+                }
+            }
+            return {ok:false, error:"Invalid preview integer setting."};
         }
 
         private function startup(phase:String):void

@@ -1,5 +1,6 @@
 #include "OSFSettingsMenu.h"
 #include "Core/Runtime.h"
+#include <charconv>
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
 
@@ -7,11 +8,18 @@ namespace OSFSettings
 {
     namespace
     {
-        enum class Function : std::uintptr_t { GetRows = 1, SetBool, Close, Startup, StartupFailed };
+        enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, Close, Startup, StartupFailed };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
             return index < params.argCount && params.args[index].IsString() ? params.args[index].GetString() : "";
+        }
+
+        std::optional<std::int64_t> ParseInteger(std::string_view text)
+        {
+            std::int64_t value{};
+            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+            return error == std::errc{} && end == text.data() + text.size() ? std::optional(value) : std::nullopt;
         }
 
         void Text(RE::Scaleform::GFx::Value& object, const char* name, const std::string& value)
@@ -39,6 +47,7 @@ namespace OSFSettings
     {
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("setBool", static_cast<std::uint64_t>(Function::SetBool));
+        RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
         RegisterNativeFunction("close", static_cast<std::uint64_t>(Function::Close));
         RegisterNativeFunction("startup", static_cast<std::uint64_t>(Function::Startup));
         RegisterNativeFunction("startupFailed", static_cast<std::uint64_t>(Function::StartupFailed));
@@ -72,8 +81,6 @@ namespace OSFSettings
             for (const auto& mod : runtime.Settings().Mods()) {
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& setting : group.settings) {
-                        const auto* definition = std::get_if<BoolDefinition>(&setting.definition);
-                        if (!definition) continue;
                         const auto value = mod.values.find(setting.key);
                         if (value == mod.values.end()) continue;
                         RE::Scaleform::GFx::Value row;
@@ -86,16 +93,42 @@ namespace OSFSettings
                         Text(row, "key", setting.key);
                         Text(row, "title", setting.label);
                         Text(row, "hint", setting.hint);
-                        row.SetMember("value", RE::Scaleform::GFx::Value(std::get<bool>(value->second)));
-                        row.SetMember("defaultValue", RE::Scaleform::GFx::Value(definition->defaultValue));
+                        if (const auto* definition = std::get_if<BoolDefinition>(&setting.definition)) {
+                            Text(row, "type", "bool");
+                            row.SetMember("value", RE::Scaleform::GFx::Value(std::get<bool>(value->second)));
+                            row.SetMember("defaultValue", RE::Scaleform::GFx::Value(definition->defaultValue));
+                            row.SetMember("editable", RE::Scaleform::GFx::Value(true));
+                        } else {
+                            const auto& integer = std::get<IntDefinition>(setting.definition);
+                            Text(row, "type", "int");
+                            Text(row, "value", std::to_string(std::get<std::int64_t>(value->second)));
+                            Text(row, "defaultValue", std::to_string(integer.defaultValue));
+                            if (integer.minimum) Text(row, "minimum", std::to_string(*integer.minimum));
+                            if (integer.maximum) Text(row, "maximum", std::to_string(*integer.maximum));
+                            // AS3 Number must preserve both bounds; BSSlider stores its range as uint32.
+                            constexpr std::int64_t safeInteger = 9007199254740991LL;
+                            const bool editable = integer.minimum && integer.maximum && *integer.minimum < *integer.maximum &&
+                                *integer.minimum >= -safeInteger && *integer.maximum <= safeInteger &&
+                                *integer.maximum - *integer.minimum <= 4294967295LL;
+                            row.SetMember("editable", RE::Scaleform::GFx::Value(editable));
+                        }
                         params.ret->PushBack(row);
                     }
                 }
             }
             break;
-        case Function::SetBool: {
-            const bool valid = params.argCount == 3 && params.args[0].IsString() && params.args[1].IsString() && params.args[2].IsBoolean();
-            const auto result = valid ? runtime.SetBool(ArgString(params, 0), ArgString(params, 1), params.args[2].GetBoolean()) : SettingsStore::SetResult{ false, "invalid edit arguments" };
+        case Function::SetBool:
+        case Function::SetInt: {
+            SettingsStore::SetResult result{ false, "invalid edit arguments" };
+            if (params.argCount == 3 && params.args[0].IsString() && params.args[1].IsString()) {
+                if (function == Function::SetBool && params.args[2].IsBoolean()) {
+                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetBoolean());
+                } else if (function == Function::SetInt && params.args[2].IsString()) {
+                    if (const auto value = ParseInteger(ArgString(params, 2))) {
+                        result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), *value);
+                    }
+                }
+            }
             root->CreateObject(params.ret);
             params.ret->SetMember("ok", RE::Scaleform::GFx::Value(result.ok));
             // Detailed file errors go to the log. The player gets an actionable message.

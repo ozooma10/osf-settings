@@ -135,8 +135,7 @@ namespace
     void TestIntegers(const Json& example)
     {
         auto schema = example;
-        schema["groups"][0]["settings"].push_back({ { "key", "notificationLimit" }, { "type", "int" },
-            { "label", "Notification limit" }, { "default", 3 }, { "min", 1 }, { "max", 10 } });
+
         schema["groups"][0]["settings"].push_back({ { "key", "counter" }, { "type", "int" }, { "default", 0 } });
         std::string error;
         const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);

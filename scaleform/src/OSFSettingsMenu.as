@@ -213,10 +213,13 @@ package
             var data:Array = []; var source:Array = modID ? allRows : mods;
             for each (var row:Object in source) {
                 if (modID && (row.mod != modID || row.group != groupID)) continue;
+                var slider:Boolean = modID != "" && row.type == "int" && row.editable;
+                // The vanilla entry multiplies fValue by 100. Our slider stores integer offsets.
                 data.push({row:row, sText:html(String(row.title)), uID:data.length, bDisabled:false, bShowSpinner:false,
-                    uCategory:0, bEnabled:true, bSubSetting:false, uType:modID ? types.SDT_CHECKBOX : types.SDT_LINK,
-                    sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0},
-                    checkBoxData:{bChecked:Boolean(row.value)}});
+                    uCategory:0, bEnabled:!modID || row.editable, bSubSetting:false,
+                    uType:!modID ? types.SDT_LINK : slider ? types.SDT_SLIDER : row.type == "bool" ? types.SDT_CHECKBOX : types.SDT_LINK,
+                    sliderData:{fValue:slider ? (Number(row.value) - Number(row.minimum)) / 100 : 0, sDisplayValue:String(row.value)},
+                    stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
             }
             options.InitializeEntries(data);
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
@@ -262,12 +265,12 @@ package
         }
         private function tabClicked(event:MouseEvent):void
         {
-            if (requestedRefresh) return;
+            if (requestedRefresh || dragging()) return;
             groupID = event.currentTarget.name; populate(); drawTabs();
         }
         private function changePage(direction:int):void
         {
-            if (!modID || groups.length < 2 || requestedRefresh) return;
+            if (!modID || groups.length < 2 || requestedRefresh || dragging()) return;
             for (var i:int = 0; i < groups.length; ++i) {
                 if (groups[i].id == groupID) {
                     groupID = groups[(i + direction + groups.length) % groups.length].id;
@@ -284,12 +287,12 @@ package
             detailHint.height = Math.max(64, 630 - detailHint.y);
             detailHint.text = row ? String(row.hint || "") : ""; detailHint.scrollV = 1;
             defaultLabel.text = modID ? "DEFAULT" : "SETTINGS";
-            defaultValue.text = row ? modID ? row.defaultValue ? "ON" : "OFF" : String(row.count) : "";
-            resetButton.Visible = Boolean(modID && row);
+            MenuStyle.fit(defaultValue, row ? modID ? row.type == "int" ? String(row.defaultValue) : row.defaultValue ? "ON" : "OFF" : String(row.count) : "");
+            resetButton.Visible = Boolean(modID && row && row.editable);
             buttonData.Accept.sButtonText = modID ? "TOGGLE" : "OPEN";
             buttonData.Cancel.sButtonText = modID ? "ALL MODS" : "BACK";
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-            acceptButton.Visible = Boolean(row); bar.RefreshButtons();
+            acceptButton.Visible = Boolean(row && (!modID || row.type == "bool")); bar.RefreshButtons();
         }
         private function scrollDescription(event:MouseEvent):void
         {
@@ -300,43 +303,56 @@ package
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
         {
-            if (closing || refreshing || requestedRefresh || activationFrame == frame || options.scrollbarScrolling) return;
+            if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
             var row:Object = current(); if (!row) return;
             if (!modID) { modID = row.mod; groupID = ""; refresh(false); }
-            else options.OnEntryPressed();
+            else if (row.type == "bool") options.OnEntryPressed();
         }
         private function reset():void
         {
             var row:Object = current();
-            if (modID && row && Boolean(row.value) != Boolean(row.defaultValue)) edit(row, Boolean(row.defaultValue));
+            if (!dragging() && modID && row && row.editable && row.value != row.defaultValue) edit(row, row.defaultValue);
         }
         private function valueChanged(event:Event):void
         {
             event.stopPropagation();
+            if (refreshing) return;
             var data:Object = Object(event).params;
             var item:Object = options.GetDataForEntry(int(data.id));
-            if (modID && item) edit(item.row, Number(data.value) != 0);
+            if (!modID || !item || !item.row.editable) return;
+            var row:Object = item.row;
+            if (row.type == "bool") edit(row, Number(data.value) != 0);
+            else if (row.type == "int") {
+                // SettingsOptionListEntry reports BSSlider.value / 100.
+                var next:Number = Math.round(Number(row.minimum) + Number(data.value) * 100);
+                next = Math.max(Number(row.minimum), Math.min(Number(row.maximum), next));
+                edit(row, String(next));
+            }
         }
-        private function edit(row:Object, value:Boolean):void
+        private function edit(row:Object, value:*):void
         {
-            if (closing || refreshing || requestedRefresh || options.scrollbarScrolling) return;
+            if (closing || refreshing || options.scrollbarScrolling || !row.editable) return;
             activationFrame = frame;
-            var result:Object = BGSCodeObj.setBool(row.mod, row.key, value);
+            if (value == row.value) { requestedRefresh = true; return; }
+            var result:Object = row.type == "int" ? BGSCodeObj.setInt(row.mod, row.key, String(value)) : BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
+            if (result && result.ok) { row.value = value; describe(); }
             status.text = result && result.ok ? "Changes apply automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.";
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
             requestedRefresh = true;
         }
         private function back():void
         {
-            if (closing || options.scrollbarScrolling || requestedRefresh) return;
+            if (closing || dragging() || requestedRefresh) return;
             if (modID) { modID = ""; groupID = ""; refresh(false); return; }
             closing = true; options.disableInput = true; BGSCodeObj.close();
         }
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (!initialized || closing) return false;
-            return Boolean(bar.ProcessUserEvent(name, pressed));
+            if (bar.ProcessUserEvent(name, pressed)) return true;
+            var clip:Object = options.FindClipForEntry(options.selectedIndex);
+            return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
         }
         private function mouseFocus(event:MouseEvent):void
         {
@@ -351,12 +367,18 @@ package
         }
         private function keyDown(event:KeyboardEvent):void
         {
-            if (!initialized || closing || refreshing || requestedRefresh || options.scrollbarScrolling) return;
+            if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
             if (event.keyCode == Keyboard.B) reset();
             else if (event.keyCode == 219) changePage(-1); // [ and ] also expose tabs without a mouse.
             else if (event.keyCode == 221) changePage(1);
             else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {
-                var row:Object = current(); if (modID && row) edit(row, event.keyCode == Keyboard.RIGHT);
+                var row:Object = current();
+                if (modID && row && row.editable) {
+                    if (row.type == "int") {
+                        var next:Number = Number(row.value) + (event.keyCode == Keyboard.RIGHT ? 1 : -1);
+                        edit(row, String(Math.max(Number(row.minimum), Math.min(Number(row.maximum), next))));
+                    } else edit(row, event.keyCode == Keyboard.RIGHT);
+                }
             } else return;
             event.stopImmediatePropagation(); event.preventDefault();
         }
@@ -364,10 +386,20 @@ package
         {
             if (event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
         }
+        private function dragging():Boolean
+        {
+            if (!options) return false;
+            if (options.scrollbarScrolling) return true;
+            for (var i:int = 0; i < options.totalEntryClips; ++i) {
+                var clip:Object = options.GetClipByIndex(i);
+                if (clip && clip.IsSlider() && clip.Slider_mc.dragging) return true;
+            }
+            return false;
+        }
         private function advance(event:Event):void
         {
             ++frame; if (!initialized || closing) return;
-            if (requestedRefresh && !options.scrollbarScrolling) refresh();
+            if (requestedRefresh && !dragging()) refresh();
             decorate();
         }
         private function decorate():void
@@ -381,17 +413,29 @@ package
                 if (!view) { view = new SettingsRow(); clip.addChild(view); rowViews[clip] = view; }
                 // Keep the vanilla hit area and behavior. Its authored timeline
                 // colors must not recolor our text or selection bar.
+                var slider:Object = Object(clip).Slider_mc;
+                var showSlider:Boolean = modID != "" && item.row.type == "int" && item.row.editable;
+                clip.setChildIndex(view, 0);
                 for (var child:int = 0; child < clip.numChildren; ++child) {
-                    var display:DisplayObject = clip.getChildAt(child); display.visible = display == view;
+                    var display:DisplayObject = clip.getChildAt(child);
+                    display.visible = display == view || (showSlider && display == slider);
                 }
-                clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = false;
+                clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider;
+                if (showSlider) {
+                    slider.x = 540; slider.y = (MenuStyle.ROW_HEIGHT - slider.height) / 2; slider.width = 330;
+                    slider.maxValue = Number(item.row.maximum) - Number(item.row.minimum);
+                    slider.disableRounding = false; slider.mouseWheelValueChange = 1;
+                    if (!slider.dragging) slider.value = Number(item.row.value) - Number(item.row.minimum);
+                    slider.transform.colorTransform = Object(clip).itemIndex == options.selectedIndex ?
+                        new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
+                }
                 var border:MovieClip = Object(clip).Border_mc;
                 border.x = 0; border.y = 0; border.width = MenuStyle.LIST_WIDTH;
                 if (border.height != MenuStyle.ROW_HEIGHT) { border.height = MenuStyle.ROW_HEIGHT; needsLayout = true; }
                 clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (MenuStyle.ROW_HEIGHT + 4);
                 view.update(item.row, Object(clip).itemIndex == options.selectedIndex, modID == "");
             }
-            if (needsLayout && !options.scrollbarScrolling) options.UpdateContainerRect();
+            if (needsLayout && !dragging()) options.UpdateContainerRect();
         }
         private function resizeBackground(event:Event = null):void
         {

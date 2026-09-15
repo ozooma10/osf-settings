@@ -159,13 +159,28 @@ def prepare(archive_path, output, schema_paths, large, menu_path):
         schema = json.loads(path.read_text(encoding="utf-8-sig"))
         for group in schema["groups"]:
             for setting in group["settings"]:
-                if setting["type"] != "bool" or not isinstance(setting["default"], bool):
-                    raise ValueError(f"Preview supports boolean settings only: {path}")
+                kind, default = setting["type"], setting["default"]
+                attributes = {"type": kind, "value": str(default).lower(), "editable": "true"}
+                if kind == "int" and type(default) is int:
+                    minimum, maximum = setting.get("min"), setting.get("max")
+                    for bound in (default, minimum, maximum):
+                        if bound is not None and (type(bound) is not int or not -(2**63) <= bound < 2**63):
+                            raise ValueError(f"Invalid preview integer: {path}")
+                    if (minimum is not None and default < minimum) or (maximum is not None and default > maximum):
+                        raise ValueError(f"Preview default is outside its bounds: {path}")
+                    if minimum is not None:
+                        attributes["minimum"] = str(minimum)
+                    if maximum is not None:
+                        attributes["maximum"] = str(maximum)
+                    attributes["editable"] = str(minimum is not None and maximum is not None and
+                        -(2**53 - 1) <= minimum < maximum <= 2**53 - 1 and maximum - minimum <= 2**32 - 1).lower()
+                elif kind != "bool" or type(default) is not bool:
+                    raise ValueError(f"Preview supports boolean and integer settings only: {path}")
                 ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
                               modDescription=schema.get("description", ""),
                               group=group["id"], groupTitle=group["label"], key=setting["key"],
                               title=setting["label"], hint=setting.get("hint", ""),
-                              value=str(setting["default"]).lower())
+                              **attributes)
     ET.indent(config)
     ET.ElementTree(config).write(output / "preview.xml", encoding="utf-8", xml_declaration=True)
 

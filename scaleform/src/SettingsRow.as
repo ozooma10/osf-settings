@@ -23,24 +23,28 @@ package
         }
         public function update(row:Object, selected:Boolean, modList:Boolean):void
         {
-            var changed:Boolean = !modList && Boolean(row.value) != Boolean(row.defaultValue);
-            var signature:String = [row.title, row.value, row.count, changed, selected, modList].join("|");
+            var changed:Boolean = !modList && row.value != row.defaultValue;
+            var slider:Boolean = !modList && row.type == "int" && row.editable;
+            var signature:String = [row.title, row.value, row.type, row.editable, row.count, changed, selected, modList].join("|");
             if (signature == previous) return;
             previous = signature;
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
             graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.ROW_HEIGHT); graphics.endFill();
             title.textColor = color; value.textColor = color;
+            title.width = slider ? 470 : 650;
+            value.x = slider ? 888 : row.type == "int" ? 694 : 776;
+            value.width = slider ? 100 : row.type == "int" ? 300 : 150;
             MenuStyle.fit(title, String(row.title));
-            value.text = modList ? String(row.count) : row.value ? "ON" : "OFF";
+            MenuStyle.fit(value, modList ? String(row.count) : row.type == "int" ? String(row.value) : row.value ? "ON" : "OFF");
             var center:Number = MenuStyle.ROW_HEIGHT / 2;
             graphics.lineStyle(2, selected ? 0x52636C : 0xA0B0B8);
-            if (!modList) {
+            if (!modList && row.type == "bool") {
                 graphics.moveTo(714, center - 5); graphics.lineTo(710, center); graphics.lineTo(714, center + 5);
             }
-            graphics.moveTo(989, center - 5); graphics.lineTo(993, center); graphics.lineTo(989, center + 5);
+            if (modList || row.type == "bool") { graphics.moveTo(989, center - 5); graphics.lineTo(993, center); graphics.lineTo(989, center + 5); }
             graphics.lineStyle();
-            if (changed) MenuStyle.diamond(graphics, Math.min(title.x + title.textWidth + 18, 683), center, MenuStyle.ACCENT);
+            if (changed) MenuStyle.diamond(graphics, Math.min(title.x + title.textWidth + 18, slider ? 508 : 683), center, MenuStyle.ACCENT);
         }
     }
 }

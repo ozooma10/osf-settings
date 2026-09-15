@@ -45,10 +45,12 @@ namespace OSFSettings
         }
     }
 
-    SettingsStore::SetResult Runtime::SetBool(std::string_view mod, std::string_view key, bool value)
+    SettingsStore::SetResult Runtime::SetValue(std::string_view mod, std::string_view key, SettingValue value)
     {
         auto result = m_settings.Set(mod, key, value);
-        if (result.ok) REX::INFO("Menu saved {} / {} = {}", mod, key, value);
+        if (result.ok) {
+            std::visit([&](const auto& current) { REX::INFO("Menu saved {} / {} = {}", mod, key, current); }, value);
+        }
         else REX::ERROR("Menu could not save {} / {}: {}", mod, key, result.error);
         return result;
     }
