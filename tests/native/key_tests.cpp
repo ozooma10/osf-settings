@@ -19,10 +19,19 @@ namespace
     class TestKeyboard final : public RE::BSKeyboardDevice
     {
     public:
-        void Unk_01() override {}
-        void Unk_02() override {}
-        void Unk_03() override {}
-        void Unk_08() override {}
+        void Initialize() override {}
+        void Process(float) override {}
+        void Release() override {}
+        void Reset() override {}
+
+        bool GetKeyNameFromCode(std::uint32_t keyCode, RE::BSFixedStringCS& name) const override
+        {
+            ++displayCalls;
+            lastCode = keyCode;
+            if (keyCode != displayCode || !hasDisplayName) return false;
+            name = displayName.c_str();
+            return true;
+        }
 
         std::uint32_t GetKeyCodeFromName(const char* name) const override
         {
@@ -35,6 +44,11 @@ namespace
         std::uint32_t result{ 0x73 };
         mutable std::string lastName;
         mutable unsigned calls{};
+        std::uint32_t displayCode{ 0x20 };
+        std::string displayName{ "Engine Space" };
+        bool hasDisplayName{ true };
+        mutable std::uint32_t lastCode{};
+        mutable unsigned displayCalls{};
     };
 }
 
@@ -44,9 +58,9 @@ namespace RE
 {
     BSInputDeviceManager* BSInputDeviceManager::GetSingleton() { return inputManager; }
     void BSInputEventSingleUser::PerformInputProcessing(const InputEvent*) {}
-    void BSInputDevice::Unk_04() {}
-    void BSInputDevice::Unk_06() {}
-    void BSInputDevice::Unk_07() {}
+    BSInputDevice::~BSInputDevice() = default;
+    bool BSInputDevice::GetKeyNameFromCode(std::uint32_t, BSFixedStringCS&) const { return false; }
+    bool BSInputDevice::GetMappedKeyCode(std::uint32_t, std::uint32_t&) const { return false; }
     std::uint32_t BSInputDevice::GetKeyCodeFromName(const char*) const { return 0xFFFFFFFF; }
 }
 
@@ -64,10 +78,12 @@ int TestKeySettings()
     static_assert(API::kUnboundKey == KeyBinding::Unbound);
     check(!KeyCodeFromName("F4") && KeyCodeFromName("unbound") == KeyBinding::Unbound,
         "missing input manager is safe and unbound needs no engine lookup");
+    check(KeyName(0x73) == "Key 0x73", "missing input manager uses the numeric display fallback");
     // Keep the F4 stand-in available for the shared schema/store tests that follow.
     static RE::BSInputDeviceManager manager{};
     inputManager = &manager;
     check(!KeyCodeFromName("F4"), "missing keyboard is safe");
+    check(KeyName(0x73) == "Key 0x73", "missing keyboard uses the numeric display fallback");
     static TestKeyboard keyboard;
     manager.devices[0] = &keyboard;
     check(KeyCodeFromName(std::string_view("F4suffix", 2)) == 0x73 && keyboard.lastName == "F4",
@@ -92,7 +108,19 @@ int TestKeySettings()
     check(!IsBindableKey(0) && !IsBindableKey(0xFF) && !IsBindableKey(0x100) && !IsBindableKey(0xFFFFFFFF) &&
         !IsBindableKey(0x01) && !IsBindableKey(0x02) && !IsBindableKey(0x04) && !IsBindableKey(0x05) &&
         !IsBindableKey(0x06) && !IsBindableKey(0x1B), "reject invalid codes, mouse buttons, and reserved Escape");
-    check(!KeyName(0x20).empty() && KeyName(0x20) != KeyName(0x44), "Space display is not the DIK D entry");
+    check(KeyName(0x20) == "Engine Space" && keyboard.lastCode == 0x20,
+        "display lookup forwards the virtual-key code without a scan-code conversion");
+    keyboard.displayName = "Native \xC3\xA9tiquette";
+    check(KeyName(0x20) == keyboard.displayName, "native UTF-8 display text is copied before releasing its fixed string");
+    keyboard.displayName.clear();
+    check(KeyName(0x20) == "Key 0x20", "empty native display name uses numeric fallback");
+    keyboard.hasDisplayName = false;
+    check(KeyName(0x20) == "Key 0x20", "failed native display lookup uses numeric fallback");
+    const auto displayCalls = keyboard.displayCalls;
+    check(KeyName(0xFF) == "UNBOUND" && KeyName(0) == "Key 0x00" && KeyName(0x100) == "Key 0x100" &&
+        keyboard.displayCalls == displayCalls, "unbound and invalid codes bypass native display lookup");
+    keyboard.hasDisplayName = true;
+    keyboard.displayName = "Engine Space";
     check(!KeyName(0xA3).empty() && KeyName(0xFF) == "UNBOUND" && KeyName(0) == "Key 0x00",
         "display names have unbound and numeric fallbacks");
 

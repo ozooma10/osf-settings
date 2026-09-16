@@ -2,7 +2,6 @@
 #include "Settings/SettingValue.h"
 #include "SFSE/Impl/PCH.h"
 #include "RE/B/BSInputDeviceManager.h"
-#include "REX/CONVERT.h"
 
 #include <cstring>
 #include <format>
@@ -47,18 +46,11 @@ namespace OSFSettings
     {
         if (keyCode == KeyBinding::Unbound) return "UNBOUND";
         if (keyCode > 0 && keyCode < KeyBinding::Unbound) {
-            // Convert only for Windows' display-name API; the binding remains a VK.
-            auto scan = ::MapVirtualKeyExW(keyCode, MAPVK_VK_TO_VSC_EX, ::GetKeyboardLayout(0));
-            if (keyCode == VK_PAUSE) {
-                scan = 0x45;
-            }
-            if (scan) {
-                auto parameter = static_cast<LONG>((scan & 0xFF) << 16);
-                if ((scan >> 8) == 0xE0 || keyCode == VK_NUMLOCK) parameter |= 1 << 24;
-                wchar_t buffer[256]{};
-                const auto length = ::GetKeyNameTextW(parameter, buffer, 256);
-                std::string name;
-                if (length > 0 && REX::UTF16_TO_UTF8(std::wstring_view(buffer, length), name) && !name.empty()) return name;
+            const auto* manager = RE::BSInputDeviceManager::GetSingleton();
+            const auto* keyboard = manager ? manager->GetKeyboard() : nullptr;
+            if (keyboard) {
+                RE::BSFixedStringCS name;
+                if (keyboard->GetKeyNameFromCode(keyCode, name) && !name.empty()) return name.c_str();
             }
         }
         return std::format("Key 0x{:02X}", keyCode);
