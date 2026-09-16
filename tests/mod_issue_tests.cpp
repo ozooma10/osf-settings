@@ -120,18 +120,41 @@ int main()
             "clearing a mod with no issues is harmless");
         check(registry.Clear("other", "missing-pack") && registry.Snapshot().empty(), "clearing the last issue leaves an empty snapshot");
 
+        const ModIssue minimal{ .modId = "sample", .id = "missing-pack", .title = "Custom animations are unavailable" };
+        check(registry.Report(minimal) && registry.Snapshot()[0].impact.empty() && registry.Snapshot()[0].nextSteps.empty(),
+            "reports may omit both impact and next steps");
+        auto impactOnly = minimal;
+        impactOnly.impact = "Scenes use standard animations.";
+        check(registry.Report(impactOnly) && registry.Snapshot()[0].impact == impactOnly.impact && registry.Snapshot()[0].nextSteps.empty(),
+            "impact can be provided without next steps");
+        auto stepsOnly = minimal;
+        stepsOnly.nextSteps = "Install the animation pack.";
+        check(registry.Report(stepsOnly) && registry.Snapshot()[0].impact.empty() && registry.Snapshot()[0].nextSteps == stepsOnly.nextSteps,
+            "next steps can be provided without impact");
+        check(registry.Report(warning) && registry.Report(minimal) && registry.Snapshot()[0].impact.empty() && registry.Snapshot()[0].nextSteps.empty(),
+            "omitting optional fields on an update clears their previous contents");
+        auto blankOptional = minimal;
+        blankOptional.impact = " \t";
+        blankOptional.nextSteps = "\r\n";
+        check(registry.Report(blankOptional), "optional text may be blank");
+
         check(registry.Report(warning), "validation fixture is active");
         for (const auto* modId : { "", ".", "..", "Sample", "two words", "path/mod" }) {
             auto invalid = warning;
             invalid.modId = modId;
             check(!registry.Report(invalid), "invalid mod IDs are rejected");
         }
-        for (auto field : { &ModIssue::modId, &ModIssue::id, &ModIssue::title, &ModIssue::impact, &ModIssue::nextSteps }) {
+        for (auto field : { &ModIssue::modId, &ModIssue::id, &ModIssue::title }) {
             for (const auto& text : { std::string{}, std::string{ " \t\r\n" }, std::string("bad\0text", 8) }) {
                 auto invalid = warning;
                 invalid.*field = text;
-                check(!registry.Report(invalid), "blank or NUL-containing report fields are rejected");
+                check(!registry.Report(invalid), "blank or NUL-containing required fields are rejected");
             }
+        }
+        for (auto field : { &ModIssue::impact, &ModIssue::nextSteps }) {
+            auto invalid = warning;
+            invalid.*field = std::string("bad\0text", 8);
+            check(!registry.Report(invalid), "optional text must still be NUL-free in internal reports");
         }
         const auto unchanged = registry.Snapshot();
         check(unchanged.size() == 1 && unchanged[0].modId == warning.modId && unchanged[0].id == warning.id &&

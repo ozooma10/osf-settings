@@ -16,7 +16,8 @@ namespace OSFSettings
 
     bool IssueRegistry::Report(ModIssue issue)
     {
-        if (!IsValidModId(issue.modId) || !ValidText(issue.id) || !ValidText(issue.title) || !ValidText(issue.impact) || !ValidText(issue.nextSteps)) {
+        if (!IsValidModId(issue.modId) || !ValidText(issue.id) || !ValidText(issue.title) ||
+            issue.impact.find('\0') != std::string::npos || issue.nextSteps.find('\0') != std::string::npos) {
             return false;
         }
         
