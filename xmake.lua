@@ -58,7 +58,7 @@ target("osfsettings-schema-tests")
 target("osfsettings-issues-tests")
     set_kind("binary")
     set_default(false)
-    add_files("tests/mod_issue_tests.cpp", "src/Diagnostics/ModIssue.cpp", "src/Diagnostics/IssueRegistry.cpp", "src/Settings/SettingsSchema.cpp")
+    add_files("tests/mod_issue_tests.cpp", "tests/diagnostics_service_tests.cpp", "src/Diagnostics/*.cpp", "src/Settings/SettingsSchema.cpp")
     add_includedirs("src")
     set_rundir(os.projectdir())
 

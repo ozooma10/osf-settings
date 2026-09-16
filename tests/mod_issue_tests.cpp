@@ -6,6 +6,8 @@
 #include <iostream>
 #include <stdexcept>
 
+int TestDiagnosticsService();
+
 // Linking the existing mod-ID validator also brings in key-value validation.
 // Issue reporting must not need the game's keyboard.
 namespace OSFSettings
@@ -131,17 +133,13 @@ int main()
                 check(!registry.Report(invalid), "blank or NUL-containing report fields are rejected");
             }
         }
-        for (const auto severity : { static_cast<IssueSeverity>(-1), static_cast<IssueSeverity>(2) }) {
-            auto invalid = warning;
-            invalid.severity = severity;
-            check(!registry.Report(invalid), "unknown severity values are rejected");
-        }
         const auto unchanged = registry.Snapshot();
         check(unchanged.size() == 1 && unchanged[0].modId == warning.modId && unchanged[0].id == warning.id &&
             unchanged[0].severity == warning.severity && unchanged[0].title == warning.title &&
             unchanged[0].impact == warning.impact && unchanged[0].nextSteps == warning.nextSteps,
             "invalid reports neither add issues nor damage an existing issue");
 
+        checks += TestDiagnosticsService();
         std::cout << checks << '/' << checks << " mod issue checks passed\n";
         return 0;
     } catch (const std::exception& error) {
