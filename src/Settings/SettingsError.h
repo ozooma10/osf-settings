@@ -13,6 +13,7 @@ namespace OSFSettings
         InvalidValue,
         SaveFailed,
         UnknownSubscription,
-        InternalError
+        InternalError,
+        UnknownSuppression
     };
 }

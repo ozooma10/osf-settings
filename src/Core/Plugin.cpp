@@ -1,5 +1,6 @@
 #include "Plugin.h"
 #include "Runtime.h"
+#include "Input/HotkeyInput.h"
 #include "Input/PauseMenu.h"
 #include "Menu/OSFSettingsMenu.h"
 
@@ -12,7 +13,7 @@ namespace OSFSettings::Plugin
             if(!message) { return; }
 
             if(message->type == SFSE::MessagingInterface::kPostPostDataLoad) {
-                const bool available = OSFSettingsMenu::Register() && PauseMenu::Install();
+                const bool available = OSFSettingsMenu::Register() && PauseMenu::RegisterSink();
                 REX::INFO("[kPostPostDataLoad] Settings menu integration available={}", available);
             } 
      
@@ -22,6 +23,9 @@ namespace OSFSettings::Plugin
     bool OnLoad()
     {
         const auto* messaging = SFSE::GetMessagingInterface();
-        return messaging && Runtime::Get().Initialize() && messaging->RegisterListener(OnMessage);
+        if (!messaging || !Runtime::Get().Initialize() || !messaging->RegisterListener(OnMessage)) return false;
+        if (!PauseMenu::Install()) REX::ERROR("Pause menu hook is unavailable");
+        if (!HotkeyInput::Install()) REX::ERROR("Hotkey input integration is unavailable");
+        return true;
     }
 }

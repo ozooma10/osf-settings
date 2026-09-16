@@ -1,4 +1,5 @@
 #include "API/SettingsApi.h"
+#include "Input/HotkeyService.h"
 #include "Input/KeyCapture.h"
 #include "Input/KeyNames.h"
 #include "Settings/SettingsJson.h"
@@ -168,7 +169,8 @@ int TestKeySettings()
     std::filesystem::create_directories(schemas);
     { std::ofstream file(schemas / "keys.json"); file << document; }
     SettingsService backend;
-    API::SettingsApi api{ backend };
+    HotkeyService hotkeys{ backend };
+    API::SettingsApi api{ backend, hotkeys };
     API::Client client;
     std::uint32_t keyCode = 999;
     check(client.GetKey("keys", "toggle", &keyCode) == Status::NotReady && keyCode == 999, "detached SDK preserves output");

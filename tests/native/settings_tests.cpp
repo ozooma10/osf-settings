@@ -22,6 +22,7 @@
 
 int TestSettingsService();
 int TestKeySettings();
+int TestHotkeys();
 
 namespace
 {
@@ -91,6 +92,10 @@ namespace
             Status Unsubscribe(Subscription) noexcept override { return Status::NotReady; }
             Status GetKey(const char*, const char*, std::uint32_t*) noexcept override { return Status::NotReady; }
             Status SetKey(const char*, const char*, std::uint32_t) noexcept override { return Status::NotReady; }
+            Status SubscribeHotkey(const char*, const char*, HotkeyFn, void*, Subscription*) noexcept override { return Status::NotReady; }
+            Status UnsubscribeHotkey(Subscription) noexcept override { return Status::NotReady; }
+            Status AcquireHotkeySuppression(Suppression*) noexcept override { return Status::NotReady; }
+            Status ReleaseHotkeySuppression(Suppression) noexcept override { return Status::NotReady; }
         } provider;
 
         Client client;
@@ -942,6 +947,7 @@ int main(int argc, char** argv)
         TestSDK();
         checks += TestSettingsService();
         checks += TestKeySettings();
+        checks += TestHotkeys();
         TestSchema(example);
         TestStore(example, examplePath);
         TestPersistence(example);

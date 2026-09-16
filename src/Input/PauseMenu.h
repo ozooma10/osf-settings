@@ -6,5 +6,6 @@ namespace OSFSettings
 	{
 	public:
 		static bool Install();
+		static bool RegisterSink();
 	};
 }

@@ -1,4 +1,5 @@
 #include "API/SettingsApi.h"
+#include "Input/HotkeyService.h"
 #include "Settings/SettingsService.h"
 #include "Settings/SettingsJson.h"
 
@@ -80,7 +81,8 @@ int TestSettingsService()
         OSFSettings_RequestAPI(API::kBaseVersion, nullptr) == exported, "export returns the same interface before readiness");
 
     SettingsService backend;
-    API::SettingsApi service{ backend };
+    HotkeyService hotkeys{ backend };
+    API::SettingsApi service{ backend, hotkeys };
     Events events{ &service };
     API::Subscription token{};
     std::string watched = "sample";
@@ -355,7 +357,7 @@ int TestSettingsService()
     int temporaryCalls{};
     API::Subscription temporaryToken{};
     {
-        API::SettingsApi temporary{ backend };
+        API::SettingsApi temporary{ backend, hotkeys };
         check(temporary.Subscribe("sample", [](const char*, const char*, void* user) noexcept {
             ++*static_cast<int*>(user);
         }, &temporaryCalls, &temporaryToken) == Status::Ok, "temporary adapter subscribes to the same service");
