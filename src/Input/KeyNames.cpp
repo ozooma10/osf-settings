@@ -2,6 +2,7 @@
 #include "Settings/SettingValue.h"
 #include "SFSE/Impl/PCH.h"
 #include "RE/B/BSInputDeviceManager.h"
+#include "SFSE/InputMap.h"
 
 #include <cstring>
 #include <format>
@@ -20,8 +21,7 @@ namespace OSFSettings
         const auto* manager = RE::BSInputDeviceManager::GetSingleton();
         const auto* keyboard = manager ? manager->GetKeyboard() : nullptr;
         REX::INFO("Attempting to get keyboard from input device manager {}", manager ? keyboard ? "succeeded" : "failed keyboard" : "failed manager");
-        if (!keyboard) return std::nullopt;
-        const auto keyCode = keyboard->GetKeyCodeFromName(std::string(name).c_str());
+        const auto keyCode = keyboard ? keyboard->GetKeyCodeFromName(std::string(name).c_str()) : SFSE::InputMap::GetKeyboardVirtualKey(name);
         if (keyCode == 0xFFFFFFFF) return std::nullopt;
         return keyCode;
     }

@@ -22,10 +22,10 @@ namespace OSFSettings
 		std::optional<QueueActionHook> g_queueActionHook;
 		std::atomic_bool g_registered{};
 
-		void QueueActionThunk(void* a_model, const RE::BSFixedStringCS* a_label, std::uint32_t a_actionType, const RE::BSFixedStringCS* a_confirmText, bool a_disabled)
+		void HookedQueueAction(void* a_model, const RE::BSFixedStringCS* a_label, std::uint32_t a_actionType, const RE::BSFixedStringCS* a_confirmText, bool a_disabled)
 		{
 			(*g_queueActionHook)(a_model, a_label, a_actionType, a_confirmText, a_disabled);
-			if (!g_registered.load(std::memory_order_acquire)) {return;
+			if (!g_registered.load(std::memory_order_acquire)) {return;}
 
 			// leaked: the engine can touch these strings after static teardown
 			static const auto* label = new RE::BSFixedStringCS{ "MOD SETTINGS" };
@@ -61,7 +61,7 @@ namespace OSFSettings
 			return g_queueActionHook->GetEnabled();
 		}
 
-		g_queueActionHook.emplace("PauseMenu::QueueAction", RE::ID::PauseMenu::RebuildActionList, kQuitCallOffset, &QueueActionThunk);
+		g_queueActionHook.emplace("PauseMenu::QueueAction", RE::ID::PauseMenu::RebuildActionList, kQuitCallOffset, &HookedQueueAction);
 		if (!g_queueActionHook->Init() || !g_queueActionHook->Enable()) {
 			g_queueActionHook.reset();
 			return false;
