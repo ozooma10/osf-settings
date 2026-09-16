@@ -45,3 +45,12 @@ target("osfsettings-tests")
     add_includedirs("src")
     add_packages("nlohmann_json")
     set_rundir(os.projectdir())
+
+target("osfsettings-schema-tests")
+    set_kind("binary")
+    set_default(false)
+    add_files("tests/hotkey_schema_tests.cpp", "src/Settings/SettingsSchema.cpp", "src/Settings/SettingsSchemaJson.cpp",
+        "src/Settings/SettingsJson.cpp", "src/Settings/SettingsStore.cpp", "src/Settings/SettingsValuesJson.cpp")
+    add_includedirs("src")
+    add_packages("nlohmann_json")
+    set_rundir(os.projectdir())

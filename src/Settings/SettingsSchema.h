@@ -48,6 +48,13 @@ namespace OSFSettings
         bool allowUnbound{};
     };
 
+    struct HotkeyDefinition
+    {
+        std::string id;
+        std::string label;
+        std::optional<std::string> defaultKey; // Native key name; omitted means unbound.
+    };
+
     struct SettingDefinition
     {
         std::string key;
@@ -74,6 +81,7 @@ namespace OSFSettings
         std::string title;
         std::string description;
         std::vector<SettingsGroup> groups;
+        std::vector<HotkeyDefinition> hotkeys;
         const SettingDefinition* FindSetting(std::string_view key) const;
     };
 

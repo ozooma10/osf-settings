@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "osfsettings",
+  "title": "OSF Settings",
+  "groups": [],
+  "hotkeys": [
+    {
+      "id": "openMenu",
+      "label": "Open mod settings",
+      "default": "F10"
+    }
+  ]
+}

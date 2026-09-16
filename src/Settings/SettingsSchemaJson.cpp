@@ -158,6 +158,26 @@ namespace OSFSettings::SettingsJson
                 }
                 mod.groups.push_back(std::move(group));
             }
+            if (const auto hotkeys = document.find("hotkeys"); hotkeys != document.end()) {
+                Require(hotkeys->is_array(), "hotkeys must be an array");
+                std::set<std::string> ids;
+                for (const auto& source : *hotkeys) {
+                    Require(source.is_object(), "each hotkey must be an object");
+                    HotkeyDefinition hotkey;
+                    hotkey.id = RequiredText(source, "id");
+                    Require(hotkey.id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos, "hotkey id must use ASCII letters, digits, underscores, or hyphens");
+                    auto folded = hotkey.id;
+                    for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';
+                    Require(ids.insert(folded).second, "duplicate hotkey id: " + hotkey.id);
+                    hotkey.label = RequiredText(source, "label");
+                    Require(hotkey.label.find('\0') == std::string::npos, "hotkey label must not contain NUL");
+                    if (source.contains("default")) {
+                        hotkey.defaultKey = RequiredText(source, "default");
+                        Require(hotkey.defaultKey->find('\0') == std::string::npos, "hotkey default must not contain NUL");
+                    }
+                    mod.hotkeys.push_back(std::move(hotkey));
+                }
+            }
             return mod;
         } catch (const std::exception& exception) {
             error = exception.what();

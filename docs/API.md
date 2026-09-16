@@ -38,6 +38,26 @@ if (settings.Init() && settings.IsReady()) {
 | `UnknownSubscription` | Subscription token not found. |
 | `InternalError` | Internal limit reached or unexpected internal status. |
 
+## Hotkey declarations (schema only)
+
+A schema can declare an optional top-level `hotkeys` array:
+
+```json
+"hotkeys": [
+  { "id": "openMenu", "label": "Open mod settings", "default": "F10" }
+]
+```
+
+`id` and `label` are required, nonempty strings. IDs use ASCII letters, digits,
+underscores or hyphens and must be unique within the mod, ignoring letter case.
+`default` is an optional, nonempty key-name string; omitting it means unbound.
+Embedded NUL characters are rejected. Key names remain text at this checkpoint;
+native name resolution and validation belong to the later binding integration.
+
+Declarations are loaded into `ModSchema::hotkeys`, separately from ordinary
+setting values. This checkpoint adds no native bindings, input handlers or
+callbacks. The existing required `groups` array can be empty for a hotkey-only schema.
+
 ## Subscriptions
 
 `Subscribe(mod, callback, user, &token)` watches one mod. `Unsubscribe(token)` removes it.
