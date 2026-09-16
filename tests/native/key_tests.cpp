@@ -38,6 +38,7 @@ namespace
         {
             ++calls;
             lastName = name;
+            if (lastName == "F10" || lastName == "f10") return 0x79;
             return lastName == expectedName ? result : 0xFFFFFFFF;
         }
 
@@ -77,6 +78,13 @@ int TestKeySettings()
     };
     static_assert(API::kVersion == 0x00010000u);
     static_assert(API::kUnboundKey == KeyBinding::Unbound);
+    constexpr std::wstring_view table = L"F10\t0x79\nL Ctrl\t0xA2\t17\n;\t0xBA\n";
+    check(KeyCodeFromTable(table, "f10") == 0x79 && KeyCodeFromTable(table, "L Ctrl") == 0xA2 &&
+        KeyCodeFromTable(table, ";") == 0xBA, "early table lookup uses native names and hex VKs, not the third column");
+    check(!KeyCodeFromTable(table, "LCtrl") && !KeyCodeFromTable(table, "F1") &&
+        !KeyCodeFromTable(table, std::string_view("F10\0", 4)), "early lookup rejects aliases, prefixes and embedded NULs");
+    check(!KeyCodeFromTable(L"F10\t0x100\n", "F10") && !KeyCodeFromTable(L"F10\t0xZZ\n", "F10"),
+        "early lookup rejects overlong and malformed VKs");
     check(!KeyCodeFromName("F4") && KeyCodeFromName("unbound") == KeyBinding::Unbound,
         "missing input manager is safe and unbound needs no engine lookup");
     check(KeyName(0x73) == "Key 0x73", "missing input manager uses the numeric display fallback");

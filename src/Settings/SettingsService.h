@@ -27,7 +27,8 @@ namespace OSFSettings
         static SettingsService& Get();
 
         void Load(const std::filesystem::path& schemas, const std::filesystem::path& values);
-        void Start(); // After the notification dispatcher is installed.
+        // The scheduler queues a dispatch task; it must not invoke callbacks inline.
+        void Start(std::function<void()> schedule = {});
         std::vector<ModSettings> Snapshot() const;
         std::vector<SettingsLoadError> LoadErrors() const;
         bool HasPendingChanges() const noexcept;
@@ -55,6 +56,7 @@ namespace OSFSettings
         SettingsError FinishWrite(std::string_view mod, std::optional<std::string_view> key, const SettingsStore::SetResult& result) noexcept;
         void Notify(std::string_view mod, std::optional<std::string_view> key) noexcept;
         void Invoke(const std::shared_ptr<Listener>& listener, const std::string* key);
+        void ScheduleChanges(bool finished = false);
 
         mutable std::mutex m_mutex;
         std::condition_variable m_callbackFinished;
@@ -62,6 +64,8 @@ namespace OSFSettings
         std::map<Subscription, std::shared_ptr<Listener>> m_listeners;
         Subscription m_nextSubscription{ 1 };
         bool m_loaded{};
+        std::function<void()> m_schedule;
+        bool m_taskQueued{};
         std::atomic_bool m_ready{};
         std::atomic_bool m_pending{};
         std::atomic_bool m_dispatching{};

@@ -14,6 +14,7 @@ namespace OSFSettings
         SaveFailed,
         UnknownSubscription,
         InternalError,
-        UnknownSuppression
+        UnknownHotkeyBlock,
+        UnknownAction
     };
 }

@@ -158,6 +158,39 @@ namespace OSFSettings::SettingsJson
                 }
                 mod.groups.push_back(std::move(group));
             }
+            if (const auto hotkeys = document.find("hotkeys"); hotkeys != document.end()) {
+                Require(hotkeys->is_array() && hotkeys->size() <= kMaxHotkeyActions, "hotkeys must be an array of at most 64 actions");
+                std::set<std::string> ids;
+                for (const auto& source : *hotkeys) {
+                    Require(source.is_object(), "each hotkey must be an object");
+                    HotkeyDefinition action;
+                    action.id = RequiredText(source, "id");
+                    Require(IsValidHotkeyId(action.id) && NativeHotkeyName(mod.id, action.id).size() <= 96,
+                        "hotkey id must use ASCII letters, digits, underscores or hyphens; native name must fit 96 bytes");
+                    auto folded = action.id;
+                    for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';
+                    Require(ids.insert(folded).second, "duplicate hotkey id: " + action.id);
+                    action.label = OptionalText(source, "label", action.id);
+                    action.hint = OptionalText(source, "hint");
+                    Require(!action.label.empty() && action.label.size() <= 160 && action.label.find('\0') == std::string::npos,
+                        "hotkey label must be nonempty text without NUL, at most 160 bytes");
+                    Require(action.hint.find('\0') == std::string::npos, "hotkey hint must not contain NUL");
+                    Require(OptionalText(source, "context", "gameplay") == "gameplay", "hotkeys currently support only gameplay context");
+                    Require(OptionalText(source, "trigger", "press") == "press", "hotkeys currently support only press activation");
+                    const auto value = source.find("default");
+                    std::optional<std::uint32_t> key = 0xFF;
+                    if (value != source.end()) {
+                        key.reset();
+                        if (value->is_string()) key = KeyCodeFromName(value->get_ref<const std::string&>());
+                        else if (const auto number = DecodeInteger(*value); number && *number > 0 && *number <= 0xFF)
+                            key = static_cast<std::uint32_t>(*number);
+                    }
+                    Require(key && (*key == 0xFF || IsBindableKey(*key)),
+                        "hotkey default must be a supported key name or keyboard virtual-key integer (255/UNBOUND clears it)");
+                    action.defaultKey = *key;
+                    mod.hotkeys.push_back(std::move(action));
+                }
+            }
             return mod;
         } catch (const std::exception& exception) {
             error = exception.what();

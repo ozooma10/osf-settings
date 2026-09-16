@@ -4,6 +4,8 @@
 #include <cmath>
 #include "Core/Runtime.h"
 #include <charconv>
+#include <Windows.h>
+#undef ERROR
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
 
@@ -121,12 +123,15 @@ namespace OSFSettings
         case Function::CommitKeyCapture: {
             const auto snapshot = m_capture.GetSnapshot();
             const bool canSaveBinding = snapshot.selectedKeyReleased && (snapshot.state == KeyCapture::State::KeySelected || snapshot.state == KeyCapture::State::ConfirmationRequested);
-            const bool ok = canSaveBinding && runtime.SetValue(m_captureMod, m_captureKey, KeyBinding{ snapshot.selectedKeyCode }) == SettingsError::None;
+            bool ok{};
+            if (canSaveBinding) {
+                ok = runtime.SetValue(m_captureMod, m_captureKey, KeyBinding{ snapshot.selectedKeyCode }) == SettingsError::None;
+            }
             if (ok) m_capture.EndCapture();
             else m_capture.RetryConfirmation();
             root->CreateObject(params.ret);
             params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
-            Text(*params.ret, "error", ok ? "" : "Could not save this setting. Your previous value is unchanged.");
+            Text(*params.ret, "error", ok ? "" : "Could not save this binding. Try again.");
             break;
         }
         case Function::CancelKeyCapture:

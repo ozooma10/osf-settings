@@ -40,8 +40,16 @@
           "label": "Notification mode",
           "hint": "Choose how much detail notifications show. A learning example; no gameplay behavior is connected yet.",
           "default": "normal",
-          "options": ["quiet", "normal", "verbose"],
-          "optionLabels": ["Quiet", "Normal", "Verbose"]
+          "options": [
+            "quiet",
+            "normal",
+            "verbose"
+          ],
+          "optionLabels": [
+            "Quiet",
+            "Normal",
+            "Verbose"
+          ]
         },
         {
           "key": "notificationKey",
@@ -52,6 +60,13 @@
           "allowUnbound": true
         }
       ]
+    }
+  ],
+  "hotkeys": [
+    {
+      "id": "toggleNotifications",
+      "label": "Toggle notifications",
+      "hint": "Example declaration; a consuming mod subscribes to implement its behavior."
     }
   ]
 }

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "osfsettings",
+  "title": "OSF Settings",
+  "description": "Configure the shortcut that opens this menu.",
+  "groups": [],
+  "hotkeys": [
+    {
+      "id": "openMenu",
+      "label": "Open mod settings",
+      "hint": "Open OSF Settings. Escape or Back closes the menu.",
+      "default": "F10"
+    }
+  ]
+}

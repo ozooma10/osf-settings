@@ -25,7 +25,7 @@ package
         {
             var changed:Boolean = !modList && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
-            var choice:Boolean = !modList && (row.type == "enum" || row.type == "key");
+            var choice:Boolean = !modList && (row.type == "enum" || NumericSetting.isKey(row));
             var displayValue:String = modList ? String(row.count) : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
             var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList].join("|");
             if (signature == previous) return;

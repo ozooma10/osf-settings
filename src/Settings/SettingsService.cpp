@@ -29,11 +29,15 @@ namespace OSFSettings
         m_loaded = true;
     }
 
-    void SettingsService::Start()
+    void SettingsService::Start(std::function<void()> schedule)
     {
-        std::lock_guard lock(m_mutex);
+        std::unique_lock lock(m_mutex);
+        if (IsReady()) return;
         if (!m_loaded) throw std::logic_error("settings must be loaded before starting the service");
+        m_schedule = std::move(schedule);
         m_ready.store(true, std::memory_order_release);
+        lock.unlock();
+        ScheduleChanges();
     }
 
     bool SettingsService::IsReady() const noexcept { return m_ready.load(std::memory_order_acquire); }
@@ -77,25 +81,34 @@ namespace OSFSettings
     SettingsError SettingsService::SetValue(std::string_view mod, std::string_view key, SettingValue value)
     {
         if (!IsValidModId(mod) || !ValidKey(key)) return SettingsError::InvalidArgument;
-        std::lock_guard lock(m_mutex);
+        std::unique_lock lock(m_mutex);
         if (!IsReady()) return SettingsError::NotReady;
-        return FinishWrite(mod, key, m_store.Set(mod, key, std::move(value)));
+        const auto result = FinishWrite(mod, key, m_store.Set(mod, key, std::move(value)));
+        lock.unlock();
+        ScheduleChanges();
+        return result;
     }
 
     SettingsError SettingsService::Reset(std::string_view mod, std::string_view key)
     {
         if (!IsValidModId(mod) || !ValidKey(key)) return SettingsError::InvalidArgument;
-        std::lock_guard lock(m_mutex);
+        std::unique_lock lock(m_mutex);
         if (!IsReady()) return SettingsError::NotReady;
-        return FinishWrite(mod, key, m_store.Reset(mod, key));
+        const auto result = FinishWrite(mod, key, m_store.Reset(mod, key));
+        lock.unlock();
+        ScheduleChanges();
+        return result;
     }
 
     SettingsError SettingsService::ResetMod(std::string_view mod)
     {
         if (!IsValidModId(mod)) return SettingsError::InvalidArgument;
-        std::lock_guard lock(m_mutex);
+        std::unique_lock lock(m_mutex);
         if (!IsReady()) return SettingsError::NotReady;
-        return FinishWrite(mod, std::nullopt, m_store.ResetMod(mod));
+        const auto result = FinishWrite(mod, std::nullopt, m_store.ResetMod(mod));
+        lock.unlock();
+        ScheduleChanges();
+        return result;
     }
 
     SettingsError SettingsService::Subscribe(std::string_view mod, Changed callback, Subscription& out)
@@ -104,11 +117,13 @@ namespace OSFSettings
         auto listener = std::make_shared<Listener>();
         listener->mod = mod;
         listener->callback = std::move(callback);
-        std::lock_guard lock(m_mutex);
+        std::unique_lock lock(m_mutex);
         if (!m_nextSubscription) return SettingsError::InternalError;
         m_listeners.emplace(m_nextSubscription, listener);
         out = m_nextSubscription++; // Publish the token before dispatch can begin.
         m_pending.store(true, std::memory_order_release);
+        lock.unlock();
+        ScheduleChanges();
         return SettingsError::None;
     }
 
@@ -146,6 +161,19 @@ namespace OSFSettings
         return m_ready.load(std::memory_order_acquire) && m_pending.load(std::memory_order_acquire);
     }
 
+    void SettingsService::ScheduleChanges(bool finished)
+    {
+        std::function<void()> schedule;
+        {
+            std::lock_guard lock(m_mutex);
+            if (finished) m_taskQueued = false;
+            if (!HasPendingChanges() || !m_schedule || m_taskQueued) return;
+            schedule = m_schedule;
+            m_taskQueued = true;
+        }
+        schedule(); // Never enter a task scheduler while holding the service lock.
+    }
+
     void SettingsService::Invoke(const std::shared_ptr<Listener>& listener, const std::string* key)
     {
         {
@@ -168,9 +196,13 @@ namespace OSFSettings
         }
         struct Finish
         {
-            std::atomic_bool& dispatching;
-            ~Finish() { dispatching.store(false, std::memory_order_release); }
-        } finish{ m_dispatching };
+            SettingsService& service;
+            ~Finish()
+            {
+                service.m_dispatching.store(false, std::memory_order_release);
+                service.ScheduleChanges(true);
+            }
+        } finish{ *this };
 
         struct Batch
         {

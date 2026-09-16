@@ -4,6 +4,7 @@ package
     // from native code so decimal increments never accumulate binary rounding.
     public final class NumericSetting
     {
+        public static function isKey(row:Object):Boolean { return row && row.type == "key"; }
         public static function isNumeric(row:Object):Boolean
         {
             return row != null && (row.type == "int" || row.type == "float");

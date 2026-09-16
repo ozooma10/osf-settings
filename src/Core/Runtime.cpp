@@ -1,5 +1,4 @@
 #include "Runtime.h"
-#include "SettingsDispatcher.h"
 #include "Utils/Paths.h"
 
 namespace OSFSettings
@@ -40,11 +39,12 @@ namespace OSFSettings
             }
         }
         REX::INFO("OSF Settings Loaded: {} mod(s), {} setting(s), {} load error(s)", mods.size(), settingCount, errors.size());
-        if (!SettingsDispatcher::Install()) {
+        const auto* tasks = SFSE::GetTaskInterface();
+        if (!tasks) {
             REX::ERROR("Settings notification dispatcher is unavailable");
             return false;
         }
-        settings.Start();
+        settings.Start([tasks, &settings] { tasks->AddTask([&settings] { settings.DispatchChanges(); }); });
         m_initialized = true;
         return true;
     }

@@ -318,16 +318,16 @@ package
             detailHint.height = Math.max(64, 630 - detailHint.y);
             detailHint.text = row ? String(row.hint || "") : ""; detailHint.scrollV = 1;
             defaultLabel.text = modID ? "DEFAULT" : "SETTINGS";
-            defaultValue.x = row && (row.type == "enum" || row.type == "key") ? 1434 : 1674;
-            defaultValue.width = row && (row.type == "enum" || row.type == "key") ? 410 : 170;
+            defaultValue.x = row && (row.type == "enum" || NumericSetting.isKey(row)) ? 1434 : 1674;
+            defaultValue.width = row && (row.type == "enum" || NumericSetting.isKey(row)) ? 410 : 170;
             MenuStyle.fit(defaultValue, row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
             resetButton.Visible = Boolean(!captureRow && modID && row && row.editable);
-            clearButton.Visible = Boolean(!captureRow && modID && row && row.type == "key" && row.allowUnbound && Number(row.value) != 255);
-            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : !modID ? "OPEN" : row && row.type == "key" ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
+            clearButton.Visible = Boolean(!captureRow && modID && row && NumericSetting.isKey(row) && row.allowUnbound && Number(row.value) != 255);
+            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : !modID ? "OPEN" : row && NumericSetting.isKey(row) ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
             buttonData.Cancel.sButtonText = captureRow ? "CANCEL" : modID ? "ALL MODS" : "BACK";
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-            acceptButton.Visible = captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key"))); bar.RefreshButtons();
+            acceptButton.Visible = captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || NumericSetting.isKey(row)))); bar.RefreshButtons();
         }
         private function scrollDescription(event:MouseEvent):void
         {
@@ -344,7 +344,7 @@ package
             var row:Object = current(); if (!row) return;
             if (!modID) { modID = row.mod; groupID = ""; refresh(false); }
             else if (row.type == "bool") options.OnEntryPressed();
-            else if (row.type == "key" && row.editable) beginBinding(row);
+            else if (NumericSetting.isKey(row) && row.editable) beginBinding(row);
             else if (row.type == "enum" && row.editable) {
                 var clip:Object = options.FindClipForEntry(options.selectedIndex);
                 if (clip) clip.LargeStepper_mc.PressHandler();
@@ -385,10 +385,10 @@ package
             if (row.type == "float") result = BGSCodeObj.setFloat(row.mod, row.key, Number(value));
             else if (row.type == "int") result = BGSCodeObj.setInt(row.mod, row.key, String(value));
             else if (row.type == "enum") result = BGSCodeObj.setEnum(row.mod, row.key, String(value));
-            else if (row.type == "key") result = BGSCodeObj.setKey(row.mod, row.key, Number(value));
+            else if (NumericSetting.isKey(row)) result = BGSCodeObj.setKey(row.mod, row.key, Number(value));
             else result = BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
             if (result && result.ok) {
-                if (row.type == "key") row.valueName = NumericSetting.text(row, value);
+                if (NumericSetting.isKey(row)) row.valueName = NumericSetting.text(row, value);
                 row.value = value; describe();
             }
             status.text = result && result.ok ? "Changes apply automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.";
@@ -431,7 +431,7 @@ package
             if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
             if (event.keyCode == Keyboard.B) reset();
-            else if (event.keyCode == Keyboard.X && current() && current().type == "key") clearBinding();
+            else if (event.keyCode == Keyboard.X && current() && NumericSetting.isKey(current())) clearBinding();
             else if (event.keyCode == 219) changePage(-1); // [ and ] also expose tabs without a mouse.
             else if (event.keyCode == 221) changePage(1);
             else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {
@@ -472,7 +472,7 @@ package
         private function clearBinding():void
         {
             var row:Object = current();
-            if (!captureRow && modID && row && row.type == "key" && row.allowUnbound) edit(row, 255);
+            if (!captureRow && modID && row && NumericSetting.isKey(row) && row.allowUnbound) edit(row, 255);
         }
         private function beginBinding(row:Object):void
         {
@@ -506,7 +506,10 @@ package
         {
             if (!captureRow || !captureReady) return;
             var result:Object = BGSCodeObj.commitKeyCapture();
-            if (result && result.ok) { finishBinding(false); return; }
+            if (result && result.ok) {
+                finishBinding(false);
+                return;
+            }
             status.text = result && result.error ? result.error : "Could not save this setting. Your previous value is unchanged.";
             status.textColor = MenuStyle.ACCENT;
         }

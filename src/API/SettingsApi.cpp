@@ -1,5 +1,6 @@
 #include "SettingsApi.h"
 #include "Settings/SettingsService.h"
+#include "Input/HotkeyService.h"
 
 #include <cstring>
 #include <limits>
@@ -21,6 +22,8 @@ namespace OSFSettings::API
             case SettingsError::SaveFailed: return Status::SaveFailed;
             case SettingsError::UnknownSubscription: return Status::UnknownSubscription;
             case SettingsError::InternalError: return Status::InternalError;
+            case SettingsError::UnknownHotkeyBlock: return Status::UnknownHotkeyBlock;
+            case SettingsError::UnknownAction: return Status::UnknownAction;
             }
             return Status::InternalError;
         }
@@ -28,7 +31,7 @@ namespace OSFSettings::API
 
     SettingsApi& SettingsApi::Get()
     {
-        static auto* api = new SettingsApi(SettingsService::Get());
+        static auto* api = new SettingsApi(SettingsService::Get(), HotkeyService::Get());
         return *api;
     }
 
@@ -117,5 +120,31 @@ namespace OSFSettings::API
     Status SettingsApi::Unsubscribe(Subscription subscription) noexcept
     {
         return ToStatus(m_service.Unsubscribe(subscription));
+    }
+
+    Status SettingsApi::SubscribeHotkey(const char* mod, const char* key, HotkeyFn callback, void* user, Subscription* out) noexcept
+    {
+        if (!mod || !key || !callback || !out) {
+            return Status::InvalidArgument;
+        }
+        return ToStatus(m_hotkeys.Subscribe(mod, key, [callback, user](const std::string& mod, const std::string& key) noexcept {
+            callback(mod.c_str(), key.c_str(), user);
+        }, *out));
+    }
+
+    Status SettingsApi::UnsubscribeHotkey(Subscription subscription) noexcept
+    {
+        return ToStatus(m_hotkeys.Unsubscribe(subscription));
+    }
+
+    Status SettingsApi::AcquireHotkeyBlock(HotkeyBlock* out) noexcept
+    {
+        if (!out) return Status::InvalidArgument;
+        return ToStatus(m_hotkeys.AcquireBlock(*out));
+    }
+
+    Status SettingsApi::ReleaseHotkeyBlock(HotkeyBlock block) noexcept
+    {
+        return ToStatus(m_hotkeys.ReleaseBlock(block));
     }
 }

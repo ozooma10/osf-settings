@@ -32,14 +32,18 @@ namespace OSFSettings::API
         BufferTooSmall = 7,
         SaveFailed = 8,
         UnknownSubscription = 9,
-        InternalError = 10
+        InternalError = 10,
+        UnknownHotkeyBlock = 11,
+        UnknownAction = 12
     };
 
     using Subscription = std::uint64_t; // Zero is never a valid subscription.
+    using HotkeyBlock = std::uint64_t; // Each owner releases its own nonzero token.
 
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
     // Callbacks run serially from an SFSE task; no main-thread guarantee.
     using ChangedFn = void (*)(const char* mod, const char* key, void* user) noexcept;
+    using HotkeyFn = void (*)(const char* mod, const char* action, void* user) noexcept;
 
     struct ISettings
     {
@@ -73,6 +77,11 @@ namespace OSFSettings::API
         // Keys are a distinct setting type; failed reads preserve *out.
         virtual Status GetKey(const char* mod, const char* key, std::uint32_t* out) noexcept = 0;
         virtual Status SetKey(const char* mod, const char* key, std::uint32_t value) noexcept = 0;
+
+        virtual Status SubscribeHotkey(const char* mod, const char* key, HotkeyFn callback, void* user, Subscription* out) noexcept = 0;
+        virtual Status UnsubscribeHotkey(Subscription subscription) noexcept = 0;
+        virtual Status AcquireHotkeyBlock(HotkeyBlock* out) noexcept = 0;
+        virtual Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept = 0;
 
     protected:
         ~ISettings() = default;
@@ -188,6 +197,23 @@ namespace OSFSettings::API
         Status Unsubscribe(Subscription subscription) const noexcept
         {
             return m_api ? m_api->Unsubscribe(subscription) : Status::NotReady;
+        }
+
+        Status SubscribeHotkey(const char* mod, const char* key, HotkeyFn callback, void* user, Subscription* out) const noexcept
+        {
+            return m_api ? m_api->SubscribeHotkey(mod, key, callback, user, out) : Status::NotReady;
+        }
+        Status UnsubscribeHotkey(Subscription subscription) const noexcept
+        {
+            return m_api ? m_api->UnsubscribeHotkey(subscription) : Status::NotReady;
+        }
+        Status AcquireHotkeyBlock(HotkeyBlock* out) const noexcept
+        {
+            return m_api ? m_api->AcquireHotkeyBlock(out) : Status::NotReady;
+        }
+        Status ReleaseHotkeyBlock(HotkeyBlock block) const noexcept
+        {
+            return m_api ? m_api->ReleaseHotkeyBlock(block) : Status::NotReady;
         }
 
     private:

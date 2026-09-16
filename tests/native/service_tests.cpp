@@ -4,6 +4,7 @@
 #include "Settings/SettingsJson.h"
 
 #include <chrono>
+#include <deque>
 #include <future>
 #include <fstream>
 #include <limits>
@@ -373,5 +374,68 @@ int TestSettingsService()
     invalid = schema;
     invalid["groups"][0]["settings"][3]["options"][1] = std::string("bad\0option", 10);
     check(!SettingsJson::ParseSchema(invalid, error) && error.find("NUL") != std::string::npos, "schema rejects enum values truncated by the ABI");
+    SettingsService scheduled;
+    std::deque<std::function<void()>> tasks;
+    SettingsService::Subscription scheduledToken{};
+    int scheduledCalls{}, posts{};
+    bool writeDuringCallback{};
+    scheduled.Subscribe("sample", [&](const SettingsService::Change&) {
+        ++scheduledCalls;
+        if (std::exchange(writeDuringCallback, false)) {
+            // A producer arriving while dispatch owns its detached batch must
+            // get another task, even without another external event afterward.
+            std::jthread writer([&] { scheduled.SetValue("sample", "count", std::int64_t{ 9 }); });
+            writer.join();
+            scheduled.DispatchChanges();
+            check(tasks.empty(), "recursive dispatch neither invokes nor schedules inline");
+        }
+    }, scheduledToken);
+    scheduled.Load(schemas, root / "scheduled-values");
+    check(tasks.empty() && scheduledCalls == 0, "pre-start subscription stays pending");
+    scheduled.Start([&] {
+        check(scheduled.Snapshot().size() == 1, "scheduler is invoked outside the settings lock");
+        ++posts;
+        tasks.emplace_back([&] { scheduled.DispatchChanges(); });
+    });
+    const auto runTask = [&] {
+        auto task = std::move(tasks.front());
+        tasks.pop_front();
+        task();
+    };
+    check(tasks.size() == 1 && scheduledCalls == 0, "start queues the initial refresh without calling the subscriber");
+    runTask();
+    check(tasks.empty() && scheduledCalls == 1, "initial refresh leaves no idle task behind");
+    scheduled.SetValue("sample", "count", std::int64_t{ 4 });
+    scheduled.SetValue("sample", "count", std::int64_t{ 5 });
+    check(tasks.size() == 1 && scheduledCalls == 1, "committed writes coalesce into one deferred task");
+    writeDuringCallback = true;
+    runTask();
+    check(tasks.size() == 1 && scheduledCalls == 2, "write during dispatch schedules a following task without losing the wakeup");
+    runTask();
+    check(tasks.empty() && scheduledCalls == 3, "following task delivers the callback write and becomes idle");
+    const auto beforeNoops = posts;
+    scheduled.SetValue("sample", "count", std::int64_t{ 9 });
+    scheduled.SetValue("sample", "count", std::int64_t{ 100 });
+    std::filesystem::create_directory(root / "scheduled-values/sample.json.tmp");
+    check(scheduled.SetValue("sample", "count", std::int64_t{ 8 }) == SettingsError::SaveFailed,
+        "scheduled write preserves save failure status");
+    std::filesystem::remove(root / "scheduled-values/sample.json.tmp");
+    check(tasks.empty() && posts == beforeNoops, "unchanged, rejected and failed writes do not schedule work");
+    scheduled.Reset("sample", "count");
+    check(tasks.size() == 1, "single setting reset schedules a notification");
+    runTask();
+    scheduled.SetValue("sample", "count", std::int64_t{ 6 });
+    scheduled.ResetMod("sample");
+    check(tasks.size() == 1, "full reset coalesces with an already queued write");
+    scheduled.Unsubscribe(scheduledToken);
+    const auto beforeUnsubscribe = scheduledCalls;
+    runTask();
+    check(tasks.empty() && scheduledCalls == beforeUnsubscribe, "unsubscribing cancels queued notification delivery");
+    scheduled.SetValue("sample", "count", std::int64_t{ 7 });
+    check(tasks.empty(), "writes without subscribers leave the scheduler idle");
+    scheduled.Subscribe("sample", [&](const SettingsService::Change&) { ++scheduledCalls; }, scheduledToken);
+    check(tasks.size() == 1, "a subscription after start queues its initial refresh");
+    runTask();
+    scheduled.Unsubscribe(scheduledToken);
     return checks;
 }

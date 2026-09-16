@@ -94,8 +94,8 @@ namespace
             Status SetKey(const char*, const char*, std::uint32_t) noexcept override { return Status::NotReady; }
             Status SubscribeHotkey(const char*, const char*, HotkeyFn, void*, Subscription*) noexcept override { return Status::NotReady; }
             Status UnsubscribeHotkey(Subscription) noexcept override { return Status::NotReady; }
-            Status AcquireHotkeySuppression(Suppression*) noexcept override { return Status::NotReady; }
-            Status ReleaseHotkeySuppression(Suppression) noexcept override { return Status::NotReady; }
+            Status AcquireHotkeyBlock(HotkeyBlock*) noexcept override { return Status::NotReady; }
+            Status ReleaseHotkeyBlock(HotkeyBlock) noexcept override { return Status::NotReady; }
         } provider;
 
         Client client;
@@ -936,6 +936,8 @@ namespace
     }
 }
 
+int TestNativeInputInterfaces();
+
 int main(int argc, char** argv)
 {
     try {
@@ -948,6 +950,7 @@ int main(int argc, char** argv)
         checks += TestSettingsService();
         checks += TestKeySettings();
         checks += TestHotkeys();
+        checks += TestNativeInputInterfaces();
         TestSchema(example);
         TestStore(example, examplePath);
         TestPersistence(example);

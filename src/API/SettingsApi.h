@@ -2,7 +2,7 @@
 
 #include "../../sdk/OSFSettings.h"
 
-namespace OSFSettings { class SettingsService; }
+namespace OSFSettings { class SettingsService; class HotkeyService; }
 
 namespace OSFSettings::API
 {
@@ -10,7 +10,7 @@ namespace OSFSettings::API
     {
     public:
         static SettingsApi& Get();
-        explicit SettingsApi(SettingsService& service) : m_service(service) {}
+        SettingsApi(SettingsService& service, HotkeyService& hotkeys) : m_service(service), m_hotkeys(hotkeys) {}
 
         bool IsReady() noexcept override;
         Status GetBool(const char* mod, const char* key, bool* out) noexcept override;
@@ -28,9 +28,15 @@ namespace OSFSettings::API
         Status Subscribe(const char* mod, ChangedFn callback, void* user, Subscription* out) noexcept override;
         Status Unsubscribe(Subscription subscription) noexcept override;
 
+        Status SubscribeHotkey(const char* mod, const char* key, HotkeyFn callback, void* user, Subscription* out) noexcept override;
+        Status UnsubscribeHotkey(Subscription subscription) noexcept override;
+        Status AcquireHotkeyBlock(HotkeyBlock* out) noexcept override;
+        Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept override;
+
     private:
         template <class T> Status Read(const char* mod, const char* key, T* out) noexcept;
         template <class T> Status Write(const char* mod, const char* key, T value) noexcept;
         SettingsService& m_service;
+        HotkeyService& m_hotkeys;
     };
 }

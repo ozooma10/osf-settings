@@ -6,6 +6,22 @@
 
 namespace OSFSettings
 {
+    bool IsValidHotkeyId(std::string_view id)
+    {
+        if (id.empty() || id.size() > 48) return false;
+        for (const auto ch : id) {
+            if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+                (ch >= '0' && ch <= '9') || ch == '_' || ch == '-')) return false;
+        }
+        return true;
+    }
+
+    std::string NativeHotkeyName(std::string_view mod, std::string_view id)
+    {
+        // Action IDs cannot contain dots, so the last separator is unambiguous.
+        return "OSFSettings." + std::string(mod) + "." + std::string(id);
+    }
+
     bool IsValidModId(std::string_view id)
     {
         return !id.empty() && id != "." && id != ".." && std::ranges::all_of(id, [](char c) {

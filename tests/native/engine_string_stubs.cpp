@@ -4,8 +4,10 @@
 #include <cstring>
 #include <stdexcept>
 
-// The native tests run outside Starfield. Supply only the two string-pool
-// relocations needed by BSFixedStringCS; unexpected engine calls fail the test.
+std::uintptr_t NativeInputTestAddress(std::uint64_t id);
+
+// The native tests run outside Starfield. Supply the string-pool and explicit
+// native-interface test doubles; unexpected engine calls fail the test.
 namespace
 {
     void GetStringEntry(RE::BSStringPool::Entry*& result, const char* text, bool)
@@ -40,7 +42,8 @@ namespace REL
         } else if (id == RE::ID::BSStringPool::Entry::Release.id()) {
             address = reinterpret_cast<std::uintptr_t>(&ReleaseStringEntry);
         } else {
-            throw std::runtime_error("Unexpected engine relocation in native tests: " + std::to_string(id));
+            address = NativeInputTestAddress(id);
+            if (!address) throw std::runtime_error("Unexpected engine relocation in native tests: " + std::to_string(id));
         }
         return address - REX::FModule::GetExecutingModule().GetBaseAddress();
     }

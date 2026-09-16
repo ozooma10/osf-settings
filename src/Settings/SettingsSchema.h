@@ -10,6 +10,11 @@
 
 namespace OSFSettings
 {
+    struct HotkeyDefinition { std::string id, label, hint; std::uint32_t defaultKey = 0xFF; };
+    inline constexpr std::size_t kMaxHotkeyActions = 64;
+    bool IsValidHotkeyId(std::string_view id);
+    std::string NativeHotkeyName(std::string_view mod, std::string_view id);
+
     struct BoolDefinition
     {
         bool defaultValue{};
@@ -74,6 +79,7 @@ namespace OSFSettings
         std::string title;
         std::string description;
         std::vector<SettingsGroup> groups;
+        std::vector<HotkeyDefinition> hotkeys;
         const SettingDefinition* FindSetting(std::string_view key) const;
     };
 
