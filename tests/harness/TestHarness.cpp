@@ -58,7 +58,7 @@ namespace OSFSettings::TestHarness
                     "selection", "rows", "stage", "capture", "kind", "index", "key", "type", "value", "title",
                     "rect", "controlRect", "x", "y", "width", "height", "visibleRect", "active", "ready",
                     "editable", "minimum", "maximum", "status", "scrollPosition", "startupPhase", "state", "diagnosticError",
-                    "mouse", "mouseDown", "mouseClick", "sequence", "frame", "target", "buttonDown"}) {
+                    "mouse", "mouseDown", "mouseClick", "sequence", "frame", "target", "buttonDown", "saving"}) {
                     Value member;
                     if (value.GetMember(field, &member) && !member.IsUndefined()) result[field] = CopyValue(member, depth + 1);
                 }
@@ -74,15 +74,25 @@ namespace OSFSettings::TestHarness
                 !RE::BSService::TaskQueue::IsQueueEnabled()) return;
             try {
                 Json binding = nullptr;
+                std::uint32_t testBinding = 255;
+                std::uint32_t freeTestKey = 255;
                 auto menuBindings = Json::object();
                 if (const auto* map = RE::ControlMap::GetSingleton()) {
+                    bool occupied[256]{};
                     for (const auto& entry : map->GetMappings(RE::ControlMap::InputContextID::kMainGameplay,
                         RE::InputEvent::DeviceType::kKeyboard)) {
+                        if (entry.keyCode < 256) occupied[entry.keyCode] = true;
                         if (std::string_view(entry.eventID.c_str()) == "osfsettings/openMenu" &&
                             entry.bindingSlot == RE::ControlMap::BindingSlot::kMain) {
                             binding = entry.keyCode;
-                            break;
                         }
+                        if (std::string_view(entry.eventID.c_str()) == "learning/testHotkey" &&
+                            entry.bindingSlot == RE::ControlMap::BindingSlot::kMain) {
+                            testBinding = entry.keyCode;
+                        }
+                    }
+                    for (const std::uint32_t key : { 117u, 118u, 119u, 122u }) {
+                        if (!occupied[key]) { freeTestKey = key; break; }
                     }
                     // Settings requests this native navigation context. Preserve
                     // slots/chords instead of pretending an alternate is the main key.
@@ -97,6 +107,8 @@ namespace OSFSettings::TestHarness
                 }
                 std::scoped_lock lock(g_mutex);
                 g_state["openKeyCode"] = std::move(binding);
+                g_state["testHotkeyCode"] = testBinding;
+                g_state["freeTestKey"] = freeTestKey;
                 g_state["menuBindings"] = std::move(menuBindings);
                 g_state["menuBindingsObservedAtMs"] = ::GetTickCount64();
                 g_state["bindingObservedAtMs"] = ::GetTickCount64();

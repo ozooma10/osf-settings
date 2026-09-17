@@ -70,7 +70,7 @@ namespace OSFSettings
                 return InputResult::Cancelled;
             }
         }
-        // Pause/Main Menu may already have delivered this event to the same native receiver.
+        // PauseMenu may already have delivered this event to the same native receiver.
         if (m_input->currInputTimeCount != -1 && event->timeCode < static_cast<std::uint32_t>(m_input->currInputTimeCount)) {
             return InputResult::Unhandled;
         }

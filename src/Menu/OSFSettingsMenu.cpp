@@ -1,5 +1,4 @@
 #include "OSFSettingsMenu.h"
-#include "SettingsMenuRoute.h"
 #include "harness/TestHarness.h"
 #include "FloatSlider.h"
 #include "Input/KeyNames.h"
@@ -71,15 +70,9 @@ namespace OSFSettings
 
     RE::UI_MESSAGE_RESULT OSFSettingsMenu::ProcessMessage(RE::UIMessageData& message)
     {
-        if (message.type == RE::UI_MESSAGE_TYPE::kShow) {
-            m_admitted = SettingsMenuRoute::Admit();
-            // kIgnore refuses stack admission. Its native cleanup still sends hide and OnRemovedFromMenuStack; that must retain the pending Pause request.
-            if (!m_admitted) return RE::UI_MESSAGE_RESULT::kIgnore;
-        }
         if (message.type == RE::UI_MESSAGE_TYPE::kHide) {
             m_bindingEditor.End(true);
             m_capture.ResetForMenuClose();
-            if (m_admitted) SettingsMenuRoute::Reset();
         }
         return RE::GameMenuBase::ProcessMessage(message);
     }
@@ -313,10 +306,6 @@ namespace OSFSettings
     {
         m_bindingEditor.End(true);
         m_capture.ResetForMenuClose();
-        if (m_admitted) {
-            SettingsMenuRoute::Reset();
-        }
-        m_admitted = false;
         RE::GameMenuBase::OnRemovedFromMenuStack();
     }
 
@@ -336,9 +325,6 @@ namespace OSFSettings
             ui->RegisterMenu(MENU_NAME.data(), &Create, true);
         }
         const bool registered = ui->IsMenuRegistered(name);
-        if (registered) {
-            SettingsMenuRoute::Register(*ui);
-        }
         TestHarness::RegisterMenuObserver(*ui, registered);
         return registered;
     }
@@ -352,7 +338,6 @@ namespace OSFSettings
 
     void OSFSettingsMenu::Close() 
     { 
-        SettingsMenuRoute::Reset();
         m_bindingEditor.End(true);
         m_capture.EndCapture();
         if (auto* queue = RE::UIMessageQueue::GetSingleton()) {

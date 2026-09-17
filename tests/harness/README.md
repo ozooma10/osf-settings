@@ -42,7 +42,10 @@ The export can be called from a worker: it copies cached observations and uses t
 thread-safe settings service. It does not access engine-owned UI objects there.
 
 `valuesDirectory` identifies the isolated store. `openKeyCode` comes from the actual main ControlMap binding sampled on the verified
-game-thread drain. `hotkeyInput` and `menuInput` record normal native callbacks and
+game-thread drain. `testHotkeyCode` samples the main `learning/testHotkey` binding,
+and `freeTestKey` selects an unused keyboard key from F6/F7/F8/F11 in MainGameplay
+(255 means none). `ui.capture.saving` tracks the native save in progress.
+`hotkeyInput` and `menuInput` record normal native callbacks and
 include `sequence` and initial-down `pressSequence`. `learning` contains typed values
 from the settings service. `ui` contains the selected mod/group/setting, visible row
 identities and hit rectangles, key-capture state, and the AS3 frame counter. The movie
@@ -64,3 +67,9 @@ For a normal build, configure `--test_harness=n` and rebuild;
 the export and movie reporting code are absent. Never deploy an instrumented build
 to the normal mod profile merely to run a test. See the sibling `OSF Test Harness`
 project for session ownership, fixture isolation, and scenarios.
+
+Its `SettingsSmoke -NativeBindings` mode checks standalone native capture,
+conflict cancel/confirm, saving and persistence across a fresh game launch.
+Native controls use the global Documents `ControlMap_Custom.txt`; this mode
+backs it up, stops its owned sessions and restores the original bytes in cleanup.
+It rejects `-KeepGame` so restoration cannot race a live native settings session.

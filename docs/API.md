@@ -100,15 +100,13 @@ event stopped. Presses and repeats do not open a menu. The engine dispatcher
 admits held actions and rejects unpaired releases before the button callback.
 This is an open request; it does not toggle or close an already-open menu.
 
-`OSFSettingsMenu` requires an open `PauseMenu` or `MainMenu` parent. Its show
-handler checks that requirement on the UI lifecycle path. From gameplay it
-requests Pause, refuses its own stack admission, then retries after Pause's
-open event. The bundled shortcut (F10 by default), the Pause MOD SETTINGS entry,
-and direct show requests all use this same menu gate. Back from the mod list
-closes only OSF, returning to the parent; parent removal also closes OSF and
-cancels capture. A failed Pause request expires after five seconds. This does
-not add a new button to the Main Menu movie. Other mods' menu targets keep
-their own lifecycle and opening policy.
+`OSFSettingsMenu` opens directly from gameplay and pauses the game through its
+own menu flags. During native rebinding, it forwards input to the existing
+SettingsDataModel receiver; no Pause parent or pending-open route is needed.
+The bundled shortcut (F10 by default), the Pause MOD SETTINGS entry, and direct
+show requests all open the same menu. Back from the mod list closes only OSF,
+returning to gameplay or the already-open Pause menu. Hide/removal cancels any
+active capture. Other mods' menu targets keep their own opening policy.
 
 Menu declarations use control mask `0x08`, the same mask as keyboard Pause.
 Declarations without `menu` retain the Movement mask and only register mappings;

@@ -34,7 +34,6 @@ namespace OSFSettings
         void Close();
         void OnStartupFailed(std::string_view message);
         static RE::Scaleform::Ptr<RE::IMenu> Create();
-        bool m_admitted{};
         KeyCapture m_capture;
         NativeBindingEditor m_bindingEditor;
         std::string m_captureMod;

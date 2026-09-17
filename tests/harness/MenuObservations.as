@@ -68,7 +68,7 @@ private function reportTestState():void
         scrollPosition:options ? options.scrollPosition : 0, selection:testRow(current()), rows:visibleRows,
         stage:{width:1920, height:1080, visibleRect:visible ? testRect(visible) : null},
         mouse:{x:menuStage.mouseX, y:menuStage.mouseY}, mouseDown:testMouseDown, mouseClick:testMouseClick,
-        capture:{active:Boolean(captureRow) || nativeHotkeys.busy, ready:captureReady,
+        capture:{active:Boolean(captureRow) || nativeHotkeys.busy, ready:captureReady, saving:nativeHotkeys.saving,
             state:nativeHotkeys.busy ? nativeHotkeys.popup.active ? "conflict" : "listening" : testCaptureState,
             mod:captureRow ? captureRow.mod : nativeHotkeys.busy && current() ? current().mod : "",
             key:captureRow ? captureRow.key : nativeHotkeys.busy && current() ? current().key : ""},
