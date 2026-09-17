@@ -5,6 +5,7 @@ param(
     [switch]$LargeText,
     [switch]$Scrolling,
     [switch]$Design,
+    [switch]$Issues,
     [switch]$BuildOnly,
     [switch]$Watch,
     [ValidateRange(640, 7680)][int]$Width = 1280,
@@ -32,6 +33,7 @@ function Build-Preview {
     $suffix = if ($LargeText) { '_LRG' } else { '' }
     $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output, '--menu', "$repo/build/scaleform/OSFSettingsMenu$suffix.raw.swf")
     if ($LargeText) { $prepareArgs += '--large' }
+    if ($Issues) { $prepareArgs += @('--issues', (Join-Path $repo 'tests/menu/issues.json')) }
     & python -B "$PSScriptRoot/prepare-menu-preview.py" @prepareArgs @schemas
     if ($LASTEXITCODE -ne 0) { throw 'Could not prepare preview assets.' }
     $env:JAVA_HOME = Join-Path $repo 'external/temurin8'
@@ -54,6 +56,7 @@ function Source-Stamp {
     $files = @(Get-ChildItem -LiteralPath "$repo/scaleform" -Recurse -File)
     $files += Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object { $_.Extension -in '.py', '.ps1' }
     $files += Get-Item -LiteralPath $schemas
+    if ($Issues) { $files += Get-Item -LiteralPath (Join-Path $repo 'tests/menu/issues.json') }
     ($files | Sort-Object FullName | ForEach-Object { "$($_.FullName):$($_.LastWriteTimeUtc.Ticks):$($_.Length)" }) -join '|'
 }
 

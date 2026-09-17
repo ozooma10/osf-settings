@@ -120,7 +120,7 @@ class InterfaceArchive:
         return data
 
 
-def prepare(archive_path, output, schema_paths, large, menu_path):
+def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=None):
     archive = InterfaceArchive(archive_path)
     assets = output / "assets"
     assets.mkdir(parents=True, exist_ok=True)
@@ -256,6 +256,16 @@ def prepare(archive_path, output, schema_paths, large, menu_path):
                 if kind == "enum":
                     for value, label in zip(options, labels):
                         ET.SubElement(row, "option", value=value, label=label or value)
+    issues = ET.SubElement(config, "issues")
+    if issues_path:
+        titles = {schema["id"]: schema.get("title") or schema["id"]
+                  for schema in (json.loads(path.read_text(encoding="utf-8")) for path in schema_paths)}
+        reports = json.loads(issues_path.read_text(encoding="utf-8"))
+        for report in sorted(reports, key=lambda report: report["severity"] != "ERROR"):
+            issue = ET.SubElement(issues, "issue", mod=report["modId"], id=report["id"],
+                                  modTitle=titles.get(report["modId"], report["modId"]), severity=report["severity"])
+            for field in ("title", "impact", "nextSteps"):
+                ET.SubElement(issue, field).text = report.get(field, "")
     ET.indent(config)
     ET.ElementTree(config).write(output / "preview.xml", encoding="utf-8", xml_declaration=True)
 
@@ -300,6 +310,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--large", action="store_true")
     parser.add_argument("--menu", type=Path, required=True)
+    parser.add_argument("--issues", type=Path)
     parser.add_argument("schemas", type=Path, nargs="+")
     args = parser.parse_args()
-    prepare(args.archive, args.output, args.schemas, args.large, args.menu)
+    prepare(args.archive, args.output, args.schemas, args.large, args.menu, args.issues)

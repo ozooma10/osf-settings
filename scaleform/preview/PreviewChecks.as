@@ -21,7 +21,7 @@ package
         private var list:Object;
         private var playbackTab:DisplayObject;
         private var tick:int = 0;
-        private var step:int = 0;
+        private var step:int = -1;
         private var setter:Function;
 
         public function PreviewChecks(movie:MovieClip)
@@ -51,6 +51,11 @@ package
             if (++tick % 12) return;
             try {
                 switch (step++) {
+                case -1:
+                    require(Object(menu).startupPhase == "ready" && list != null, "menu ready at root");
+                    require(list.entryCount == 1 && list.selectedEntry.row.mod == "design-preview", "single mod still opens at All Mods");
+                    require(findNamed(menu, "mods") != null && findNamed(menu, "issues") != null, "both root tabs are reachable");
+                    capture("all-mods"); userEvent("Accept"); break;
                 case 0:
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready");
                     requireGlyphs("SELECTED SETTING");

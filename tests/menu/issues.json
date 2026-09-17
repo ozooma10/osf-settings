@@ -1,0 +1,32 @@
+[
+  {
+    "modId": "design-preview",
+    "id": "playback-unavailable",
+    "severity": "ERROR",
+    "title": "Scene playback unavailable",
+    "impact": "Scenes cannot start until the required animation files are available.",
+    "nextSteps": "Check that the required animation pack is installed and enabled, then restart the game."
+  },
+  {
+    "modId": "example-mod",
+    "id": "optional-pack-missing",
+    "severity": "WARNING",
+    "title": "Optional animation pack missing",
+    "impact": "Some additional scenes are unavailable. Other features continue to work.",
+    "nextSteps": "Install the optional pack if you want to use those scenes."
+  },
+  {
+    "modId": "design-preview",
+    "id": "title-only",
+    "severity": "WARNING",
+    "title": "A report with no additional details"
+  },
+  {
+    "modId": "example-mod",
+    "id": "long-description",
+    "severity": "WARNING",
+    "title": "A longer report to check reading and scrolling",
+    "impact": "This development fixture exercises long issue text in both menu sizes. Its title and body should wrap without overlapping another section. The complete report remains readable even when it is taller than the detail pane.\n\nThe issue list stays focused while you scroll the details. Mouse-wheel input over this pane must not move selection in the list. Keyboard Page Up and Page Down, and the displayed controller scroll controls, should reach all of the text.",
+    "nextSteps": "Scroll to the end of this report, then select a different issue. The new issue should start at the top.\n\nIf the same issue is updated, keep its selection and preserve the reading position where possible. If it is cleared, select a nearby remaining issue. If all reports are cleared, show No issues reported.\n\nEND OF LONG REPORT"
+  }
+]

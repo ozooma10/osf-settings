@@ -75,5 +75,41 @@ output version to zero. On success the output contains the provider's version.
 After launch, existing vtable slots and `Issue` layout are fixed for this ABI.
 
 A [development-only native example](../examples/diagnostics/README.md) demonstrates
-reporting, updating and clearing without a settings schema. Menu presentation
-and Papyrus support remain separate work.
+reporting, updating and clearing without a settings schema. Papyrus support
+remains separate work.
+
+## Mod Issues in Settings
+
+Settings always opens at **All Mods**, even with a single settings mod. The
+adjacent **Mod Issues** tab shows the current report count and remains available
+when there are no reports. Its empty state is **No issues reported**; this does
+not certify that every installed mod is working.
+
+The issue list shows errors before warnings, with each report's title, reporting
+mod and severity. Selection displays the complete title and optional **What this
+affects** / **What you can do** text on the right. Missing optional sections are
+omitted. Reports without a settings schema are included using the mod ID as the
+display name.
+
+Click the tabs, use `[` / `]`, or use the native previous/next page button prompts.
+Long issue details scroll with the mouse wheel over the pane, Page Up / Page Down,
+or the displayed Scroll Up / Scroll Down buttons (Y/X on a controller). The list
+selection stays in place while reading.
+
+The menu reads an owned snapshot once per second while open, deferring refreshes
+during binding capture or dragging. It keeps the selected `(modId, id)` when that
+report moves or updates; if it disappears, a nearby remaining report is selected.
+Reports remain read-only: opening the menu does not run checks, clear issues,
+repair anything, or create history. The public diagnostics ABI is unchanged.
+
+Development preview with illustrative reports (never installed in the game):
+
+```powershell
+pwsh tools/preview-menu.ps1 -Design -Issues
+pwsh tools/preview-menu.ps1 -Design -Issues -LargeText
+```
+
+Omit `-Issues` for the empty state. The fixture includes a schema-less mod,
+missing optional fields, and long text. In-game acceptance still needs checks of
+both menu sizes, keyboard/controller navigation, live report/update/clear, and
+returning from Mod Issues to ordinary settings and native binding capture.

@@ -30,6 +30,12 @@ target("OSF Settings")
         description = "Mod Settings Menu for Starfield",
         email = "ozooma10@protonmail.com"
     })
+    on_config(function(target)
+        -- Keep this checkout's MO2 payload separate from the historical Settings mod.
+        if os.getenv("XSE_SF_MODS_PATH") then
+            target:set("installdir", path.join(os.getenv("XSE_SF_MODS_PATH"), "OSF Settings Slim"))
+        end
+    end)
 
     -- add src files
     add_files("src/**.cpp")

@@ -4,6 +4,7 @@
 #include "Input/KeyNames.h"
 #include <cmath>
 #include "Core/Runtime.h"
+#include "Diagnostics/DiagnosticsService.h"
 #include <charconv>
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
@@ -13,7 +14,7 @@ namespace OSFSettings
     namespace
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
-            SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding };
+            SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -51,6 +52,7 @@ namespace OSFSettings
     void OSFSettingsMenu::MapCodeObjectFunctions()
     {
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
+        RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
         RegisterNativeFunction("setBool", static_cast<std::uint64_t>(Function::SetBool));
         RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
         RegisterNativeFunction("setFloat", static_cast<std::uint64_t>(Function::SetFloat));
@@ -152,6 +154,25 @@ namespace OSFSettings
         case Function::EndNativeBinding:
             m_bindingEditor.End(params.argCount > 0 && params.args[0].IsBoolean() && params.args[0].GetBoolean());
             break;
+        case Function::GetIssues: {
+            const auto issues = DiagnosticsService::Get().Snapshot();
+            const auto settings = runtime.Settings();
+            root->CreateArray(params.ret);
+            for (const auto& issue : issues) {
+                RE::Scaleform::GFx::Value row;
+                root->CreateObject(&row);
+                Text(row, "type", "issue");
+                Text(row, "mod", issue.modId);
+                Text(row, "id", issue.id);
+                Text(row, "modTitle", IssueModName(issue, settings));
+                Text(row, "severity", issue.severity == IssueSeverity::Error ? "ERROR" : "WARNING");
+                Text(row, "title", issue.title);
+                Text(row, "impact", issue.impact);
+                Text(row, "nextSteps", issue.nextSteps);
+                params.ret->PushBack(row);
+            }
+            break;
+        }
         case Function::GetRows:
             root->CreateArray(params.ret);
             for (const auto& mod : runtime.Settings()) {

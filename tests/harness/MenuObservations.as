@@ -35,7 +35,8 @@ private function testClick(event:MouseEvent):void
 private function testRow(row:Object):Object
 {
     if (!row) return null;
-    return {kind:modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
+    return {kind:issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
+        issueId:String(row.id || ""), severity:String(row.severity || ""),
         key:String(row.key || ""), type:String(row.type || ""), value:row.value,
         alternate:row.alternate, title:row.title, editable:Boolean(row.editable), minimum:row.minimum, maximum:row.maximum};
 }
@@ -64,7 +65,8 @@ private function reportTestState():void
     var visible:Rectangle = Object(extensions).visibleRect as Rectangle;
     BGSCodeObj.testSnapshot(frame, {initialized:initialized, closing:closing,
         refreshing:refreshing || requestedRefresh, startupPhase:startupPhase,
-        mod:modID, group:groupID, selectedIndex:options ? options.selectedIndex : -1,
+        mod:modID, group:groupID, rootPage:rootPage, issueCount:issues.length,
+        selectedIndex:options ? options.selectedIndex : -1,
         scrollPosition:options ? options.scrollPosition : 0, selection:testRow(current()), rows:visibleRows,
         stage:{width:1920, height:1080, visibleRect:visible ? testRect(visible) : null},
         mouse:{x:menuStage.mouseX, y:menuStage.mouseY}, mouseDown:testMouseDown, mouseClick:testMouseClick,

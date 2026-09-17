@@ -25,6 +25,7 @@ package
         private var libraries:Array = [];
         private var loaders:Array = [];
         private var rows:Array = [];
+        private var issues:Array = [];
         private var fontNames:Array = [];
         private var domain:ApplicationDomain;
         private var menu:Object;
@@ -63,7 +64,7 @@ package
         {
             if (menu) { removeChild(menu as MovieClip); menu = null; }
             for each (var loader:Loader in loaders) loader.unloadAndStop();
-            loaders = []; libraries = []; fontNames = []; rows = [];
+            loaders = []; libraries = []; fontNames = []; rows = []; issues = [];
             domain = new ApplicationDomain(ApplicationDomain.currentDomain);
             var config:URLLoader = new URLLoader();
             config.addEventListener(IOErrorEvent.IO_ERROR, ioFailed);
@@ -74,6 +75,10 @@ package
         private function configured(event:Event):void
         {
             var config:XML = new XML(URLLoader(event.target).data);
+            for each (var issue:XML in config.issues.issue) {
+                issues.push({type:"issue", mod:String(issue.@mod), id:String(issue.@id), modTitle:String(issue.@modTitle),
+                    severity:String(issue.@severity), title:String(issue.title), impact:String(issue.impact), nextSteps:String(issue.nextSteps)});
+            }
             for each (var library:XML in config.libraries.library) libraries.push(String(library.@url));
             for each (var font:XML in config.fonts.font) fontNames.push(String(font.@name));
             for each (var row:XML in config.rows.row) {
@@ -127,7 +132,9 @@ package
                 {strUserEventName:"Accept", strButtonName:"E", aButtonName:["E"], sContextName:"BasicMenuNav"},
                 {strUserEventName:"Cancel", strButtonName:"Tab", aButtonName:["Tab"], sContextName:"BasicMenuNav"},
                 {strUserEventName:"YButton", strButtonName:"B", aButtonName:["B"], sContextName:"BasicMenuNav"},
-                {strUserEventName:"XButton", strButtonName:"X", aButtonName:["X"], sContextName:"BasicMenuNav"}
+                {strUserEventName:"XButton", strButtonName:"X", aButtonName:["X"], sContextName:"BasicMenuNav"},
+                {strUserEventName:"LShoulder", strButtonName:"[", aButtonName:["["], sContextName:"BasicMenuNav"},
+                {strUserEventName:"RShoulder", strButtonName:"]", aButtonName:["]"], sContextName:"BasicMenuNav"}
             ];
             controls.SetReady(true);
             var loader:Loader = new Loader(); loaders.push(loader);
@@ -140,7 +147,7 @@ package
         private function menuLoaded(event:Event):void
         {
             menu = event.target.content;
-            menu.BGSCodeObj = {getRows:getRows, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, close:closeMenu,
+            menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, close:closeMenu,
                 startup:startup, startupFailed:report, setKey:setKey,
                 beginKeyCapture:beginKeyCapture, pollKeyCapture:function():Object { return captureState; },
                 commitKeyCapture:commitKeyCapture, cancelKeyCapture:function():void { captureState.state = "idle"; },
@@ -160,6 +167,17 @@ package
             for each (var row:Object in rows) {
                 var copy:Object = {};
                 for (var property:String in row) copy[property] = row[property];
+                result.push(copy);
+            }
+            return result;
+        }
+
+        private function getIssues():Array
+        {
+            var result:Array = [];
+            for each (var issue:Object in issues) {
+                var copy:Object = {};
+                for (var key:String in issue) copy[key] = issue[key];
                 result.push(copy);
             }
             return result;
