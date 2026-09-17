@@ -37,7 +37,7 @@ private function testRow(row:Object):Object
     if (!row) return null;
     return {kind:modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
         key:String(row.key || ""), type:String(row.type || ""), value:row.value,
-        title:row.title, editable:Boolean(row.editable), minimum:row.minimum, maximum:row.maximum};
+        alternate:row.alternate, title:row.title, editable:Boolean(row.editable), minimum:row.minimum, maximum:row.maximum};
 }
 private function reportTestState():void
 {
@@ -68,7 +68,9 @@ private function reportTestState():void
         scrollPosition:options ? options.scrollPosition : 0, selection:testRow(current()), rows:visibleRows,
         stage:{width:1920, height:1080, visibleRect:visible ? testRect(visible) : null},
         mouse:{x:menuStage.mouseX, y:menuStage.mouseY}, mouseDown:testMouseDown, mouseClick:testMouseClick,
-        capture:{active:Boolean(captureRow), ready:captureReady, state:testCaptureState,
-            mod:captureRow ? captureRow.mod : "", key:captureRow ? captureRow.key : ""},
+        capture:{active:Boolean(captureRow) || nativeHotkeys.busy, ready:captureReady,
+            state:nativeHotkeys.busy ? nativeHotkeys.popup.active ? "conflict" : "listening" : testCaptureState,
+            mod:captureRow ? captureRow.mod : nativeHotkeys.busy && current() ? current().mod : "",
+            key:captureRow ? captureRow.key : nativeHotkeys.busy && current() ? current().key : ""},
         status:status ? status.text : ""});
 }

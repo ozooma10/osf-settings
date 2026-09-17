@@ -16,7 +16,11 @@ namespace OSFSettings::TestHarness
         public:
             RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent& event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override
             {
-                if (std::string_view(event.menuName.c_str()) == OSFSettingsMenu::MENU_NAME) MenuState(event.opening);
+                if (std::string_view(event.menuName.c_str()) == OSFSettingsMenu::MENU_NAME) {
+                    // The engine also emits an opening event after refused admission.
+                    auto* ui = RE::UI::GetSingleton();
+                    MenuState(event.opening && ui && ui->IsMenuOpen(event.menuName));
+                }
                 return RE::BSEventNotifyControl::kContinue;
             }
         };

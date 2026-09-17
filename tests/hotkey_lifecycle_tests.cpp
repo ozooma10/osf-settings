@@ -1,10 +1,12 @@
 #include "SFSE/Impl/PCH.h"
 // Exercise the production startup hook and input callback against executable fixtures.
 #include "../src/Input/HotkeyInput.cpp"
+#include "../src/Menu/SettingsMenuRoute.cpp"
 
 #include <iostream>
 #include <cstring>
 #include <stdexcept>
+#include <set>
 
 namespace
 {
@@ -22,6 +24,31 @@ namespace
     RE::UIMessageQueue queueStorage;
     RE::UIMessageQueue* queue = &queueStorage;
     std::vector<std::pair<std::string, RE::UI_MESSAGE_TYPE>> messages;
+    alignas(RE::UI) std::byte uiStorage[sizeof(RE::UI)]{};
+    auto* ui = reinterpret_cast<RE::UI*>(uiStorage);
+    std::set<std::string> openMenus;
+    RE::BSTEventSink<RE::MenuOpenCloseEvent>* routeSink{};
+    unsigned routeRegistrations{};
+
+    bool IsMenuOpen(const RE::UI* receiver, const RE::BSFixedString& name)
+    {
+        if (receiver != ui) throw std::runtime_error("Wrong UI singleton");
+        return openMenus.contains(name.c_str());
+    }
+
+    void RegisterRoute(RE::BSTEventSource<RE::MenuOpenCloseEvent>* source, RE::BSTEventSink<RE::MenuOpenCloseEvent>* sink)
+    {
+        if (source != ui->GetEventSource<RE::MenuOpenCloseEvent>()) throw std::runtime_error("Wrong menu event source");
+        routeSink = sink;
+        ++routeRegistrations;
+    }
+
+    void MenuEvent(const char* name, bool opening)
+    {
+        if (opening) openMenus.emplace(name);
+        else openMenus.erase(name);
+        routeSink->ProcessEvent({ RE::BSFixedString(name), opening }, nullptr);
+    }
 
     class Event final : public RE::ButtonEvent
     {
@@ -157,6 +184,9 @@ namespace REL
         case 392794: address = reinterpret_cast<std::uintptr_t>(allocatorVtable); break;
         case 937897: address = reinterpret_cast<std::uintptr_t>(&queue); break;
         case 130659: address = reinterpret_cast<std::uintptr_t>(&RecordMessage); break;
+        case 937580: address = reinterpret_cast<std::uintptr_t>(&ui); break;
+        case 130475: address = reinterpret_cast<std::uintptr_t>(&IsMenuOpen); break;
+        case 123821: address = reinterpret_cast<std::uintptr_t>(&RegisterRoute); break;
         case 1186742: address = reinterpret_cast<std::uintptr_t>(&GetString); break;
         case 139340: address = reinterpret_cast<std::uintptr_t>(&ReleaseString); break;
         default: throw std::runtime_error("Unexpected relocation: " + std::to_string(id));
@@ -278,7 +308,59 @@ int main()
         check(constructions == 2 && destructions == 1 && attached && controls.GetHandlerCount() == 8 &&
             controls.handlers.data[7] == &*HotkeyInput::g_handler && events.empty(),
             "duplicate attachment retains the one process-lifetime handler without reconstruction");
-        std::cout << checks << '/' << checks << " hotkey lifecycle checks passed\n";
+        messages.clear();
+        SettingsMenuRoute::Register(*ui);
+        SettingsMenuRoute::Register(*ui);
+        check(routeSink && routeRegistrations == 1, "menu route registers its process-lifetime sink once");
+        check(!SettingsMenuRoute::Admit() && messages == std::vector<std::pair<std::string, RE::UI_MESSAGE_TYPE>>{
+            { "PauseMenu", RE::UI_MESSAGE_TYPE::kShow } }, "gameplay first requests Pause and refuses Settings admission");
+        check(!SettingsMenuRoute::Admit() && messages.size() == 1, "duplicate requests do not queue another Pause");
+        MenuEvent("OtherMenu", true);
+        check(messages.size() == 1, "unrelated menu events cannot finish the pending route");
+        MenuEvent("PauseMenu", true);
+        check(messages.size() == 2 && messages.back().first == "OSFSettingsMenu" &&
+            messages.back().second == RE::UI_MESSAGE_TYPE::kShow && SettingsMenuRoute::Admit(),
+            "actual Pause opening queues Settings and permits its subsequent admission");
+        MenuEvent("PauseMenu", false);
+        check(messages.size() == 3 && messages.back().second == RE::UI_MESSAGE_TYPE::kHide &&
+            !SettingsMenuRoute::Admit() && messages.size() == 3,
+            "parent removal closes Settings and rejects an older queued show without reopening Pause");
+        SettingsMenuRoute::Reset();
+        messages.clear();
+        MenuEvent("MainMenu", true);
+        check(SettingsMenuRoute::Admit() && messages.empty(), "existing MainMenu admits Settings without opening Pause");
+        MenuEvent("PauseMenu", false);
+        check(messages.empty(), "an unrelated parent's close leaves Settings open");
+        MenuEvent("MainMenu", false);
+        check(messages.size() == 1 && messages.back().second == RE::UI_MESSAGE_TYPE::kHide,
+            "MainMenu removal also closes its Settings child");
+        SettingsMenuRoute::Reset();
+        messages.clear();
+        MenuEvent("PauseMenu", true);
+        check(SettingsMenuRoute::Admit() && messages.empty(), "Pause entry reuses the existing parent");
+        SettingsMenuRoute::Reset();
+        check(openMenus.contains("PauseMenu") && messages.empty(), "closing Settings leaves its parent open for Back");
+        MenuEvent("PauseMenu", false);
+        check(!SettingsMenuRoute::Admit(), "another gameplay request can start after closing");
+        SettingsMenuRoute::Reset();
+        messages.clear();
+        MenuEvent("PauseMenu", true);
+        check(messages.empty(), "cancelling a pending request prevents a later Pause open from showing Settings");
+        openMenus.clear();
+        queue = nullptr;
+        check(!SettingsMenuRoute::Admit() && messages.empty(), "a missing queue leaves no pending route");
+        queue = &queueStorage;
+        MenuEvent("PauseMenu", true);
+        check(messages.empty(), "queue recovery cannot revive a request that was never queued");
+        openMenus.clear();
+        check(!SettingsMenuRoute::Admit(), "failed Pause admission fixture begins with a gameplay request");
+        messages.clear();
+        routeSink->ProcessEvent({ RE::BSFixedString("PauseMenu"), true }, nullptr);
+        check(messages.empty(), "a refused Pause opening notification cannot show Settings");
+        MenuEvent("MainMenu", true);
+        check(SettingsMenuRoute::Admit() && messages.empty(), "failed Pause admission does not strand the route on a missing parent");
+        SettingsMenuRoute::Reset();
+        std::cout << checks << '/' << checks << " hotkey/menu lifecycle checks passed\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAILED: " << error.what() << '\n';
