@@ -1,4 +1,5 @@
 #include "OSFSettingsMenu.h"
+#include "SettingsMenuRoute.h"
 #include "harness/TestHarness.h"
 #include "FloatSlider.h"
 #include "Input/KeyNames.h"
@@ -13,7 +14,7 @@ namespace OSFSettings
     namespace
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
-            SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture };
+            SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -60,10 +61,27 @@ namespace OSFSettings
         RegisterNativeFunction("pollKeyCapture", static_cast<std::uint64_t>(Function::PollKeyCapture));
         RegisterNativeFunction("commitKeyCapture", static_cast<std::uint64_t>(Function::CommitKeyCapture));
         RegisterNativeFunction("cancelKeyCapture", static_cast<std::uint64_t>(Function::CancelKeyCapture));
+        RegisterNativeFunction("beginNativeBinding", static_cast<std::uint64_t>(Function::BeginNativeBinding));
+        RegisterNativeFunction("endNativeBinding", static_cast<std::uint64_t>(Function::EndNativeBinding));
         RegisterNativeFunction("close", static_cast<std::uint64_t>(Function::Close));
         RegisterNativeFunction("startup", static_cast<std::uint64_t>(Function::Startup));
         RegisterNativeFunction("startupFailed", static_cast<std::uint64_t>(Function::StartupFailed));
         TestHarness::RegisterMenuFunctions(*this);
+    }
+
+    RE::UI_MESSAGE_RESULT OSFSettingsMenu::ProcessMessage(RE::UIMessageData& message)
+    {
+        if (message.type == RE::UI_MESSAGE_TYPE::kShow) {
+            m_admitted = SettingsMenuRoute::Admit();
+            // kIgnore refuses stack admission. Its native cleanup still sends hide and OnRemovedFromMenuStack; that must retain the pending Pause request.
+            if (!m_admitted) return RE::UI_MESSAGE_RESULT::kIgnore;
+        }
+        if (message.type == RE::UI_MESSAGE_TYPE::kHide) {
+            m_bindingEditor.End(true);
+            m_capture.ResetForMenuClose();
+            if (m_admitted) SettingsMenuRoute::Reset();
+        }
+        return RE::GameMenuBase::ProcessMessage(message);
     }
 
     void OSFSettingsMenu::OnStartupFailed(std::string_view message)
@@ -135,9 +153,32 @@ namespace OSFSettings
         case Function::CancelKeyCapture:
             m_capture.EndCapture();
             break;
+        case Function::BeginNativeBinding:
+            *params.ret = RE::Scaleform::GFx::Value(m_capture.GetSnapshot().state == KeyCapture::State::Idle && m_bindingEditor.Begin());
+            break;
+        case Function::EndNativeBinding:
+            m_bindingEditor.End(params.argCount > 0 && params.args[0].IsBoolean() && params.args[0].GetBoolean());
+            break;
         case Function::GetRows:
             root->CreateArray(params.ret);
             for (const auto& mod : runtime.Settings()) {
+                for (const auto& hotkey : mod.schema.hotkeys) {
+                    RE::Scaleform::GFx::Value row;
+                    root->CreateObject(&row);
+                    Text(row, "mod", mod.schema.id);
+                    Text(row, "modTitle", mod.schema.title);
+                    Text(row, "modDescription", mod.schema.description);
+                    Text(row, "group", "@hotkeys");
+                    Text(row, "groupTitle", "Hotkeys");
+                    Text(row, "key", hotkey.id);
+                    Text(row, "action", mod.schema.id + "/" + hotkey.id);
+                    Text(row, "title", hotkey.label);
+                    Text(row, "type", "hotkey");
+                    Text(row, "hint", "Select a binding to change it. Escape cancels.");
+                    Text(row, "defaultName", hotkey.defaultKey.value_or("Unbound"));
+                    // Current bindings arrive through vanilla ControlBindingsData in the movie.
+                    params.ret->PushBack(row);
+                }
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& setting : group.settings) {
                         const auto value = mod.values.find(setting.key);
@@ -250,6 +291,9 @@ namespace OSFSettings
 
     bool OSFSettingsMenu::ShouldHandleEvent(const RE::InputEvent* event)
     {
+        const auto bindingInput = m_bindingEditor.ProcessInput(event);
+        if (bindingInput == NativeBindingEditor::InputResult::Cancelled) menuObj.Invoke("onNativeBindingCancelled");
+        if (bindingInput != NativeBindingEditor::InputResult::Unhandled) return false;
         if (event && event->deviceType == RE::InputEvent::DeviceType::kKeyboard && event->eventType == RE::InputEvent::EventType::kButton &&
             m_capture.ShouldConsumeKey(static_cast<std::uint32_t>(static_cast<const RE::ButtonEvent*>(event)->idCode))) return true;
         return RE::GameMenuBase::ShouldHandleEvent(event);
@@ -266,7 +310,12 @@ namespace OSFSettings
 
     void OSFSettingsMenu::OnRemovedFromMenuStack()
     {
+        m_bindingEditor.End(true);
         m_capture.ResetForMenuClose();
+        if (m_admitted) {
+            SettingsMenuRoute::Reset();
+        }
+        m_admitted = false;
         RE::GameMenuBase::OnRemovedFromMenuStack();
     }
 
@@ -286,6 +335,9 @@ namespace OSFSettings
             ui->RegisterMenu(MENU_NAME.data(), &Create, true);
         }
         const bool registered = ui->IsMenuRegistered(name);
+        if (registered) {
+            SettingsMenuRoute::Register(*ui);
+        }
         TestHarness::RegisterMenuObserver(*ui, registered);
         return registered;
     }
@@ -299,6 +351,8 @@ namespace OSFSettings
 
     void OSFSettingsMenu::Close() 
     { 
+        SettingsMenuRoute::Reset();
+        m_bindingEditor.End(true);
         m_capture.EndCapture();
         if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
             queue->AddMessage(RE::BSFixedString(MENU_NAME.data()), RE::UI_MESSAGE_TYPE::kHide); 

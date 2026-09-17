@@ -1,5 +1,6 @@
 #include "HotkeyInput.h"
 #include "NativeHotkeys.h"
+#include "NativeBindingEditor.h"
 #include "harness/TestHarness.h"
 #include "RE/B/BSInputEventUserStandalone.h"
 #include "RE/M/MenuControls.h"
@@ -25,7 +26,7 @@ namespace OSFSettings::HotkeyInput
         public:
             bool ShouldHandleEvent(const RE::InputEvent* event) override
             {
-                if (!event || event->eventType != RE::InputEvent::EventType::kButton || event->deviceType != RE::InputEvent::DeviceType::kKeyboard) {
+                if (NativeBindingEditor::IsActive() || !event || event->eventType != RE::InputEvent::EventType::kButton || event->deviceType != RE::InputEvent::DeviceType::kKeyboard) {
                     return false;
                 }
                 const auto* button = static_cast<const RE::ButtonEvent*>(event);

@@ -27,9 +27,10 @@ package
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
             var choice:Boolean = !modList && (row.type == "enum" || row.type == "key");
             var displayValue:String = modList ? String(row.count) : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
-            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList].join("|");
+            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing].join("|");
             if (signature == previous) return;
             previous = signature;
+            value.visible = !row.capturing;
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
             graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.ROW_HEIGHT); graphics.endFill();

@@ -2,6 +2,7 @@
 
 #include "RE/G/GameMenuBase.h"
 #include "Input/KeyCapture.h"
+#include "Input/NativeBindingEditor.h"
 
 namespace OSFSettings
 {
@@ -18,6 +19,7 @@ namespace OSFSettings
             return RE::BSEventNotifyControl::kContinue;
         }
         void PostCreate() override;
+        RE::UI_MESSAGE_RESULT ProcessMessage(RE::UIMessageData& message) override;
         bool UseEventDispatcher() override { return true; }
         void MapCodeObjectFunctions() override;
         void Call(const RE::Scaleform::GFx::FunctionHandler::Params& params) noexcept override;
@@ -32,7 +34,9 @@ namespace OSFSettings
         void Close();
         void OnStartupFailed(std::string_view message);
         static RE::Scaleform::Ptr<RE::IMenu> Create();
+        bool m_admitted{};
         KeyCapture m_capture;
+        NativeBindingEditor m_bindingEditor;
         std::string m_captureMod;
         std::string m_captureKey;
     };

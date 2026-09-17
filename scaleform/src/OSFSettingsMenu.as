@@ -34,6 +34,8 @@ package
         private var modID:String = "";
         private var groupID:String = "";
         private var options:Object;
+        private var settingsOptions:Object;
+        private var nativeHotkeys:NativeHotkeysList;
         private var types:Class;
         private var bar:Object;
         private var background:MovieClip;
@@ -60,11 +62,7 @@ package
         private var pageHint:TextField;
         private var clearButton:Object;
         private var captureRow:Object;
-        private var capturePanel:Sprite;
-        private var captureTitle:TextField;
-        private var captureValue:TextField;
-        private var captureHint:TextField;
-        private var captureConfirm:Sprite;
+        private var captureBinding:MovieClip;
         private var captureReady:Boolean = false;
         CONFIG::testHarness {
             include "../../tests/harness/MenuObservations.as";
@@ -136,21 +134,8 @@ package
             section = label("", MenuStyle.LEFT, 305, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
             count = label("", 902, 308, 230, 40, 23, MenuStyle.MUTED, true); alignRight(count);
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
-            options.x = MenuStyle.LEFT; options.y = MenuStyle.LIST_TOP; addChild(options as MovieClip);
-            var config:Object = create("Shared.AS3.BSScrollingConfigParams");
-            config.EntryClassName = "OptionListEntry"; config.VerticalSpacing = 4;
-            config.TruncateToFit = true; config.RestoreIndex = true; config.WrapAround = false;
-            options.Configure(config);
-            options.Border_mc.x = 0; options.Border_mc.y = 0;
-            options.Border_mc.width = MenuStyle.LIST_WIDTH; options.borderHeight = MenuStyle.LIST_HEIGHT;
-            options.scrollBarHeight = MenuStyle.LIST_HEIGHT;
-            var entries:DisplayObject = MovieClip(options).getChildByName("EntryHolder_mc");
-            entries.x = 0; entries.y = 0;
-            entries.scrollRect = new Rectangle(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.LIST_HEIGHT);
-            if (options.ScrollBar) options.ScrollBar.x = MenuStyle.LIST_WIDTH + 14;
-            options.addEventListener("ScrollingEvent::selectionChange", selectionChanged);
-            options.addEventListener("ScrollingEvent::itemPress", itemPressed);
-            options.addEventListener("ScrollingEvent::playFocusSound", focusSound);
+            settingsOptions = options;
+            configureList(options, "OptionListEntry");
             options.addEventListener("SettingsOptionEntry_ValueChanged", valueChanged);
             label("SELECTED SETTING", 1210, 363, 630, 36, 21, MenuStyle.MUTED, true);
             detailTitle = label("", 1210, 409, 634, 102, CONFIG::largeText ? 38 : 34);
@@ -175,17 +160,18 @@ package
             resetButton = button("RESET SETTING", "YButton", reset);
             clearButton = button("CLEAR BINDING", "XButton", clearBinding);
             backButton = button("ALL MODS", "Cancel", back); bar.RefreshButtons();
-            capturePanel = new Sprite(); capturePanel.visible = false; addChild(capturePanel);
-            capturePanel.graphics.beginFill(MenuStyle.INK);
-            capturePanel.graphics.drawRect(MenuStyle.LEFT, 270, MenuStyle.RIGHT - MenuStyle.LEFT, 630);
-            capturePanel.graphics.endFill();
-            captureTitle = MenuStyle.field("", 260, 355, 1400, 80, CONFIG::largeText ? 42 : 36);
-            captureValue = MenuStyle.field("", 260, 490, 1400, 90, CONFIG::largeText ? 64 : 56, MenuStyle.ACCENT);
-            captureHint = MenuStyle.field("", 260, 640, 1400, 160, CONFIG::largeText ? 32 : 28, MenuStyle.MUTED);
-            captureHint.multiline = true; captureHint.wordWrap = true;
-            capturePanel.addChild(captureTitle); capturePanel.addChild(captureValue); capturePanel.addChild(captureHint);
-            captureConfirm = captureButton("CONFIRM BINDING (ENTER)", 260, 470, function(event:MouseEvent):void { confirmBinding(); });
-            captureButton("CANCEL (ESC)", 770, 300, function(event:MouseEvent):void { finishBinding(true); });
+            captureBinding = create("Binding") as MovieClip;
+            captureBinding.mouseEnabled = false; captureBinding.mouseChildren = false;
+            captureBinding.visible = false;
+            nativeHotkeys = new NativeHotkeysList(create, definition, BGSCodeObj, nativeBindingsChanged);
+            configureList(nativeHotkeys.list, "Shared.Components.SystemPanels.SettingsControlListEntry");
+            nativeHotkeys.list.visible = false;
+            nativeHotkeys.list.addEventListener("SettingsControlListEnty_ActiveBindingChanged", selectionChanged);
+            var popup:MovieClip = nativeHotkeys.popup as MovieClip;
+            addChild(popup);
+            var bounds:Rectangle = popup.getBounds(popup);
+            popup.x = (1920 - bounds.width) / 2 - bounds.x;
+            popup.y = (1080 - bounds.height) / 2 - bounds.y;
             menuStage.stageFocusRect = false;
             menuStage.addEventListener(Event.RESIZE, resizeBackground); resizeBackground();
             menuStage.addEventListener(Event.DEACTIVATE, focusLost);
@@ -195,16 +181,33 @@ package
             CONFIG::testHarness { menuStage.addEventListener(MouseEvent.CLICK, testClick, true); }
             addEventListener(Event.ENTER_FRAME, advance);
         }
-        private function captureButton(text:String, x:Number, width:Number, callback:Function):Sprite
+        private function configureList(list:Object, entryClass:String):void
         {
-            var result:Sprite = new Sprite(); result.x = x; result.y = 805;
-            result.graphics.lineStyle(1, MenuStyle.MUTED); result.graphics.beginFill(MenuStyle.ROW);
-            result.graphics.drawRect(0, 0, width, 60); result.graphics.endFill();
-            var field:TextField = MenuStyle.field(text, 16, 12, width - 32, 40, 25, MenuStyle.WHITE, true);
-            result.addChild(field); result.mouseChildren = false; result.buttonMode = true;
-            result.addEventListener(MouseEvent.CLICK, callback); capturePanel.addChild(result);
-            return result;
+            list.x = MenuStyle.LEFT; list.y = MenuStyle.LIST_TOP; addChild(list as MovieClip);
+            var config:Object = create("Shared.AS3.BSScrollingConfigParams");
+            config.EntryClassName = entryClass; config.VerticalSpacing = 4;
+            config.TruncateToFit = true; config.RestoreIndex = true; config.WrapAround = false;
+            list.Configure(config);
+            list.Border_mc.x = 0; list.Border_mc.y = 0;
+            list.Border_mc.width = MenuStyle.LIST_WIDTH; list.borderHeight = MenuStyle.LIST_HEIGHT;
+            list.scrollBarHeight = MenuStyle.LIST_HEIGHT;
+            var entries:DisplayObject = MovieClip(list).getChildByName("EntryHolder_mc");
+            entries.x = 0; entries.y = 0;
+            entries.scrollRect = new Rectangle(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.LIST_HEIGHT);
+            if (list.ScrollBar) list.ScrollBar.x = MenuStyle.LIST_WIDTH + 14;
+            list.addEventListener("ScrollingEvent::selectionChange", selectionChanged);
+            list.addEventListener("ScrollingEvent::itemPress", itemPressed);
+            list.addEventListener("ScrollingEvent::playFocusSound", focusSound);
         }
+        private function nativeBindingsChanged(message:String, refreshRows:Boolean):void
+        {
+            if (!initialized || closing) return;
+            if (message) Object(definition("Shared.GlobalFunc")).SetText(status, message);
+            if (refreshRows) requestedRefresh = true;
+            describe();
+        }
+        private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
+        private function bindingsPage():Boolean { return nativeHotkeys && options == nativeHotkeys.list; }
         private function button(text:String, eventName:String, callback:Function):Object
         {
             var eventClass:Class = definition("Shared.Components.ButtonControls.ButtonData.UserEventData");
@@ -243,11 +246,16 @@ package
         private function populate(preserve:Boolean = false):void
         {
             refreshing = true; requestedRefresh = false;
+            var next:Object = modID && groupID == "@hotkeys" ? nativeHotkeys.list : settingsOptions;
+            preserve = preserve && options == next;
+            options = next;
+            settingsOptions.visible = !bindingsPage(); nativeHotkeys.list.visible = bindingsPage();
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
             var data:Array = []; var source:Array = modID ? allRows : mods;
             for each (var row:Object in source) {
                 if (modID && (row.mod != modID || row.group != groupID)) continue;
+                if (bindingsPage()) { data.push(row); continue; }
                 var slider:Boolean = modID != "" && NumericSetting.isSlider(row);
                 // The vanilla entry multiplies fValue by 100. Our slider stores integer offsets.
                 data.push({row:row, sText:html(String(row.title)), uID:data.length, bDisabled:false, bShowSpinner:false,
@@ -256,10 +264,11 @@ package
                     sliderData:{fValue:slider ? NumericSetting.position(row) / 100 : 0, sDisplayValue:NumericSetting.text(row, row.value)},
                     stepperData:{aStepperOptions:row.type == "enum" ? EnumSetting.labels(row) : [], uIndex:row.type == "enum" ? EnumSetting.index(row) : 0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
             }
-            options.InitializeEntries(data);
+            if (bindingsPage()) { nativeHotkeys.populate(data, allRows); nativeHotkeys.open(); }
+            else options.InitializeEntries(data);
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
-            options.disableInput = false; menuStage.focus = options as MovieClip;
+            options.disableInput = bindingBusy(); menuStage.focus = options as MovieClip;
             empty.text = data.length ? "" : "No settings to display.";
             var title:String = "MOD SETTINGS"; var group:String = "ALL MODS";
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
@@ -300,12 +309,12 @@ package
         }
         private function tabClicked(event:MouseEvent):void
         {
-            if (captureRow || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || requestedRefresh || dragging()) return;
             groupID = event.currentTarget.name; populate(); drawTabs();
         }
         private function changePage(direction:int):void
         {
-            if (captureRow || !modID || groups.length < 2 || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || !modID || groups.length < 2 || requestedRefresh || dragging()) return;
             for (var i:int = 0; i < groups.length; ++i) {
                 if (groups[i].id == groupID) {
                     groupID = groups[(i + direction + groups.length) % groups.length].id;
@@ -324,14 +333,17 @@ package
             defaultLabel.text = modID ? "DEFAULT" : "SETTINGS";
             defaultValue.x = row && (row.type == "enum" || row.type == "key") ? 1434 : 1674;
             defaultValue.width = row && (row.type == "enum" || row.type == "key") ? 410 : 170;
-            MenuStyle.fit(defaultValue, row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
+            MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
-            resetButton.Visible = Boolean(!captureRow && modID && row && row.editable);
-            clearButton.Visible = Boolean(!captureRow && modID && row && row.type == "key" && row.allowUnbound && Number(row.value) != 255);
-            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : !modID ? "OPEN" : row && row.type == "key" ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
-            buttonData.Cancel.sButtonText = captureRow ? "CANCEL" : modID ? "ALL MODS" : "BACK";
+            resetButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row && row.editable && row.type != "hotkey");
+            clearButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row &&
+                (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
+            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : !modID ? "OPEN" : row && (row.type == "key" || row.type == "hotkey") ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
+            buttonData.Cancel.sButtonText = captureRow || nativeHotkeys && nativeHotkeys.busy ? "CANCEL" : modID ? "ALL MODS" : "BACK";
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-            acceptButton.Visible = captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key"))); bar.RefreshButtons();
+            acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey"))));
+            backButton.Visible = !bindingBusy();
+            bar.RefreshButtons();
         }
         private function scrollDescription(event:MouseEvent):void
         {
@@ -342,6 +354,7 @@ package
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
         {
+            if (bindingBusy()) return;
             if (captureRow) { confirmBinding(); return; }
             if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
@@ -349,6 +362,7 @@ package
             if (!modID) { modID = row.mod; groupID = ""; refresh(false); }
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
+            else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
             else if (row.type == "enum" && row.editable) {
                 var clip:Object = options.FindClipForEntry(options.selectedIndex);
                 if (clip) clip.LargeStepper_mc.PressHandler();
@@ -356,7 +370,7 @@ package
         }
         private function reset():void
         {
-            if (captureRow) return;
+            if (captureRow || bindingBusy() || bindingsPage()) return;
             var row:Object = current();
             if (!dragging() && modID && row && row.editable && row.value != row.defaultValue) edit(row, row.defaultValue);
         }
@@ -401,6 +415,8 @@ package
         }
         private function back():void
         {
+            if (nativeHotkeys.busy) { nativeHotkeys.cancel(); return; }
+            if (nativeHotkeys.saving) return;
             if (captureRow) { finishBinding(true); return; }
             if (closing || dragging() || requestedRefresh) return;
             if (modID) { modID = ""; groupID = ""; refresh(false); return; }
@@ -409,6 +425,11 @@ package
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (!initialized || closing) return false;
+            if (nativeHotkeys.popup.active) return Boolean(nativeHotkeys.popup.ProcessUserEvent(name, pressed));
+            if (bindingBusy()) {
+                if (pressed && name == "Cancel") nativeHotkeys.cancel();
+                return true;
+            }
             if (captureRow) {
                 if (pressed && name == "Cancel") finishBinding(true);
                 else if (pressed && name == "Accept") confirmBinding();
@@ -416,12 +437,12 @@ package
             }
             if (bar.ProcessUserEvent(name, pressed)) return true;
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
-            return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
+            return !bindingsPage() && clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
         }
         private function mouseFocus(event:MouseEvent):void
         {
             CONFIG::testHarness { testMouseDown = testMouseEvent(event, testMouseDown); }
-            if (captureRow) return;
+            if (captureRow || bindingBusy()) return;
             if (!initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
             if (!target || !MovieClip(options).contains(target)) return;
@@ -433,13 +454,15 @@ package
         }
         private function keyDown(event:KeyboardEvent):void
         {
+            if (bindingBusy()) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
             if (event.keyCode == Keyboard.B) reset();
-            else if (event.keyCode == Keyboard.X && current() && current().type == "key") clearBinding();
+            else if (event.keyCode == Keyboard.X && current() && (current().type == "key" || current().type == "hotkey")) clearBinding();
             else if (event.keyCode == 219) changePage(-1); // [ and ] also expose tabs without a mouse.
             else if (event.keyCode == 221) changePage(1);
             else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {
+                if (bindingsPage()) return; // Vanilla ControlsList owns binding-slot navigation.
                 var row:Object = current();
                 if (modID && row && row.editable) {
                     if (NumericSetting.isSlider(row)) {
@@ -455,12 +478,13 @@ package
         }
         private function keyUp(event:KeyboardEvent):void
         {
-            if (captureRow || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
+            if (captureRow || bindingBusy() || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
         }
         private function dragging():Boolean
         {
             if (!options) return false;
             if (options.scrollbarScrolling) return true;
+            if (bindingsPage()) return false;
             for (var i:int = 0; i < options.totalEntryClips; ++i) {
                 var clip:Object = options.GetClipByIndex(i);
                 if (clip && clip.IsSlider() && clip.Slider_mc.dragging) return true;
@@ -473,7 +497,7 @@ package
             if (initialized && !closing) {
                 if (captureRow) pollBinding();
                 else {
-                    if (requestedRefresh && !dragging()) refresh();
+                    if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
                     decorate();
                 }
             }
@@ -481,6 +505,7 @@ package
         }
         private function clearBinding():void
         {
+            if (bindingsPage()) { nativeHotkeys.clearBinding(); return; }
             var row:Object = current();
             if (!captureRow && modID && row && row.type == "key" && row.allowUnbound) edit(row, 255);
         }
@@ -488,17 +513,19 @@ package
         {
             var result:Object = BGSCodeObj.beginKeyCapture(row.mod, row.key);
             if (!result || !result.ok) { status.text = "Could not start key capture."; return; }
-            captureRow = row; captureReady = false;
+            captureRow = row; captureRow.capturing = true; captureReady = false;
             CONFIG::testHarness { testCaptureState = "waiting"; }
             options.disableInput = true;
             MovieClip(options).mouseEnabled = false; MovieClip(options).mouseChildren = false;
             menuStage.focus = null;
-            capturePanel.visible = true;
-            MovieClip(bar).visible = false; pageHint.visible = false; captureConfirm.visible = false;
-            MenuStyle.fit(captureTitle, "CHANGE BINDING: " + row.title);
-            captureValue.text = "PRESS A KEY";
-            captureHint.text = "Press one keyboard key. Escape cancels.\nCurrent binding: " + NumericSetting.text(row, row.value);
-            status.text = "Choose a key, then confirm it to save.";
+            decorate();
+            var clip:MovieClip = options.FindClipForEntry(options.selectedIndex) as MovieClip;
+            clip.addChild(captureBinding);
+            captureBinding.x = 720; captureBinding.y = (MenuStyle.ROW_HEIGHT - captureBinding.height) / 2;
+            Object(captureBinding).SetBinding({aButtonName:[], aPCKeyName:[]});
+            Object(captureBinding).SetState("listening"); captureBinding.visible = true;
+            pageHint.visible = false;
+            status.text = "Press a key. Escape cancels.";
             status.textColor = MenuStyle.MUTED;
             describe();
         }
@@ -508,10 +535,10 @@ package
             CONFIG::testHarness { testCaptureState = state ? state.state : "unavailable"; }
             if (!state || state.state == "cancelled" || state.state == "idle") { finishBinding(true); return; }
             if (state.state == "candidate" || state.state == "confirmed") {
-                captureValue.text = state.name;
-                captureHint.text = state.released ? "Press Enter or choose CONFIRM BINDING to save.\nEscape cancels and keeps your previous binding." : "Release the key before confirming.\nEscape cancels and keeps your previous binding.";
-                if (captureReady != Boolean(state.released)) { captureReady = Boolean(state.released); captureConfirm.visible = captureReady; describe(); }
-                if (state.state == "confirmed") confirmBinding();
+                Object(captureBinding).SetBinding({aButtonName:[], aPCKeyName:[state.name]});
+                if (!captureReady && state.released) {
+                    captureReady = true; describe(); confirmBinding();
+                } else if (state.state == "confirmed") confirmBinding();
             }
         }
         private function confirmBinding():void
@@ -524,12 +551,19 @@ package
         }
         private function focusLost(event:Event):void
         {
+            nativeHotkeys.cancel();
             if (captureRow) finishBinding(true);
+        }
+        public function onNativeBindingCancelled():void
+        {
+            if (nativeHotkeys) nativeHotkeys.cancel();
         }
         private function finishBinding(cancel:Boolean):void
         {
             if (cancel) BGSCodeObj.cancelKeyCapture();
-            captureRow = null; captureReady = false; capturePanel.visible = false;
+            if (captureRow) captureRow.capturing = false;
+            captureRow = null; captureReady = false; captureBinding.visible = false;
+            if (captureBinding.parent) captureBinding.parent.removeChild(captureBinding);
             CONFIG::testHarness { testCaptureState = "idle"; }
             MovieClip(bar).visible = true; pageHint.visible = true;
             MovieClip(options).mouseEnabled = true; MovieClip(options).mouseChildren = true;
@@ -540,6 +574,7 @@ package
         }
         private function decorate():void
         {
+            if (bindingsPage()) { nativeHotkeys.decorate(); return; }
             var needsLayout:Boolean = false;
             for (var i:int = 0; i < options.totalEntryClips; ++i) {
                 var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;
@@ -593,6 +628,7 @@ package
         private function removed(event:Event):void
         {
             if (event.target != this) return;
+            if (nativeHotkeys) nativeHotkeys.dispose();
             if (captureRow) BGSCodeObj.cancelKeyCapture();
             if (menuStage) {
                 menuStage.removeEventListener(Event.RESIZE, resizeBackground);
