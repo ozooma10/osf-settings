@@ -128,14 +128,15 @@ package
             detailDivider.mouseEnabled = false; addChild(detailDivider);
             detailDivider.graphics.lineStyle(1, MenuStyle.LINE);
             detailDivider.graphics.moveTo(1210, 656); detailDivider.graphics.lineTo(MenuStyle.RIGHT, 656);
-            for (var i:int = 0; i < 5; ++i) {
-                var y:Number = 350 + i * 94;
-                chrome.graphics.beginFill(0xC9D4D7); chrome.graphics.moveTo(40, y);
-                chrome.graphics.lineTo(70, y + 30); chrome.graphics.lineTo(70, y + 51);
-                chrome.graphics.lineTo(40, y + 21); chrome.graphics.endFill();
+            // Match SettingsPanel's 40px rail and roughly 47px stripe pitch.
+            for (var i:int = 0; i < 14; ++i) {
+                var y:Number = 274 + i * 47.25;
+                chrome.graphics.beginFill(MenuStyle.WHITE); chrome.graphics.moveTo(60, y);
+                chrome.graphics.lineTo(100, y + 40); chrome.graphics.lineTo(100, y + 62.3);
+                chrome.graphics.lineTo(60, y + 22.3); chrome.graphics.endFill();
             }
             var rail:TextField = label("MOD SETTINGS", 0, 0, 250, 40, 25, 0xD3DDDF, true);
-            rail.rotation = -90; rail.x = 40; rail.y = 268;
+            rail.rotation = -90; rail.x = 60; rail.y = 268;
             breadcrumb = label("", MenuStyle.LEFT, 58, 1240, 35, 23, MenuStyle.MUTED, true);
             heading = label("", MenuStyle.LEFT, 98, 1320, 85, CONFIG::largeText ? 60 : 52, MenuStyle.WHITE, true);
             tabViewport.x = MenuStyle.LEFT; tabViewport.y = 196;
@@ -156,7 +157,7 @@ package
             defaultLabel = label("DEFAULT", 1210, 680, 420, 44, 23, MenuStyle.MUTED, true);
             defaultValue = label("", 1674, 680, 170, 44, 25, MenuStyle.WHITE, true); alignRight(defaultValue);
             issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
-            status = label("Changes apply automatically.", MenuStyle.LEFT, 938, 1180, 52, 21, MenuStyle.MUTED, true);
+            status = label("Changes are saved automatically.", MenuStyle.LEFT, 938, 1180, 52, 21, MenuStyle.MUTED, true);
             var legend:TextField = label("Changed from default", 1450, 938, 394, 36, 21, MenuStyle.MUTED, true);
             changedLegend.mouseEnabled = false; changedLegend.mouseChildren = false;
             addChild(changedLegend); changedLegend.addChild(legend);
@@ -216,7 +217,7 @@ package
         private function nativeBindingsChanged(message:String, refreshRows:Boolean):void
         {
             if (!initialized || closing) return;
-            if (message) Object(definition("Shared.GlobalFunc")).SetText(status, message);
+            if (message) MenuStyle.setText(status, message);
             if (refreshRows) requestedRefresh = true;
             options.disableInput = bindingBusy() || Boolean(captureRow);
             options.disableSelection = bindingBusy();
@@ -311,18 +312,18 @@ package
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             options.disableInput = bindingBusy(); menuStage.focus = options as MovieClip;
-            empty.text = data.length ? "" : issuesPage() ? "No issues reported." : "No settings to display.";
+            MenuStyle.setText(empty, data.length ? "" : issuesPage() ? "No issues reported." : "No settings to display.");
             var title:String = "MOD SETTINGS"; var group:String = "ALL MODS";
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
             MenuStyle.fit(breadcrumb, modID ? "MOD SETTINGS   /   " + title.toUpperCase() : "MOD SETTINGS   /   " + (issuesPage() ? "MOD ISSUES" : "ALL MODS"));
             MenuStyle.fit(heading, title.toUpperCase());
-            section.text = issuesPage() ? "REPORTED ISSUES" : group.toUpperCase();
-            count.text = data.length + (issuesPage() ? data.length == 1 ? " ISSUE" : " ISSUES" : modID ? data.length == 1 ? " SETTING" : " SETTINGS" : data.length == 1 ? " MOD" : " MODS");
+            MenuStyle.setText(section, issuesPage() ? "REPORTED ISSUES" : group.toUpperCase());
+            MenuStyle.setText(count, data.length + (issuesPage() ? data.length == 1 ? " ISSUE" : " ISSUES" : modID ? data.length == 1 ? " SETTING" : " SETTINGS" : data.length == 1 ? " MOD" : " MODS"));
             if (!modID) {
-                status.text = issuesPage() ? "Issues are reported by mods." : "Select a mod to view its settings.";
+                MenuStyle.setText(status, issuesPage() ? "Issues are reported by mods." : "Select a mod to view its settings.");
                 status.textColor = MenuStyle.MUTED;
-            } else if (!preserve) status.text = "Changes apply automatically.";
+            } else if (!preserve) MenuStyle.setText(status, "Changes are saved automatically.");
             refreshing = false; describe(); decorate();
         }
         private function drawTabs():void
@@ -379,14 +380,16 @@ package
             var row:Object = current();
             var reporting:Boolean = issuesPage();
             detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting;
-            detailLabel.text = modID ? "SELECTED SETTING" : "SELECTED MOD";
+            MenuStyle.setText(detailLabel, modID ? "SELECTED SETTING" : "SELECTED MOD");
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
-            detailTitle.text = row ? row.title : "Nothing selected";
+            MenuStyle.setText(detailTitle, row ? row.title : "Nothing selected");
             detailHint.y = 409 + Math.max(68, detailTitle.textHeight + 20);
             detailHint.height = Math.max(64, 630 - detailHint.y);
-            detailHint.text = row ? String(row.hint || "") : ""; detailHint.scrollV = 1;
-            defaultLabel.text = modID ? "DEFAULT" : "SETTINGS";
+            var hint:String = row ? String(row.hint || "") : "";
+            MenuStyle.setText(detailHint, (row && row.requiresRestart ? "Changes take effect after restarting Starfield." + (hint ? "\n\n" : "") : "") + hint);
+            detailHint.scrollV = 1;
+            MenuStyle.setText(defaultLabel, modID ? "DEFAULT" : "SETTINGS");
             defaultValue.x = row && (row.type == "enum" || row.type == "key") ? 1434 : 1674;
             defaultValue.width = row && (row.type == "enum" || row.type == "key") ? 410 : 170;
             MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
@@ -474,7 +477,7 @@ package
                 if (row.type == "key") row.valueName = NumericSetting.text(row, value);
                 row.value = value; describe();
             }
-            status.text = result && result.ok ? "Changes apply automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.";
+            MenuStyle.setText(status, result && result.ok ? "Changes are saved automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.");
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
             requestedRefresh = true;
         }
@@ -586,7 +589,7 @@ package
         private function beginBinding(row:Object):void
         {
             var result:Object = BGSCodeObj.beginKeyCapture(row.mod, row.key);
-            if (!result || !result.ok) { status.text = "Could not start key capture."; return; }
+            if (!result || !result.ok) { MenuStyle.setText(status, "Could not start key capture."); return; }
             captureRow = row; captureRow.capturing = true; captureReady = false;
             CONFIG::testHarness { testCaptureState = "waiting"; }
             options.disableInput = true;
@@ -599,7 +602,7 @@ package
             Object(captureBinding).SetBinding({aButtonName:[], aPCKeyName:[]});
             Object(captureBinding).SetState("listening"); captureBinding.visible = true;
             pageBar.visible = false;
-            status.text = "Press a key. Escape cancels.";
+            MenuStyle.setText(status, "Press a key. Escape cancels.");
             status.textColor = MenuStyle.MUTED;
             describe();
         }
@@ -620,7 +623,7 @@ package
             if (!captureRow || !captureReady) return;
             var result:Object = BGSCodeObj.commitKeyCapture();
             if (result && result.ok) { finishBinding(false); return; }
-            status.text = result && result.error ? result.error : "Could not save this setting. Your previous value is unchanged.";
+            MenuStyle.setText(status, result && result.error ? result.error : "Could not save this setting. Your previous value is unchanged.");
             status.textColor = MenuStyle.ACCENT;
         }
         private function focusLost(event:Event):void
@@ -642,7 +645,7 @@ package
             MovieClip(bar).visible = true;
             MovieClip(options).mouseEnabled = true; MovieClip(options).mouseChildren = true;
             activationFrame = frame;
-            status.text = cancel ? "Binding unchanged." : "Changes apply automatically.";
+            MenuStyle.setText(status, cancel ? "Binding unchanged." : "Changes are saved automatically.");
             status.textColor = MenuStyle.MUTED;
             refresh();
         }

@@ -30,16 +30,23 @@ package
             symbol.removeChild(result);
             var format:TextFormat = new TextFormat(); format.size = size; format.color = color;
             result.defaultTextFormat = format;
-            result.text = text; result.textColor = color;
+            result.textColor = color; setText(result, text);
             result.x = x; result.y = y; result.width = width; result.height = height;
             result.selectable = false; result.mouseEnabled = false; return result;
         }
+        public static function setText(field:TextField, text:String):void
+        {
+            // Apply the requested format to authored text as well as future
+            // text; relying on defaultTextFormat left in-game labels unformatted.
+            var format:TextFormat = field.defaultTextFormat; format.color = field.textColor;
+            field.text = text; field.defaultTextFormat = format; field.setTextFormat(format);
+        }
         public static function fit(field:TextField, text:String):void
         {
-            field.text = text;
+            setText(field, text);
             if (field.textWidth <= field.width - 6) return;
             while (text.length && field.textWidth > field.width - 6) {
-                text = text.substr(0, text.length - 1); field.text = text + "...";
+                text = text.substr(0, text.length - 1); setText(field, text + "...");
             }
         }
         public static function diamond(graphics:Graphics, x:Number, y:Number, color:uint):void

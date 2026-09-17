@@ -37,7 +37,7 @@
       "id": "advanced",
       "label": "Advanced",
       "settings": [
-        { "key": "debug", "type": "bool", "label": "Diagnostic logging", "hint": "Include additional details in the log while troubleshooting a scene.", "default": false }
+        { "key": "debug", "type": "bool", "label": "Diagnostic logging", "hint": "Include additional details in the log while troubleshooting a scene.", "default": false, "requires": "restart" }
       ]
     }
   ]

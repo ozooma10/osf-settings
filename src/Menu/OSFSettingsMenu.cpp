@@ -190,6 +190,7 @@ namespace OSFSettings
                         Text(row, "key", setting.key);
                         Text(row, "title", setting.label);
                         Text(row, "hint", setting.hint);
+                        row.SetMember("requiresRestart", RE::Scaleform::GFx::Value(setting.requiresRestart));
                         if (const auto* definition = std::get_if<BoolDefinition>(&setting.definition)) {
                             Text(row, "type", "bool");
                             row.SetMember("value", RE::Scaleform::GFx::Value(std::get<bool>(value->second)));

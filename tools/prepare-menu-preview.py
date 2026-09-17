@@ -201,6 +201,8 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
         schema = json.loads(path.read_text(encoding="utf-8-sig"))
         for group in schema["groups"]:
             for setting in group["settings"]:
+                if "requires" in setting and setting["requires"] != "restart":
+                    raise ValueError(f'Preview requires must be "restart" when present: {path} / {setting["key"]}')
                 kind, default = setting["type"], setting["default"]
                 attributes = {"type": kind, "value": str(default).lower(), "editable": "true"}
                 if kind == "int" and type(default) is int:
@@ -252,6 +254,7 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
                               modDescription=schema.get("description", ""),
                               group=group["id"], groupTitle=group["label"], key=setting["key"],
                               title=setting["label"], hint=setting.get("hint", ""),
+                              requiresRestart=str(setting.get("requires") == "restart").lower(),
                               **attributes)
                 if kind == "enum":
                     for value, label in zip(options, labels):

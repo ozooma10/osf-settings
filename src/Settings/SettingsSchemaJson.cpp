@@ -154,6 +154,10 @@ namespace OSFSettings::SettingsJson
                     }, setting.definition);
                     setting.label = OptionalText(sourceSetting, "label", setting.key);
                     setting.hint = OptionalText(sourceSetting, "hint");
+                    if (const auto requirement = sourceSetting.find("requires"); requirement != sourceSetting.end()) {
+                        Require(requirement->is_string() && *requirement == "restart", "requires must be \"restart\" when present: " + setting.key);
+                        setting.requiresRestart = true;
+                    }
                     group.settings.push_back(std::move(setting));
                 }
                 mod.groups.push_back(std::move(group));

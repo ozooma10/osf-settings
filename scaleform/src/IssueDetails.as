@@ -62,7 +62,7 @@ package
             var field:TextField = MenuStyle.field("", 0, extent, WIDTH - 18, 40, size, color, label);
             field.multiline = true; field.wordWrap = true;
             var format:TextFormat = field.defaultTextFormat; format.leading = label ? 3 : 8;
-            field.defaultTextFormat = format; field.text = text;
+            field.defaultTextFormat = format; MenuStyle.setText(field, text);
             field.height = field.textHeight + 8; content.addChild(field);
             extent += field.height + after;
         }

@@ -24,6 +24,32 @@ if (settings.Init() && settings.IsReady()) {
 - Values live in `Data/SFSE/Plugins/OSF/Settings/values/<mod>.json`, across save games.
 - The `Client` string overload owns its result in the calling mod and preserves it on error.
 
+## Restart-required settings
+
+Any ordinary setting can declare `"requires": "restart"`:
+
+```json
+{
+  "key": "developerMode",
+  "type": "bool",
+  "label": "Developer mode",
+  "default": false,
+  "requires": "restart"
+}
+```
+
+When selected, its details begin with **Changes take effect after restarting
+Starfield.**, followed by its hint. The notice also appears when the value is
+unchanged or at its default. Omit `requires` for settings without this notice;
+when present, only the exact string `"restart"` is accepted. Other values are
+schema errors. This field applies to ordinary settings, not native hotkey declarations.
+
+This is presentation metadata. Writes still save immediately, reads return the
+saved value, and change notifications run normally. The owning mod decides when
+to apply its settings. Slim does not defer changes or track whether a restart
+is pending. The development design preview includes a restart-required setting
+under **Advanced**.
+
 ## Status
 
 | Status | Meaning |

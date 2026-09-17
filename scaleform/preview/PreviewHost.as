@@ -91,6 +91,7 @@ package
                 rows.push({modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
                     group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
+                    requiresRestart:String(row.@requiresRestart) == "true",
                     type:String(row.@type), editable:String(row.@editable) == "true", allowUnbound:String(row.@allowUnbound) == "true",
                     minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value, options:choices,
                     valueName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",

@@ -104,6 +104,15 @@ int main()
         result = SettingsJson::ParseSchema(changed, error);
         check(result && result->hotkeys[0].group == "first" && result->groups[0].settings.size() == 1,
             "ordinary settings and hotkeys share a group");
+        check(!result->groups[0].settings[0].requiresRestart, "settings omit the restart notice by default");
+        changed["groups"][0]["settings"][0]["requires"] = "restart";
+        result = SettingsJson::ParseSchema(changed, error);
+        check(result && result->groups[0].settings[0].requiresRestart, "restart metadata is retained on an ordinary setting");
+        for (const auto& value : {Json(nullptr), Json(false), Json(1), Json(""), Json("reload"), Json("Restart"), Json::array()}) {
+            auto invalid = changed;
+            invalid["groups"][0]["settings"][0]["requires"] = value;
+            reject(invalid);
+        }
         changed["hotkeys"][1]["group"] = "missing";
         reject(changed);
         check(error == "unknown hotkey group: missing", "unknown group names report the invalid reference");
@@ -129,7 +138,7 @@ int main()
         fs::create_directories(root / "schemas");
         changed = document;
         changed["groups"] = Json::array({{{"id", "general"}, {"settings", Json::array({
-            {{"key", "enabled"}, {"type", "bool"}, {"default", true}}
+            {{"key", "enabled"}, {"type", "bool"}, {"default", true}, {"requires", "restart"}}
         })}}});
         { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
         SettingsStore store;
@@ -138,7 +147,9 @@ int main()
             "normal schema loading retains hotkey declarations");
         check(store.Mods()[0].values.size() == 1 && !store.GetValue("osfsettings", "openMenu"),
             "hotkeys do not create persisted setting values");
-        check(store.Set("osfsettings", "enabled", false).ok, "ordinary settings still save");
+        check(store.Mods()[0].schema.FindSetting("enabled")->requiresRestart &&
+            store.Set("osfsettings", "enabled", false).ok && store.GetValue("osfsettings", "enabled") == SettingValue{false},
+            "restart-required settings still save and publish the new value immediately");
         std::ifstream saved(root / "values/osfsettings.json");
         check(Json::parse(saved)["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey declarations");
         std::cout << checks << '/' << checks << " schema checks passed\n";

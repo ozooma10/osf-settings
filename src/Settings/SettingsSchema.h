@@ -62,6 +62,7 @@ namespace OSFSettings
         std::string key;
         std::string label;
         std::string hint;
+        bool requiresRestart{};
         std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition, KeyDefinition> definition;
 
         SettingValue DefaultValue() const;
