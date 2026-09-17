@@ -1,4 +1,5 @@
 #include "SettingsApi.h"
+#include "Input/HotkeyInputState.h"
 #include "Settings/SettingsService.h"
 
 #include <cstring>
@@ -25,6 +26,8 @@ namespace OSFSettings::API
             return Status::InternalError;
         }
     }
+
+    SettingsApi::SettingsApi(SettingsService& service) : SettingsApi(service, HotkeyInputState::Get()) {}
 
     SettingsApi& SettingsApi::Get()
     {
@@ -117,5 +120,19 @@ namespace OSFSettings::API
     Status SettingsApi::Unsubscribe(Subscription subscription) noexcept
     {
         return ToStatus(m_service.Unsubscribe(subscription));
+    }
+
+    Status SettingsApi::AcquireHotkeyBlock(HotkeyBlock* out) noexcept
+    {
+        if (!out) return Status::InvalidArgument;
+        const auto block = m_input.AcquireBlock();
+        if (!block) return Status::InternalError;
+        *out = block;
+        return Status::Ok;
+    }
+
+    Status SettingsApi::ReleaseHotkeyBlock(HotkeyBlock block) noexcept
+    {
+        return m_input.ReleaseBlock(block) ? Status::Ok : Status::UnknownHotkeyBlock;
     }
 }

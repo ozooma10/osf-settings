@@ -25,7 +25,7 @@ namespace
     class Event final : public RE::ButtonEvent
     {
     public:
-        explicit Event(const char* name) { strUserEvent = name; deviceType = DeviceType::kKeyboard; eventType = EventType::kButton; }
+        explicit Event(const char* name) { strUserEvent = name; idCode = 0x79; deviceType = DeviceType::kKeyboard; eventType = EventType::kButton; }
         const RE::BSFixedString& QUserEvent() const override { return strUserEvent; }
     };
 
@@ -250,6 +250,10 @@ int main()
             settings.heldDownSecs = -1;
             handler->OnButtonEvent(&settings);
             check(messages.empty(), "negative hold sentinel does not activate");
+            settings.value = 1;
+            settings.heldDownSecs = 0;
+            handler->OnButtonEvent(&settings);
+            settings.value = 0;
             settings.heldDownSecs = 0.1F;
             settings.next = &pause;
             handler->OnButtonEvent(&settings);
@@ -257,6 +261,9 @@ int main()
                 settings.status == RE::InputEvent::Status::kStop && settings.next == &pause &&
                 std::string_view(settings.QUserEvent().c_str()) == "osfsettings/openMenu",
                 "release queues Settings show and consumes without changing event identity or linkage");
+            otherMenu.value = 1;
+            otherMenu.heldDownSecs = 0;
+            handler->OnButtonEvent(&otherMenu);
             otherMenu.value = 0;
             otherMenu.heldDownSecs = 1;
             handler->OnButtonEvent(&otherMenu);
@@ -268,9 +275,44 @@ int main()
             check(messages.size() == 2 && pause.status == RE::InputEvent::Status::kUnhandled, "unrecognized actions cannot enqueue or consume");
             queue = nullptr;
             settings.status = RE::InputEvent::Status::kUnhandled;
+            settings.value = 1;
+            settings.heldDownSecs = 0;
+            handler->OnButtonEvent(&settings);
+            settings.value = 0;
+            settings.heldDownSecs = 1;
             handler->OnButtonEvent(&settings);
             check(messages.size() == 2 && settings.status == RE::InputEvent::Status::kUnhandled, "absent queue leaves the release unconsumed");
             queue = &queueStorage;
+
+            const auto button = [&](float value, float held) {
+                settings.value = value;
+                settings.heldDownSecs = held;
+                settings.status = RE::InputEvent::Status::kUnhandled;
+                if (handler->ShouldHandleEvent(&settings)) handler->OnButtonEvent(&settings);
+            };
+            auto& input = HotkeyInputState::Get();
+            button(1, 0);
+            const auto block = input.AcquireBlock();
+            check(handler->ShouldHandleEvent(&settings), "blocked edges still reach native held-action bookkeeping");
+            button(0, 1);
+            button(1, 0);
+            button(1, 1);
+            button(0, 1);
+            check(messages.size() == 2 && settings.status == RE::InputEvent::Status::kUnhandled,
+                "blocked typing does not enqueue or stop game events");
+            input.ReleaseBlock(block);
+            button(1, 1);
+            button(0, 1);
+            check(messages.size() == 2, "repeat and release after capture do not replay blocked input");
+            button(1, 0);
+            const auto briefBlock = input.AcquireBlock();
+            input.ReleaseBlock(briefBlock);
+            button(0, 1);
+            check(messages.size() == 2, "a block between edges cancels an already held menu opener");
+            button(1, 0);
+            button(0, 1);
+            check(messages.size() == 3 && settings.status == RE::InputEvent::Status::kStop,
+                "a fresh press after focus restoration opens the menu normally");
         }
         events.clear();
         HotkeyInput::Attach(&controls);

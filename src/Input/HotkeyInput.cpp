@@ -1,4 +1,5 @@
 #include "HotkeyInput.h"
+#include "HotkeyInputState.h"
 #include "NativeHotkeys.h"
 #include "NativeBindingEditor.h"
 #include "harness/TestHarness.h"
@@ -36,10 +37,12 @@ namespace OSFSettings::HotkeyInput
             void OnButtonEvent(const RE::ButtonEvent* button) override
             {
                 TestHarness::ObserveInput(button, true);
-                if (button->value != 0 || button->heldDownSecs < 0) return;
                 const auto menu = NativeHotkeys::GetMenu(button->QUserEvent().c_str());
+                if (menu.empty() || !HotkeyInputState::Get().ProcessButton(static_cast<std::uint32_t>(button->idCode), button->QUserEvent().c_str(), button->value, button->heldDownSecs)) {
+                    return;
+                }
                 auto* queue = RE::UIMessageQueue::GetSingleton();
-                if (menu.empty() || !queue) return;
+                if (!queue) return;
                 queue->AddMessage(RE::BSFixedString(menu), RE::UI_MESSAGE_TYPE::kShow);
                 //Stop further processing of this button event
                 const_cast<RE::ButtonEvent*>(button)->status = RE::InputEvent::Status::kStop;

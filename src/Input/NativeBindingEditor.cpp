@@ -1,4 +1,5 @@
 #include "NativeBindingEditor.h"
+#include "HotkeyInputState.h"
 #include "RE/C/ControlMap.h"
 #include "RE/S/SettingsDataModel.h"
 #include "REL/THook.h"
@@ -53,8 +54,14 @@ namespace OSFSettings
         std::lock_guard lock(m_mutex);
         if (m_input || !g_validateHook || !g_validateHook->GetEnabled()) return false;
         m_input = RE::SettingsDataModel::GetSingleton();
-        s_active = m_input != nullptr;
-        return m_input != nullptr;
+        if (!m_input) return false;
+        m_hotkeyBlock = HotkeyInputState::Get().AcquireBlock();
+        if (!m_hotkeyBlock) {
+            m_input = nullptr;
+            return false;
+        }
+        s_active = true;
+        return true;
     }
 
     NativeBindingEditor::InputResult NativeBindingEditor::ProcessInput(const RE::InputEvent* event)
@@ -91,5 +98,7 @@ namespace OSFSettings
         }
         m_input = nullptr;
         s_active = false;
+        HotkeyInputState::Get().ReleaseBlock(m_hotkeyBlock);
+        m_hotkeyBlock = 0;
     }
 }

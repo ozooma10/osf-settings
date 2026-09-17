@@ -38,6 +38,7 @@ if (settings.Init() && settings.IsReady()) {
 | `BufferTooSmall` | Enum buffer needs `required` bytes; the string overload handles this. |
 | `SaveFailed` | Could not save; previous value is unchanged. |
 | `UnknownSubscription` | Subscription token not found. |
+| `UnknownHotkeyBlock` | Block token is zero, unknown, or already released. |
 | `InternalError` | Internal limit reached or unexpected internal status. |
 
 ## Native hotkey declarations
@@ -140,6 +141,64 @@ See [inline binding editor](NATIVE-BINDING-EDITOR.md) for the checkpoint's scope
 and pending in-game checks. The required `groups` array may be
 empty for a hotkey-only schema. Declarations are read once at startup; changes
 require restarting the game.
+
+## Blocking hotkeys for focused views
+
+Use `AcquireHotkeyBlock(&token)` before granting a web view or other input owner
+focus, and `ReleaseHotkeyBlock(token)` after ending capture. These calls are
+thread-safe and need no settings schema or settings readiness. Initialize the
+SDK client at `kPostPostLoad` as usual. Acquisition returns `Ok` and a nonzero
+token; a failed call preserves the output. Keep one token per capture lifetime
+and release it on close, cancellation, failed opening, or teardown.
+
+```cpp
+OSFSettings::API::HotkeyBlock block{};
+// Before granting capture; refuse capture if acquisition fails.
+auto status = settings.AcquireHotkeyBlock(&block);
+// After revoking capture, including error/cleanup paths:
+if (status == OSFSettings::API::Status::Ok) {
+    settings.ReleaseHotkeyBlock(block);
+    block = 0;
+}
+```
+
+Each acquisition is independent, including repeated acquisitions by one caller.
+Releasing one token leaves all other blocks active. Blocks affect only menu
+hotkeys dispatched by OSF Settings; they do not disable Starfield controls,
+consume keyboard events, close menus, or stop another mod's input handler.
+Declarations handled directly by another mod need that mod's own focus policy.
+The native binding editor holds its own token while capturing a binding.
+
+Acquisition discards pending presses. External blocks leave button edges
+available to native held-action bookkeeping, but OSF does not arm or dispatch
+menu opens. Native context and binding-editor filters still apply.
+After the last token is released, activation requires a fresh down and matching
+release for the same physical key and action. Repeats and releases from keys
+held before or during capture cannot reopen a menu. A release already admitted
+before acquisition may finish enqueueing; a block cannot retract a show message
+already submitted to the engine. The existing native admission rules still apply.
+
+### OSF UI integration checkpoint
+
+Source inspection of OSF UI's current focus menu found no blocking menu flags
+or pushed input contexts; its receiver stops gamepad events only, and its
+control layer leaves the `0x08` mask used by Slim's menu actions enabled.
+Its window-message capture therefore does not establish native hotkey exclusion.
+The block API supplies explicit coordination without altering shared control masks.
+
+OSF UI still uses its older Settings ABI. When porting `OSFSettingsClient`, replace
+its suppression calls with these methods and retain the token until capture is
+revoked. Handle acquisition failure before allowing capture and balance cleanup
+on view closure, failed reveal, browser-host failure, and focus teardown. Passive
+HUDs do not need a block. Public hotkey callbacks and the rest of the adapter
+port remain separate work.
+
+Host checks cover nested/concurrent owners, typing during a block, held releases,
+capture cancellation, native handler enqueueing, and shared API/input state.
+They do not establish native focus or engine dispatch behavior in a running game.
+After the UI adapter port, use `SettingsSmoke` in the OSF Test Harness to check
+capturing versus passive views, close before key release, failed opening/host
+recovery, and focus loss/restoration. Fresh hotkey presses must work after cleanup.
 
 ## Subscriptions
 

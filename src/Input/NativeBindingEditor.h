@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 
 namespace OSFSettings
@@ -20,5 +21,6 @@ namespace OSFSettings
         inline static std::atomic_bool s_active{};
         std::mutex m_mutex;
         RE::BSInputEventSingleUser* m_input{};
+        std::uint64_t m_hotkeyBlock{};
     };
 }

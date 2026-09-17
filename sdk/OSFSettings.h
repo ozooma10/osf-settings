@@ -32,10 +32,12 @@ namespace OSFSettings::API
         BufferTooSmall = 7,
         SaveFailed = 8,
         UnknownSubscription = 9,
-        InternalError = 10
+        InternalError = 10,
+        UnknownHotkeyBlock = 11
     };
 
     using Subscription = std::uint64_t; // Zero is never a valid subscription.
+    using HotkeyBlock = std::uint64_t; // Each owner releases its own nonzero token.
 
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
     // Callbacks run serially from an SFSE task; no main-thread guarantee.
@@ -73,6 +75,10 @@ namespace OSFSettings::API
         // Keys are a distinct setting type; failed reads preserve *out.
         virtual Status GetKey(const char* mod, const char* key, std::uint32_t* out) noexcept = 0;
         virtual Status SetKey(const char* mod, const char* key, std::uint32_t value) noexcept = 0;
+
+        // Blocks OSF-dispatched hotkeys; All blocks must be released before new presses can activate.
+        virtual Status AcquireHotkeyBlock(HotkeyBlock* out) noexcept = 0;
+        virtual Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept = 0;
 
     protected:
         ~ISettings() = default;
@@ -188,6 +194,15 @@ namespace OSFSettings::API
         Status Unsubscribe(Subscription subscription) const noexcept
         {
             return m_api ? m_api->Unsubscribe(subscription) : Status::NotReady;
+        }
+
+        Status AcquireHotkeyBlock(HotkeyBlock* out) const noexcept
+        {
+            return m_api ? m_api->AcquireHotkeyBlock(out) : Status::NotReady;
+        }
+        Status ReleaseHotkeyBlock(HotkeyBlock block) const noexcept
+        {
+            return m_api ? m_api->ReleaseHotkeyBlock(block) : Status::NotReady;
         }
 
     private:

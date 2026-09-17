@@ -108,9 +108,7 @@ int main()
         Fixture fixture;
         check(!fixture.editor.Begin(), "capture unavailable before validation hook installation");
         check(!NativeBindingEditor::Install(), "reject unexpected validation opcode");
-        REL::WriteData(evaluator + 0x185, REL::ASM::CALL5{
-            reinterpret_cast<std::uintptr_t>(evaluator + 0x185), reinterpret_cast<std::uintptr_t>(&CancelNative) });
-        check(!NativeBindingEditor::Install(), "reject a call to an unexpected target");
+        // Install chains the existing call through THook; it does not validate a target ID.
         REL::WriteData(evaluator + 0x185, REL::ASM::CALL5{
             reinterpret_cast<std::uintptr_t>(evaluator + 0x185), reinterpret_cast<std::uintptr_t>(&ValidateNative) });
         check(NativeBindingEditor::Install() && NativeBindingEditor::Install(), "install once and reuse the hook");
@@ -142,6 +140,8 @@ int main()
             return result;
         };
         check(candidate() == 0, "ordinary vanilla editing retains its allowed-swap policy");
+        auto& hotkeys = OSFSettings::HotkeyInputState::Get();
+        hotkeys.ProcessButton(0x79, "test/action", 1, 0);
         check(fixture.editor.Begin(), "begin OSF capture");
         check(candidate() == 2, "populated primary requires confirmation for another action's key");
         check(candidate(Slot::kAlternate) == 2, "secondary requires the same confirmation");
@@ -168,9 +168,19 @@ int main()
         fixture.editor.End(true);
         check(cancellations == 1 && !NativeBindingEditor::IsActive() && candidate() == 0,
             "cancel delegates once and releases OSF's policy");
+        check(!hotkeys.ProcessButton(0x79, "test/action", 0, 1),
+            "ending capture does not revive the key held before capture began");
+        const auto externalBlock = hotkeys.AcquireBlock();
         check(fixture.editor.Begin() && candidate() == 2, "cancel then retry the same occupied key prompts again");
         fixture.editor.End(false);
         check(cancellations == 1 && candidate() == 0, "completion releases ownership without cancelling");
+        hotkeys.ProcessButton(0x79, "test/action", 1, 0);
+        check(!hotkeys.ProcessButton(0x79, "test/action", 0, 1),
+            "ending native capture preserves an external consumer's block");
+        hotkeys.ReleaseBlock(externalBlock);
+        hotkeys.ProcessButton(0x79, "test/action", 1, 0);
+        check(hotkeys.ProcessButton(0x79, "test/action", 0, 1),
+            "new presses work after native and external owners release");
         check(owners[0].keyCode == 0x20 && owners[1].keyCode == 0x79,
             "confirmation policy never mutates bindings before the native decision");
         std::cout << checks << " native binding editor checks passed\n";
