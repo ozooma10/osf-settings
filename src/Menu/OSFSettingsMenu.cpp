@@ -162,23 +162,6 @@ namespace OSFSettings
         case Function::GetRows:
             root->CreateArray(params.ret);
             for (const auto& mod : runtime.Settings()) {
-                for (const auto& hotkey : mod.schema.hotkeys) {
-                    RE::Scaleform::GFx::Value row;
-                    root->CreateObject(&row);
-                    Text(row, "mod", mod.schema.id);
-                    Text(row, "modTitle", mod.schema.title);
-                    Text(row, "modDescription", mod.schema.description);
-                    Text(row, "group", "@hotkeys");
-                    Text(row, "groupTitle", "Hotkeys");
-                    Text(row, "key", hotkey.id);
-                    Text(row, "action", mod.schema.id + "/" + hotkey.id);
-                    Text(row, "title", hotkey.label);
-                    Text(row, "type", "hotkey");
-                    Text(row, "hint", "Select a binding to change it. Escape cancels.");
-                    Text(row, "defaultName", hotkey.defaultKey.value_or("Unbound"));
-                    // Current bindings arrive through vanilla ControlBindingsData in the movie.
-                    params.ret->PushBack(row);
-                }
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& setting : group.settings) {
                         const auto value = mod.values.find(setting.key);
@@ -250,6 +233,24 @@ namespace OSFSettings
                             }
                             row.SetMember("options", options);
                         }
+                        params.ret->PushBack(row);
+                    }
+                    for (const auto& hotkey : mod.schema.hotkeys) {
+                        if (hotkey.group != group.id) continue;
+                        RE::Scaleform::GFx::Value row;
+                        root->CreateObject(&row);
+                        Text(row, "mod", mod.schema.id);
+                        Text(row, "modTitle", mod.schema.title);
+                        Text(row, "modDescription", mod.schema.description);
+                        Text(row, "group", group.id);
+                        Text(row, "groupTitle", group.label);
+                        Text(row, "key", hotkey.id);
+                        Text(row, "action", mod.schema.id + "/" + hotkey.id);
+                        Text(row, "title", hotkey.label);
+                        Text(row, "type", "hotkey");
+                        Text(row, "hint", "Select a binding to change it. Escape cancels.");
+                        Text(row, "defaultName", hotkey.defaultKey.value_or("Unbound"));
+                        // Current bindings arrive through vanilla ControlBindingsData in the movie.
                         params.ret->PushBack(row);
                     }
                 }

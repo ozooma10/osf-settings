@@ -1,10 +1,17 @@
 # Inline native bindings
 
-Hotkey declarations are shown in a mod's Hotkeys section using `ControlsList`
-and `Shared.Components.SystemPanels.SettingsControlListEntry` from the imported
-`SettingsPanel.swf` / `SettingsPanel_LRG.swf`. The authored `Binding` cells retain
-their selected/listening states. Schema labels replace the stock translation-key
-text. `RemapConfirmation` supplies vanilla's occupied-binding confirmation.
+Hotkeys share the mod's settings groups. The optional declaration `group` selects
+a declared group; omission appends to the first group, or an implicit General
+group when no groups are declared. Unknown explicit groups are schema errors.
+
+The shared `SettingsOptionList` owns selection and scrolling for all rows.
+`NativeHotkeysList` embeds `Shared.Components.SystemPanels.SettingsControlListEntry`
+from the imported `SettingsPanel.swf` / `SettingsPanel_LRG.swf` in each visible
+hotkey row. The outer settings row draws the schema label and background; the
+authored `Binding` cells retain their selected/listening states and native remap
+events. Left/Right changes the selected binding slot when secondary bindings are
+enabled. `RemapConfirmation` supplies vanilla's occupied-binding confirmation.
+Mixed-group layout, scrolling and input still need fresh in-game acceptance.
 
 The movie subscribes to `ControlBindingsData`, filters MainGameplay rows by the
 declared action name, and retains native main/alternate binding data. It opens

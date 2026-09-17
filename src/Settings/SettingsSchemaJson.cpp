@@ -179,8 +179,17 @@ namespace OSFSettings::SettingsJson
                         hotkey.menu = RequiredText(source, "menu");
                         Require(hotkey.menu->find('\0') == std::string::npos, "hotkey menu must not contain NUL");
                     }
+                    if (source.contains("group")) {
+                        hotkey.group = RequiredText(source, "group");
+                        Require(groupIds.contains(hotkey.group), "unknown hotkey group: " + hotkey.group);
+                    } else {
+                        hotkey.group = mod.groups.empty() ? "general" : mod.groups.front().id;
+                    }
                     mod.hotkeys.push_back(std::move(hotkey));
                 }
+            }
+            if (mod.groups.empty() && !mod.hotkeys.empty()) {
+                mod.groups.push_back({ "general", "General", {} });
             }
             return mod;
         } catch (const std::exception& exception) {

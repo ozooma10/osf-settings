@@ -42,6 +42,9 @@ int main()
         check(action.id == "openMenu" && action.label == "Open mod settings" && action.defaultKey == "F10" && action.menu == "OSFSettingsMenu",
             "identity, label, default name and registered menu target are preserved");
         check(!parsed->FindSetting("openMenu"), "hotkeys are separate from ordinary setting definitions");
+        check(parsed->groups.size() == 1 && parsed->groups[0].id == "general" &&
+            parsed->groups[0].label == "General" && parsed->groups[0].settings.empty() && action.group == "general",
+            "hotkey-only schemas use an implicit General group");
 
         auto changed = document;
         changed["hotkeys"][0].erase("menu");
@@ -53,7 +56,7 @@ int main()
         check(result && !result->hotkeys[0].defaultKey, "omitting the default declares an unbound action");
         changed["hotkeys"] = Json::array();
         result = SettingsJson::ParseSchema(changed, error);
-        check(result && result->hotkeys.empty(), "an empty hotkey list is allowed");
+        check(result && result->hotkeys.empty() && result->groups.empty(), "an empty hotkey list adds no implicit group");
         changed.erase("hotkeys");
         result = SettingsJson::ParseSchema(changed, error);
         check(result && result->hotkeys.empty(), "existing schemas need no hotkeys field");
@@ -66,7 +69,7 @@ int main()
             changed = document; changed["hotkeys"][0] = value;
             if (!value.is_object()) reject(changed);
         }
-        for (const auto* field : {"id", "label", "default", "menu"}) {
+        for (const auto* field : {"id", "label", "default", "menu", "group"}) {
             for (const auto& value : {Json(nullptr), Json(10), Json(false), Json(""), Json(std::string("a\0b", 3))}) {
                 changed = document; changed["hotkeys"][0][field] = value; reject(changed);
             }
@@ -87,6 +90,29 @@ int main()
         result = SettingsJson::ParseSchema(changed, error);
         check(result && result->hotkeys.size() == 2 && !result->hotkeys[1].defaultKey && error.empty(),
             "distinct actions retain order and clear a previous parse error");
+
+        changed["groups"] = Json::array({
+            {{"id", "first"}, {"label", "First page"}, {"settings", Json::array()}},
+            {{"id", "second"}, {"settings", Json::array()}}
+        });
+        changed["hotkeys"][1]["group"] = "second";
+        result = SettingsJson::ParseSchema(changed, error);
+        check(result && result->groups.size() == 2 && result->groups[0].id == "first" &&
+            result->hotkeys[0].group == "first" && result->hotkeys[1].group == "second",
+            "omitted groups use the first declared group, while explicit groups retain their target");
+        changed["groups"][0]["settings"] = Json::array({{{"key", "enabled"}, {"type", "bool"}, {"default", true}}});
+        result = SettingsJson::ParseSchema(changed, error);
+        check(result && result->hotkeys[0].group == "first" && result->groups[0].settings.size() == 1,
+            "ordinary settings and hotkeys share a group");
+        changed["hotkeys"][1]["group"] = "missing";
+        reject(changed);
+        check(error == "unknown hotkey group: missing", "unknown group names report the invalid reference");
+        changed["hotkeys"][1]["group"] = "Second";
+        reject(changed);
+        changed = document;
+        changed["hotkeys"][0]["group"] = "general";
+        reject(changed);
+        check(error == "unknown hotkey group: general", "explicit groups must reference a declared group");
 
         const auto root = fs::temp_directory_path() /
             ("osf-hotkey-schema-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));

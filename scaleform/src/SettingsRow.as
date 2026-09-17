@@ -23,14 +23,14 @@ package
         }
         public function update(row:Object, selected:Boolean, modList:Boolean):void
         {
-            var changed:Boolean = !modList && row.value != row.defaultValue;
+            var changed:Boolean = !modList && row.type != "hotkey" && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
-            var choice:Boolean = !modList && (row.type == "enum" || row.type == "key");
+            var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey");
             var displayValue:String = modList ? String(row.count) : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
             var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing].join("|");
             if (signature == previous) return;
             previous = signature;
-            value.visible = !row.capturing;
+            value.visible = !row.capturing && row.type != "hotkey";
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
             graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.ROW_HEIGHT); graphics.endFill();

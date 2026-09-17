@@ -64,6 +64,20 @@ setting values. A declaration becomes a native MainGameplay action named
 at the start of vanilla's defaults before its parser runs, including on control
 reset. The original caller continues loading saved overrides and resolving links.
 
+Hotkeys appear alongside ordinary settings in the mod's groups. An optional
+`group` field names an existing group ID (case-sensitive):
+
+```json
+{ "id": "openMenu", "label": "Open mod settings", "default": "F10", "menu": "OSFSettingsMenu", "group": "general" }
+```
+
+Omitting `group` appends the hotkey after the first declared group's settings.
+Explicitly assigned hotkeys are appended after their target group's settings;
+hotkeys within a group retain declaration order. If `groups` is empty, unassigned
+hotkeys use an implicit **General** group. An explicit `group` must be a nonempty
+string referring to a declared group; unknown IDs are schema errors. Group
+placement does not change the native action name or binding persistence.
+
 An optional `menu` field names a **registered native menu**, not a SWF filename:
 
 ```json
@@ -121,8 +135,8 @@ for the static dispatch and queue evidence. Live focus, loading, key capture and
 transition behavior still need an in-game check; this path promises generic
 show requests, not exact Pause eligibility.
 
-The OSF menu's Hotkeys section uses vanilla Controls rows and native remapping
-and persistence. It displays the schema `label`; translating that label in the
+The OSF menu embeds vanilla binding rows in its shared settings list and uses
+native remapping and persistence. It displays the schema `label`; translating that label in the
 game's own Controls panel and public hotkey callbacks remain separate work.
 See [inline binding editor](NATIVE-BINDING-EDITOR.md) for the checkpoint's scope
 and pending in-game checks. The required `groups` array may be

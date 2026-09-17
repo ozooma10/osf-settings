@@ -54,6 +54,7 @@ namespace OSFSettings
         std::string label;
         std::optional<std::string> defaultKey; // Native key name; omitted means unbound.
         std::optional<std::string> menu; // Registered native menu name to show on release.
+        std::string group; // Resolved display group; omitted declarations use the first group.
     };
 
     struct SettingDefinition

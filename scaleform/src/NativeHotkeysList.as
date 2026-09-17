@@ -1,14 +1,19 @@
 package
 {
     import flash.display.DisplayObject;
+    import flash.display.MovieClip;
     import flash.events.Event;
+    import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.geom.Rectangle;
+    import flash.utils.Dictionary;
 
-    // The authored ControlsList, its rows and conflict popup come from SettingsPanel.swf.
+    // Adapts vanilla binding rows to the same scrolling list as ordinary settings.
     public final class NativeHotkeysList
     {
-        public var list:Object;
+        private var list:Object;
+        private var create:Function;
+        private var views:Dictionary = new Dictionary(true);
         public var popup:Object;
         public var busy:Boolean = false;
         public var saving:Boolean = false;
@@ -24,16 +29,11 @@ package
         private var openRequested:Boolean = false;
         private var showAlternate:Boolean = false;
 
-        public function NativeHotkeysList(create:Function, definition:Function, code:Object, notify:Function)
+        public function NativeHotkeysList(sharedList:Object, factory:Function, definition:Function, code:Object, notify:Function)
         {
-            bridge = code; changed = notify;
+            list = sharedList; create = factory; bridge = code; changed = notify;
             dataManager = definition("Shared.AS3.Data.BSUIDataManager");
             global = definition("Shared.GlobalFunc");
-            list = create("ControlsList");
-            // ControlsList's first child is its authored timeline mask, separate from Border_mc.
-            var viewport:DisplayObject = list.getChildAt(0) as DisplayObject;
-            viewport.x = 0; viewport.y = 0;
-            viewport.width = MenuStyle.LIST_WIDTH; viewport.height = MenuStyle.LIST_HEIGHT;
             popup = create("RemapConfirmation");
             popup.PopulateButtonBar(1, 38); popup.active = false;
             dataManager.Subscribe("ControlBindingsData", bindingsChanged);
@@ -41,7 +41,8 @@ package
             dataManager.Subscribe("RemapConfirmationData", confirmationChanged);
             dataManager.Subscribe("FireForgetEventData", saved);
             dataManager.addEventListener("SettingsPanel_RemapConfirmed", remapConfirmed);
-            list.addEventListener(MouseEvent.CLICK, beforeBindingClick, true, 100);
+            for each (var type:String in [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL])
+                list.addEventListener(type, blockMouse, true, 100);
         }
 
         public function open():void
@@ -53,11 +54,11 @@ package
             dataManager.dispatchCustomEvent("SettingsPanel_OpenCategory", {categoryID:4});
         }
 
-        public function populate(rows:Array, labels:Array):void
+        public function populate(rows:Array):void
         {
-            definitions = labels;
-            var data:Array = [];
+            definitions = rows;
             for each (var row:Object in rows) {
+                if (row.type != "hotkey") continue;
                 var native:Object = null;
                 for each (var entry:Object in entries) {
                     if (!entry.bIsDivider && entry.uContextID == 0 && entry.sInputName == row.action) {
@@ -69,50 +70,80 @@ package
                 row.alternate = native ? native.AltBinding.aPCKeyName.join(" + ") : "";
                 if (!native) row.hint = "This action is not available in the current native Controls list.";
                 if (native) {
-                    // Keep the data model's slot/glyph data intact; attach OSF presentation metadata.
+                    // Keep the data model's slot/glyph data intact.
                     var item:Object = {};
                     for (var key:String in native) item[key] = native[key];
-                    item.row = row; data.push(item);
+                    row.binding = item;
                 } else {
-                    data.push({row:row, sInputName:row.action, uContextID:0, sContextName:"MainGameplay",
+                    row.binding = {sInputName:row.action, uContextID:0, sContextName:"MainGameplay",
                         bReadOnly:true, bIsDivider:false, bRequired:false, bGamepadEntry:false,
-                        MainBinding:{aButtonName:[], aPCKeyName:[]}, AltBinding:{aButtonName:[], aPCKeyName:[]}});
+                        MainBinding:{aButtonName:[], aPCKeyName:[]}, AltBinding:{aButtonName:[], aPCKeyName:[]}};
                 }
             }
-            list.InitializeEntries(data);
-            list.EnableAltBindings(showAlternate);
         }
 
-        public function decorate():void
+        public function decorate(host:MovieClip, row:Object, selected:Boolean):DisplayObject
         {
-            for (var i:int = 0; i < list.totalEntryClips; ++i) {
-                var clip:Object = list.GetClipByIndex(i);
-                if (!clip || clip.itemIndex < 0) continue;
-                var item:Object = list.GetDataForEntry(clip.itemIndex);
-                if (!item) continue;
-                // Vanilla builds translation keys from the action ID; OSF schemas supply the label.
-                global.SetText(clip.Text_mc.textField, item.row.title);
-                clip.AltBinding_mc.visible = showAlternate;
-                // Measure authored cell bounds so normal and large-text variants fit the viewport.
-                var right:Number = MenuStyle.LIST_WIDTH - clip.x - 24;
-                var bounds:Rectangle;
-                if (showAlternate) {
-                    bounds = clip.AltBinding_mc.getBounds(clip);
-                    clip.AltBinding_mc.x += right - bounds.right;
-                    right -= bounds.width + 24;
-                }
-                bounds = clip.MainBinding_mc.getBounds(clip);
-                clip.MainBinding_mc.x += right - bounds.right;
-                clip.Text_mc.scaleX = 1;
-                clip.Text_mc.textField.width = Math.max(0, right - bounds.width - 24 - clip.Text_mc.x - clip.Text_mc.textField.x);
-                clip.Border_mc.width = MenuStyle.LIST_WIDTH;
-                clip.Fill_mc.width = MenuStyle.LIST_WIDTH;
+            var view:Object = views[host];
+            if (row.type != "hotkey") {
+                if (view) { view.clip.ClearActiveBinding(); view.row = null; }
+                return null;
             }
+            if (!view) {
+                var native:Object = create("Shared.Components.SystemPanels.SettingsControlListEntry");
+                native.mouseEnabled = false;
+                native.addEventListener(MouseEvent.CLICK, beforeBindingClick, true, 100);
+                host.addChild(native as MovieClip);
+                view = {clip:native, row:null}; views[host] = view;
+            }
+            var clip:Object = view.clip;
+            if (view.row != row) {
+                if (!view.row || view.row.action != row.action) clip.ClearActiveBinding();
+                clip.SetEntryText(row.binding); view.row = row;
+            }
+            clip.itemIndex = Object(host).itemIndex;
+            if (!busy) {
+                if (selected) {
+                    if (!clip.selected) clip.onRollover();
+                    if (clip.activePriority == 2 || !showAlternate) clip.SetActiveBinding(0);
+                } else if (clip.selected || clip.activePriority != 2) clip.onRollout();
+            }
+            // The outer SettingsRow supplies the label, background and row hit area.
+            for (var i:int = 0; i < clip.numChildren; ++i) {
+                var child:DisplayObject = clip.getChildAt(i);
+                child.visible = child == clip.MainBinding_mc || showAlternate && child == clip.AltBinding_mc;
+            }
+            var right:Number = MenuStyle.LIST_WIDTH - 24;
+            for each (var cell:Object in showAlternate ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
+                cell.scaleX = cell.scaleY = 1;
+                var bounds:Rectangle = cell.getBounds(clip);
+                cell.scaleX = cell.scaleY = Math.min(1, 224 / bounds.width, (MenuStyle.ROW_HEIGHT - 12) / bounds.height);
+                bounds = cell.getBounds(clip);
+                cell.x += right - bounds.right;
+                cell.y += (MenuStyle.ROW_HEIGHT - bounds.height) / 2 - bounds.top;
+                right -= bounds.width + 24;
+            }
+            return clip as DisplayObject;
+        }
+
+        private function get currentClip():Object
+        {
+            var host:Object = list.FindClipForEntry(list.selectedIndex);
+            var view:Object = host ? views[host] : null;
+            return view && list.selectedEntry && view.row == list.selectedEntry.row ? view.clip : null;
+        }
+
+        public function navigate(event:KeyboardEvent):void
+        {
+            var clip:Object = currentClip;
+            if (!clip || busy || saving || !showAlternate) return;
+            if (clip.activePriority == 2) clip.SetActiveBinding(0);
+            else clip.onKeyDownHandler(event);
         }
 
         private function begin():Boolean
         {
-            if (busy || saving || !list.selectedEntry || !list.selectedEntry.row.editable) return false;
+            if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
             if (!bridge.beginNativeBinding()) { changed("Could not start key capture.", false); return false; }
             busy = true; seenRemapping = false; cancelled = false;
             list.disableInput = true; list.disableSelection = true;
@@ -120,11 +151,23 @@ package
             return true;
         }
 
+        private function blockMouse(event:MouseEvent):void
+        {
+            // Freeze the shared list, including vanilla child controls and slot hover,
+            // without changing the active cell's listening state during capture.
+            if (busy || saving) { event.stopImmediatePropagation(); event.preventDefault(); }
+        }
+
         private function beforeBindingClick(event:MouseEvent):void
         {
             var target:DisplayObject = event.target as DisplayObject;
             while (target && target != list) {
                 if (target.name == "MainBinding_mc" || target.name == "AltBinding_mc") {
+                    var clip:Object = event.currentTarget;
+                    // Select the clicked slot even if no rollover preceded the click.
+                    list.selectedIndex = clip.itemIndex;
+                    if (busy || saving) { event.stopImmediatePropagation(); return; }
+                    clip.SetActiveBinding(target.name == "AltBinding_mc" ? 1 : 0);
                     if (!begin()) event.stopImmediatePropagation();
                     return;
                 }
@@ -135,16 +178,16 @@ package
         public function press():void
         {
             if (!begin()) return;
-            var clip:Object = list.GetClipByIndex(list.selectedClipIndex);
+            var clip:Object = currentClip;
             if (clip.activePriority == 2) clip.SetActiveBinding(0);
             clip.onEntryPressed();
         }
 
         public function get canClear():Boolean
         {
-            if (busy || saving || !list.selectedEntry || !list.selectedEntry.row.editable) return false;
-            var binding:Object = list.activePriority == 0 ? list.selectedEntry.MainBinding :
-                list.activePriority == 1 ? list.selectedEntry.AltBinding : null;
+            if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
+            var binding:Object = currentClip.activePriority == 0 ? list.selectedEntry.row.binding.MainBinding :
+                currentClip.activePriority == 1 ? list.selectedEntry.row.binding.AltBinding : null;
             return Boolean(binding && (binding.aPCKeyName.length || binding.aButtonName.length));
         }
 
@@ -156,8 +199,8 @@ package
             // The native operation accepts either priority; the stock row's delete
             // method restricts it to alternate bindings before dispatching this event.
             dataManager.dispatchCustomEvent("SettingsPanel_ClearBinding", {
-                name:list.selectedEntry.sInputName, keyPriority:list.activePriority,
-                contextID:list.selectedEntry.uContextID
+                name:list.selectedEntry.row.binding.sInputName, keyPriority:currentClip.activePriority,
+                contextID:list.selectedEntry.row.binding.uContextID
             });
         }
 
@@ -174,7 +217,7 @@ package
         {
             busy = false; seenRemapping = false;
             popup.active = false;
-            list.ClearEntryListenState();
+            if (currentClip) currentClip.ClearListenState();
             list.disableInput = false; list.disableSelection = false;
             bridge.endNativeBinding(false);
         }
@@ -246,7 +289,9 @@ package
             dataManager.Unsubscribe("RemapConfirmationData", confirmationChanged);
             dataManager.Unsubscribe("FireForgetEventData", saved);
             dataManager.removeEventListener("SettingsPanel_RemapConfirmed", remapConfirmed);
-            list.removeEventListener(MouseEvent.CLICK, beforeBindingClick, true);
+            for each (var type:String in [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL])
+                list.removeEventListener(type, blockMouse, true);
+            for each (var view:Object in views) view.clip.removeEventListener(MouseEvent.CLICK, beforeBindingClick, true);
         }
     }
 }

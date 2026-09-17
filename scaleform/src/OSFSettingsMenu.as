@@ -34,7 +34,6 @@ package
         private var modID:String = "";
         private var groupID:String = "";
         private var options:Object;
-        private var settingsOptions:Object;
         private var nativeHotkeys:NativeHotkeysList;
         private var types:Class;
         private var bar:Object;
@@ -134,7 +133,6 @@ package
             section = label("", MenuStyle.LEFT, 305, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
             count = label("", 902, 308, 230, 40, 23, MenuStyle.MUTED, true); alignRight(count);
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
-            settingsOptions = options;
             configureList(options, "OptionListEntry");
             options.addEventListener("SettingsOptionEntry_ValueChanged", valueChanged);
             label("SELECTED SETTING", 1210, 363, 630, 36, 21, MenuStyle.MUTED, true);
@@ -163,10 +161,8 @@ package
             captureBinding = create("Binding") as MovieClip;
             captureBinding.mouseEnabled = false; captureBinding.mouseChildren = false;
             captureBinding.visible = false;
-            nativeHotkeys = new NativeHotkeysList(create, definition, BGSCodeObj, nativeBindingsChanged);
-            configureList(nativeHotkeys.list, "Shared.Components.SystemPanels.SettingsControlListEntry");
-            nativeHotkeys.list.visible = false;
-            nativeHotkeys.list.addEventListener("SettingsControlListEnty_ActiveBindingChanged", selectionChanged);
+            nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
+            options.addEventListener("SettingsControlListEnty_ActiveBindingChanged", selectionChanged);
             var popup:MovieClip = nativeHotkeys.popup as MovieClip;
             addChild(popup);
             var bounds:Rectangle = popup.getBounds(popup);
@@ -204,10 +200,11 @@ package
             if (!initialized || closing) return;
             if (message) Object(definition("Shared.GlobalFunc")).SetText(status, message);
             if (refreshRows) requestedRefresh = true;
+            options.disableInput = bindingBusy() || Boolean(captureRow);
+            options.disableSelection = bindingBusy();
             describe();
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
-        private function bindingsPage():Boolean { return nativeHotkeys && options == nativeHotkeys.list; }
         private function button(text:String, eventName:String, callback:Function):Object
         {
             var eventClass:Class = definition("Shared.Components.ButtonControls.ButtonData.UserEventData");
@@ -246,16 +243,14 @@ package
         private function populate(preserve:Boolean = false):void
         {
             refreshing = true; requestedRefresh = false;
-            var next:Object = modID && groupID == "@hotkeys" ? nativeHotkeys.list : settingsOptions;
-            preserve = preserve && options == next;
-            options = next;
-            settingsOptions.visible = !bindingsPage(); nativeHotkeys.list.visible = bindingsPage();
+            nativeHotkeys.populate(allRows);
+            var hasHotkeys:Boolean = false;
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
             var data:Array = []; var source:Array = modID ? allRows : mods;
             for each (var row:Object in source) {
                 if (modID && (row.mod != modID || row.group != groupID)) continue;
-                if (bindingsPage()) { data.push(row); continue; }
+                if (row.type == "hotkey") hasHotkeys = true;
                 var slider:Boolean = modID != "" && NumericSetting.isSlider(row);
                 // The vanilla entry multiplies fValue by 100. Our slider stores integer offsets.
                 data.push({row:row, sText:html(String(row.title)), uID:data.length, bDisabled:false, bShowSpinner:false,
@@ -264,8 +259,8 @@ package
                     sliderData:{fValue:slider ? NumericSetting.position(row) / 100 : 0, sDisplayValue:NumericSetting.text(row, row.value)},
                     stepperData:{aStepperOptions:row.type == "enum" ? EnumSetting.labels(row) : [], uIndex:row.type == "enum" ? EnumSetting.index(row) : 0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
             }
-            if (bindingsPage()) { nativeHotkeys.populate(data, allRows); nativeHotkeys.open(); }
-            else options.InitializeEntries(data);
+            options.InitializeEntries(data);
+            if (hasHotkeys) nativeHotkeys.open();
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             options.disableInput = bindingBusy(); menuStage.focus = options as MovieClip;
@@ -370,14 +365,14 @@ package
         }
         private function reset():void
         {
-            if (captureRow || bindingBusy() || bindingsPage()) return;
+            if (captureRow || bindingBusy() || current() && current().type == "hotkey") return;
             var row:Object = current();
             if (!dragging() && modID && row && row.editable && row.value != row.defaultValue) edit(row, row.defaultValue);
         }
         private function valueChanged(event:Event):void
         {
             event.stopPropagation();
-            if (refreshing || captureRow) return;
+            if (refreshing || captureRow || bindingBusy()) return;
             var data:Object = Object(event).params;
             var item:Object = options.GetDataForEntry(int(data.id));
             if (!modID || !item || !item.row.editable) return;
@@ -396,7 +391,7 @@ package
         }
         private function edit(row:Object, value:*):void
         {
-            if (closing || refreshing || options.scrollbarScrolling || !row.editable) return;
+            if (closing || refreshing || bindingBusy() || options.scrollbarScrolling || !row.editable) return;
             activationFrame = frame;
             if (value == row.value) { requestedRefresh = true; return; }
             var result:Object;
@@ -437,7 +432,7 @@ package
             }
             if (bar.ProcessUserEvent(name, pressed)) return true;
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
-            return !bindingsPage() && clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
+            return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
         }
         private function mouseFocus(event:MouseEvent):void
         {
@@ -462,10 +457,10 @@ package
             else if (event.keyCode == 219) changePage(-1); // [ and ] also expose tabs without a mouse.
             else if (event.keyCode == 221) changePage(1);
             else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {
-                if (bindingsPage()) return; // Vanilla ControlsList owns binding-slot navigation.
                 var row:Object = current();
                 if (modID && row && row.editable) {
-                    if (NumericSetting.isSlider(row)) {
+                    if (row.type == "hotkey") nativeHotkeys.navigate(event);
+                    else if (NumericSetting.isSlider(row)) {
                         var next:Number = NumericSetting.position(row) + (event.keyCode == Keyboard.RIGHT ? 1 : -1);
                         edit(row, NumericSetting.atPosition(row, next));
                     } else if (row.type == "enum") {
@@ -484,7 +479,6 @@ package
         {
             if (!options) return false;
             if (options.scrollbarScrolling) return true;
-            if (bindingsPage()) return false;
             for (var i:int = 0; i < options.totalEntryClips; ++i) {
                 var clip:Object = options.GetClipByIndex(i);
                 if (clip && clip.IsSlider() && clip.Slider_mc.dragging) return true;
@@ -505,7 +499,7 @@ package
         }
         private function clearBinding():void
         {
-            if (bindingsPage()) { nativeHotkeys.clearBinding(); return; }
+            if (current() && current().type == "hotkey") { nativeHotkeys.clearBinding(); return; }
             var row:Object = current();
             if (!captureRow && modID && row && row.type == "key" && row.allowUnbound) edit(row, 255);
         }
@@ -574,7 +568,6 @@ package
         }
         private function decorate():void
         {
-            if (bindingsPage()) { nativeHotkeys.decorate(); return; }
             var needsLayout:Boolean = false;
             for (var i:int = 0; i < options.totalEntryClips; ++i) {
                 var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;
@@ -588,12 +581,13 @@ package
                 var showSlider:Boolean = modID != "" && NumericSetting.isSlider(item.row);
                 var stepper:Object = Object(clip).LargeStepper_mc;
                 var showStepper:Boolean = modID != "" && item.row.type == "enum" && item.row.editable;
+                var binding:DisplayObject = modID ? nativeHotkeys.decorate(clip, item.row, Object(clip).itemIndex == options.selectedIndex) : null;
                 clip.setChildIndex(view, 0);
                 for (var child:int = 0; child < clip.numChildren; ++child) {
                     var display:DisplayObject = clip.getChildAt(child);
-                    display.visible = display == view || (showSlider && display == slider) || (showStepper && display == stepper);
+                    display.visible = display == view || display == binding || (showSlider && display == slider) || (showStepper && display == stepper);
                 }
-                clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider || showStepper;
+                clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider || showStepper || binding != null;
                 if (showSlider) {
                     slider.x = 540; slider.y = (MenuStyle.ROW_HEIGHT - slider.height) / 2; slider.width = 330;
                     slider.maxValue = NumericSetting.steps(item.row);
