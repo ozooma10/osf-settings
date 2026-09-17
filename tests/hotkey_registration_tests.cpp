@@ -61,8 +61,8 @@ namespace RE
         std::uint32_t controlMask, std::uint32_t groupMask, bool required)
     {
         formattedRows.push_back({ event, keyboard, mouse == 0xFF && gamepad == 0xFF && keyboardVisible &&
-            !mouseVisible && !gamepadVisible && controlMask == 0x401 && groupMask == 0 && !required });
-        return std::format("{}\t{:#x}\t0xff\t0xff\t1\t0\t0\t0x401\t0\t0\n", event, keyboard);
+            !mouseVisible && !gamepadVisible && controlMask == (std::string_view(event).ends_with("/openMenu") ? 0x08u : 0x401u) && groupMask == 0 && !required });
+        return std::format("{}\t{:#x}\t0xff\t0xff\t1\t0\t0\t{:#x}\t0\t0\n", event, keyboard, controlMask);
     }
 }
 
@@ -119,17 +119,22 @@ int main()
 
         schemas.resize(2);
         schemas[0].schema.id = "osfsettings";
-        schemas[0].schema.hotkeys = { { "openMenu", "Open settings", "F10" },
-            { "unbound", "Unbound", std::nullopt }, { "invalid", "Invalid", "Unknown" } };
+        schemas[0].schema.hotkeys = { { "openMenu", "Open settings", "F10", "OSFSettingsMenu" },
+            { "unbound", "Unbound", std::nullopt }, { "invalid", "Invalid", "Unknown", "InvalidMenu" } };
         schemas[1].schema.id = "anothermod";
-        schemas[1].schema.hotkeys = { { "openMenu", "Other action", "F4" } };
+        schemas[1].schema.hotkeys = { { "openMenu", "Other action", "F4", "OtherMenu" } };
         check(OSFSettings::NativeHotkeys::Install(), "real CALL5 hook installs");
         check(formattedRows.size() == 3 && formattedRows[0].event == "osfsettings/openMenu" &&
             formattedRows[0].key == 0x79 && formattedRows[1].key == 0xFF &&
             formattedRows[2].event == "anothermod/openMenu" && formattedRows[2].key == 0x73,
             "schema defaults, unbound actions, namespaces and invalid defaults are handled");
         check(std::ranges::all_of(formattedRows, [](const Row& row) { return row.nativeFlags; }),
-            "all declarations use keyboard-visible native gameplay flags");
+            "menu targets use the menu mask; mapping-only actions retain their gameplay flags");
+        check(OSFSettings::NativeHotkeys::GetMenu("osfsettings/openMenu") == "OSFSettingsMenu" &&
+            OSFSettings::NativeHotkeys::GetMenu("anothermod/openMenu") == "OtherMenu" &&
+            OSFSettings::NativeHotkeys::GetMenu("osfsettings/unbound").empty() &&
+            OSFSettings::NativeHotkeys::GetMenu("osfsettings/invalid").empty() &&
+            OSFSettings::NativeHotkeys::GetMenu("Pause").empty(), "only valid declarations with a menu target are dispatched");
 
         load(&first, vanilla);
         check(parsedTexts.size() == 2 && parsedMap == &first && parsedTexts.back().ends_with(vanilla),
@@ -146,9 +151,15 @@ int main()
             "repeated installation neither rebuilds rows nor chains the hook twice");
         load(&reset, vanilla);
         check(parsedTexts.size() == 4 && parsedTexts[2] == parsedTexts[3], "repeated installation preserves one parser call");
+        const char pauseContexts[] = "Pause\t0x1b\t0xff\t0xff\t1\t0\t0\t0x8\t0\t1\r\n\r\n"
+            "// Menu context\r\nPause\t0x70\t0xff\t0xff\t1\t0\t0\t0x8\t0\t1\r\n\r\n"
+            "AnotherPause\t0x71\t0xff\t0xff\t1\t0\t0\t0x8\t0\t1";
+        load(&reset, pauseContexts);
+        check(parsedTexts.back() == OSFSettings::NativeHotkeys::g_hotkeyDefinitions + pauseContexts,
+            "Pause contexts remain intact without adding action-specific links");
         fixture.Reset();
         load(&reset, vanilla);
-        check(parsedTexts.size() == 5 && parsedTexts.back() == vanilla &&
+        check(parsedTexts.size() == 6 && parsedTexts.back() == vanilla &&
             !OSFSettings::NativeHotkeys::g_parseHook,
             "fixture restores the original call and destroys the hook before host teardown");
         std::cout << checks << '/' << checks << " native registration checks passed\n";

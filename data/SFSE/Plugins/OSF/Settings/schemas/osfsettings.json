@@ -7,7 +7,8 @@
     {
       "id": "openMenu",
       "label": "Open mod settings",
-      "default": "F10"
+      "default": "F10",
+      "menu": "OSFSettingsMenu"
     }
   ]
 }

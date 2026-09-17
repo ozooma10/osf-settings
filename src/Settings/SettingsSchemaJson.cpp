@@ -175,6 +175,10 @@ namespace OSFSettings::SettingsJson
                         hotkey.defaultKey = RequiredText(source, "default");
                         Require(hotkey.defaultKey->find('\0') == std::string::npos, "hotkey default must not contain NUL");
                     }
+                    if (source.contains("menu")) {
+                        hotkey.menu = RequiredText(source, "menu");
+                        Require(hotkey.menu->find('\0') == std::string::npos, "hotkey menu must not contain NUL");
+                    }
                     mod.hotkeys.push_back(std::move(hotkey));
                 }
             }

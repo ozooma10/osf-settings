@@ -1,7 +1,9 @@
 #include "HotkeyInput.h"
-#include "Menu/SettingsMenuActivation.h"
+#include "NativeHotkeys.h"
+#include "harness/TestHarness.h"
 #include "RE/B/BSInputEventUserStandalone.h"
 #include "RE/M/MenuControls.h"
+#include "RE/U/UIMessageQueue.h"
 #include "REL/THook.h"
 
 #include <Windows.h>
@@ -15,12 +17,9 @@ namespace OSFSettings::HotkeyInput
     namespace
     {
         constexpr std::ptrdiff_t kInitializeCall = 0x303;
+        using InitializeHook = REL::THook<void(RE::MenuControls*)>;
+        std::optional<InitializeHook> g_initializeHook;
 
-        using LifecycleHook = REL::THook<void(RE::MenuControls*)>;
-        std::optional<LifecycleHook> g_initializeHook;
-        RE::MenuControls* g_attachedControls{}; // game input dispatcher our handler attached to.
-
-        //Hook into game input events to forward registered hotkeys to requesting mods
         class HotkeyHandler final : public RE::BSInputEventUserStandalone
         {
         public:
@@ -30,16 +29,24 @@ namespace OSFSettings::HotkeyInput
                     return false;
                 }
                 const auto* button = static_cast<const RE::ButtonEvent*>(event);
-                return !button->disabled && std::string_view{ button->QUserEvent().c_str() } == "osfsettings/openMenu";
+                return !button->disabled && !NativeHotkeys::GetMenu(button->QUserEvent().c_str()).empty();
             }
 
             void OnButtonEvent(const RE::ButtonEvent* button) override
             {
-                SettingsMenuActivation::OnHotkeyEvent(*button);
+                TestHarness::ObserveInput(button, true);
+                if (button->value != 0 || button->heldDownSecs < 0) return;
+                const auto menu = NativeHotkeys::GetMenu(button->QUserEvent().c_str());
+                auto* queue = RE::UIMessageQueue::GetSingleton();
+                if (menu.empty() || !queue) return;
+                queue->AddMessage(RE::BSFixedString(menu), RE::UI_MESSAGE_TYPE::kShow);
+                //Stop further processing of this button event
+                const_cast<RE::ButtonEvent*>(button)->status = RE::InputEvent::Status::kStop;
             }
         };
 
-        std::optional<HotkeyHandler> g_handler;
+        // Intentionally retained to avoid engine calls during DLL teardown.
+        auto& g_handler = *new std::optional<HotkeyHandler>{};
 
         void Attach(RE::MenuControls* controls)
         {
@@ -54,21 +61,9 @@ namespace OSFSettings::HotkeyInput
                 REX::ERROR("Hotkeys: could not register native handler; input disabled");
                 return;
             }
-            g_attachedControls = controls;
-            SettingsMenuActivation::SetInputAttached(true);
+            TestHarness::SetInputAttached(true);
             REX::INFO("Hotkeys: MenuControls handler registered ({} -> {}, thread={})",
                 before, controls->GetHandlerCount(), ::GetCurrentThreadId());
-        }
-
-        void Detach(RE::MenuControls* controls)
-        {
-            if (controls != g_attachedControls || !g_handler) return;
-            SettingsMenuActivation::SetInputAttached(false);
-            g_handler->inputEventHandlingEnabled = false;
-            controls->UnregisterHandler(&*g_handler);
-            g_handler.reset();
-            g_attachedControls = nullptr;
-            REX::INFO("Hotkeys: MenuControls handler removed (remaining={})", controls->GetHandlerCount());
         }
 
         void InitializeHandlers(RE::MenuControls* controls)
@@ -89,18 +84,12 @@ namespace OSFSettings::HotkeyInput
         }
 
         g_initializeHook.emplace("Hotkeys::Initialize", RE::ID::Main::InitializeInputSingletons, kInitializeCall, &InitializeHandlers);
-        for (auto* hook : { &g_shutdownHook, &g_destroyHook, &g_initializeHook }) {
-            if (!(*hook)->Init() || !(*hook)->Enable()) {
-                g_initializeHook.reset();
-                return false;
-            }
+        if(!g_initializeHook->Init() || !g_initializeHook->Enable()) {
+            g_initializeHook.reset();
+            return false;
         }
+      
         REX::INFO("Hotkeys: native handler lifecycle hooks installed");
         return true;
-    }
-
-    bool RegisterMenuEvents()
-    {
-        return g_initializeHook && g_initializeHook->GetEnabled() && SettingsMenuActivation::RegisterMenuEvents();
     }
 }

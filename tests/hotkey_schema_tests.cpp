@@ -39,13 +39,17 @@ int main()
         const auto parsed = SettingsJson::ParseSchema(document, error);
         check(parsed && error.empty() && parsed->hotkeys.size() == 1, "example declaration loads");
         const auto& action = parsed->hotkeys.front();
-        check(action.id == "openMenu" && action.label == "Open mod settings" && action.defaultKey == "F10",
-            "identity, label and default name are preserved");
+        check(action.id == "openMenu" && action.label == "Open mod settings" && action.defaultKey == "F10" && action.menu == "OSFSettingsMenu",
+            "identity, label, default name and registered menu target are preserved");
         check(!parsed->FindSetting("openMenu"), "hotkeys are separate from ordinary setting definitions");
 
         auto changed = document;
-        changed["hotkeys"][0].erase("default");
+        changed["hotkeys"][0].erase("menu");
         auto result = SettingsJson::ParseSchema(changed, error);
+        check(result && !result->hotkeys[0].menu, "omitting menu preserves mapping-only declarations");
+        changed = document;
+        changed["hotkeys"][0].erase("default");
+        result = SettingsJson::ParseSchema(changed, error);
         check(result && !result->hotkeys[0].defaultKey, "omitting the default declares an unbound action");
         changed["hotkeys"] = Json::array();
         result = SettingsJson::ParseSchema(changed, error);
@@ -62,7 +66,7 @@ int main()
             changed = document; changed["hotkeys"][0] = value;
             if (!value.is_object()) reject(changed);
         }
-        for (const auto* field : {"id", "label", "default"}) {
+        for (const auto* field : {"id", "label", "default", "menu"}) {
             for (const auto& value : {Json(nullptr), Json(10), Json(false), Json(""), Json(std::string("a\0b", 3))}) {
                 changed = document; changed["hotkeys"][0][field] = value; reject(changed);
             }

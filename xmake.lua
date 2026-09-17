@@ -15,6 +15,12 @@ add_rules("mode.debug", "mode.releasedbg")
 add_rules("plugin.vsxmake.autoupdate")
 add_rules("plugin.compile_commands.autoupdate", { outputdir = ".", lsp = "cpptools" })
 
+option("test_harness")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Expose passive local testing observations; normal input remains active")
+option_end()
+
 -- define targets
 target("OSF Settings")
     set_basename("OSFSettings")
@@ -28,14 +34,38 @@ target("OSF Settings")
     -- add src files
     add_files("src/**.cpp")
     add_headerfiles("src/**.h")
-    add_includedirs("src")
+    add_includedirs("src", "tests")
     set_pcxxheader("src/pch.h")
     add_packages("nlohmann_json")
+    if has_config("test_harness") then
+        add_defines("OSFSETTINGS_TEST_HARNESS")
+        add_files("tests/harness/*.cpp")
+    end
+    add_headerfiles("tests/harness/*.h")
     before_build(function(target)
-        os.execv("pwsh", { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-scaleform.ps1") })
+        local args = { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-scaleform.ps1") }
+        if has_config("test_harness") then table.insert(args, "-TestHarness") end
+        os.execv("pwsh", args)
     end)
     add_installfiles("data/(**)")
     add_installfiles("build/scaleform/OSFSettingsMenu.swf", "build/scaleform/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })
+
+target("osfsettings-diagnostics-example")
+    set_default(false)
+    set_basename("OSFSettingsDiagnosticsExample")
+    add_rules("commonlibsf.plugin", {
+        name = "OSFSettingsDiagnosticsExample",
+        author = "ozooma10",
+        description = "Development-only Mod Issues SDK example",
+        options = { address_library = false, no_struct_use = true }
+    })
+    add_files("examples/diagnostics/main.cpp")
+    add_includedirs("sdk")
+    set_values("commonlib.plugin.install", false)
+    on_config(function(target)
+        -- Keep the example out of installs and packages, including --all.
+        target:set("installfiles", {})
+    end)
 
 target("osfsettings-tests")
     set_kind("binary")
@@ -68,6 +98,23 @@ target("osfsettings-registration-tests")
     add_deps("commonlibsf")
     add_files("tests/hotkey_registration_tests.cpp")
     add_includedirs("src")
+    set_pcxxheader("src/pch.h")
+
+target("osfsettings-input-tests")
+    set_kind("binary")
+    set_default(false)
+    add_deps("commonlibsf")
+    add_files("tests/native_input_user_tests.cpp")
+    add_includedirs("src")
+    set_pcxxheader("src/pch.h")
+
+target("osfsettings-lifecycle-tests")
+    set_kind("binary")
+    set_default(false)
+    add_deps("commonlibsf")
+    add_files("tests/hotkey_lifecycle_tests.cpp")
+    add_includedirs("src", "tests")
+    add_defines("OSFSETTINGS_TEST_HARNESS")
     set_pcxxheader("src/pch.h")
 
 target("osfsettings-diagnostics-api-tests")

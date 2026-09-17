@@ -3,6 +3,8 @@
 C++ SDK: [OSFSettings.h](../sdk/OSFSettings.h). Requires CommonLibSF.
 Papyrus is planned.
 
+For native issue reporting, see [Mod Issues](DIAGNOSTICS.md).
+
 ## Usage
 
 ```cpp
@@ -38,25 +40,81 @@ if (settings.Init() && settings.IsReady()) {
 | `UnknownSubscription` | Subscription token not found. |
 | `InternalError` | Internal limit reached or unexpected internal status. |
 
-## Hotkey declarations (schema only)
+## Native hotkey declarations
 
 A schema can declare an optional top-level `hotkeys` array:
 
 ```json
 "hotkeys": [
-  { "id": "openMenu", "label": "Open mod settings", "default": "F10" }
+  { "id": "openMenu", "label": "Open mod settings", "default": "F10", "menu": "OSFSettingsMenu" }
 ]
 ```
 
 `id` and `label` are required, nonempty strings. IDs use ASCII letters, digits,
 underscores or hyphens and must be unique within the mod, ignoring letter case.
 `default` is an optional, nonempty key-name string; omitting it means unbound.
-Embedded NUL characters are rejected. Key names remain text at this checkpoint;
-native name resolution and validation belong to the later binding integration.
+Embedded NUL characters are rejected. At plugin load, key names are resolved
+case-insensitively against the game's baked keyboard table. Unknown defaults
+are logged and that declaration is skipped.
 
 Declarations are loaded into `ModSchema::hotkeys`, separately from ordinary
-setting values. This checkpoint adds no native bindings, input handlers or
-callbacks. The existing required `groups` array can be empty for a hotkey-only schema.
+setting values. A declaration becomes a native MainGameplay action named
+`<mod id>/<hotkey id>`; the example above becomes `osfsettings/openMenu` for the
+`osfsettings` mod. The plugin uses the native row formatter and adds the rows
+at the start of vanilla's defaults before its parser runs, including on control
+reset. The original caller continues loading saved overrides and resolving links.
+
+An optional `menu` field names a **registered native menu**, not a SWF filename:
+
+```json
+"hotkeys": [
+  { "id": "openMenu", "label": "Open my menu", "default": "F4", "menu": "MyModMenu" }
+]
+```
+
+The owning mod registers its menu factory with `RE::UI::RegisterMenu` and loads
+its SWF in that menu's normal lifecycle. Register it before accepting gameplay
+input. OSF does not create a menu class or register a factory from the SWF name.
+The bundled Settings declaration targets `OSFSettingsMenu` through this same path.
+`menu` must be a nonempty string without embedded NUL characters.
+
+`HotkeyInput` installs its own `BSInputEventUserStandalone` in `MenuControls`.
+It accepts enabled keyboard events for declarations with a menu target. All
+edges reach native held-action tracking; a release (`value == 0`, nonnegative
+`heldDownSecs`) sends `UIMessageQueue::AddMessage(menu, kShow)` and marks the
+event stopped. Presses and repeats do not open a menu. The engine dispatcher
+admits held actions and rejects unpaired releases before the button callback.
+This is an open request; it does not toggle or close an already-open menu.
+
+Menu declarations use control mask `0x08`, the same mask as keyboard Pause.
+Declarations without `menu` retain the Movement mask and only register mappings;
+OSF does not dispatch them to a public callback yet. Mappings are in MainGameplay;
+there are no injected Pause-context links. The engine's active contexts,
+control masks, disabled-event translation and held-action admission still apply.
+Matching Pause's mask does **not** reproduce its private opening checks or its
+availability in other contexts. Each menu owns its contexts and input behavior.
+
+The input callback only enqueues a show message. Native `AddMessage` (ID 130659,
+1.16.244.0) owns its queue lock and string references; the UI pump constructs and
+opens the menu. No game-thread assumption or extra `BSService` task is needed
+for that enqueue-only operation. The handler does not inspect player state or
+menu stacks, impersonate Pause input, or intercept another menu's requests.
+
+One startup hook attaches after native `InitializeHandlers`; the initialization
+call (`99490 + 0x303 -> 114215`) is validated before patching. `MenuControls` and
+the registered handler live until process exit. On 1.16.244, save reloads and
+returning to the main menu preserve the same input service and registrations.
+There is no cleanup hook or automatic handler destructor calling into the engine
+during DLL teardown. No `MenuOpenHandler` vtable or Pause helper is modified.
+See the local [vanilla input investigation](../../OSF%20RE/Investigations/Responses/2026-09-16-vanilla-menu-activation.md)
+for the static dispatch and queue evidence. Live focus, loading, key capture and
+transition behavior still need an in-game check; this path promises generic
+show requests, not exact Pause eligibility.
+
+Public hotkey callbacks, an OSF rebinding editor and translating `label` into
+vanilla's Controls text remain separate work. The required `groups` array may be
+empty for a hotkey-only schema. Declarations are read once at startup; changes
+require restarting the game.
 
 ## Subscriptions
 
