@@ -1,4 +1,5 @@
 #include "OSFSettingsMenu.h"
+#include "harness/TestHarness.h"
 #include "FloatSlider.h"
 #include "Input/KeyNames.h"
 #include <cmath>
@@ -62,6 +63,7 @@ namespace OSFSettings
         RegisterNativeFunction("close", static_cast<std::uint64_t>(Function::Close));
         RegisterNativeFunction("startup", static_cast<std::uint64_t>(Function::Startup));
         RegisterNativeFunction("startupFailed", static_cast<std::uint64_t>(Function::StartupFailed));
+        TestHarness::RegisterMenuFunctions(*this);
     }
 
     void OSFSettingsMenu::OnStartupFailed(std::string_view message)
@@ -73,6 +75,7 @@ namespace OSFSettings
     void OSFSettingsMenu::Call(const RE::Scaleform::GFx::FunctionHandler::Params& params) noexcept
     {
         if (!params.ret || !params.movie || !params.movie->asMovieRoot) return;
+        if (TestHarness::HandleMenuCall(params)) return;
         
         auto* root = params.movie->asMovieRoot.get();
         const auto function = static_cast<Function>(reinterpret_cast<std::uintptr_t>(params.userData));
@@ -255,6 +258,7 @@ namespace OSFSettings
     // Keyboard idCode is a Win32 virtual-key code, passed through without scan-code conversion.
     void OSFSettingsMenu::OnButtonEvent(const RE::ButtonEvent* event)
     {
+        TestHarness::ObserveInput(event, false);
         if (event && event->deviceType == RE::InputEvent::DeviceType::kKeyboard &&
             m_capture.HandleKeyEvent(static_cast<std::uint32_t>(event->idCode), event->value > 0, event->heldDownSecs > 0)) return;
         RE::GameMenuBase::OnButtonEvent(event);
@@ -281,7 +285,9 @@ namespace OSFSettings
         if (!ui->IsMenuRegistered(name)) {
             ui->RegisterMenu(MENU_NAME.data(), &Create, true);
         }
-        return ui->IsMenuRegistered(name);
+        const bool registered = ui->IsMenuRegistered(name);
+        TestHarness::RegisterMenuObserver(*ui, registered);
+        return registered;
     }
 
     void OSFSettingsMenu::Open() 

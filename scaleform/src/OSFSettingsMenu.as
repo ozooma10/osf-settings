@@ -66,6 +66,9 @@ package
         private var captureHint:TextField;
         private var captureConfirm:Sprite;
         private var captureReady:Boolean = false;
+        CONFIG::testHarness {
+            include "../../tests/harness/MenuObservations.as";
+        }
 
         public function OSFSettingsMenu()
         {
@@ -189,6 +192,7 @@ package
             menuStage.addEventListener(KeyboardEvent.KEY_DOWN, keyDown, true, 50);
             menuStage.addEventListener(KeyboardEvent.KEY_UP, keyUp, true, 50);
             menuStage.addEventListener(MouseEvent.MOUSE_DOWN, mouseFocus, true);
+            CONFIG::testHarness { menuStage.addEventListener(MouseEvent.CLICK, testClick, true); }
             addEventListener(Event.ENTER_FRAME, advance);
         }
         private function captureButton(text:String, x:Number, width:Number, callback:Function):Sprite
@@ -416,6 +420,7 @@ package
         }
         private function mouseFocus(event:MouseEvent):void
         {
+            CONFIG::testHarness { testMouseDown = testMouseEvent(event, testMouseDown); }
             if (captureRow) return;
             if (!initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
@@ -464,10 +469,15 @@ package
         }
         private function advance(event:Event):void
         {
-            ++frame; if (!initialized || closing) return;
-            if (captureRow) { pollBinding(); return; }
-            if (requestedRefresh && !dragging()) refresh();
-            decorate();
+            ++frame;
+            if (initialized && !closing) {
+                if (captureRow) pollBinding();
+                else {
+                    if (requestedRefresh && !dragging()) refresh();
+                    decorate();
+                }
+            }
+            CONFIG::testHarness { advanceTestObservations(); }
         }
         private function clearBinding():void
         {
@@ -479,6 +489,7 @@ package
             var result:Object = BGSCodeObj.beginKeyCapture(row.mod, row.key);
             if (!result || !result.ok) { status.text = "Could not start key capture."; return; }
             captureRow = row; captureReady = false;
+            CONFIG::testHarness { testCaptureState = "waiting"; }
             options.disableInput = true;
             MovieClip(options).mouseEnabled = false; MovieClip(options).mouseChildren = false;
             menuStage.focus = null;
@@ -494,6 +505,7 @@ package
         private function pollBinding():void
         {
             var state:Object = BGSCodeObj.pollKeyCapture();
+            CONFIG::testHarness { testCaptureState = state ? state.state : "unavailable"; }
             if (!state || state.state == "cancelled" || state.state == "idle") { finishBinding(true); return; }
             if (state.state == "candidate" || state.state == "confirmed") {
                 captureValue.text = state.name;
@@ -518,6 +530,7 @@ package
         {
             if (cancel) BGSCodeObj.cancelKeyCapture();
             captureRow = null; captureReady = false; capturePanel.visible = false;
+            CONFIG::testHarness { testCaptureState = "idle"; }
             MovieClip(bar).visible = true; pageHint.visible = true;
             MovieClip(options).mouseEnabled = true; MovieClip(options).mouseChildren = true;
             activationFrame = frame;
@@ -587,6 +600,7 @@ package
                 menuStage.removeEventListener(KeyboardEvent.KEY_DOWN, keyDown, true);
                 menuStage.removeEventListener(KeyboardEvent.KEY_UP, keyUp, true);
                 menuStage.removeEventListener(MouseEvent.MOUSE_DOWN, mouseFocus, true);
+                CONFIG::testHarness { menuStage.removeEventListener(MouseEvent.CLICK, testClick, true); }
             }
             removeEventListener(Event.ENTER_FRAME, advance);
         }

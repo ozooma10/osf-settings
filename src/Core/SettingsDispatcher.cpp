@@ -1,5 +1,6 @@
 #include "SettingsDispatcher.h"
 #include "Settings/SettingsService.h"
+#include "harness/TestHarness.h"
 #include "SFSE/SFSE.h"
 
 namespace OSFSettings::SettingsDispatcher
@@ -11,6 +12,7 @@ namespace OSFSettings::SettingsDispatcher
         static bool installed{};
         if (!installed) {
             tasks->AddPermanentTask([] {
+                TestHarness::Poll();
                 auto& settings = SettingsService::Get();
                 if (settings.HasPendingChanges()) {
                     settings.DispatchChanges();
