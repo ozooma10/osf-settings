@@ -1,8 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "learning",
-  "title": "Learning example",
-  "description": "A boolean, an integer, a float, an enum, and a keyboard binding, understood end to end.",
+  "title": "Test Mod",
+  "description": "Sample settings and a native hotkey for testing the settings menu.",
+  "hotkeys": [
+    {
+      "id": "testHotkey",
+      "label": "Test hotkey"
+    }
+  ],
   "groups": [
     {
       "id": "general",
@@ -12,14 +18,14 @@
           "key": "notifications",
           "type": "bool",
           "label": "Enable notifications",
-          "hint": "A learning example; no gameplay behavior is connected yet.",
+          "hint": "A test setting; no gameplay behavior is connected.",
           "default": true
         },
         {
           "key": "notificationLimit",
           "type": "int",
           "label": "Notification limit",
-          "hint": "Choose a limit from 1 to 10. A learning example; no gameplay behavior is connected yet.",
+          "hint": "Choose a limit from 1 to 10. This test setting has no gameplay behavior.",
           "default": 3,
           "min": 1,
           "max": 10
@@ -28,7 +34,7 @@
           "key": "notificationVolume",
           "type": "float",
           "label": "Notification volume",
-          "hint": "Choose a volume from 0.00 to 1.00 in steps of 0.05. A learning example; no gameplay behavior is connected yet.",
+          "hint": "Choose a volume from 0.00 to 1.00 in steps of 0.05. This test setting has no gameplay behavior.",
           "default": 0.75,
           "min": 0.0,
           "max": 1.0,
@@ -38,7 +44,7 @@
           "key": "notificationMode",
           "type": "enum",
           "label": "Notification mode",
-          "hint": "Choose how much detail notifications show. A learning example; no gameplay behavior is connected yet.",
+          "hint": "Choose how much detail notifications show. This test setting has no gameplay behavior.",
           "default": "normal",
           "options": ["quiet", "normal", "verbose"],
           "optionLabels": ["Quiet", "Normal", "Verbose"]
@@ -47,7 +53,7 @@
           "key": "notificationKey",
           "type": "key",
           "label": "Notification key",
-          "hint": "Choose a keyboard key or clear the binding. A learning example; no gameplay behavior is connected yet.",
+          "hint": "Choose a keyboard key or clear the binding. This test setting has no gameplay behavior.",
           "default": "F4",
           "allowUnbound": true
         }

@@ -86,6 +86,16 @@ event stopped. Presses and repeats do not open a menu. The engine dispatcher
 admits held actions and rejects unpaired releases before the button callback.
 This is an open request; it does not toggle or close an already-open menu.
 
+`OSFSettingsMenu` requires an open `PauseMenu` or `MainMenu` parent. Its show
+handler checks that requirement on the UI lifecycle path. From gameplay it
+requests Pause, refuses its own stack admission, then retries after Pause's
+open event. The bundled shortcut (F10 by default), the Pause MOD SETTINGS entry,
+and direct show requests all use this same menu gate. Back from the mod list
+closes only OSF, returning to the parent; parent removal also closes OSF and
+cancels capture. A failed Pause request expires after five seconds. This does
+not add a new button to the Main Menu movie. Other mods' menu targets keep
+their own lifecycle and opening policy.
+
 Menu declarations use control mask `0x08`, the same mask as keyboard Pause.
 Declarations without `menu` retain the Movement mask and only register mappings;
 OSF does not dispatch them to a public callback yet. Mappings are in MainGameplay;
@@ -111,8 +121,11 @@ for the static dispatch and queue evidence. Live focus, loading, key capture and
 transition behavior still need an in-game check; this path promises generic
 show requests, not exact Pause eligibility.
 
-Public hotkey callbacks, an OSF rebinding editor and translating `label` into
-vanilla's Controls text remain separate work. The required `groups` array may be
+The OSF menu's Hotkeys section uses vanilla Controls rows and native remapping
+and persistence. It displays the schema `label`; translating that label in the
+game's own Controls panel and public hotkey callbacks remain separate work.
+See [inline binding editor](NATIVE-BINDING-EDITOR.md) for the checkpoint's scope
+and pending in-game checks. The required `groups` array may be
 empty for a hotkey-only schema. Declarations are read once at startup; changes
 require restarting the game.
 
