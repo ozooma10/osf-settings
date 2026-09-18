@@ -43,7 +43,6 @@ package
         private var bar:Object;
         private var background:MovieClip;
         private var menuStage:Stage;
-        private var breadcrumb:TextField;
         private var heading:TextField;
         private var section:TextField;
         private var count:TextField;
@@ -137,7 +136,6 @@ package
             }
             var rail:TextField = label("MOD SETTINGS", 0, 0, 250, 40, 25, 0xD3DDDF, true);
             rail.rotation = -90; rail.x = 60; rail.y = 268;
-            breadcrumb = label("", MenuStyle.LEFT, 58, 1240, 35, 23, MenuStyle.MUTED, true);
             heading = label("", MenuStyle.LEFT, 98, 1320, 85, CONFIG::largeText ? 60 : 52, MenuStyle.WHITE, true);
             tabViewport.x = MenuStyle.LEFT; tabViewport.y = 196;
             tabViewport.scrollRect = new Rectangle(0, 0, 1728, 64); tabViewport.addChild(tabs); addChild(tabViewport);
@@ -316,7 +314,6 @@ package
             var title:String = "MOD SETTINGS"; var group:String = "ALL MODS";
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
-            MenuStyle.fit(breadcrumb, modID ? "MOD SETTINGS   /   " + title.toUpperCase() : "MOD SETTINGS   /   " + (issuesPage() ? "MOD ISSUES" : "ALL MODS"));
             MenuStyle.fit(heading, title.toUpperCase());
             MenuStyle.setText(section, issuesPage() ? "REPORTED ISSUES" : group.toUpperCase());
             MenuStyle.setText(count, data.length + (issuesPage() ? data.length == 1 ? " ISSUE" : " ISSUES" : modID ? data.length == 1 ? " SETTING" : " SETTINGS" : data.length == 1 ? " MOD" : " MODS"));
