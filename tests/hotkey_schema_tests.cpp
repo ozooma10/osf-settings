@@ -49,7 +49,7 @@ int main()
         auto changed = document;
         changed["hotkeys"][0].erase("menu");
         auto result = SettingsJson::ParseSchema(changed, error);
-        check(result && !result->hotkeys[0].menu, "omitting menu preserves mapping-only declarations");
+        check(result && !result->hotkeys[0].menu, "omitting menu declares a callback hotkey without additional schema fields");
         changed = document;
         changed["hotkeys"][0].erase("default");
         result = SettingsJson::ParseSchema(changed, error);

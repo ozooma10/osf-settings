@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "osfsettings-hotkeys-example",
+  "title": "Hotkey callback example",
+  "groups": [],
+  "hotkeys": [
+    {
+      "id": "toggleFeature",
+      "label": "Toggle example feature",
+      "default": "F6"
+    }
+  ]
+}

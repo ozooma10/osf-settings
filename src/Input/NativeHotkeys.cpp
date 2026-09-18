@@ -1,13 +1,16 @@
 #include "NativeHotkeys.h"
+#include "HotkeyInputState.h"
 #include "Settings/SettingsService.h"
 #include "RE/C/ControlMap.h"
 #include "RE/U/UserEvents.h"
 #include "SFSE/InputMap.h"
+#include "SFSE/API.h"
 #include "REL/THook.h"
 
 #include <cstddef>
 #include <map>
 #include <optional>
+#include <utility>
 
 namespace OSFSettings::NativeHotkeys
 {
@@ -20,7 +23,7 @@ namespace OSFSettings::NativeHotkeys
         using ParseHook = REL::THook<void(RE::ControlMap*, const char*)>;
         std::optional<ParseHook> g_parseHook;
         std::string g_hotkeyDefinitions;
-        std::map<std::string, std::string, std::less<>> g_menus;
+        std::map<std::string, Action, std::less<>> g_actions;
 
         void HookedParseMappings(RE::ControlMap* map, const char* vanilla)
         {
@@ -37,10 +40,14 @@ namespace OSFSettings::NativeHotkeys
 
         //Need to build hotkey definitions that will get pre-pended to vanilla binding map
         g_hotkeyDefinitions.clear();
-        g_menus.clear();
+        g_actions.clear();
+        HotkeyInputState::Declarations declarations;
         for (const auto& mod : SettingsService::Get().Snapshot()) {
+            auto& targets = declarations[mod.schema.id];
             for (const auto& hotkey : mod.schema.hotkeys) {
                 const auto event = mod.schema.id + "/" + hotkey.id;
+                auto& target = targets[hotkey.id];
+                target = hotkey.menu ? HotkeyInputState::Target::Menu : HotkeyInputState::Target::Invalid;
                 const auto key = hotkey.defaultKey ? SFSE::InputMap::GetKeyboardVirtualKey(*hotkey.defaultKey) : kUnbound;
                 if (key == kUnknownKey) {
                     REX::ERROR("Hotkeys: unknown default key '{}' for {}", *hotkey.defaultKey, event);
@@ -48,29 +55,30 @@ namespace OSFSettings::NativeHotkeys
                 }
                 // Menu actions use Pause's control mask (0x08), independent of Movement.
                 const auto mask = hotkey.menu ? RE::USER_EVENT_FLAG::TabMenuMaybe : RE::USER_EVENT_FLAG::Movement;
-                g_hotkeyDefinitions += RE::ControlMap::FormatMappingRow(
-                    event.c_str(), key, kUnbound, kUnbound,
+                g_hotkeyDefinitions += RE::ControlMap::FormatMappingRow(event.c_str(), key, kUnbound, kUnbound,
                     true, false, false, static_cast<std::uint32_t>(mask), 0u, false);
-                if (hotkey.menu) {
-                    g_menus.emplace(event, *hotkey.menu);
+                g_actions.emplace(event, Action{ mod.schema.id, hotkey.id, hotkey.menu });
+                if (!hotkey.menu) {
+                    target = HotkeyInputState::Target::Callback;
                 }
             }
         }
-        if (g_hotkeyDefinitions.empty()) return true;
-
-        g_parseHook.emplace("Hotkeys::ParseMappings", RE::ID::ControlMap::LoadMappings, kParseMappingsCallOffset, &HookedParseMappings);
-        if (!g_parseHook->Init() || !g_parseHook->Enable()) {
-            g_parseHook.reset();
-            g_menus.clear();
-            return false;
+        if (!g_hotkeyDefinitions.empty()) {
+            g_parseHook.emplace("Hotkeys::ParseMappings", RE::ID::ControlMap::LoadMappings, kParseMappingsCallOffset, &HookedParseMappings);
+            if (!g_parseHook->Init() || !g_parseHook->Enable()) {
+                g_parseHook.reset();
+                g_actions.clear();
+                return false;
+            }
+            REX::INFO("Hotkeys: native defaults hook installed");
         }
-        REX::INFO("Hotkeys: native defaults hook installed");
+        HotkeyInputState::Get().Initialize(std::move(declarations));
         return true;
     }
 
-    std::string_view GetMenu(std::string_view action)
+    const Action* FindAction(std::string_view action)
     {
-        const auto found = g_menus.find(action);
-        return found != g_menus.end() ? std::string_view(found->second) : std::string_view{};
+        const auto found = g_actions.find(action);
+        return found != g_actions.end() ? &found->second : nullptr;
     }
 }

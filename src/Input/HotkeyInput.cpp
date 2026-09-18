@@ -31,19 +31,21 @@ namespace OSFSettings::HotkeyInput
                     return false;
                 }
                 const auto* button = static_cast<const RE::ButtonEvent*>(event);
-                return !button->disabled && !NativeHotkeys::GetMenu(button->QUserEvent().c_str()).empty();
+                return !button->disabled && NativeHotkeys::FindAction(button->QUserEvent().c_str());
             }
 
             void OnButtonEvent(const RE::ButtonEvent* button) override
             {
                 TestHarness::ObserveInput(button, true);
-                const auto menu = NativeHotkeys::GetMenu(button->QUserEvent().c_str());
-                if (menu.empty() || !HotkeyInputState::Get().ProcessButton(static_cast<std::uint32_t>(button->idCode), button->QUserEvent().c_str(), button->value, button->heldDownSecs)) {
-                    return;
+                const auto* action = NativeHotkeys::FindAction(button->QUserEvent().c_str());
+                if (!action) return;
+                const auto key = static_cast<std::uint32_t>(button->idCode);
+                if (!HotkeyInputState::Get().ProcessButton(key, button->QUserEvent().c_str(), button->value, button->heldDownSecs)) return;
+                if (action->menu) {
+                    auto* queue = RE::UIMessageQueue::GetSingleton();
+                    if (!queue) return;
+                    queue->AddMessage(RE::BSFixedString(*action->menu), RE::UI_MESSAGE_TYPE::kShow);
                 }
-                auto* queue = RE::UIMessageQueue::GetSingleton();
-                if (!queue) return;
-                queue->AddMessage(RE::BSFixedString(menu), RE::UI_MESSAGE_TYPE::kShow);
                 //Stop further processing of this button event
                 const_cast<RE::ButtonEvent*>(button)->status = RE::InputEvent::Status::kStop;
             }

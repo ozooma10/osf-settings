@@ -33,7 +33,8 @@ namespace OSFSettings::API
         SaveFailed = 8,
         UnknownSubscription = 9,
         InternalError = 10,
-        UnknownHotkeyBlock = 11
+        UnknownHotkeyBlock = 11,
+        UnknownHotkey = 12
     };
 
     using Subscription = std::uint64_t; // Zero is never a valid subscription.
@@ -42,6 +43,7 @@ namespace OSFSettings::API
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
     // Callbacks run serially from an SFSE task; no main-thread guarantee.
     using ChangedFn = void (*)(const char* mod, const char* key, void* user) noexcept;
+    using HotkeyFn = void (*)(const char* mod, const char* id, void* user) noexcept;
 
     struct ISettings
     {
@@ -79,6 +81,9 @@ namespace OSFSettings::API
         // Blocks OSF-dispatched hotkeys; All blocks must be released before new presses can activate.
         virtual Status AcquireHotkeyBlock(HotkeyBlock* out) noexcept = 0;
         virtual Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept = 0;
+
+        // Exact IDs of a loaded hotkeys declaration without a menu target. Initialize at kPostPostLoad.
+        virtual Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept = 0;
 
     protected:
         ~ISettings() = default;
@@ -203,6 +208,11 @@ namespace OSFSettings::API
         Status ReleaseHotkeyBlock(HotkeyBlock block) const noexcept
         {
             return m_api ? m_api->ReleaseHotkeyBlock(block) : Status::NotReady;
+        }
+
+        Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) const noexcept
+        {
+            return m_api ? m_api->RegisterHotkey(mod, id, callback, user) : Status::NotReady;
         }
 
     private:

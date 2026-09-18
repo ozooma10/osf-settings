@@ -1,9 +1,12 @@
+#include "HotkeyTasks.h"
 #include "API/SettingsApi.h"
 #include "Input/HotkeyInputState.h"
 #include "Settings/SettingsService.h"
 
 #include <array>
 #include <barrier>
+#include <chrono>
+#include <fstream>
 #include <iostream>
 #include <set>
 #include <stdexcept>
@@ -33,6 +36,12 @@ int main()
         check(client.ReleaseHotkeyBlock(0) == Status::UnknownHotkeyBlock &&
             client.ReleaseHotkeyBlock(99) == Status::UnknownHotkeyBlock, "unknown tokens cannot unblock input");
 
+        using Target = HotkeyInputState::Target;
+        const HotkeyInputState::Declarations menus{
+            { "osfsettings", {{ "openMenu", Target::Menu }} },
+            { "anothermod", {{ "openMenu", Target::Menu }} }
+        };
+        input.Initialize(menus);
         constexpr std::uint32_t key = 0x79;
         constexpr auto action = "osfsettings/openMenu";
         const auto press = [&] { return input.ProcessButton(key, action, 1, 0); };
@@ -104,16 +113,79 @@ int main()
         }
         check(!press() && release(), "input resumes after all concurrent consumers release");
 
+        unsigned callbacks{};
+        const auto fired = +[](const char*, const char*, void* user) noexcept { ++*static_cast<unsigned*>(user); };
+        API::Client disconnected;
+        check(disconnected.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::NotReady,
+            "disconnected registration returns NotReady");
+        check(client.RegisterHotkey(nullptr, "toggleFeature", fired, &callbacks) == Status::InvalidArgument &&
+            client.RegisterHotkey("sample", nullptr, fired, &callbacks) == Status::InvalidArgument &&
+            client.RegisterHotkey("sample", "toggleFeature", nullptr, &callbacks) == Status::InvalidArgument &&
+            client.RegisterHotkey("BAD", "toggleFeature", fired, &callbacks) == Status::InvalidArgument &&
+            client.RegisterHotkey("sample", "", fired, &callbacks) == Status::InvalidArgument &&
+            client.RegisterHotkey("sample", "bad/id", fired, &callbacks) == Status::InvalidArgument,
+            "hotkey API validates required pointers and ID syntax");
+        check(client.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::NotReady,
+            "callback registration requires settings readiness");
+        namespace fs = std::filesystem;
+        const auto root = fs::temp_directory_path() /
+            ("osf-hotkey-api-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        struct Cleanup
+        {
+            fs::path root;
+            ~Cleanup() { std::error_code ignored; fs::remove_all(root, ignored); }
+        } cleanup{root};
+        fs::create_directories(root / "schemas");
+        {
+            std::ofstream file(root / "schemas/sample.json");
+            file << R"({"schemaVersion":1,"id":"sample","groups":[],"hotkeys":[
+                {"id":"toggleFeature","label":"Toggle feature","default":"F6"},
+                {"id":"openMenu","label":"Open menu","menu":"SampleMenu"},
+                {"id":"invalid","label":"Invalid key","default":"Unknown"}]})";
+        }
+        settings.Load(root / "schemas", root / "values");
+        check(settings.LoadErrors().empty(), "load callback API fixture schema");
+        settings.Start();
+        HotkeyInputState pendingInput;
+        API::SettingsApi pendingAdapter(settings, pendingInput);
+        check(pendingAdapter.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::NotReady,
+            "callback registration also waits for native registration");
+        const HotkeyInputState::Declarations declarations{
+            { "sample", {{ "toggleFeature", Target::Callback }, { "openMenu", Target::Menu }, { "invalid", Target::Invalid }} }
+        };
+        input.Initialize(declarations);
+        check(client.RegisterHotkey("missing", "toggleFeature", fired, &callbacks) == Status::UnknownMod &&
+            client.RegisterHotkey("sample", "missing", fired, &callbacks) == Status::UnknownHotkey &&
+            client.RegisterHotkey("sample", "ToggleFeature", fired, &callbacks) == Status::UnknownHotkey &&
+            client.RegisterHotkey("sample", "openMenu", fired, &callbacks) == Status::TypeMismatch &&
+            client.RegisterHotkey("sample", "invalid", fired, &callbacks) == Status::InvalidValue,
+            "hotkey API exposes declaration validation statuses with exact IDs");
+        check(client.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::Ok,
+            "client registers a process-lifetime callback through the extended interface");
+        input.ProcessButton(0x75, "sample/toggleFeature", 1, 0);
+        check(callbacks == 0, "public callbacks do not run on the producer");
+        HotkeyTasks::Run();
+        check(callbacks == 1, "client registration and input share the callback state");
+
         std::uint32_t version{};
         auto* exported = static_cast<API::ISettings*>(OSFSettings_RequestAPI(API::kVersion, &version));
         check(exported && version == API::kVersion && client.Attach(exported, version),
             "the production export exposes the extended settings interface");
         auto& productionInput = HotkeyInputState::Get();
+        productionInput.Initialize(menus);
         productionInput.ProcessButton(key, action, 1, 0);
         check(client.AcquireHotkeyBlock(&first) == Status::Ok &&
             !productionInput.ProcessButton(key, action, 0, 1), "exported API and native handler share block state");
         check(client.ReleaseHotkeyBlock(first) == Status::Ok &&
             !productionInput.ProcessButton(key, action, 0, 1), "exported release does not revive cancelled input");
+        SettingsService::Get().Load(root / "schemas", root / "values");
+        SettingsService::Get().Start();
+        productionInput.Initialize(declarations);
+        check(client.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::Ok &&
+            productionInput.ProcessButton(0x75, "sample/toggleFeature", 1, 0),
+            "production export shares the callback registry and queue used by input");
+        HotkeyTasks::Run();
+        check(callbacks == 2, "the exported interface invokes a real registered callback");
         std::cout << checks << '/' << checks << " hotkey block/API checks passed\n";
     } catch (const std::exception& error) {
         std::cerr << "FAILED: " << error.what() << '\n';

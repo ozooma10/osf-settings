@@ -65,6 +65,7 @@ under **Advanced**.
 | `SaveFailed` | Could not save; previous value is unchanged. |
 | `UnknownSubscription` | Subscription token not found. |
 | `UnknownHotkeyBlock` | Block token is zero, unknown, or already released. |
+| `UnknownHotkey` | Hotkey ID not found in the mod's declarations. |
 | `InternalError` | Internal limit reached or unexpected internal status. |
 
 ## Native hotkey declarations
@@ -120,8 +121,8 @@ The bundled Settings declaration targets `OSFSettingsMenu` through this same pat
 `menu` must be a nonempty string without embedded NUL characters.
 
 `HotkeyInput` installs its own `BSInputEventUserStandalone` in `MenuControls`.
-It accepts enabled keyboard events for declarations with a menu target. All
-edges reach native held-action tracking; a release (`value == 0`, nonnegative
+It accepts enabled keyboard events for registered declarations. For menu targets,
+all edges reach native held-action tracking; a release (`value == 0`, nonnegative
 `heldDownSecs`) sends `UIMessageQueue::AddMessage(menu, kShow)` and marks the
 event stopped. Presses and repeats do not open a menu. The engine dispatcher
 admits held actions and rejects unpaired releases before the button callback.
@@ -136,14 +137,14 @@ returning to gameplay or the already-open Pause menu. Hide/removal cancels any
 active capture. Other mods' menu targets keep their own opening policy.
 
 Menu declarations use control mask `0x08`, the same mask as keyboard Pause.
-Declarations without `menu` retain the Movement mask and only register mappings;
-OSF does not dispatch them to a public callback yet. Mappings are in MainGameplay;
+Declarations without `menu` retain the Movement mask (`0x401`) and support
+registered callbacks on key-down. Mappings are in MainGameplay;
 there are no injected Pause-context links. The engine's active contexts,
 control masks, disabled-event translation and held-action admission still apply.
 Matching Pause's mask does **not** reproduce its private opening checks or its
 availability in other contexts. Each menu owns its contexts and input behavior.
 
-The input callback only enqueues a show message. Native `AddMessage` (ID 130659,
+For menu targets, the input handler only enqueues a show message. Native `AddMessage` (ID 130659,
 1.16.244.0) owns its queue lock and string references; the UI pump constructs and
 opens the menu. No game-thread assumption or extra `BSService` task is needed
 for that enqueue-only operation. The handler does not inspect player state or
@@ -162,11 +163,74 @@ show requests, not exact Pause eligibility.
 
 The OSF menu embeds vanilla binding rows in its shared settings list and uses
 native remapping and persistence. It displays the schema `label`; translating that label in the
-game's own Controls panel and public hotkey callbacks remain separate work.
+game's own Controls panel remains separate work.
 See [inline binding editor](NATIVE-BINDING-EDITOR.md) for the checkpoint's scope
 and pending in-game checks. The required `groups` array may be
 empty for a hotkey-only schema. Declarations are read once at startup; changes
 require restarting the game.
+
+## Native hotkey callbacks
+
+Omit `menu` to declare a callback hotkey. No callback function name or additional
+type field is needed in JSON:
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "mymod",
+  "title": "My mod",
+  "groups": [],
+  "hotkeys": [
+    { "id": "toggleFeature", "label": "Toggle feature", "default": "F6" }
+  ]
+}
+```
+
+Place this schema at `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json`.
+The hotkey appears in the implicit General group and uses the same native binding
+editor and persistence as menu hotkeys. An explicit `group` must name a declared
+group, as described above. Omitting `default` creates an initially unbound hotkey
+that can still accept callback registrations.
+
+After `Client::Init()` at SFSE `kPostPostLoad`, register using the exact mod and
+hotkey IDs. The callback is a C++ function pointer with an optional owner pointer:
+
+```cpp
+void OnHotkey(const char* mod, const char* id, void* user) noexcept;
+
+auto status = settings.RegisterHotkey("mymod", "toggleFeature", OnHotkey, owner);
+// OnHotkey and owner remain valid until process exit.
+```
+
+See the complete [native hotkey example](../examples/hotkeys/README.md) for a
+buildable SFSE consumer and its schema.
+
+- `RegisterHotkey` requires initialized settings, native mappings and task submission; otherwise
+  it returns `NotReady`. Null required arguments or malformed IDs return
+  `InvalidArgument`. The `user` pointer may be null if the callback does not need it.
+- Unknown mods return `UnknownMod`; missing or differently cased hotkey IDs return
+  `UnknownHotkey`. Menu-target declarations return `TypeMismatch`. A callback
+  declaration skipped because its default key is unknown returns `InvalidValue`.
+- Registrations last until process exit. There is no token or unregister call;
+  keep the callback code and its `user` object alive for that lifetime. Register
+  once per owner, rather than on every save load. Each successful call adds a
+  callback, including repeated registration of the same function and owner.
+- Each accepted key-down submits one `SFSE::TaskInterface::AddTask` task capturing
+  the callbacks present at that moment. That task invokes them in registration
+  order. Separate presses are not coalesced. Registration sends no initial
+  notification, and later registrations receive no earlier presses.
+- A fresh down (`value > 0`, `heldDownSecs == 0`) submits delivery. Repeats and
+  releases do not activate callbacks. Input is stopped only when a press is
+  submitted for at least one callback; declarations without callbacks remain unconsumed.
+- SFSE owns task scheduling. Callbacks run outside the input handler and internal
+  locks; OSF adds no main-thread or cross-task serialization guarantee. Schedule engine effects in
+  their required context. Callback strings last through the call, and exceptions
+  must not escape. Accepted tasks always invoke their captured callbacks, even if
+  a hotkey block is acquired before execution or by an earlier callback in the task.
+- Callback hotkeys use gameplay control eligibility: the native Movement mask,
+  active contexts, disabled-event filtering, keyboard-only input and native
+  binding capture still apply. Registering a callback does not change availability
+  or the saved binding. Use the focus block API below for custom input owners.
 
 ## Blocking hotkeys for focused views
 
@@ -189,19 +253,22 @@ if (status == OSFSettings::API::Status::Ok) {
 ```
 
 Each acquisition is independent, including repeated acquisitions by one caller.
-Releasing one token leaves all other blocks active. Blocks affect only menu
+Releasing one token leaves all other blocks active. Blocks affect menu and callback
 hotkeys dispatched by OSF Settings; they do not disable Starfield controls,
 consume keyboard events, close menus, or stop another mod's input handler.
 Declarations handled directly by another mod need that mod's own focus policy.
 The native binding editor holds its own token while capturing a binding.
 
-Acquisition discards pending presses. External blocks leave button edges
+Acquisition discards held menu presses and prevents new callback presses from
+being accepted. It does not cancel tasks for previously accepted presses, and
+tasks do not recheck blocks when they run. External blocks leave button edges
 available to native held-action bookkeeping, but OSF does not arm or dispatch
-menu opens. Native context and binding-editor filters still apply.
-After the last token is released, activation requires a fresh down and matching
-release for the same physical key and action. Repeats and releases from keys
-held before or during capture cannot reopen a menu. A release already admitted
-before acquisition may finish enqueueing; a block cannot retract a show message
+menu opens or accept new callback presses. Native context and binding-editor filters still apply.
+After the last token is released, callback activation requires a fresh down;
+menu activation also requires the matching release for the same physical key
+and action. Repeats and releases from keys held before or during capture cannot
+replay input rejected during the block. Previously accepted callbacks still run,
+and an admitted menu release may finish; a block cannot retract a show message
 already submitted to the engine. The existing native admission rules still apply.
 
 ### OSF UI integration checkpoint
@@ -216,8 +283,8 @@ OSF UI still uses its older Settings ABI. When porting `OSFSettingsClient`, repl
 its suppression calls with these methods and retain the token until capture is
 revoked. Handle acquisition failure before allowing capture and balance cleanup
 on view closure, failed reveal, browser-host failure, and focus teardown. Passive
-HUDs do not need a block. Public hotkey callbacks and the rest of the adapter
-port remain separate work.
+HUDs do not need a block. Use `RegisterHotkey` with a process-lifetime owner for
+hotkey callbacks; the rest of the OSF UI adapter port remains separate work.
 
 Host checks cover nested/concurrent owners, typing during a block, held releases,
 capture cancellation, native handler enqueueing, and shared API/input state.

@@ -30,6 +30,7 @@ namespace OSFSettings::API
         Status Unsubscribe(Subscription subscription) noexcept override;
         Status AcquireHotkeyBlock(HotkeyBlock* out) noexcept override;
         Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept override;
+        Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept override;
 
     private:
         template <class T> Status Read(const char* mod, const char* key, T* out) noexcept;

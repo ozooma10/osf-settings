@@ -1,3 +1,4 @@
+#include "HotkeyTasks.h"
 #include "SFSE/Impl/PCH.h"
 // Exercise the production startup hook and input callback against executable fixtures.
 #include "../src/Input/HotkeyInput.cpp"
@@ -130,11 +131,15 @@ namespace OSFSettings::TestHarness
 
 namespace OSFSettings::NativeHotkeys
 {
-    std::string_view GetMenu(std::string_view action)
+    const Action* FindAction(std::string_view action)
     {
-        if (action == "osfsettings/openMenu") return "OSFSettingsMenu";
-        if (action == "anothermod/openMenu") return "OtherMenu";
-        return {};
+        static const Action settings{ "osfsettings", "openMenu", "OSFSettingsMenu" };
+        static const Action other{ "anothermod", "openMenu", "OtherMenu" };
+        static const Action callback{ "anothermod", "toggleFeature", std::nullopt };
+        if (action == "osfsettings/openMenu") return &settings;
+        if (action == "anothermod/openMenu") return &other;
+        if (action == "anothermod/toggleFeature") return &callback;
+        return nullptr;
     }
 }
 
@@ -226,6 +231,12 @@ int main()
             "vanilla initialization precedes exactly one native handler registration");
         {
             auto* handler = &*HotkeyInput::g_handler;
+            auto& input = HotkeyInputState::Get();
+            using Target = HotkeyInputState::Target;
+            input.Initialize({
+                { "osfsettings", {{ "openMenu", Target::Menu }} },
+                { "anothermod", {{ "openMenu", Target::Menu }, { "toggleFeature", Target::Callback }} }
+            });
             Event settings("osfsettings/openMenu"), otherMenu("anothermod/openMenu"), pause("Pause");
             check(handler->ShouldHandleEvent(&settings) && handler->ShouldHandleEvent(&otherMenu) &&
                 !handler->ShouldHandleEvent(&pause) && !handler->ShouldHandleEvent(nullptr),
@@ -290,7 +301,6 @@ int main()
                 settings.status = RE::InputEvent::Status::kUnhandled;
                 if (handler->ShouldHandleEvent(&settings)) handler->OnButtonEvent(&settings);
             };
-            auto& input = HotkeyInputState::Get();
             button(1, 0);
             const auto block = input.AcquireBlock();
             check(handler->ShouldHandleEvent(&settings), "blocked edges still reach native held-action bookkeeping");
@@ -313,6 +323,56 @@ int main()
             button(0, 1);
             check(messages.size() == 3 && settings.status == RE::InputEvent::Status::kStop,
                 "a fresh press after focus restoration opens the menu normally");
+
+            Event callback("anothermod/toggleFeature");
+            const auto callbackButton = [&](float value, float held) {
+                callback.value = value;
+                callback.heldDownSecs = held;
+                callback.status = RE::InputEvent::Status::kUnhandled;
+                if (handler->ShouldHandleEvent(&callback)) handler->OnButtonEvent(&callback);
+            };
+            callbackButton(1, 0);
+            check(handler->ShouldHandleEvent(&callback) && callback.status == RE::InputEvent::Status::kUnhandled &&
+                HotkeyTasks::pending.empty(), "declarations without registered callbacks remain unconsumed");
+            unsigned calls{};
+            check(input.Register("anothermod", "toggleFeature", +[](const char*, const char*, void* user) noexcept {
+                ++*static_cast<unsigned*>(user);
+            }, &calls) == SettingsError::None, "register a native callback fixture");
+            callback.disabled = true;
+            callbackButton(1, 0);
+            check(!handler->ShouldHandleEvent(&callback) && HotkeyTasks::pending.empty(), "disabled callback actions are filtered");
+            callback.disabled = false;
+            callback.deviceType = RE::InputEvent::DeviceType::kGamepad;
+            callbackButton(1, 0);
+            check(!handler->ShouldHandleEvent(&callback) && HotkeyTasks::pending.empty(), "callback actions remain keyboard-only");
+            callback.deviceType = RE::InputEvent::DeviceType::kKeyboard;
+            callback.eventType = RE::InputEvent::EventType::kChar;
+            callbackButton(1, 0);
+            check(!handler->ShouldHandleEvent(&callback) && HotkeyTasks::pending.empty(), "text events cannot activate callbacks");
+            callback.eventType = RE::InputEvent::EventType::kButton;
+            queue = nullptr;
+            callbackButton(1, 0);
+            check(callback.status == RE::InputEvent::Status::kStop && !HotkeyTasks::pending.empty() && calls == 0,
+                "callback key-down is consumed when queued without requiring a UI queue or invoking inline");
+            callbackButton(1, 1);
+            callbackButton(0, 1);
+            check(callback.status == RE::InputEvent::Status::kUnhandled, "callback repeats and releases are unconsumed");
+            HotkeyTasks::Run();
+            check(calls == 1 && messages.size() == 3, "one callback runs on dispatch without opening a menu");
+            queue = &queueStorage;
+            callbackButton(1, 0);
+            const auto callbackBlock = input.AcquireBlock();
+            callbackButton(1, 0);
+            check(handler->ShouldHandleEvent(&callback) && callback.status == RE::InputEvent::Status::kUnhandled,
+                "blocked callback edges retain native admission without consuming input");
+            input.ReleaseBlock(callbackBlock);
+            callbackButton(1, 1);
+            callbackButton(0, 1);
+            HotkeyTasks::Run();
+            check(calls == 2, "focus blocks leave submitted tasks intact while held input cannot replay");
+            callbackButton(1, 0);
+            HotkeyTasks::Run();
+            check(calls == 3, "a fresh callback press works after focus restoration");
         }
         events.clear();
         HotkeyInput::Attach(&controls);

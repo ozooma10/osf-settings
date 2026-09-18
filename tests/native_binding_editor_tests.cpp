@@ -1,3 +1,4 @@
+#include "HotkeyTasks.h"
 #include "SFSE/Impl/PCH.h"
 #include "../src/Input/NativeBindingEditor.cpp"
 
@@ -141,8 +142,17 @@ int main()
         };
         check(candidate() == 0, "ordinary vanilla editing retains its allowed-swap policy");
         auto& hotkeys = OSFSettings::HotkeyInputState::Get();
+        hotkeys.Initialize({ { "test", {{ "action", HotkeyInputState::Target::Menu }, { "callback", HotkeyInputState::Target::Callback }} } });
+        unsigned callbacks{};
+        check(hotkeys.Register("test", "callback", +[](const char*, const char*, void* user) noexcept {
+            ++*static_cast<unsigned*>(user);
+        }, &callbacks) == SettingsError::None, "register capture callback fixture");
+        hotkeys.ProcessButton(0x75, "test/callback", 1, 0);
         hotkeys.ProcessButton(0x79, "test/action", 1, 0);
         check(fixture.editor.Begin(), "begin OSF capture");
+        HotkeyTasks::Run();
+        check(callbacks == 1 && !hotkeys.ProcessButton(0x75, "test/callback", 1, 0),
+            "native capture permits submitted tasks to finish but blocks new callback presses");
         check(candidate() == 2, "populated primary requires confirmation for another action's key");
         check(candidate(Slot::kAlternate) == 2, "secondary requires the same confirmation");
         owners[0].bindingSlot = Slot::kAlternate;
@@ -170,6 +180,8 @@ int main()
             "cancel delegates once and releases OSF's policy");
         check(!hotkeys.ProcessButton(0x79, "test/action", 0, 1),
             "ending capture does not revive the key held before capture began");
+        check(!hotkeys.ProcessButton(0x75, "test/callback", 1, 1) &&
+            !hotkeys.ProcessButton(0x75, "test/callback", 0, 1), "capture cancellation cannot replay held callback input");
         const auto externalBlock = hotkeys.AcquireBlock();
         check(fixture.editor.Begin() && candidate() == 2, "cancel then retry the same occupied key prompts again");
         fixture.editor.End(false);
@@ -177,10 +189,14 @@ int main()
         hotkeys.ProcessButton(0x79, "test/action", 1, 0);
         check(!hotkeys.ProcessButton(0x79, "test/action", 0, 1),
             "ending native capture preserves an external consumer's block");
+        check(!hotkeys.ProcessButton(0x75, "test/callback", 1, 0), "external blocks still suppress callbacks after capture ends");
         hotkeys.ReleaseBlock(externalBlock);
         hotkeys.ProcessButton(0x79, "test/action", 1, 0);
         check(hotkeys.ProcessButton(0x79, "test/action", 0, 1),
             "new presses work after native and external owners release");
+        check(hotkeys.ProcessButton(0x75, "test/callback", 1, 0), "fresh callback presses work after all owners release");
+        HotkeyTasks::Run();
+        check(callbacks == 2, "capture cleanup restores callback delivery");
         check(owners[0].keyCode == 0x20 && owners[1].keyCode == 0x79,
             "confirmation policy never mutates bindings before the native decision");
         std::cout << checks << " native binding editor checks passed\n";

@@ -7,6 +7,7 @@
 #include "SFSE/InputMap.h"
 #include "REL/ASM.h"
 #include "REL/Trampoline.h"
+#include "HotkeyTasks.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -117,24 +118,43 @@ int main()
         load(&first, vanilla);
         check(parsedTexts.size() == 1 && parsedTexts.back() == vanilla, "empty declarations preserve vanilla input");
 
-        schemas.resize(2);
+        schemas.resize(3);
         schemas[0].schema.id = "osfsettings";
         schemas[0].schema.hotkeys = { { "openMenu", "Open settings", "F10", "OSFSettingsMenu" },
-            { "unbound", "Unbound", std::nullopt }, { "invalid", "Invalid", "Unknown", "InvalidMenu" } };
+            { "unbound", "Unbound", std::nullopt }, { "invalid", "Invalid", "Unknown", "InvalidMenu" },
+            { "badCallback", "Invalid callback", "Unknown" } };
         schemas[1].schema.id = "anothermod";
         schemas[1].schema.hotkeys = { { "openMenu", "Other action", "F4", "OtherMenu" } };
+        schemas[2].schema.id = "empty";
         check(OSFSettings::NativeHotkeys::Install(), "real CALL5 hook installs");
         check(formattedRows.size() == 3 && formattedRows[0].event == "osfsettings/openMenu" &&
             formattedRows[0].key == 0x79 && formattedRows[1].key == 0xFF &&
             formattedRows[2].event == "anothermod/openMenu" && formattedRows[2].key == 0x73,
             "schema defaults, unbound actions, namespaces and invalid defaults are handled");
         check(std::ranges::all_of(formattedRows, [](const Row& row) { return row.nativeFlags; }),
-            "menu targets use the menu mask; mapping-only actions retain their gameplay flags");
-        check(OSFSettings::NativeHotkeys::GetMenu("osfsettings/openMenu") == "OSFSettingsMenu" &&
-            OSFSettings::NativeHotkeys::GetMenu("anothermod/openMenu") == "OtherMenu" &&
-            OSFSettings::NativeHotkeys::GetMenu("osfsettings/unbound").empty() &&
-            OSFSettings::NativeHotkeys::GetMenu("osfsettings/invalid").empty() &&
-            OSFSettings::NativeHotkeys::GetMenu("Pause").empty(), "only valid declarations with a menu target are dispatched");
+            "menu targets use the menu mask; callback actions retain their gameplay flags");
+        using OSFSettings::NativeHotkeys::FindAction;
+        const auto* menu = FindAction("osfsettings/openMenu");
+        const auto* otherMenu = FindAction("anothermod/openMenu");
+        const auto* callback = FindAction("osfsettings/unbound");
+        check(menu && menu->menu == "OSFSettingsMenu" && otherMenu && otherMenu->menu == "OtherMenu" &&
+            callback && !callback->menu && callback->mod == "osfsettings" && callback->id == "unbound" &&
+            !FindAction("osfsettings/invalid") && !FindAction("osfsettings/badCallback") && !FindAction("Pause"),
+            "valid native actions retain callback identity or a menu target, excluding invalid defaults");
+        auto& input = OSFSettings::HotkeyInputState::Get();
+        unsigned calls{};
+        const auto fired = +[](const char*, const char*, void* user) noexcept { ++*static_cast<unsigned*>(user); };
+        using OSFSettings::SettingsError;
+        check(input.Register("osfsettings", "badCallback", fired, &calls) == SettingsError::InvalidValue &&
+            input.Register("osfsettings", "openMenu", fired, &calls) == SettingsError::TypeMismatch &&
+            input.Register("empty", "missing", fired, &calls) == SettingsError::UnknownHotkey,
+            "registration publishes schema validation outcomes, including mods without hotkeys");
+        check(input.Register("osfsettings", "unbound", fired, &calls) == SettingsError::None,
+            "valid unbound native actions accept callbacks");
+        check(input.ProcessButton(0x75, "osfsettings/unbound", 1, 0) && calls == 0 && HotkeyTasks::pending.size() == 1,
+            "production registration submits the callback through the real SFSE AddTask wrapper");
+        HotkeyTasks::Run();
+        check(calls == 1, "the SFSE task delegate runs the callback and destroys its captured work");
 
         load(&first, vanilla);
         check(parsedTexts.size() == 2 && parsedMap == &first && parsedTexts.back().ends_with(vanilla),

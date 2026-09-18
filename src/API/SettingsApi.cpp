@@ -22,6 +22,7 @@ namespace OSFSettings::API
             case SettingsError::SaveFailed: return Status::SaveFailed;
             case SettingsError::UnknownSubscription: return Status::UnknownSubscription;
             case SettingsError::InternalError: return Status::InternalError;
+            case SettingsError::UnknownHotkey: return Status::UnknownHotkey;
             }
             return Status::InternalError;
         }
@@ -120,6 +121,15 @@ namespace OSFSettings::API
     Status SettingsApi::Unsubscribe(Subscription subscription) noexcept
     {
         return ToStatus(m_service.Unsubscribe(subscription));
+    }
+
+    Status SettingsApi::RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept
+    {
+        if (!mod || !id || !callback || !IsValidModId(mod)) return Status::InvalidArgument;
+        const std::string_view hotkeyId(id);
+        if (hotkeyId.empty() || hotkeyId.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") != std::string_view::npos) return Status::InvalidArgument;
+        if (!m_service.IsReady()) return Status::NotReady;
+        return ToStatus(m_input.Register(mod, id, callback, user));
     }
 
     Status SettingsApi::AcquireHotkeyBlock(HotkeyBlock* out) noexcept
