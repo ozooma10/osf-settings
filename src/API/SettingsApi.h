@@ -33,6 +33,7 @@ namespace OSFSettings::API
         Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept override;
         Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override;
         Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept override;
+        Status ReadRegistry(const char* mod, RegistryFn callback, void* user) noexcept override;
 
     private:
         template <class T> Status Read(const char* mod, const char* key, T* out) noexcept;

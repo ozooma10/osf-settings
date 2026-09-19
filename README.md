@@ -22,6 +22,17 @@ The [native hotkey callback API](docs/API.md#native-hotkey-callbacks) uses schem
 hotkeys without a `menu` target. A buildable consumer lives in
 [examples/hotkeys](examples/hotkeys/README.md).
 
+The [registry snapshot API](docs/API.md#registry-discovery-and-snapshots) discovers
+mods, schema metadata, and current typed values. A buildable consumer in
+[examples/registry](examples/registry/README.md) refreshes owned values after
+initial, keyed, and full-refresh notifications. Focused checks:
+
+```powershell
+xmake build osfsettings-registry-tests
+xmake run osfsettings-registry-tests
+xmake build osfsettings-registry-example
+```
+
 Focused hotkey checks on Windows:
 
 ```powershell

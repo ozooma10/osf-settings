@@ -1,9 +1,13 @@
 #include "SettingsApi.h"
+#include "../../sdk/OSFSettingsRegistry.h"
 #include "Input/HotkeyInputState.h"
 #include "Settings/SettingsService.h"
 
+#include <algorithm>
 #include <cstring>
 #include <limits>
+#include <stdexcept>
+#include <type_traits>
 
 namespace OSFSettings::API
 {
@@ -26,6 +30,110 @@ namespace OSFSettings::API
             }
             return Status::InternalError;
         }
+
+        std::uint32_t Count(std::size_t size)
+        {
+            if (size > std::numeric_limits<std::uint32_t>::max()) throw std::length_error("registry field is too large");
+            return static_cast<std::uint32_t>(size);
+        }
+
+        TextView Text(const std::string& text) { return { text.c_str(), Count(text.size()) }; }
+
+        template <class T>
+        const T* Elements(const std::vector<T>& items) { return items.empty() ? nullptr : items.data(); }
+
+        template <class T>
+        RegistryValue Value(const T& value)
+        {
+            if constexpr (std::is_same_v<T, bool>) return { .boolean = value };
+            else if constexpr (std::is_same_v<T, std::int64_t>) return { .integer = value };
+            else if constexpr (std::is_same_v<T, double>) return { .number = value };
+            else if constexpr (std::is_same_v<T, EnumValue>) return { .text = Text(value.value) };
+            else if constexpr (std::is_same_v<T, KeyBinding>) return { .key = value.keyCode };
+            else return { .text = Text(value) };
+        }
+
+        SettingView Describe(const SettingDefinition& setting, const SettingValue& current, std::vector<EnumOptionView>& options)
+        {
+            SettingView view{ .key = Text(setting.key), .label = Text(setting.label), .hint = Text(setting.hint), .requiresRestart = setting.requiresRestart };
+            std::visit([&](const auto& definition) {
+                using Definition = std::decay_t<decltype(definition)>;
+                using ValueType = std::decay_t<decltype(definition.defaultValue)>;
+                view.value = Value(std::get<ValueType>(current));
+                view.defaultValue = Value(definition.defaultValue);
+                if constexpr (std::is_same_v<Definition, BoolDefinition>) {
+                    view.type = SettingType::Bool;
+                } else if constexpr (std::is_same_v<Definition, IntDefinition>) {
+                    view.type = SettingType::Int;
+                } else if constexpr (std::is_same_v<Definition, FloatDefinition>) {
+                    view.type = SettingType::Float;
+                    view.step = definition.step;
+                } else if constexpr (std::is_same_v<Definition, EnumDefinition>) {
+                    view.type = SettingType::Enum;
+                    view.optionCount = Count(definition.options.size());
+                    options.reserve(definition.options.size());
+                    for (const auto& option : definition.options) options.push_back({ Text(option.value), Text(option.label) });
+                    view.options = Elements(options);
+                } else if constexpr (std::is_same_v<Definition, KeyDefinition>) {
+                    view.type = SettingType::Key;
+                    view.allowUnbound = definition.allowUnbound;
+                } else if constexpr (std::is_same_v<Definition, StringDefinition>) {
+                    view.type = SettingType::String;
+                    view.maxLength = definition.maxLength;
+                }
+                if constexpr (std::is_same_v<Definition, IntDefinition> || std::is_same_v<Definition, FloatDefinition>) {
+                    view.hasMinimum = definition.minimum.has_value();
+                    view.hasMaximum = definition.maximum.has_value();
+                    if (definition.minimum) view.minimum = Value(*definition.minimum);
+                    if (definition.maximum) view.maximum = Value(*definition.maximum);
+                }
+            }, setting.definition);
+            return view;
+        }
+
+        // Private backing arrays describe a detached service snapshot. None of these owning containers crosses the ABI or survives ReadRegistry.
+        struct RegistryProjection
+        {
+            struct Group
+            {
+                std::vector<SettingView> settings;
+                std::vector<std::vector<EnumOptionView>> options;
+            };
+            struct Mod
+            {
+                std::vector<Group> groups;
+                std::vector<GroupView> views;
+            };
+            std::vector<Mod> mods;
+            std::vector<ModView> views;
+
+            explicit RegistryProjection(const std::vector<ModSettings>& snapshot, const char* selected)
+            {
+                // Size once so no later growth invalidates a published pointer.
+                const auto count = selected ? 1u : Count(snapshot.size());
+                mods.resize(count);
+                views.reserve(count);
+                for (const auto& mod : snapshot) {
+                    if (selected && mod.schema.id != selected) continue;
+                    auto& backing = mods[views.size()];
+                    const auto& schema = mod.schema;
+                    const auto groupCount = Count(schema.groups.size());
+                    backing.groups.resize(groupCount);
+                    backing.views.reserve(groupCount);
+                    for (const auto& group : schema.groups) {
+                        auto& data = backing.groups[backing.views.size()];
+                        const auto settingCount = Count(group.settings.size());
+                        data.settings.reserve(settingCount);
+                        data.options.resize(settingCount);
+                        for (const auto& setting : group.settings) {
+                            data.settings.push_back(Describe(setting, mod.values.at(setting.key), data.options[data.settings.size()]));
+                        }
+                        backing.views.push_back({ Text(group.id), Text(group.label), Elements(data.settings), settingCount });
+                    }
+                    views.push_back({ Text(schema.id), Text(schema.title), Text(schema.description), Elements(backing.views), groupCount });
+                }
+            }
+        };
     }
 
     SettingsApi::SettingsApi(SettingsService& service) : SettingsApi(service, HotkeyInputState::Get()) {}
@@ -37,6 +145,20 @@ namespace OSFSettings::API
     }
 
     bool SettingsApi::IsReady() noexcept { return m_service.IsReady(); }
+
+    Status SettingsApi::ReadRegistry(const char* mod, RegistryFn callback, void* user) noexcept
+    {
+        if (!callback || (mod && !IsValidModId(mod))) return Status::InvalidArgument;
+        if (!m_service.IsReady()) return Status::NotReady;
+        const auto snapshot = m_service.Snapshot();
+        if (mod && std::ranges::none_of(snapshot, [&](const auto& entry) { return entry.schema.id == mod; })) {
+            return Status::UnknownMod;
+        }
+        const RegistryProjection projection(snapshot, mod);
+        const RegistryView view{ Elements(projection.views), Count(projection.views.size()) };
+        callback(view, user);
+        return Status::Ok;
+    }
 
     template <class T>
     Status SettingsApi::Read(const char* mod, const char* key, T* out) noexcept

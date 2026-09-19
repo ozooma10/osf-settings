@@ -24,6 +24,158 @@ if (settings.Init() && settings.IsReady()) {
 - Values live in `Data/SFSE/Plugins/OSF/Settings/values/<mod>.json`, across save games.
 - The `Client` string overload owns its result in the calling mod and preserves it on error.
 
+## Registry discovery and snapshots
+
+`ISettings::ReadRegistry(mod, callback, context)` and the matching `Client` method
+expose the loaded settings registry without knowledge of internal store types.
+Include `OSFSettingsRegistry.h` for the registry descriptors; it also includes
+`OSFSettings.h`. Ordinary settings consumers only need `OSFSettings.h`.
+Pass `nullptr` for all mods or an exact, case-sensitive mod ID for one mod:
+
+```cpp
+#include "OSFSettingsRegistry.h"
+
+void OnRegistry(const OSFSettings::API::RegistryView& registry, void* context) noexcept;
+
+auto status = settings.ReadRegistry(nullptr, OnRegistry, owner); // Discover all mods.
+status = settings.ReadRegistry("mymod", OnRegistry, owner);      // Refresh one mod.
+```
+
+On `Ok`, the callback runs exactly once, including when there are no loaded mods.
+It receives `RegistryView::mods/modCount`; each `ModView` contains
+`groups/groupCount`, and each `GroupView` contains `settings/settingCount`.
+Empty arrays have a null pointer and zero count. All successfully loaded mods
+are included, even if they have no ordinary settings. Failed schemas are not
+registry entries. Mod order is provider order; group, setting, and enum-option
+order matches the parsed schema. Use IDs as identities, never array indices.
+
+The descriptors are independent, standard-layout, trivially copyable public
+records, with no STL containers, internal type aliases, or allocator ownership.
+They contain this metadata:
+
+| Descriptor | Fields and meaning |
+| --- | --- |
+| `ModView` | Authored ID, title, description, and groups |
+| `GroupView` | Authored ID, label, and settings, including empty groups |
+| `SettingView` | Key, label, hint, exact `SettingType`, restart requirement, current value, and default value |
+| Integer metadata | Optional inclusive `int64_t` minimum/maximum; editor increment is implicitly 1 |
+| Float metadata | Optional inclusive `double` minimum/maximum and editor `step`; step is not a storage-validity grid |
+| Enum metadata | Ordered option identifiers and corresponding display labels |
+| String metadata | Effective `maxLength` in UTF-8 bytes, excluding NUL |
+| Key metadata | `allowUnbound`; current/default values are native keyboard VK codes, including `kUnboundKey` |
+
+`SettingView::type` selects the active member of both `value` and `defaultValue`:
+`Bool → boolean`, `Int → integer`, `Float → number`, `Enum/String → text`,
+`Key → key`. Bounds use `integer` or `number` and are readable only when their
+respective `hasMinimum`/`hasMaximum` flag is true. Options exist only for Enum;
+`step` is meaningful only for Float, `maxLength` only for String, and
+`allowUnbound` only for Key. Other metadata fields remain zero/false/null; do
+not read inactive union members. Enum current/default text is the option ID,
+not its label. Integers remain exact 64-bit integers, without conversion through
+double. Public enum values are explicit and unrelated to internal variant indices.
+
+All text uses `TextView { data, size }`. `data` is non-null, NUL-terminated UTF-8;
+`size` is the byte length excluding the final NUL. Copy with
+`std::string(text.data, text.size)`. Presentation strings and group IDs may
+contain embedded NULs; using only `strlen` would lose data. Mod IDs, setting keys,
+enum IDs, and free-form values follow their existing validation contracts.
+Text is the parsed schema text with existing fallback labels applied; this API
+does not localize or invent additional metadata.
+
+### Ownership, consistency, and threading
+
+The provider copies the authoritative store under the service mutex, then builds
+the complete public projection before invoking consumer code. Metadata, defaults,
+and current values in one snapshot describe a single instant, across all selected
+mods. This is the same store used by typed getters, writes, resets, and the native
+menu. There is no second registry, schema-file rescan, or persistent public cache.
+
+The callback runs synchronously on the calling thread, with no provider locks
+held. Calls may originate on any thread; simultaneous reads may overlap. Reads,
+writes, subscriptions, and nested reads are allowed in the callback. Concurrent
+or reentrant writes cannot alter the snapshot currently being read. A nested
+read or an ordinary getter may observe newer values. Separate calls do not form
+one transaction. Schemas and the mod set are fixed after startup; changes to
+schema files require restarting the game.
+
+Every descriptor, array, and string is read-only and valid only until that
+callback returns. Copy anything to be retained. Copying a descriptor alone does
+not extend the lifetime of its pointers. The provider owns and releases all
+snapshot memory; consumers must neither modify nor free it. Caller arguments
+must remain valid during the call. The callback and `context` are not retained.
+
+The callback must be `noexcept`: an exception escaping it terminates the process.
+If copying can fail, handle that inside the callback and record a consumer-side
+result. Provider `Ok` means snapshot delivery succeeded, not that the consumer's
+processing succeeded. Do not perform engine/UI effects unless the calling
+context permits them; neither registry reads nor change notifications create
+a main-thread guarantee.
+
+### Errors
+
+Errors never invoke the callback. The provider validates the callback and mod ID
+before checking readiness, then performs lookup and projection:
+
+| Status | Meaning |
+| --- | --- |
+| `InvalidArgument` | Null callback, or a non-null mod ID that fails the existing mod-ID rules; empty is not a wildcard |
+| `NotReady` | Provider has not started; a detached Client also returns this |
+| `UnknownMod` | A well-formed filtered mod ID is not loaded |
+| `InternalError` | Snapshot allocation/projection failed, or a length/count cannot fit the public `uint32_t` field |
+
+`context` may be null. There is no buffer probe, truncation, partial delivery,
+callback cancellation, or snapshot-release call. Registry reads cause no writes
+or notifications. This extends the pre-launch 1.0 interface; rebuild consumers
+against the current SDK and provider together, since older pre-launch 1.0 DLLs
+do not have this method. Existing slots remain in place.
+
+### Notifications and OSF UI bridge requirements
+
+Discover mod IDs, subscribe to each mod, then read values again before publishing
+an initial cache. Do not publish values captured before subscription. A write
+between discovery and subscription is covered by that later read; writes after
+subscription also produce invalidations. A pending invalidation may describe a
+value already included in a snapshot, so duplicate current-value refreshes are
+normal. Serialize capture and replacement in the consumer if more than one
+thread can refresh its cache.
+
+`ChangedFn` supplies an invalidation, not a value. On a keyed notification,
+reread the key using its known type or read the affected mod. On
+`key == nullptr` (including the initial notification and a changed `ResetMod`),
+read the mod and refresh all its values. Never manufacture a setting identity
+for null. Existing subscription lifetime, coalescing, and unsubscribe guarantees
+remain unchanged. If a refresh fails, retain the last good cache and retry the
+invalidation rather than publishing partial data as current.
+
+Inspection of OSF UI's `SettingsModule`, `SettingsMirror`, and
+`SettingsSubscriptions` establishes these integration requirements:
+
+- Retained `osfui/settings` state contains mods, schema groups/settings, and
+  current values. The public descriptors supply Slim's supported subset,
+  including defaults and editor metadata. Initial publication or a full refresh
+  can rebuild that retained state from a complete snapshot.
+- `SettingsMirror` owns values indexed by authored mod/key identities. Copy the
+  snapshot before replacing its contents; do not retain provider views or use
+  display labels as identities.
+- Native subscription replay requires one current value per setting, serialized
+  as a value rather than display text. Refresh the mirror before generating those
+  replay entries. A null-key invalidation therefore expands into current-value
+  entries; it cannot be forwarded directly as a `settings.changed` event. Existing
+  OSF UI replay ordering and duplicate tolerance remain adapter responsibilities.
+- Localization, native VK-to-OSF-UI-key-name conversion, case-insensitive lookup
+  policy, and any web numeric-representation policy belong to the adapter. This
+  API preserves Slim's identities, numeric precision, and key representation.
+
+Native `hotkeys` declarations are separate engine-managed actions and are not
+ordinary settings values. This registry does not project them as key settings.
+Historical OSF UI features that Slim does not support (such as flags, pages,
+conditions, presets, and injected conflict/keyboard data) are not synthesized.
+This change does not implement or port the OSF UI adapter.
+
+The buildable [registry example](../examples/registry/README.md) demonstrates
+discovery, copying, refresh serialization, null-key handling, and unsubscribe
+cleanup using only the public SDK.
+
 ## Free-form strings
 
 Use `"type": "string"` for editable single-line text. `default` is required and
@@ -300,7 +452,7 @@ After `Client::Init()` at SFSE `kPostPostLoad`, register using the exact mod and
 hotkey IDs. The callback is a C++ function pointer with an optional owner pointer:
 
 ```cpp
-void OnHotkey(const char* mod, const char* id, void* user) noexcept;
+void OnHotkey(const char* mod, const char* id, void* context) noexcept;
 
 auto status = settings.RegisterHotkey("mymod", "toggleFeature", OnHotkey, owner);
 // OnHotkey and owner remain valid until process exit.
@@ -311,12 +463,12 @@ buildable SFSE consumer and its schema.
 
 - `RegisterHotkey` requires initialized settings, native mappings and task submission; otherwise
   it returns `NotReady`. Null required arguments or malformed IDs return
-  `InvalidArgument`. The `user` pointer may be null if the callback does not need it.
+  `InvalidArgument`. The `context` pointer may be null if the callback does not need it.
 - Unknown mods return `UnknownMod`; missing or differently cased hotkey IDs return
   `UnknownHotkey`. Menu-target declarations return `TypeMismatch`. A callback
   declaration skipped because its default key is unknown returns `InvalidValue`.
 - Registrations last until process exit. There is no token or unregister call;
-  keep the callback code and its `user` object alive for that lifetime. Register
+  keep the callback code and its `context` object alive for that lifetime. Register
   once per owner, rather than on every save load. Each successful call adds a
   callback, including repeated registration of the same function and owner.
 - Each accepted key-down submits one `SFSE::TaskInterface::AddTask` task capturing
@@ -399,10 +551,10 @@ recovery, and focus loss/restoration. Fresh hotkey presses must work after clean
 
 ## Subscriptions
 
-`Subscribe(mod, callback, user, &token)` watches one mod. `Unsubscribe(token)` removes it.
+`Subscribe(mod, callback, context, &token)` watches one mod. `Unsubscribe(token)` removes it.
 
 ```cpp
-void OnChanged(const char* mod, const char* key, void* user) noexcept;
+void OnChanged(const char* mod, const char* key, void* context) noexcept;
 ```
 
 - Subscribe before the first read.
@@ -410,7 +562,7 @@ void OnChanged(const char* mod, const char* key, void* user) noexcept;
 - Later callbacks identify changed keys. Changes may coalesce; null means reread all.
 - API calls may come from any thread. Callbacks run serially on an SFSE task; no main-thread guarantee.
 - Callback strings last only for that callback. Exceptions must not escape.
-- Keep `user` alive until `Unsubscribe` returns. When unsubscribing inside a callback, keep it alive until that callback returns.
+- Keep `context` alive until `Unsubscribe` returns. When unsubscribing inside a callback, keep it alive until that callback returns.
 k that consumer effects run in their required context. Verify both menu sizes and controller input.
 Compilation and file deployment do not replace this check.
 

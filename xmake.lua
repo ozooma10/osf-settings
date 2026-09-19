@@ -200,3 +200,30 @@ target("osfsettings-string-tests")
     set_pcxxheader("src/pch.h")
     add_packages("nlohmann_json")
     set_rundir(os.projectdir())
+
+target("osfsettings-registry-tests")
+    set_kind("binary")
+    set_default(false)
+    add_deps("commonlibsf")
+    add_files("tests/registry_api_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp", "src/Input/KeyNames.cpp",
+        "src/API/SettingsApi.cpp", "src/API/Exports.cpp", "src/Settings/*.cpp")
+    add_includedirs("src", "sdk", "examples/registry")
+    set_pcxxheader("src/pch.h")
+    add_packages("nlohmann_json")
+    set_rundir(os.projectdir())
+
+target("osfsettings-registry-example")
+    set_default(false)
+    set_basename("OSFSettingsRegistryExample")
+    add_rules("commonlibsf.plugin", {
+        name = "OSFSettingsRegistryExample",
+        author = "ozooma10",
+        description = "Development-only settings registry SDK example",
+        options = { address_library = false, no_struct_use = true }
+    })
+    add_files("examples/registry/main.cpp")
+    add_includedirs("sdk")
+    set_values("commonlib.plugin.install", false)
+    on_config(function(target)
+        target:set("installfiles", {})
+    end)

@@ -47,6 +47,10 @@ namespace OSFSettings::API
     using ChangedFn = void (*)(const char* mod, const char* key, void* user) noexcept;
     using HotkeyFn = void (*)(const char* mod, const char* id, void* user) noexcept;
 
+    // Include OSFSettingsRegistry.h to inspect registry records.
+    struct RegistryView;
+    using RegistryFn = void (*)(const RegistryView&, void* user) noexcept;
+
     struct ISettings
     {
         virtual bool IsReady() noexcept = 0;
@@ -89,6 +93,11 @@ namespace OSFSettings::API
 
         virtual Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept = 0;
         virtual Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept = 0;
+
+        // Reads the registry for the specified mod, invoking the callback with a consistent snapshot.
+        // nullptr mod selects all mods; otherwise an exact mod ID.
+        // Copy retained data in the callback;
+        virtual Status ReadRegistry(const char* mod, RegistryFn callback, void* context) noexcept = 0;
 
     protected:
         ~ISettings() = default;
@@ -251,6 +260,10 @@ namespace OSFSettings::API
         Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) const noexcept
         {
             return m_api ? m_api->RegisterHotkey(mod, id, callback, user) : Status::NotReady;
+
+        Status ReadRegistry(const char* mod, RegistryFn callback, void* context) const noexcept
+        {
+            return m_api ? m_api->ReadRegistry(mod, callback, context) : Status::NotReady;
         }
 
     private:
