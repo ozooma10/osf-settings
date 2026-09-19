@@ -23,9 +23,11 @@ package
         private var tick:int = 0;
         private var step:int = -1;
         private var setter:Function;
+        private var bindingsOnly:Boolean;
 
-        public function PreviewChecks(movie:MovieClip)
+        public function PreviewChecks(movie:MovieClip, bindings:Boolean = false)
         {
+            bindingsOnly = bindings;
             menu = movie;
             for (var i:int = 0; i < menu.numChildren; ++i) {
                 var child:Object = menu.getChildAt(i);
@@ -42,6 +44,7 @@ package
         {
             Object(menu).ProcessUserEvent(name, true); Object(menu).ProcessUserEvent(name, false);
         }
+        private function searchField():TextField { return DisplayObjectContainer(findNamed(menu,"bindingSearch")).getChildAt(0) as TextField; }
         private function key(code:uint):void
         {
             list.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, true, 0, code));
@@ -53,9 +56,11 @@ package
                 switch (step++) {
                 case -1:
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready at root");
-                    require(list.entryCount == 1 && list.selectedEntry.row.mod == "design-preview", "single mod still opens at All Mods");
+                    require(list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview", "design and binding fixture mods open at All Mods");
                     require(findNamed(menu, "mods") != null && findNamed(menu, "issues") != null, "both root tabs are reachable");
-                    capture("all-mods"); userEvent("Accept"); break;
+                    capture("all-mods");
+                    if (bindingsOnly) step = 34;
+                    else userEvent("Accept"); break;
                 case 0:
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready");
                     requireGlyphs("SELECTED SETTING");
@@ -92,7 +97,7 @@ package
                     require(list.entryCount == 1 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
                     userEvent("Cancel"); break;
                 case 8:
-                    require(list.entryCount == 1 && list.selectedEntry.row.title == "OSF Director", "back opens mod list");
+                    require(list.entryCount == 3 && list.selectedEntry.row.title == "OSF Director", "back opens mod list");
                     userEvent("Accept"); break;
                 case 9:
                     require(list.entryCount == 6, "opening a mod returns to playback");
@@ -118,13 +123,11 @@ package
                 case 14:
                     userEvent("Accept");
                     require(list.selectedEntry.row.value == 115, "held candidate cannot be confirmed");
-                    Object(menu).BGSCodeObj.previewKey(116, false); break;
-                case 15:
-                    capture("key-confirm");
                     findNamed(menu, "camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
                     require(list.selectedEntry.row.key == "toggleKey", "capture blocks tab changes");
-                    Object(menu).BGSCodeObj.previewKey(13, true);
-                    Object(menu).BGSCodeObj.previewKey(13, false); break;
+                    Object(menu).BGSCodeObj.previewKey(116, false); break;
+                case 15:
+                    capture("key-saved"); break;
                 case 16:
                     require(list.selectedEntry.row.value == 116 && !list.disableInput, "confirmed key saved and list input restored");
                     userEvent("YButton"); break;
@@ -139,8 +142,7 @@ package
                     require(list.selectedEntry.row.value == 13, "required key cannot be cleared");
                     userEvent("Accept"); break;
                 case 20:
-                    Object(menu).BGSCodeObj.previewKey(9, true);
-                    Object(menu).BGSCodeObj.previewKey(9, false); break;
+                    Object(menu).BGSCodeObj.previewKey(9, true); break;
                 case 21:
                     require(Object(menu).BGSCodeObj.pollKeyCapture().name == "Tab" && list.disableInput, "Tab is captured instead of navigating back");
                     Object(menu).BGSCodeObj.previewKey(27, true);
@@ -153,14 +155,12 @@ package
                     Object(menu).BGSCodeObj.previewKey(13, true); break;
                 case 24:
                     require(list.selectedEntry.row.value == 115 && list.disableInput, "held Enter does not save itself");
-                    Object(menu).BGSCodeObj.previewKey(13, false); break;
-                case 25:
                     setter = Object(menu).BGSCodeObj.setKey;
                     Object(menu).BGSCodeObj.setKey = function(mod:String, key:String, value:Number):Object {
                         return {ok:false, error:"Could not save this setting. Your previous value is unchanged."};
                     };
-                    Object(menu).BGSCodeObj.previewKey(13, true);
                     Object(menu).BGSCodeObj.previewKey(13, false); break;
+                case 25: break;
                 case 26:
                     require(list.selectedEntry.row.value == 115 && list.disableInput, "failed key save preserves binding and candidate");
                     capture("key-save-failed");
@@ -172,8 +172,7 @@ package
                 case 28:
                     Object(menu).BGSCodeObj.previewKey(32, true);
                     Object(menu).BGSCodeObj.previewKey(32, false); break;
-                case 29:
-                    userEvent("Accept"); break;
+                case 29: break;
                 case 30:
                     require(list.selectedEntry.row.value == 32 && list.selectedEntry.row.valueName == "Space",
                         "Space keeps its virtual-key identity and display label");
@@ -181,12 +180,103 @@ package
                 case 31:
                     Object(menu).BGSCodeObj.previewKey(179, true);
                     Object(menu).BGSCodeObj.previewKey(179, false); break;
-                case 32:
-                    userEvent("Accept"); break;
+                case 32: break;
                 case 33:
                     require(list.selectedEntry.row.value == 179 && list.selectedEntry.row.valueName == "Key 0xB3",
                         "unlisted key stays bindable with a fallback display label");
                     capture("key-fallback");
+                    userEvent("Cancel"); break;
+                case 34:
+                    findNamed(menu,"bindings").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 35:
+                    require(list.entryCount == 40,"MainGameplay native rows include both sources and unbound actions");
+                    require(list.selectedEntry.row.action == "Jump" && list.selectedEntry.row.potential,"mixed ownership potential conflict computed");
+                    capture("keybindings");
+                    findNamed(menu,"key_77").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 36:
+                    require(list.entryCount == 3,"key filter includes plain and chord bindings");
+                    require(list.selectedEntry.row.potential,"filter preserves other ownership");
+                    findNamed(menu,"key_77").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 37:
+                    require(list.entryCount == 40,"clicking selected key clears the filter");
+                    findNamed(menu,"key_162").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 38:
+                    require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/chord","modifier filter finds chord");
+                    capture("keybindings-chord");
+                    findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    var search:TextField = searchField();
+                    menu.stage.focus = search;
+                    search.text = "alternate"; search.dispatchEvent(new Event(Event.CHANGE)); break;
+                case 39:
+                    require(list.entryCount == 1 && !list.selectedEntry.row.potential,"two slots of one action do not conflict");
+                    require(menu.stage.focus == searchField(),"filter refresh preserves search focus");
+                    key(221); key(Keyboard.B); key(Keyboard.X); userEvent("Accept"); userEvent("RShoulder");
+                    require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/alternate","search suppresses native and raw shortcuts");
+                    var input:TextField = searchField();
+                    input.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN,true,true,0,Keyboard.ENTER));
+                    require(menu.stage.focus == list,"Enter returns focus to results"); break;
+                case 40:
+                    userEvent("Right");
+                    capture("keybindings-alternate");
+                    var query:TextField = searchField();
+                    menu.stage.focus = query; query.text = "zzzz-no-match"; query.dispatchEvent(new Event(Event.CHANGE)); break;
+                case 41:
+                    require(list.entryCount == 0,"combined search has explicit empty results");
+                    capture("keybindings-empty");
+                    var focused:TextField = searchField();
+                    focused.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN,true,true,0,Keyboard.ESCAPE));
+                    require(menu.stage.focus == list && findNamed(menu,"bindings") != null,"Escape leaves search without closing menu");
+                    findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 42:
+                    findNamed(menu,"bindingSource").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 43:
+                    require(list.entryCount == 32,"Game source filter");
+                    var mouse:TextField = searchField();
+                    mouse.text = "mouse"; mouse.dispatchEvent(new Event(Event.CHANGE)); break;
+                case 44:
+                    require(list.entryCount == 1 && list.selectedEntry.row.action == "Attack","mouse button zero is bound and searchable");
+                    capture("keybindings-mouse");
+                    findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 45:
+                    list.selectedIndex = list.entryCount - 1;
+                    list.scrollPosition = list.maxScrollPosition; break;
+                case 46:
+                    require(list.selectedEntry.row.action == "Fixture27","last native action is reachable");
+                    capture("keybindings-scroll");
+                    checkBindingPolicy();
+                    setter = Object(menu).BGSCodeObj.pollBindings;
+                    Object(menu).BGSCodeObj.pollBindings = function():Object {
+                        var old:Object = setter(); return {generation:old.generation - 1,state:"ready",records:old.records};
+                    };
+                    findNamed(menu,"bindings").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 47:
+                    require(list.entryCount == 0,"stale snapshot cannot populate a new request");
+                    Object(menu).BGSCodeObj.pollBindings = setter; break;
+                case 48:
+                    require(list.entryCount == 40,"current snapshot replaces loading state");
+                    searchField().text = "intentionally long"; searchField().dispatchEvent(new Event(Event.CHANGE)); break;
+                case 49:
+                    require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/long","long labels remain selectable with both native slots");
+                    capture("keybindings-long-label");
+                    findNamed(menu,"bindingSource").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    findNamed(menu,"bindingSource").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 50:
+                    require(list.entryCount == 1 && list.selectedEntry.row.mod == "navigation","individual mod filter combines with search");
+                    findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    searchField().text = "unbound action"; searchField().dispatchEvent(new Event(Event.CHANGE)); break;
+                case 51:
+                    var unbound:Object = null;
+                    for (var index:int = 0; index < list.entryCount; ++index) {
+                        if (list.GetDataForEntry(index).row.action == "preview/unbound") {
+                            unbound = list.GetDataForEntry(index).row; list.selectedIndex = index; break;
+                        }
+                    }
+                    require(unbound && unbound.editable && unbound.records[0].key == 255,"unbound native action remains editable");
+                    capture("keybindings-unbound");
+                    searchField().text = "media"; searchField().dispatchEvent(new Event(Event.CHANGE)); break;
+                case 52:
+                    require(list.entryCount == 1 && list.selectedEntry.row.records[0].key == 179,"unsupported diagram key remains searchable and editable");
+                    capture("keybindings-unsupported");
                     menu.removeEventListener(Event.ENTER_FRAME, advance);
                     trace("[verify] PASS"); break;
                 }
@@ -220,8 +310,28 @@ package
             first.dispose(); second.dispose();
             require(visible && distinct, "custom font renders distinct glyphs: " + text);
         }
+        private function checkBindingPolicy():void
+        {
+            var policy:Object = menu.loaderInfo.applicationDomain.getDefinition("KeybindingsData");
+            var native:Object = {sInputName:"same",uContextID:0,bGamepadEntry:false,bIsDivider:false,bReadOnly:false,bRequired:true,
+                MainBinding:{aPCKeyName:["Localized key"],aButtonName:["glyph"]},AltBinding:{aPCKeyName:[],aButtonName:[]}};
+            var joined:Array = policy.join([native], [{type:"hotkey",action:"same",registered:false,title:"Wrong owner"}],
+                [{action:"same",context:1,device:0,slot:0,key:77,modifier:255},
+                 {action:"same",context:0,device:1,slot:1,key:0,modifier:162}],function(row:Object):String { return "Native translated label"; });
+            require(joined.length == 1 && joined[0].title == "Native translated label" && joined[0].source == "Game","only explicitly registered metadata changes native ownership and labels");
+            require(joined[0].records.length == 1 && joined[0].records[0].slot == 1 && joined[0].records[0].device == 1,"action matching includes context, device and alternate slot");
+            require(joined[0].binding.bRequired && joined[0].binding.MainBinding.aButtonName[0] == "glyph","native required flag and glyph data preserved");
+            require(policy.filter(joined,"", "all",162).length == 1 && policy.filter(joined,"", "all",77).length == 0,"modifier identity is numeric, never inferred from localized strings");
+            joined = policy.join([native],[],[],function(row:Object):String { return "Missing"; });
+            require(!joined[0].available && !joined[0].editable,"missing numeric data is unavailable, not editable unbound");
+            var chords:Array = [{identity:"0:one",records:[{device:0,key:77,modifier:162}]},
+                {identity:"0:two",records:[{device:0,key:78,modifier:162}]}];
+            policy.classify(chords);
+            require(chords[0].shared && chords[1].shared && !chords[0].potential,"shared modifiers are distinct from exact assignment conflicts");
+        }
         private function findInput(container:DisplayObjectContainer):TextField
         {
+            if (!container.visible) return null;
             for (var i:int = 0; i < container.numChildren; ++i) {
                 var child:DisplayObject = container.getChildAt(i);
                 if (child is TextField && TextField(child).type == "input") return child as TextField;

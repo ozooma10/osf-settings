@@ -39,6 +39,10 @@ package
         private var groupID:String = "";
         private var options:Object;
         private var nativeHotkeys:NativeHotkeysList;
+        private var keybindings:KeybindingsPage;
+        private var searchExitFrame:int = -10;
+        private var navigationFrame:int = -1;
+        private var bindingSelection:String = "";
         private var types:Class;
         private var bar:Object;
         private var background:MovieClip;
@@ -88,7 +92,12 @@ package
             if (!result) throw new Error("Missing game class: " + name);
             return result;
         }
-        private function create(name:String):Object { var c:Class = definition(name); return new c(); }
+        private function create(name:String):Object
+        {
+            var c:Class = definition(name); var result:Object = new c();
+            CONFIG::preview { BGSCodeObj.previewConstruct(name,result); }
+            return result;
+        }
         public function onCodeObjCreate():void
         {
             bridgeReady = true; BGSCodeObj.startup("native bridge ready"); initializeWhenReady();
@@ -179,6 +188,8 @@ package
             captureBinding.mouseEnabled = false; captureBinding.mouseChildren = false;
             captureBinding.visible = false;
             nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
+            keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
+            addChild(keybindings);
             options.addEventListener("SettingsControlListEnty_ActiveBindingChanged", selectionChanged);
             var popup:MovieClip = nativeHotkeys.popup as MovieClip;
             addChild(popup);
@@ -222,16 +233,26 @@ package
             describe();
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
+        private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
+        private function searching():Boolean { return keybindings && keybindings.searching; }
+        private function focusResults():void
+        {
+            searchExitFrame = frame;
+            menuStage.focus = options as MovieClip;
+            options.disableInput = bindingBusy();
+        }
         private function issuesPage():Boolean { return !modID && rootPage == "issues"; }
         private function pages():Array
         {
-            return modID ? groups : [{id:"mods", title:"ALL MODS"}, {id:"issues", title:"MOD ISSUES" + (issues.length ? " (" + issues.length + ")" : "")}];
+            return modID ? groups : [{id:"mods", title:"ALL MODS"}, {id:"bindings", title:"KEYBINDINGS"}, {id:"issues", title:"MOD ISSUES" + (issues.length ? " (" + issues.length + ")" : "")}];
         }
         private function activePage():String { return modID ? groupID : rootPage; }
         private function selectPage(id:String):void
         {
             if (modID) groupID = id;
             else rootPage = id;
+            if (bindingsPage()) keybindings.open(allRows);
+            else keybindings.close();
             readIssues(); populate(); drawTabs();
         }
         private function button(text:String, eventName:String, callback:Function, target:Object = null):Object
@@ -285,11 +306,20 @@ package
         {
             refreshing = true; requestedRefresh = false;
             nativeHotkeys.populate(allRows);
+            nativeHotkeys.fullPage = bindingsPage();
+            keybindings.visible = bindingsPage();
+            var listHeight:Number = bindingsPage() ? 250 : MenuStyle.LIST_HEIGHT;
+            options.y = bindingsPage() ? 634 : MenuStyle.LIST_TOP;
+            options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
+            MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,MenuStyle.LIST_WIDTH,listHeight);
+            section.visible = count.visible = !bindingsPage();
+            empty.y = options.y + 22;
             var hasHotkeys:Boolean = false;
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
-            var selectedIssue:Object = preserve && issuesPage() ? current() : null;
-            var data:Array = []; var source:Array = issuesPage() ? issues : modID ? allRows : mods;
+            var selectedIssue:Object = preserve && (issuesPage() || bindingsPage()) ? current() : null;
+            if (preserve && bindingsPage() && !selectedIssue && bindingSelection) selectedIssue = {identity:bindingSelection};
+            var data:Array = []; var source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
             for each (var row:Object in source) {
                 if (modID && (row.mod != modID || row.group != groupID)) continue;
                 if (row.type == "hotkey") hasHotkeys = true;
@@ -300,7 +330,7 @@ package
                     uType:!modID ? types.SDT_LINK : slider ? types.SDT_SLIDER : row.type == "enum" ? types.SDT_LARGE_STEPPER : row.type == "bool" ? types.SDT_CHECKBOX : types.SDT_LINK,
                     sliderData:{fValue:slider ? NumericSetting.position(row) / 100 : 0, sDisplayValue:NumericSetting.text(row, row.value)},
                     stepperData:{aStepperOptions:row.type == "enum" ? EnumSetting.labels(row) : [], uIndex:row.type == "enum" ? EnumSetting.index(row) : 0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
-                if (selectedIssue && row.mod == selectedIssue.mod && row.id == selectedIssue.id) {
+                if (selectedIssue && (bindingsPage() ? row.identity == selectedIssue.identity : row.mod == selectedIssue.mod && row.id == selectedIssue.id)) {
                     selected = data.length - 1;
                     scroll = Math.max(0, selected - (options.selectedIndex - options.scrollPosition));
                 }
@@ -309,16 +339,17 @@ package
             if (hasHotkeys) nativeHotkeys.open();
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
-            options.disableInput = bindingBusy(); menuStage.focus = options as MovieClip;
-            MenuStyle.setText(empty, data.length ? "" : issuesPage() ? "No issues reported." : "No settings to display.");
+            options.disableInput = bindingBusy() || searching();
+            if (!searching()) menuStage.focus = options as MovieClip;
+            MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? "No issues reported." : "No settings to display.");
             var title:String = "MOD SETTINGS"; var group:String = "ALL MODS";
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
             MenuStyle.fit(heading, title.toUpperCase());
             MenuStyle.setText(section, issuesPage() ? "REPORTED ISSUES" : group.toUpperCase());
             MenuStyle.setText(count, data.length + (issuesPage() ? data.length == 1 ? " ISSUE" : " ISSUES" : modID ? data.length == 1 ? " SETTING" : " SETTINGS" : data.length == 1 ? " MOD" : " MODS"));
-            if (!modID) {
-                MenuStyle.setText(status, issuesPage() ? "Issues are reported by mods." : "Select a mod to view its settings.");
+            if (!modID && (!bindingsPage() || !preserve)) {
+                MenuStyle.setText(status, bindingsPage() ? "MainGameplay / PC   |   US ANSI   |   Enter and Num Enter share a native key code." : issuesPage() ? "Issues are reported by mods." : "Select a mod to view its settings.");
                 status.textColor = MenuStyle.MUTED;
             } else if (!preserve) MenuStyle.setText(status, "Changes are saved automatically.");
             refreshing = false; describe(); decorate();
@@ -357,12 +388,12 @@ package
         }
         private function tabClicked(event:MouseEvent):void
         {
-            if (captureRow || bindingBusy() || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || searching() || requestedRefresh || dragging()) return;
             selectPage(event.currentTarget.name);
         }
         private function changePage(direction:int):void
         {
-            if (captureRow || bindingBusy() || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || searching() || requestedRefresh || dragging()) return;
             var choices:Array = pages();
             if (choices.length < 2) return;
             for (var i:int = 0; i < choices.length; ++i) {
@@ -376,7 +407,7 @@ package
         {
             var row:Object = current();
             var reporting:Boolean = issuesPage();
-            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting;
+            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage();
             MenuStyle.setText(detailLabel, modID ? "SELECTED SETTING" : "SELECTED MOD");
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
@@ -392,9 +423,9 @@ package
             MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
             resetButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row && row.editable && row.type != "hotkey");
-            clearButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row &&
+            clearButton.Visible = Boolean(!captureRow && !bindingBusy() && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
-            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : !modID ? "OPEN" : row && (row.type == "key" || row.type == "hotkey") ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
+            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : bindingsPage() ? "CHANGE BINDING" : !modID ? "OPEN" : row && (row.type == "key" || row.type == "hotkey") ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
             buttonData.Cancel.sButtonText = captureRow || nativeHotkeys && nativeHotkeys.busy ? "CANCEL" : modID ? "ALL MODS" : "BACK";
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
             acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey"))));
@@ -406,7 +437,14 @@ package
                 acceptButton.Visible = false;
                 resetButton.Visible = clearButton.Visible = issueDetails.scrollable;
             }
-            pageBar.visible = !captureRow && !bindingBusy() && pages().length > 1;
+            if (bindingsPage()) {
+                resetButton.Visible = false;
+                if (row) bindingSelection = row.identity;
+                keybindings.showSelection(row);
+                acceptButton.Visible = Boolean(!bindingBusy() && !searching() && row && row.editable);
+                clearButton.Visible = clearButton.Visible && !searching();
+            }
+            pageBar.visible = !captureRow && !bindingBusy() && !searching() && pages().length > 1;
             bar.RefreshButtons();
         }
         private function scrollDescription(event:MouseEvent):void
@@ -418,12 +456,12 @@ package
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
         {
-            if (bindingBusy() || issuesPage()) return;
+            if (bindingBusy() || issuesPage() || searching() || frame <= searchExitFrame + 1) return;
             if (captureRow) { confirmBinding(); return; }
             if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
             var row:Object = current(); if (!row) return;
-            if (!modID) { modID = row.mod; groupID = ""; refresh(false); }
+            if (!modID && !bindingsPage()) { modID = row.mod; groupID = ""; refresh(false); }
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
@@ -434,6 +472,7 @@ package
         }
         private function reset():void
         {
+            if (searching()) return;
             if (issuesPage()) { issueDetails.scroll(-160); return; }
             if (captureRow || bindingBusy() || current() && current().type == "hotkey") return;
             var row:Object = current();
@@ -483,6 +522,7 @@ package
             if (nativeHotkeys.busy) { nativeHotkeys.cancel(); return; }
             if (nativeHotkeys.saving) return;
             if (captureRow) { finishBinding(true); return; }
+            if (frame <= searchExitFrame + 1) return;
             if (closing || dragging() || requestedRefresh) return;
             if (modID) { modID = ""; groupID = ""; rootPage = "mods"; readIssues(); refresh(false); return; }
             closing = true; options.disableInput = true; BGSCodeObj.close();
@@ -500,6 +540,14 @@ package
                 else if (pressed && name == "Accept") confirmBinding();
                 return true;
             }
+            // Returning false lets native raw keyboard/character forwarding
+            // reach the focused field; no menu shortcut handlers run here.
+            if (searching()) {
+                if (name == "Cancel") { if (!pressed) back(); return true; }
+                return false;
+            }
+            if (frame <= searchExitFrame + 1) return true;
+            if (bindingsPage() && navigateBindings(name, pressed)) return true;
             if (bar.ProcessUserEvent(name, pressed)) return true;
             if (name == "LShoulder" || name == "RShoulder") {
                 if (pageBar.visible) pageBar.ProcessUserEvent(name, pressed);
@@ -525,7 +573,12 @@ package
         {
             if (bindingBusy()) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
+            if (keybindings && keybindings.searchKey(event)) return;
             if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
+            if (bindingsPage() && (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT)) {
+                navigateBindings(event.keyCode == Keyboard.UP ? "Up" : event.keyCode == Keyboard.DOWN ? "Down" : event.keyCode == Keyboard.LEFT ? "Left" : "Right", true);
+                event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
             if (event.keyCode == Keyboard.B) reset();
             else if (event.keyCode == Keyboard.X && (issuesPage() || current() && (current().type == "key" || current().type == "hotkey"))) clearBinding();
             else if (issuesPage() && (event.keyCode == Keyboard.PAGE_UP || event.keyCode == Keyboard.PAGE_DOWN)) issueDetails.scroll(event.keyCode == Keyboard.PAGE_UP ? -360 : 360);
@@ -548,7 +601,18 @@ package
         }
         private function keyUp(event:KeyboardEvent):void
         {
-            if (captureRow || bindingBusy() || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
+            if (keybindings && keybindings.searchKey(event)) return;
+            if (frame <= searchExitFrame + 1 || captureRow || bindingBusy() || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
+        }
+        private function navigateBindings(name:String, pressed:Boolean):Boolean
+        {
+            if (name != "Up" && name != "Down" && name != "Left" && name != "Right") return false;
+            if (pressed && navigationFrame != frame) {
+                navigationFrame = frame;
+                if (name == "Up" || name == "Down") options.MoveSelection(name == "Up" ? -1 : 1);
+                else nativeHotkeys.navigate(new KeyboardEvent(KeyboardEvent.KEY_DOWN,true,true,0,name == "Left" ? Keyboard.LEFT : Keyboard.RIGHT));
+            }
+            return true;
         }
         private function dragging():Boolean
         {
@@ -564,6 +628,8 @@ package
         {
             ++frame;
             if (initialized && !closing) {
+                keybindings.advance(allRows,bindingBusy());
+                options.disableInput = bindingBusy() || searching() || Boolean(captureRow);
                 if (captureRow) pollBinding();
                 else {
                     if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
@@ -578,6 +644,7 @@ package
         }
         private function clearBinding():void
         {
+            if (searching()) return;
             if (issuesPage()) { issueDetails.scroll(160); return; }
             if (current() && current().type == "hotkey") { nativeHotkeys.clearBinding(); return; }
             var row:Object = current();
@@ -626,6 +693,7 @@ package
         private function focusLost(event:Event):void
         {
             nativeHotkeys.cancel();
+            if (searching()) focusResults();
             if (captureRow) finishBinding(true);
         }
         public function onNativeBindingCancelled():void
@@ -665,7 +733,7 @@ package
                 var showSlider:Boolean = modID != "" && NumericSetting.isSlider(item.row);
                 var stepper:Object = Object(clip).LargeStepper_mc;
                 var showStepper:Boolean = modID != "" && item.row.type == "enum" && item.row.editable;
-                var binding:DisplayObject = modID ? nativeHotkeys.decorate(clip, item.row, Object(clip).itemIndex == options.selectedIndex) : null;
+                var binding:DisplayObject = modID || bindingsPage() ? nativeHotkeys.decorate(clip, item.row, Object(clip).itemIndex == options.selectedIndex) : null;
                 clip.setChildIndex(view as DisplayObject, 0);
                 for (var child:int = 0; child < clip.numChildren; ++child) {
                     var display:DisplayObject = clip.getChildAt(child);
@@ -692,7 +760,7 @@ package
                 border.x = 0; border.y = 0; border.width = MenuStyle.LIST_WIDTH;
                 if (border.height != MenuStyle.ROW_HEIGHT) { border.height = MenuStyle.ROW_HEIGHT; needsLayout = true; }
                 clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (MenuStyle.ROW_HEIGHT + 4);
-                view.update(item.row, Object(clip).itemIndex == options.selectedIndex, modID == "");
+                view.update(item.row, Object(clip).itemIndex == options.selectedIndex, modID == "" && !bindingsPage());
             }
             if (needsLayout && !dragging()) options.UpdateContainerRect();
         }

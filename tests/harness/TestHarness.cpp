@@ -1,4 +1,5 @@
 #include "TestHarness.h"
+#include "TranslationRegistration.h"
 
 #include "Settings/SettingsService.h"
 #include "Utils/Paths.h"
@@ -13,6 +14,7 @@
 
 namespace OSFSettings::TestHarness
 {
+    nlohmann::json TranslationRegistrationSnapshot();
     namespace
     {
         using Json = nlohmann::json;
@@ -58,7 +60,11 @@ namespace OSFSettings::TestHarness
                     "selection", "rows", "stage", "capture", "kind", "index", "key", "type", "value", "title",
                     "rect", "controlRect", "x", "y", "width", "height", "visibleRect", "active", "ready",
                     "editable", "minimum", "maximum", "status", "scrollPosition", "startupPhase", "state", "diagnosticError",
-                    "mouse", "mouseDown", "mouseClick", "sequence", "frame", "target", "buttonDown", "saving"}) {
+                    "mouse", "mouseDown", "mouseClick", "sequence", "frame", "target", "buttonDown", "saving",
+                    "rootPage", "issueCount", "alternate", "action", "source", "potential", "records", "device", "slot", "modifier", "context",
+                    "translations", "heading", "originalContext", "kbm", "gamepad", "unicode", "unknown", "vanilla", "requiredHeading", "conflictText",
+                    "nativeRows", "divider", "presentationContext",
+                    "bindings", "count", "required", "requiredActions", "selectedKey", "query", "searching", "searchRect", "sourceRect", "clearRect", "primaryRect", "alternateRect"}) {
                     Value member;
                     if (value.GetMember(field, &member) && !member.IsUndefined()) result[field] = CopyValue(member, depth + 1);
                 }
@@ -96,13 +102,14 @@ namespace OSFSettings::TestHarness
                     }
                     // Settings requests this native navigation context. Preserve
                     // slots/chords instead of pretending an alternate is the main key.
-                    for (const auto& entry : map->GetMappings(RE::ControlMap::InputContextID::kBasicMenuNav,
-                        RE::InputEvent::DeviceType::kKeyboard)) {
-                        const auto action = std::string(entry.eventID.c_str());
-                        if (!menuBindings.contains(action)) menuBindings[action] = Json::array();
-                        menuBindings[action].push_back({{"keyCode", entry.keyCode},
-                            {"modifierKeyCode", entry.modifierKeyCode}, {"slot", static_cast<std::uint32_t>(entry.bindingSlot)},
-                            {"contextID", static_cast<std::uint32_t>(RE::ControlMap::InputContextID::kBasicMenuNav)}});
+                    for (const auto context : { RE::ControlMap::InputContextID::kBasicMenuNav, RE::ControlMap::InputContextID::kVirtualController }) {
+                        for (const auto& entry : map->GetMappings(context, RE::InputEvent::DeviceType::kKeyboard)) {
+                            const auto action = std::string(entry.eventID.c_str());
+                            if (!menuBindings.contains(action)) menuBindings[action] = Json::array();
+                            menuBindings[action].push_back({{"keyCode", entry.keyCode},
+                                {"modifierKeyCode", entry.modifierKeyCode}, {"slot", static_cast<std::uint32_t>(entry.bindingSlot)},
+                                {"contextID", static_cast<std::uint32_t>(context)}});
+                        }
                     }
                 }
                 std::scoped_lock lock(g_mutex);
@@ -161,6 +168,7 @@ namespace OSFSettings::TestHarness
     void ObserveUI(std::uint64_t frame, const Value* state) noexcept
     {
         try {
+            ObserveTranslationRegistration();
             Json copy;
             if (state && state->IsObject()) copy = CopyValue(*state);
             std::scoped_lock lock(g_mutex);
@@ -193,10 +201,14 @@ namespace OSFSettings::TestHarness
                 }
             }
             result["learning"] = std::move(values);
+            result["translationRegistration"] = TranslationRegistrationSnapshot();
             const auto text = result.dump();
             const auto required = static_cast<std::uint32_t>(text.size() + 1);
             if (buffer && capacity >= required) std::memcpy(buffer, text.c_str(), required);
             return required;
+        } catch (const std::exception& error) {
+            REX::ERROR("Settings test snapshot failed: {}", error.what());
+            return 0;
         } catch (...) { return 0; }
     }
 }

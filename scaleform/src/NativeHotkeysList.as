@@ -28,6 +28,19 @@ package
         private var clearing:Boolean = false;
         private var openRequested:Boolean = false;
         private var showAlternate:Boolean = false;
+        public var revision:uint = 0;
+        public var ready:Boolean = false;
+        public var fullPage:Boolean = false;
+        private var labelEntry:Object;
+
+        public function get bindings():Array { return entries; }
+        public function title(entry:Object):String
+        {
+            if (!labelEntry) labelEntry = create("Shared.Components.SystemPanels.SettingsControlListEntry");
+            labelEntry.SetEntryText(entry);
+            CONFIG::preview { return bridge.previewBindingTitle(entry); }
+            return String(labelEntry.Text_mc.textField.text);
+        }
 
         public function NativeHotkeysList(sharedList:Object, factory:Function, definition:Function, code:Object, notify:Function)
         {
@@ -61,7 +74,7 @@ package
                 if (row.type != "hotkey") continue;
                 var native:Object = null;
                 for each (var entry:Object in entries) {
-                    if (!entry.bIsDivider && entry.uContextID == 0 && entry.sInputName == row.action) {
+                    if (!entry.bIsDivider && !entry.bGamepadEntry && entry.uContextID == 0 && entry.sInputName == row.action) {
                         native = entry; break;
                     }
                 }
@@ -105,23 +118,24 @@ package
             if (!busy) {
                 if (selected) {
                     if (!clip.selected) clip.onRollover();
-                    if (clip.activePriority == 2 || !showAlternate) clip.SetActiveBinding(0);
+                    if (clip.activePriority == 2 || !(showAlternate || fullPage)) clip.SetActiveBinding(0);
                 } else if (clip.selected || clip.activePriority != 2) clip.onRollout();
             }
             // The outer SettingsRow supplies the label, background and row hit area.
             for (var i:int = 0; i < clip.numChildren; ++i) {
                 var child:DisplayObject = clip.getChildAt(i);
-                child.visible = child == clip.MainBinding_mc || showAlternate && child == clip.AltBinding_mc;
+                child.visible = child == clip.MainBinding_mc || (showAlternate || fullPage) && child == clip.AltBinding_mc;
             }
             var right:Number = MenuStyle.LIST_WIDTH - 24;
-            for each (var cell:Object in showAlternate ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
+            for each (var cell:Object in showAlternate || fullPage ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
+                CONFIG::preview { bridge.previewBindingCell(cell); }
                 cell.scaleX = cell.scaleY = 1;
                 var bounds:Rectangle = cell.getBounds(clip);
                 cell.scaleX = cell.scaleY = Math.min(1, 224 / bounds.width, (MenuStyle.ROW_HEIGHT - 12) / bounds.height);
                 bounds = cell.getBounds(clip);
                 cell.x += right - bounds.right;
                 cell.y += (MenuStyle.ROW_HEIGHT - bounds.height) / 2 - bounds.top;
-                right -= bounds.width + 24;
+                right -= fullPage ? 238 : bounds.width + 24;
             }
             return clip as DisplayObject;
         }
@@ -132,11 +146,19 @@ package
             var view:Object = host ? views[host] : null;
             return view && list.selectedEntry && view.row == list.selectedEntry.row ? view.clip : null;
         }
+        public function get selectedSlot():int { return currentClip ? currentClip.activePriority : 2; }
+        CONFIG::testHarness {
+            public function slotRect(slot:int):Rectangle
+            {
+                if (!currentClip) return new Rectangle();
+                return DisplayObject(slot == 0 ? currentClip.MainBinding_mc : currentClip.AltBinding_mc).getBounds(list.stage);
+            }
+        }
 
         public function navigate(event:KeyboardEvent):void
         {
             var clip:Object = currentClip;
-            if (!clip || busy || saving || !showAlternate) return;
+            if (!clip || busy || saving || !(showAlternate || fullPage)) return;
             if (clip.activePriority == 2) clip.SetActiveBinding(0);
             else clip.onKeyDownHandler(event);
         }
@@ -226,6 +248,7 @@ package
         {
             var data:Object = Object(event).data;
             entries = data.aInputSettingsList as Array || [];
+            ready = true; ++revision;
             showAlternate = Boolean(data.bShowSecondaryBindings);
             if (busy && data.bRemappingControl) seenRemapping = true;
             if (busy && seenRemapping && !data.bRemappingControl) {

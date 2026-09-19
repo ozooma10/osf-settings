@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [switch]$LargeText,
+    [switch]$Bindings,
     [string]$InterfaceArchive = 'C:/Program Files (x86)/Steam/steamapps/common/Starfield/Data/Starfield - Interface.ba2'
 )
 $ErrorActionPreference = 'Stop'
@@ -14,7 +15,7 @@ $name = if ($LargeText) { 'large' } else { 'normal' }
 $log = Join-Path $output "test-$name.log"
 $env:RUST_LOG = 'warn,avm_trace=info'
 $player = Start-Process -FilePath $ruffle -WorkingDirectory $output -WindowStyle Hidden -ArgumentList @(
-    '-Pverify=true', '--width', '1280', '--height', '720', '--storage', 'memory',
+    '-Pverify=true', "-PverifyBindings=$($Bindings.IsPresent.ToString().ToLowerInvariant())", '--width', '1280', '--height', '720', '--storage', 'memory',
     '--config', 'check-config', '--cache-directory', 'ruffle-cache',
     '--filesystem-access-mode', 'allow', '--dummy-external-interface',
     '--open-url-mode', 'deny', '--tcp-connections', 'deny', 'PreviewHost.swf'

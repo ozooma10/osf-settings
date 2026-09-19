@@ -162,8 +162,12 @@ transition behavior still need an in-game check; this path promises generic
 show requests, not exact Pause eligibility.
 
 The OSF menu embeds vanilla binding rows in its shared settings list and uses
-native remapping and persistence. It displays the schema `label`; translating that label in the
-game's own Controls panel remains separate work.
+native remapping and persistence. It displays the schema `label`. Vanilla Bindings
+places registered OSF hotkeys in one **Mod Bindings** section before the vanilla
+sections, using `<mod title>: <hotkey label>` for each row. Mods are sorted by title
+(ignoring ASCII letter case), then ID for ties; hotkeys retain declaration order.
+Schema groups organize the OSF menu only. This is presentation: native action IDs,
+MainGameplay contexts, conflicts, and saved bindings retain their existing meaning.
 See [inline binding editor](NATIVE-BINDING-EDITOR.md) for the checkpoint's scope
 and pending in-game checks. The required `groups` array may be
 empty for a hotkey-only schema. Declarations are read once at startup; changes

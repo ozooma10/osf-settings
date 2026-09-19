@@ -30,6 +30,8 @@ xmake run osfsettings-registration-tests
 xmake run osfsettings-input-tests
 xmake run osfsettings-lifecycle-tests
 xmake run osfsettings-binding-tests
+xmake run osfsettings-bindings-menu-tests
+xmake run osfsettings-binding-snapshot-tests
 xmake run osfsettings-hotkey-block-tests
 xmake run osfsettings-hotkey-callback-tests
 ```
@@ -50,7 +52,13 @@ Preview the layout with development-only sample settings:
 
 ```powershell
 pwsh tools/preview-menu.ps1 -Design -Watch
+pwsh tools/test-menu-preview.ps1 -Bindings
+pwsh tools/test-menu-preview.ps1 -Bindings -LargeText
 ```
+
+The root **KEYBINDINGS** page displays native MainGameplay keyboard/mouse actions
+and registered OSF hotkeys. See [Keybindings](docs/Keybindings.md) for its data
+ownership, interaction contract, and verification boundaries.
 
 ## In-game testing
 
@@ -58,3 +66,7 @@ Development-only instrumentation lives in [tests/harness](tests/harness/README.m
 It is disabled by default (`--test_harness=n`). That folder documents test builds,
 isolated settings storage, and the observation interface used by the sibling
 `OSF Test Harness` project's `SettingsSmoke` scenario.
+
+Run its `Test-Starfield.ps1 -Scenario SettingsSmoke -Keybindings` for the native
+page checks. It backs up global Controls, exercises native saves and a fresh
+restart, then stops its game and restores the exact original Controls file.

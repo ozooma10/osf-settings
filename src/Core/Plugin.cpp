@@ -3,6 +3,7 @@
 #include "Input/HotkeyInput.h"
 #include "Input/NativeHotkeys.h"
 #include "Input/NativeBindingEditor.h"
+#include "Input/NativeBindingsMenu.h"
 #include "Input/PauseMenu.h"
 #include "Menu/OSFSettingsMenu.h"
 
@@ -28,6 +29,7 @@ namespace OSFSettings::Plugin
         if (!messaging || !Runtime::Get().Initialize() || !messaging->RegisterListener(OnMessage)) return false;
         if (!PauseMenu::Install()) REX::ERROR("Pause menu hook is unavailable");
         if (!NativeHotkeys::Install()) REX::ERROR("Native hotkey registration is unavailable");
+        if (!NativeBindingsMenu::Install()) REX::ERROR("Mod bindings presentation is unavailable");
         if (!NativeBindingEditor::Install()) REX::ERROR("Native binding editor is unavailable");
         if (!HotkeyInput::Install()) REX::ERROR("Native hotkey input hook is unavailable");
         return true;

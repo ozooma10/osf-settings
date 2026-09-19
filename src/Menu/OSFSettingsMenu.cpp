@@ -2,19 +2,23 @@
 #include "harness/TestHarness.h"
 #include "FloatSlider.h"
 #include "Input/KeyNames.h"
+#include "Input/NativeHotkeys.h"
 #include <cmath>
 #include "Core/Runtime.h"
 #include "Diagnostics/DiagnosticsService.h"
 #include <charconv>
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
+#include "RE/B/BSService.h"
+#include "REX/W32/KERNEL32.h"
 
 namespace OSFSettings
 {
     namespace
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
-            SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues };
+            SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
+            RequestBindings, PollBindings, TextInput };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -37,22 +41,58 @@ namespace OSFSettings
     OSFSettingsMenu::OSFSettingsMenu()
     {
         menuName = MENU_NAME.data();
-        SetFlags(RE::IMenu::kPausesGame | RE::IMenu::kBlocksLowerMenuInput | RE::IMenu::ShowCursor | RE::IMenu::kModal);
+        // Native menu-mode lifecycle suppresses console-command hotkeys.
+        SetFlags(RE::IMenu::kUsesMenuMode | RE::IMenu::kPausesGame | RE::IMenu::kBlocksLowerMenuInput | RE::IMenu::ShowCursor | RE::IMenu::kModal);
     }
 
     void OSFSettingsMenu::PostCreate()
     {
-        // Use PauseMenu's native input contexts, with priority one above Pause (0x0B).
-        depthPriority = 0x0C;
+        // Dynamic context updates apply only below priority 0x0C. Match PauseMenu; the newly opened menu is stacked above it.
+        depthPriority = 0x0B;
         for (const auto context : { InputContextID::kBasicMenuNav, InputContextID::kLeftThumbstick, InputContextID::kVirtualController }) {
             AddInputContext(context);
         }
+    }
+
+    OSFSettingsMenu::~OSFSettingsMenu()
+    {
+        ++*m_textRequests;
+    }
+
+    bool OSFSettingsMenu::RequestTextInput(bool enabled)
+    {
+        const auto generation = ++*m_textRequests;
+        RE::BSService::TaskQueue::GetSingleton()->AddTask([weak = std::weak_ptr(m_textRequests), generation, enabled] {
+            const auto request = weak.lock();
+            if (!request || request->load() != generation) return;
+            auto* ui = RE::UI::GetSingleton();
+            if (!ui) return;
+            const RE::BSFixedString name(MENU_NAME.data());
+            auto current = ui->GetMenu(name);
+            if (!current || !ui->IsMenuOpen(name)) return;
+            auto* menu = static_cast<OSFSettingsMenu*>(current.get());
+            if (menu->m_textRequests != request || menu->m_searchActive == enabled) return;
+            // Text editing must not inherit Accept/E or navigation/WASD.
+            menu->inputContexts.end = menu->inputContexts.begin;
+            if (enabled) {
+                menu->AddInputContext(InputContextID::kTextInput);
+            } else {
+                for (const auto context : { InputContextID::kBasicMenuNav, InputContextID::kLeftThumbstick, InputContextID::kVirtualController }) {
+                    menu->AddInputContext(context);
+                }
+            }
+            menu->m_searchActive = enabled;
+        });
+        return true;
     }
 
     void OSFSettingsMenu::MapCodeObjectFunctions()
     {
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
+        RegisterNativeFunction("requestBindings", static_cast<std::uint64_t>(Function::RequestBindings));
+        RegisterNativeFunction("pollBindings", static_cast<std::uint64_t>(Function::PollBindings));
+        RegisterNativeFunction("textInput", static_cast<std::uint64_t>(Function::TextInput));
         RegisterNativeFunction("setBool", static_cast<std::uint64_t>(Function::SetBool));
         RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
         RegisterNativeFunction("setFloat", static_cast<std::uint64_t>(Function::SetFloat));
@@ -73,6 +113,7 @@ namespace OSFSettings
     RE::UI_MESSAGE_RESULT OSFSettingsMenu::ProcessMessage(RE::UIMessageData& message)
     {
         if (message.type == RE::UI_MESSAGE_TYPE::kHide) {
+            m_bindings->Invalidate();
             m_bindingEditor.End(true);
             m_capture.ResetForMenuClose();
         }
@@ -94,6 +135,34 @@ namespace OSFSettings
         const auto function = static_cast<Function>(reinterpret_cast<std::uintptr_t>(params.userData));
         auto& runtime = Runtime::Get();
         switch (function) {
+        case Function::TextInput:
+            *params.ret = RE::Scaleform::GFx::Value(RequestTextInput(params.argCount && params.args[0].IsBoolean() && params.args[0].GetBoolean()));
+            break;
+        case Function::RequestBindings:
+            *params.ret = RE::Scaleform::GFx::Value(RequestBindingSnapshot(m_bindings));
+            break;
+        case Function::PollBindings: {
+            const auto snapshot = m_bindings->Read();
+            root->CreateObject(params.ret);
+            params.ret->SetMember("generation", RE::Scaleform::GFx::Value(snapshot.generation));
+            Text(*params.ret, "state", snapshot.status == BindingSnapshot::Status::Ready ? "ready" :
+                snapshot.status == BindingSnapshot::Status::Loading ? "loading" : "unavailable");
+            RE::Scaleform::GFx::Value records;
+            root->CreateArray(&records);
+            for (const auto& entry : snapshot.records) {
+                RE::Scaleform::GFx::Value record;
+                root->CreateObject(&record);
+                Text(record, "action", entry.action);
+                record.SetMember("context", RE::Scaleform::GFx::Value(entry.context));
+                record.SetMember("device", RE::Scaleform::GFx::Value(entry.device));
+                record.SetMember("slot", RE::Scaleform::GFx::Value(entry.slot));
+                record.SetMember("key", RE::Scaleform::GFx::Value(entry.key));
+                record.SetMember("modifier", RE::Scaleform::GFx::Value(entry.modifier));
+                records.PushBack(record);
+            }
+            params.ret->SetMember("records", records);
+            break;
+        }
         case Function::Close:
             Close();
             break;
@@ -261,6 +330,7 @@ namespace OSFSettings
                         Text(row, "groupTitle", group.label);
                         Text(row, "key", hotkey.id);
                         Text(row, "action", mod.schema.id + "/" + hotkey.id);
+                        row.SetMember("registered", RE::Scaleform::GFx::Value(NativeHotkeys::FindAction(mod.schema.id + "/" + hotkey.id) != nullptr));
                         Text(row, "title", hotkey.label);
                         Text(row, "type", "hotkey");
                         Text(row, "hint", "Select a binding to change it. Escape cancels.");
@@ -305,6 +375,18 @@ namespace OSFSettings
         }
     }
 
+    bool OSFSettingsMenu::WantsMovieEventForward(const RE::InputEvent* event)
+    {
+        if (!event) return false;
+        if (event->eventType == RE::InputEvent::EventType::kChar) return m_searchActive;
+        if (m_searchActive && event->eventType == RE::InputEvent::EventType::kButton && event->deviceType == RE::InputEvent::DeviceType::kKeyboard) {
+            // Native movie forwarding synthesizes Enter for the underlying gameplay Activate action even when the text context disables it.
+            const auto* button = static_cast<const RE::ButtonEvent*>(event);
+            if (button->disabled && button->strUserEvent == "Activate") return false;
+        }
+        return RE::GameMenuBase::WantsMovieEventForward(event);
+    }
+
     bool OSFSettingsMenu::ShouldHandleEvent(const RE::InputEvent* event)
     {
         const auto bindingInput = m_bindingEditor.ProcessInput(event);
@@ -326,6 +408,9 @@ namespace OSFSettings
 
     void OSFSettingsMenu::OnRemovedFromMenuStack()
     {
+        ++*m_textRequests;
+        m_searchActive = false;
+        m_bindings->Invalidate();
         m_bindingEditor.End(true);
         m_capture.ResetForMenuClose();
         RE::GameMenuBase::OnRemovedFromMenuStack();
@@ -360,6 +445,7 @@ namespace OSFSettings
 
     void OSFSettingsMenu::Close() 
     { 
+        m_bindings->Invalidate();
         m_bindingEditor.End(true);
         m_capture.EndCapture();
         if (auto* queue = RE::UIMessageQueue::GetSingleton()) {

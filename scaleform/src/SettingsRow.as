@@ -10,6 +10,7 @@ package
     {
         private var title:TextField;
         private var value:TextField;
+        private var source:TextField;
         private var previous:String = "";
 
         public function SettingsRow()
@@ -20,6 +21,7 @@ package
             value = MenuStyle.field("", 776, top, 150, 46, CONFIG::largeText ? 28 : 25, MenuStyle.WHITE, true);
             var centered:TextFormat = value.defaultTextFormat; centered.align = "center";
             value.defaultTextFormat = centered; addChild(title); addChild(value);
+            source = MenuStyle.field("",20,MenuStyle.ROW_HEIGHT - 34,510,30,CONFIG::largeText ? 24 : 20,MenuStyle.MUTED,true); addChild(source);
         }
         public function update(row:Object, selected:Boolean, modList:Boolean):void
         {
@@ -27,9 +29,15 @@ package
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
             var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey");
             var displayValue:String = modList ? String(row.count) : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
-            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing].join("|");
+            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.potential, row.shared].join("|");
             if (signature == previous) return;
             previous = signature;
+            source.visible = Boolean(row.keybindings);
+            title.y = row.keybindings ? 3 : (MenuStyle.ROW_HEIGHT - MenuStyle.BODY_SIZE) / 2 - 3;
+            if (row.keybindings) {
+                source.textColor = selected ? MenuStyle.INK : MenuStyle.MUTED;
+                MenuStyle.fit(source,row.source + (row.potential ? "  |  Potential conflict" : row.shared ? "  |  Shared key" : ""));
+            }
             value.visible = !row.capturing && row.type != "hotkey";
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);

@@ -15,6 +15,26 @@ The movie includes its observation fragment only with `CONFIG::testHarness` enab
 Production files retain small calls at the existing observation points; the header
 makes those calls no-ops in normal builds. Keep test logic in this folder.
 
+## Translation registration checks
+
+`TranslationRegistration.cpp` adds opt-in checks for Starfield 1.16.244.0.
+The sibling runner's `-TranslationRegistration` switch writes
+`"translationRegistration":true` to the private test configuration. Production and
+test builds both register labels through CommonLibSF during the native constructor
+resource load. There are no per-lookup translation overrides or alternate test hook.
+
+The checks surround the production registration while its wrapper is unpublished.
+They verify production schema labels before adding diagnostic labels, then test table
+growth and duplicate replacement, registration replay, pooled reference ownership,
+all generated keys, Unicode/control-character/long values, and preservation of every
+pre-existing key/value identity. No map mutation occurs after publication.
+`translationRegistration` in the exported snapshot contains cached startup results
+and native manager checks from the existing menu callback. `ui.translations` comes
+from real Flash text fields and native row clips. An additional private resource
+load during construction tests merging; it is not proof of an in-session translator
+reload. The extracted helpers have host coverage; the refactored production and
+observation paths still require a fresh requested in-game run.
+
 ## Building and observations
 
 Run the following commands from the repository root.
@@ -53,7 +73,7 @@ copies geometry on its own lane at 10 Hz; `observedAtMs` is a frame heartbeat an
 `layoutObservedAtMs` is the age of the detailed snapshot. All `*AtMs` fields use the
 Windows boot clock. Row rectangles use stage coordinates; map `stage.visibleRect`
 to the game client area for mouse input. An empty `ui` after closing is intentional.
-`menuBindings` maps native BasicMenuNav action names to their current keyboard
+`menuBindings` maps native BasicMenuNav and VirtualController action names to their current keyboard
 records (`keyCode`, `modifierKeyCode`, `slot`, `contextID`); use those records instead
 of assuming WASD or arrows. Its `menuBindingsObservedAtMs` marks the same safe drain
 sample. Slot 0 is main and slot 1 alternate; do not silently discard a chord modifier.
@@ -73,3 +93,11 @@ conflict cancel/confirm, saving and persistence across a fresh game launch.
 Native controls use the global Documents `ControlMap_Custom.txt`; this mode
 backs it up, stops its owned sessions and restores the original bytes in cleanup.
 It rejects `-KeepGame` so restoration cannot race a live native settings session.
+
+`SettingsSmoke -Keybindings` adds the native root page. `ui.bindings` reports
+snapshot state, search/source/key filters, selected slot and control rectangles.
+`requiredActions` contains editable native rows with `bRequired`, allowing the
+scenario to choose a real required action without modifying native definitions.
+Row observations include action/source, numeric records and the required flag.
+The scenario covers both sources, native clearing/validation, focus cancellation,
+restart persistence and Pause entry. Physical controller input remains separate.

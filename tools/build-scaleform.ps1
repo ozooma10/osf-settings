@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$TestHarness)
+param([switch]$TestHarness, [switch]$Preview)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $flex = Join-Path $repo 'external\flex'
@@ -147,8 +147,9 @@ foreach ($large in @($false, $true)) {
     $raw = Join-Path $outputDirectory "OSFSettingsMenu$suffix.raw.swf"
     $output = Join-Path $outputDirectory "OSFSettingsMenu$suffix.swf"
     $largeDefine = if ($large) { 'true' } else { 'false' }
+    $previewDefine = if ($Preview) { 'true' } else { 'false' }
     $harnessDefine = if ($TestHarness) { 'true' } else { 'false' }
-    & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" '-use-network=false' '-debug=false' '-optimize=true' "-define=CONFIG::largeText,$largeDefine" "-define+=CONFIG::testHarness,$harnessDefine" "-output=$raw" (Join-Path $repo 'scaleform\src\OSFSettingsMenu.as')
+    & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" '-use-network=false' '-debug=false' '-optimize=true' "-define=CONFIG::largeText,$largeDefine" "-define+=CONFIG::testHarness,$harnessDefine" "-define+=CONFIG::preview,$previewDefine" "-output=$raw" (Join-Path $repo 'scaleform\src\OSFSettingsMenu.as')
     if ($LASTEXITCODE -ne 0) { throw "mxmlc failed with exit code $LASTEXITCODE" }
     if (-not (Test-Path $raw)) { throw "mxmlc did not create $raw" }
     Add-GameLibraries $raw $output "SettingsPanel$suffix.swf"

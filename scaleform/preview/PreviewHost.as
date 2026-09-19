@@ -35,6 +35,7 @@ package
         private var captureMod:String;
         private var captureKey:String;
         private var held:Object = {};
+        private var nativeBindings:PreviewBindings = new PreviewBindings();
 
         public function PreviewHost()
         {
@@ -138,6 +139,11 @@ package
                 {strUserEventName:"RShoulder", strButtonName:"]", aButtonName:["]"], sContextName:"BasicMenuNav"}
             ];
             controls.SetReady(true);
+            var bindings:Object = Object(manager).GetDataFromClient("ControlBindingsData");
+            bindings.data.aInputSettingsList = nativeBindings.entries;
+            bindings.data.bShowSecondaryBindings = true;
+            bindings.data.bRemappingControl = false;
+            bindings.SetReady(true);
             var loader:Loader = new Loader(); loaders.push(loader);
             loader.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, ioFailed);
             loader.contentLoaderInfo.addEventListener(Event.COMPLETE, menuLoaded);
@@ -152,12 +158,30 @@ package
                 startup:startup, startupFailed:report, setKey:setKey,
                 beginKeyCapture:beginKeyCapture, pollKeyCapture:function():Object { return captureState; },
                 commitKeyCapture:commitKeyCapture, cancelKeyCapture:function():void { captureState.state = "idle"; },
-                previewKey:captureButton};
+                previewKey:captureButton,
+                previewBindingTitle:function(entry:Object):String { return nativeBindings.labels[entry.sInputName] || entry.sInputName; },
+                previewBindingCell:fitNativeBindingCell,
+                previewConstruct:function(name:String, clip:Object):void {
+                    // Ruffle rejects the game's class-only placement in this popup.
+                    // Restore that authored child from its real game symbol.
+                    if (name == "RemapConfirmation" && !clip.ButtonBar_mc.CancelButton_mc) {
+                        var button:Class = domain.getDefinition("BasicButton") as Class;
+                        clip.ButtonBar_mc.CancelButton_mc = new button();
+                        clip.ButtonBar_mc.addChild(clip.ButtonBar_mc.CancelButton_mc);
+                    }
+                },
+                requestBindings:function():uint { return ++nativeBindings.generation; },
+                pollBindings:nativeBindings.snapshot,
+                textInput:function(enabled:Boolean):Boolean { return true; },
+                beginNativeBinding:function():Boolean { return false; },
+                endNativeBinding:function(cancel:Boolean):void {}};
             addChild(menu as MovieClip);
             menu.onCodeObjCreate();
+            // Fixtures enter through the same native data publication and schema join.
+            // Keep ordinary design pages unchanged until Keybindings is selected.
             setChildIndex(message, numChildren - 1);
             setChildIndex(caption, numChildren - 1);
-            if (loaderInfo.parameters.verify == "true") new PreviewChecks(menu as MovieClip);
+            if (loaderInfo.parameters.verify == "true") new PreviewChecks(menu as MovieClip,loaderInfo.parameters.verifyBindings == "true");
         }
 
         private function getRows():Array
@@ -170,7 +194,21 @@ package
                 for (var property:String in row) copy[property] = row[property];
                 result.push(copy);
             }
-            return result;
+            return result.concat(nativeBindings.definitions);
+        }
+
+        private function fitNativeBindingCell(cell:Object):void
+        {
+            // ControlBinding requests Scaleform TextFieldEx.TEXTAUTOSZ_SHRINK.
+            // Ruffle does not implement that native sizing. Approximate it only
+            // in preview; production keeps the game's field/glyph implementation.
+            for each (var field:TextField in [cell.PCKey_mc.PCKey_tf,cell.Icon_mc.Icon_tf]) {
+                var format:TextFormat = field.defaultTextFormat;
+                field.setTextFormat(format);
+                while (Number(format.size) > 10 && field.textWidth > field.width - 4) {
+                    format.size = Number(format.size) - 1; field.setTextFormat(format);
+                }
+            }
         }
 
         private function getIssues():Array
@@ -306,6 +344,7 @@ package
 
         private function key(event:KeyboardEvent):void
         {
+            if (stage.focus is TextField && TextField(stage.focus).type == "input") return;
             var binding:uint = previewKeyCode(event);
             if (captureState.state != "idle" || held[binding]) {
                 captureButton(binding, event.type == KeyboardEvent.KEY_DOWN);
@@ -334,6 +373,10 @@ package
         {
             // The game translates these English labels; Flash has no translator.
             var text:TextField = child as TextField;
+            if (text && text.text.indexOf("$MainGameplay_") >= 0) {
+                var token:String = text.text.replace(/^\$+MainGameplay_/,"").replace(/_KBM$/,"").replace(/ \*$/,"");
+                if (nativeBindings.labels[token]) text.text = nativeBindings.labels[token];
+            }
             if (text && (text.text == "$BACK" || text.text == "$ON" || text.text == "$OFF")) {
                 var format:TextFormat = text.getTextFormat();
                 text.text = text.text.substr(1); text.setTextFormat(format);

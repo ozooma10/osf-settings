@@ -29,7 +29,7 @@ if (-not $BuildOnly -and -not (Test-Path -LiteralPath $ruffle)) { & "$PSScriptRo
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 
 function Build-Preview {
-    & "$PSScriptRoot/build-scaleform.ps1"
+    & "$PSScriptRoot/build-scaleform.ps1" -Preview
     $suffix = if ($LargeText) { '_LRG' } else { '' }
     $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output, '--menu', "$repo/build/scaleform/OSFSettingsMenu$suffix.raw.swf")
     if ($LargeText) { $prepareArgs += '--large' }

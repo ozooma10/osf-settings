@@ -1,4 +1,5 @@
 #include "TestHarness.h"
+#include "TranslationRegistration.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -14,6 +15,7 @@ namespace OSFSettings::TestHarness
             std::ifstream input(configPath);
             if (!input) throw std::runtime_error("test harness values configuration is missing");
             const auto config = nlohmann::json::parse(input);
+            EnableTranslationRegistration(config.value("translationRegistration", false));
             const auto path = config.at("valuesDir").get<std::string>();
             if (path.empty() || path.find('\0') != std::string::npos)
                 throw std::runtime_error("valuesDir must be a nonempty absolute path");
