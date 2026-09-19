@@ -51,9 +51,9 @@ namespace
         bool validArrays{ true };
         std::thread::id thread;
 
-        static void OnRegistry(const API::RegistryView& registry, void* user) noexcept
+        static void OnRegistry(const API::RegistryView& registry, void* context) noexcept
         {
-            auto& self = *static_cast<Capture*>(user);
+            auto& self = *static_cast<Capture*>(context);
             ++self.calls;
             self.thread = std::this_thread::get_id();
             try {
@@ -114,9 +114,9 @@ namespace
         std::vector<std::string> keys;
         Capture latest;
         Status status{ Status::NotReady };
-        static void Changed(const char* mod, const char* key, void* user) noexcept
+        static void Changed(const char* mod, const char* key, void* context) noexcept
         {
-            auto& self = *static_cast<Notifications*>(user);
+            auto& self = *static_cast<Notifications*>(context);
             ++self.calls;
             try {
                 if (key) self.keys.emplace_back(key);
@@ -205,7 +205,7 @@ int main()
         check(notifications.calls == 0, "initial notification waits for readiness");
         backend.Start();
         check(client.ReadRegistry("missing", Capture::OnRegistry, &errors) == Status::UnknownMod && errors.calls == 0, "unknown filtered mod has no callback");
-        check(client.ReadRegistry("alpha", [](const API::RegistryView&, void*) noexcept {}, nullptr) == Status::Ok, "null user allowed");
+        check(client.ReadRegistry("alpha", [](const API::RegistryView&, void*) noexcept {}, nullptr) == Status::Ok, "null context allowed");
 
         const auto all = Read(client);
         check(all.calls == 1 && all.thread == std::this_thread::get_id() && all.mods.size() == 3, "one synchronous whole-registry callback");
@@ -259,9 +259,9 @@ int main()
             Status write{};
             Capture nested;
             bool stable{};
-            static void OnRegistry(const API::RegistryView& registry, void* user) noexcept
+            static void OnRegistry(const API::RegistryView& registry, void* context) noexcept
             {
-                auto& self = *static_cast<Reentrant*>(user);
+                auto& self = *static_cast<Reentrant*>(context);
                 const auto& text = registry.mods[0].groups[0].settings[5];
                 const auto before = text.value.text;
                 self.write = self.client->SetString("alpha", "text", "changed inside callback");
@@ -299,9 +299,9 @@ int main()
             std::shared_future<void> release;
             bool stable{};
             std::thread::id thread;
-            static void OnRegistry(const API::RegistryView& registry, void* user) noexcept
+            static void OnRegistry(const API::RegistryView& registry, void* context) noexcept
             {
-                auto& self = *static_cast<Concurrent*>(user);
+                auto& self = *static_cast<Concurrent*>(context);
                 self.thread = std::this_thread::get_id();
                 self.entered.set_value();
                 self.release.wait();

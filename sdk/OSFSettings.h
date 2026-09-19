@@ -44,12 +44,12 @@ namespace OSFSettings::API
 
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
     // Callbacks run serially from an SFSE task; no main-thread guarantee.
-    using ChangedFn = void (*)(const char* mod, const char* key, void* user) noexcept;
-    using HotkeyFn = void (*)(const char* mod, const char* id, void* user) noexcept;
+    using ChangedFn = void (*)(const char* mod, const char* key, void* context) noexcept;
+    using HotkeyFn = void (*)(const char* mod, const char* id, void* context) noexcept;
 
     // Include OSFSettingsRegistry.h to inspect registry records.
     struct RegistryView;
-    using RegistryFn = void (*)(const RegistryView&, void* user) noexcept;
+    using RegistryFn = void (*)(const RegistryView&, void* context) noexcept;
 
     struct ISettings
     {
@@ -73,9 +73,9 @@ namespace OSFSettings::API
         virtual Status ResetMod(const char* mod) noexcept = 0;
 
         // Subscribe before reading to avoid missing changes. Registration is allowed before readiness; the initial notification waits until the provider is ready.
-        virtual Status Subscribe(const char* mod, ChangedFn callback, void* user, Subscription* out) noexcept = 0;
+        virtual Status Subscribe(const char* mod, ChangedFn callback, void* context, Subscription* out) noexcept = 0;
         // Outside a callback, successful unsubscribe waits for that callback to finish.
-        // Inside a callback, it prevents future calls; keep user alive until return.
+        // Inside a callback, it prevents future calls; keep context alive until return.
         virtual Status Unsubscribe(Subscription subscription) noexcept = 0;
 
         // Native Starfield keyboard virtual-key codes (Win32 VK), with kUnboundKey for unbound.
@@ -89,7 +89,7 @@ namespace OSFSettings::API
         virtual Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept = 0;
 
         // Exact IDs of a loaded hotkeys declaration without a menu target. Initialize at kPostPostLoad.
-        virtual Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept = 0;
+        virtual Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* context) noexcept = 0;
 
         virtual Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept = 0;
         virtual Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept = 0;
@@ -239,9 +239,9 @@ namespace OSFSettings::API
             return m_api ? m_api->ResetMod(mod) : Status::NotReady;
         }
 
-        Status Subscribe(const char* mod, ChangedFn callback, void* user, Subscription* out) const noexcept
+        Status Subscribe(const char* mod, ChangedFn callback, void* context, Subscription* out) const noexcept
         {
-            return m_api ? m_api->Subscribe(mod, callback, user, out) : Status::NotReady;
+            return m_api ? m_api->Subscribe(mod, callback, context, out) : Status::NotReady;
         }
         Status Unsubscribe(Subscription subscription) const noexcept
         {
@@ -257,9 +257,10 @@ namespace OSFSettings::API
             return m_api ? m_api->ReleaseHotkeyBlock(block) : Status::NotReady;
         }
 
-        Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) const noexcept
+        Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* context) const noexcept
         {
-            return m_api ? m_api->RegisterHotkey(mod, id, callback, user) : Status::NotReady;
+            return m_api ? m_api->RegisterHotkey(mod, id, callback, context) : Status::NotReady;
+        }
 
         Status ReadRegistry(const char* mod, RegistryFn callback, void* context) const noexcept
         {

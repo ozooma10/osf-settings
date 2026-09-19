@@ -29,9 +29,9 @@ namespace
         std::filesystem::path saved;
         std::vector<std::string> keys;
         bool savedBeforePublish{ true };
-        static void Changed(const char* mod, const char* key, void* user) noexcept
+        static void Changed(const char* mod, const char* key, void* context) noexcept
         {
-            auto& self = *static_cast<Events*>(user);
+            auto& self = *static_cast<Events*>(context);
             self.keys.emplace_back(key ? key : "*");
             std::string value;
             if (std::filesystem::exists(self.saved)) {

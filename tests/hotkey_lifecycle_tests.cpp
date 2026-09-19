@@ -335,8 +335,8 @@ int main()
             check(handler->ShouldHandleEvent(&callback) && callback.status == RE::InputEvent::Status::kUnhandled &&
                 HotkeyTasks::pending.empty(), "declarations without registered callbacks remain unconsumed");
             unsigned calls{};
-            check(input.Register("anothermod", "toggleFeature", +[](const char*, const char*, void* user) noexcept {
-                ++*static_cast<unsigned*>(user);
+            check(input.Register("anothermod", "toggleFeature", +[](const char*, const char*, void* context) noexcept {
+                ++*static_cast<unsigned*>(context);
             }, &calls) == SettingsError::None, "register a native callback fixture");
             callback.disabled = true;
             callbackButton(1, 0);

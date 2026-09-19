@@ -26,14 +26,14 @@ namespace OSFSettings::API
         Status SetKey(const char* mod, const char* key, std::uint32_t value) noexcept override;
         Status Reset(const char* mod, const char* key) noexcept override;
         Status ResetMod(const char* mod) noexcept override;
-        Status Subscribe(const char* mod, ChangedFn callback, void* user, Subscription* out) noexcept override;
+        Status Subscribe(const char* mod, ChangedFn callback, void* context, Subscription* out) noexcept override;
         Status Unsubscribe(Subscription subscription) noexcept override;
         Status AcquireHotkeyBlock(HotkeyBlock* out) noexcept override;
         Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept override;
-        Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept override;
+        Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* context) noexcept override;
         Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override;
         Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept override;
-        Status ReadRegistry(const char* mod, RegistryFn callback, void* user) noexcept override;
+        Status ReadRegistry(const char* mod, RegistryFn callback, void* context) noexcept override;
 
     private:
         template <class T> Status Read(const char* mod, const char* key, T* out) noexcept;

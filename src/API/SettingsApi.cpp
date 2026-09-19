@@ -146,7 +146,7 @@ namespace OSFSettings::API
 
     bool SettingsApi::IsReady() noexcept { return m_service.IsReady(); }
 
-    Status SettingsApi::ReadRegistry(const char* mod, RegistryFn callback, void* user) noexcept
+    Status SettingsApi::ReadRegistry(const char* mod, RegistryFn callback, void* context) noexcept
     {
         if (!callback || (mod && !IsValidModId(mod))) return Status::InvalidArgument;
         if (!m_service.IsReady()) return Status::NotReady;
@@ -156,7 +156,7 @@ namespace OSFSettings::API
         }
         const RegistryProjection projection(snapshot, mod);
         const RegistryView view{ Elements(projection.views), Count(projection.views.size()) };
-        callback(view, user);
+        callback(view, context);
         return Status::Ok;
     }
 
@@ -260,11 +260,11 @@ namespace OSFSettings::API
         return ToStatus(m_service.ResetMod(mod));
     }
 
-    Status SettingsApi::Subscribe(const char* mod, ChangedFn callback, void* user, Subscription* out) noexcept
+    Status SettingsApi::Subscribe(const char* mod, ChangedFn callback, void* context, Subscription* out) noexcept
     {
         if (!mod || !callback || !out) return Status::InvalidArgument;
-        return ToStatus(m_service.Subscribe(mod, [callback, user](const SettingsService::Change& change) noexcept {
-            callback(change.mod.c_str(), change.key ? change.key->c_str() : nullptr, user);
+        return ToStatus(m_service.Subscribe(mod, [callback, context](const SettingsService::Change& change) noexcept {
+            callback(change.mod.c_str(), change.key ? change.key->c_str() : nullptr, context);
         }, *out));
     }
 
@@ -273,13 +273,13 @@ namespace OSFSettings::API
         return ToStatus(m_service.Unsubscribe(subscription));
     }
 
-    Status SettingsApi::RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept
+    Status SettingsApi::RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* context) noexcept
     {
         if (!mod || !id || !callback || !IsValidModId(mod)) return Status::InvalidArgument;
         const std::string_view hotkeyId(id);
         if (hotkeyId.empty() || hotkeyId.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") != std::string_view::npos) return Status::InvalidArgument;
         if (!m_service.IsReady()) return Status::NotReady;
-        return ToStatus(m_input.Register(mod, id, callback, user));
+        return ToStatus(m_input.Register(mod, id, callback, context));
     }
 
     Status SettingsApi::AcquireHotkeyBlock(HotkeyBlock* out) noexcept

@@ -16,9 +16,9 @@ namespace
     {
         std::vector<std::string> keys;
         std::thread::id thread;
-        static void Fired(const char* mod, const char* key, void* user) noexcept
+        static void Fired(const char* mod, const char* key, void* context) noexcept
         {
-            auto& self = *static_cast<Events*>(user);
+            auto& self = *static_cast<Events*>(context);
             self.keys.emplace_back(std::string(mod) + "/" + key);
             self.thread = std::this_thread::get_id();
         }

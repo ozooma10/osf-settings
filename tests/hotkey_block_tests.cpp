@@ -114,7 +114,7 @@ int main()
         check(!press() && release(), "input resumes after all concurrent consumers release");
 
         unsigned callbacks{};
-        const auto fired = +[](const char*, const char*, void* user) noexcept { ++*static_cast<unsigned*>(user); };
+        const auto fired = +[](const char*, const char*, void* context) noexcept { ++*static_cast<unsigned*>(context); };
         API::Client disconnected;
         check(disconnected.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::NotReady,
             "disconnected registration returns NotReady");

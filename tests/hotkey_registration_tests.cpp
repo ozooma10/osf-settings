@@ -143,7 +143,7 @@ int main()
             "valid native actions retain callback identity or a menu target, excluding invalid defaults");
         auto& input = OSFSettings::HotkeyInputState::Get();
         unsigned calls{};
-        const auto fired = +[](const char*, const char*, void* user) noexcept { ++*static_cast<unsigned*>(user); };
+        const auto fired = +[](const char*, const char*, void* context) noexcept { ++*static_cast<unsigned*>(context); };
         using OSFSettings::SettingsError;
         check(input.Register("osfsettings", "badCallback", fired, &calls) == SettingsError::InvalidValue &&
             input.Register("osfsettings", "openMenu", fired, &calls) == SettingsError::TypeMismatch &&

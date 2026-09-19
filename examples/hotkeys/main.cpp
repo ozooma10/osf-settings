@@ -10,9 +10,9 @@ namespace
     bool g_registered{};
     std::atomic_uint g_enabled{};
 
-    void OnHotkey(const char* mod, const char* id, void* user) noexcept
+    void OnHotkey(const char* mod, const char* id, void* context) noexcept
     {
-        auto& enabled = *static_cast<std::atomic_uint*>(user);
+        auto& enabled = *static_cast<std::atomic_uint*>(context);
         const bool next = enabled.fetch_xor(1u) == 0;
         REX::INFO("Hotkey example: {}/{} enabled={}", mod, id, next);
         // Schedule game effects in their required context; this is an SFSE task.

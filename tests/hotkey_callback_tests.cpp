@@ -17,9 +17,9 @@ namespace
         std::vector<std::string> events;
         std::function<void()> onCall;
 
-        static void Fired(const char* mod, const char* id, void* user) noexcept
+        static void Fired(const char* mod, const char* id, void* context) noexcept
         {
-            auto& self = *static_cast<Receiver*>(user);
+            auto& self = *static_cast<Receiver*>(context);
             self.events.push_back(std::string(mod) + "/" + id);
             if (self.onCall) self.onCall();
         }

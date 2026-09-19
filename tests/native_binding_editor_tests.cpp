@@ -144,8 +144,8 @@ int main()
         auto& hotkeys = OSFSettings::HotkeyInputState::Get();
         hotkeys.Initialize({ { "test", {{ "action", HotkeyInputState::Target::Menu }, { "callback", HotkeyInputState::Target::Callback }} } });
         unsigned callbacks{};
-        check(hotkeys.Register("test", "callback", +[](const char*, const char*, void* user) noexcept {
-            ++*static_cast<unsigned*>(user);
+        check(hotkeys.Register("test", "callback", +[](const char*, const char*, void* context) noexcept {
+            ++*static_cast<unsigned*>(context);
         }, &callbacks) == SettingsError::None, "register capture callback fixture");
         hotkeys.ProcessButton(0x75, "test/callback", 1, 0);
         hotkeys.ProcessButton(0x79, "test/action", 1, 0);

@@ -18,7 +18,7 @@ namespace OSFSettings
         m_initialized = true;
     }
 
-    SettingsError HotkeyInputState::Register(std::string_view mod, std::string_view id, Callback callback, void* user)
+    SettingsError HotkeyInputState::Register(std::string_view mod, std::string_view id, Callback callback, void* context)
     {
         if (mod.empty() || id.empty() || !callback) return SettingsError::InvalidArgument;
         std::lock_guard lock(m_mutex);
@@ -29,7 +29,7 @@ namespace OSFSettings
         if (found == foundMod->second.end()) return SettingsError::UnknownHotkey;
         if (found->second == Target::Menu) return SettingsError::TypeMismatch;
         if (found->second == Target::Invalid) return SettingsError::InvalidValue;
-        m_callbacks[std::string(mod) + "/" + std::string(id)].push_back({ callback, user });
+        m_callbacks[std::string(mod) + "/" + std::string(id)].push_back({ callback, context });
         return SettingsError::None;
     }
 
@@ -70,7 +70,7 @@ namespace OSFSettings
             if (callbacks == m_callbacks.end()) return false;
             auto task = [listeners = callbacks->second, mod = mod->first, id = hotkey->first] {
                 for (const auto& listener : listeners) {
-                    listener.callback(mod.c_str(), id.c_str(), listener.user);
+                    listener.callback(mod.c_str(), id.c_str(), listener.context);
                 }
             };
             lock.unlock();

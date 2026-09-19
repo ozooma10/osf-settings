@@ -26,9 +26,9 @@ namespace
         std::thread::id thread;
         bool valid{ true };
 
-        static void Changed(const char* mod, const char* key, void* user) noexcept
+        static void Changed(const char* mod, const char* key, void* context) noexcept
         {
-            auto& self = *static_cast<Events*>(user);
+            auto& self = *static_cast<Events*>(context);
             self.thread = std::this_thread::get_id();
             self.valid = self.valid && std::string_view(mod) == "sample";
             bool value{};
@@ -213,10 +213,10 @@ int TestSettingsService()
     Status missingStatus = Status::Ok;
     struct Missing { API::ISettings* service; Status* result; } missing{ &service, &missingStatus };
     API::Subscription missingToken{};
-    check(service.Subscribe("missing", [](const char* mod, const char* key, void* user) noexcept {
-        auto& context = *static_cast<Missing*>(user);
+    check(service.Subscribe("missing", [](const char* mod, const char* key, void* context) noexcept {
+        auto& self = *static_cast<Missing*>(context);
         bool value{};
-        *context.result = key ? Status::InternalError : context.service->GetBool(mod, "enabled", &value);
+        *self.result = key ? Status::InternalError : self.service->GetBool(mod, "enabled", &value);
     }, &missing, &missingToken) == Status::Ok, "unknown mods can subscribe");
     backend.DispatchChanges();
     check(missingStatus == Status::UnknownMod, "unknown mod still receives an initial refresh");
@@ -230,15 +230,15 @@ int TestSettingsService()
         int calls{};
         bool valid{ true };
     } reentrant{ &service, &backend };
-    service.Subscribe("sample", [](const char* mod, const char*, void* user) noexcept {
-        auto& context = *static_cast<Reentrant*>(user);
-        ++context.calls;
-        if (context.calls == 1) {
-            context.valid = context.service->SetBool(mod, "enabled", true) == Status::Ok;
-            context.backend->DispatchChanges();
-            context.valid = context.valid && context.calls == 1;
+    service.Subscribe("sample", [](const char* mod, const char*, void* context) noexcept {
+        auto& self = *static_cast<Reentrant*>(context);
+        ++self.calls;
+        if (self.calls == 1) {
+            self.valid = self.service->SetBool(mod, "enabled", true) == Status::Ok;
+            self.backend->DispatchChanges();
+            self.valid = self.valid && self.calls == 1;
         } else {
-            context.valid = context.valid && context.service->Unsubscribe(context.token) == Status::Ok;
+            self.valid = self.valid && self.service->Unsubscribe(self.token) == Status::Ok;
         }
     }, &reentrant, &reentrant.token);
     backend.DispatchChanges();
@@ -280,13 +280,13 @@ int TestSettingsService()
         int calls{};
     } blocking;
     API::Subscription blockingToken{};
-    service.Subscribe("sample", [](const char*, const char*, void* user) noexcept {
-        auto& context = *static_cast<Blocking*>(user);
-        std::unique_lock lock(context.mutex);
-        ++context.calls;
-        context.entered = true;
-        context.cv.notify_all();
-        context.cv.wait(lock, [&] { return context.release; });
+    service.Subscribe("sample", [](const char*, const char*, void* context) noexcept {
+        auto& self = *static_cast<Blocking*>(context);
+        std::unique_lock lock(self.mutex);
+        ++self.calls;
+        self.entered = true;
+        self.cv.notify_all();
+        self.cv.wait(lock, [&] { return self.release; });
     }, &blocking, &blockingToken);
     std::jthread dispatch([&] { backend.DispatchChanges(); });
     bool entered{};
@@ -358,8 +358,8 @@ int TestSettingsService()
     API::Subscription temporaryToken{};
     {
         API::SettingsApi temporary{ backend, hotkeys };
-        check(temporary.Subscribe("sample", [](const char*, const char*, void* user) noexcept {
-            ++*static_cast<int*>(user);
+        check(temporary.Subscribe("sample", [](const char*, const char*, void* context) noexcept {
+            ++*static_cast<int*>(context);
         }, &temporaryCalls, &temporaryToken) == Status::Ok, "temporary adapter subscribes to the same service");
     }
     backend.DispatchChanges();

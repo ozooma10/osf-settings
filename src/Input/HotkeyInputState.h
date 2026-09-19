@@ -16,13 +16,13 @@ namespace OSFSettings
     {
     public:
         using Block = std::uint64_t;
-        using Callback = void (*)(const char* mod, const char* id, void* user) noexcept;
+        using Callback = void (*)(const char* mod, const char* id, void* context) noexcept;
         enum class Target { Callback, Menu, Invalid };
         using Declarations = std::map<std::string, std::map<std::string, Target, std::less<>>, std::less<>>;
 
         static HotkeyInputState& Get();
         void Initialize(Declarations declarations);
-        SettingsError Register(std::string_view mod, std::string_view id, Callback callback, void* user);
+        SettingsError Register(std::string_view mod, std::string_view id, Callback callback, void* context);
 
         Block AcquireBlock();
         bool ReleaseBlock(Block block);
@@ -33,7 +33,7 @@ namespace OSFSettings
         struct Listener
         {
             Callback callback{};
-            void* user{};
+            void* context{};
         };
 
         std::mutex m_mutex;
