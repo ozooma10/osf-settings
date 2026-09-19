@@ -106,7 +106,7 @@ namespace OSFSettings
                 return { false, "value does not match the setting's type", Error::TypeMismatch };
             }
             if (!IsValidValue(*setting, value)) {
-                return { false, "value does not match the setting's type, bounds, or options", Error::InvalidValue };
+                return { false, "value does not match the setting's type or validation rules", Error::InvalidValue };
             }
             if (current->second == value) {
                 return { true, {} };

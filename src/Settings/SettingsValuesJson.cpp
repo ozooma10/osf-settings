@@ -47,7 +47,7 @@ namespace OSFSettings::SettingsJson
                 }
                 const auto decoded = DecodeValue(value, *setting);
                 if (!decoded || !IsValidValue(*setting, *decoded)) {
-                    errors.push_back({ path, "saved value does not match the setting's type, bounds, or options: " + key });
+                    errors.push_back({ path, "saved value does not match the setting's type or validation rules: " + key });
                     continue;
                 }
                 current->second = *decoded;
@@ -86,6 +86,8 @@ namespace OSFSettings::SettingsJson
                 std::visit([&](const auto& current) {
                     if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) {
                         saved[key] = current.keyCode;
+                    } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
+                        saved[key] = current.value;
                     } else {
                         saved[key] = current;
                     }

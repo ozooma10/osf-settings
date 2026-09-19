@@ -594,8 +594,8 @@ namespace
         if (!parsed) return;
         const auto* mode = parsed->FindSetting("notificationMode");
         const auto* enumeration = mode ? std::get_if<OSFSettings::EnumDefinition>(&mode->definition) : nullptr;
-        Check(enumeration && enumeration->defaultValue == "normal" && mode->DefaultValue() == SettingValue{ std::string{"normal"} },
-            "enum defaults are stored as strings");
+        Check(enumeration && enumeration->defaultValue.value == "normal" && mode->DefaultValue() == SettingValue{ OSFSettings::EnumValue{"normal"} },
+            "enum defaults retain typed option identities");
         Check(enumeration && enumeration->options.size() == 3 &&
             enumeration->options[0].value == "quiet" && enumeration->options[0].label == "Quiet" &&
             enumeration->options[1].value == "normal" && enumeration->options[1].label == "Normal" &&
@@ -670,44 +670,44 @@ namespace
         store.LoadAll(schemas, values);
         Check(store.LoadErrors().empty() && store.GetValue("learning", "notificationMode") == mode->DefaultValue(),
             "enum defaults load without a saved file");
-        Check(store.Set("learning", "notificationMode", std::string{"normal"}).ok && !fs::exists(values),
+        Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{"normal"}).ok && !fs::exists(values),
             "setting the current enum value does not write a file");
         Check(!store.Set("learning", "notifications", std::string{"true"}).ok &&
             !store.Set("learning", "notificationLimit", std::string{"3"}).ok &&
             !store.Set("learning", "notificationVolume", std::string{"0.75"}).ok && !fs::exists(values),
-            "string storage for enums does not enable string coercion for other types");
+            "text values do not enable string coercion for other types");
 
         OSFSettings::SettingsStore restarted;
         for (const auto* value : { "quiet", "normal", "verbose" }) {
-            Check(store.Set("learning", "notificationMode", std::string{value}).ok, "each declared enum option can be selected");
+            Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{value}).ok, "each declared enum option can be selected");
             restarted.LoadAll(schemas, values);
             const auto saved = Json::parse(Read(valuesFile));
-            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ std::string{value} } &&
+            Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{value} } &&
                 saved["values"]["notificationMode"].is_string() && saved["values"]["notificationMode"] == value,
                 "enum saving and reloading preserve the option string");
         }
         const auto committed = Read(valuesFile);
         for (const auto& value : std::vector<SettingValue>{ true, std::int64_t{1}, 1.0,
-            std::string{}, std::string{"Normal"}, std::string{"removed"} }) {
+            std::string{"normal"}, OSFSettings::EnumValue{}, OSFSettings::EnumValue{"Normal"}, OSFSettings::EnumValue{"removed"} }) {
             const auto result = store.Set("learning", "notificationMode", value);
             Check(!result.ok && !result.error.empty() && Read(valuesFile) == committed &&
-                store.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} },
+                store.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} },
                 "wrong types, display labels, and unknown enum values preserve the live value and saved file");
         }
         fs::create_directory(temporary);
-        Check(!store.Set("learning", "notificationMode", std::string{"quiet"}).ok && Read(valuesFile) == committed &&
-            store.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} },
+        Check(!store.Set("learning", "notificationMode", OSFSettings::EnumValue{"quiet"}).ok && Read(valuesFile) == committed &&
+            store.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} },
             "a failed enum save preserves the live value and saved file");
         fs::remove(temporary); // Only the empty directory created by this test.
         Check(store.Set("learning", "notificationMode", mode->DefaultValue()).ok, "an enum resets through the normal save path");
         restarted.LoadAll(schemas, values);
         Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == mode->DefaultValue(),
             "the reset enum survives reload");
-        Check(store.Set("learning", "notificationMode", std::string{"verbose"}).ok &&
+        Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{"verbose"}).ok &&
             store.Set("learning", "notifications", false).ok && store.Set("learning", "notificationLimit", std::int64_t{7}).ok &&
             store.Set("learning", "notificationVolume", 0.5).ok, "all four setting types can be saved together");
         restarted.LoadAll(schemas, values);
-        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} } &&
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} } &&
             restarted.GetValue("learning", "notifications") == SettingValue{ false } &&
             restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} } &&
             restarted.GetValue("learning", "notificationVolume") == SettingValue{ 0.5 }, "mixed edits preserve neighboring values and types");
@@ -719,7 +719,7 @@ namespace
         reordered["optionLabels"] = { "Detailed", "Minimal", "Standard" };
         Write(schemaFile, document.dump(2));
         restarted.LoadAll(schemas, values);
-        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ std::string{"verbose"} } &&
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} } &&
             Read(valuesFile) == savedSelection, "reordering options and changing labels preserve the saved selection without rewriting it");
         reordered["options"] = { "quiet", "normal" };
         reordered.erase("optionLabels");

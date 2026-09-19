@@ -17,12 +17,112 @@ if (settings.Init() && settings.IsReady()) {
 }
 ```
 
-- Reads: `GetBool`, `GetInt`, `GetFloat`, `GetEnum`. Writes: matching `Set*` methods.
-- Types: `bool`, `int64_t`, `double`, enum option string.
+- Reads: `GetBool`, `GetInt`, `GetFloat`, `GetEnum`, `GetString`. Writes: matching `Set*` methods.
+- Types: `bool`, `int64_t`, `double`, enum option string, free-form string.
 - Check the returned `Status`. `Ok` means success; successful writes are already saved.
 - `Reset(mod, key)` restores one default; `ResetMod(mod)` restores all defaults.
 - Values live in `Data/SFSE/Plugins/OSF/Settings/values/<mod>.json`, across save games.
 - The `Client` string overload owns its result in the calling mod and preserves it on error.
+
+## Free-form strings
+
+Use `"type": "string"` for editable single-line text. `default` is required and
+must be a string; an empty string is valid. For example, OSF UI's language setting:
+
+```json
+{
+  "key": "language",
+  "label": "Language",
+  "type": "string",
+  "default": "auto",
+  "maxLength": 32,
+  "hint": "Use auto for Starfield's language, or enter a locale such as en, de, or pt-BR."
+}
+```
+
+`maxLength` counts **UTF-8 bytes**, excluding the terminating NUL used by C++
+buffers. Omit it for a limit of **256 bytes**, or provide an integer from **1 to
+4096**, inclusive. Zero, negative, fractional, null, boolean, and larger limits
+are schema errors. The default must fit the limit. For example, `é` needs two
+bytes and `😀` needs four. No path truncates an overlong value to make it fit.
+
+Defaults, saved overrides, C++ writes, and menu edits use the same text policy:
+valid UTF-8 Unicode scalar values; no NUL, C0 controls (`U+0000–001F`), DEL/C1
+controls (`U+007F–009F`), or line/paragraph separators (`U+2028`, `U+2029`). This
+rejects tabs and line breaks. Empty text, spaces, case, punctuation, and other
+Unicode text are preserved exactly, without trimming or normalization. Invalid
+defaults reject the schema. Invalid saved overrides report a load error and keep
+that setting's default; a malformed JSON/UTF-8 file keeps defaults for the file.
+Invalid writes return `InvalidValue` and leave the stored value unchanged.
+
+Strings and enums have distinct types. `GetString`/`SetString` on an enum and
+`GetEnum`/`SetEnum` on a string return `TypeMismatch`. Enum values still require
+an exact authored option, and their existing validation is unchanged. String
+settings do not need an `options` list and accept arbitrary text within their
+validation contract.
+
+```cpp
+std::string language;
+auto status = settings.GetString("osfui", "language", language);
+status = settings.SetString("osfui", "language", "pt-BR");
+status = settings.SetString("osfui", "language", std::string_view("auto"));
+```
+
+`ISettings::GetString(mod, key, out, capacity, &required)` uses a caller-owned
+UTF-8 buffer. `required` includes the final NUL; even empty text needs one byte.
+Pass `nullptr, 0` to query the size (`BufferTooSmall`). A short buffer returns
+`BufferTooSmall`, updates `required`, and leaves the buffer untouched. Other
+errors preserve both outputs. Null `required`, or null `out` with nonzero
+capacity, is `InvalidArgument`. Retry if a concurrent write grows the value
+between query and copy. `Client::GetString(..., std::string&)` handles this retry,
+owns the allocation in the caller, and changes the output only on `Ok`.
+
+`ISettings::SetString(mod, key, value, length)` copies exactly `length` UTF-8
+bytes. The length excludes a terminator, and input need not be terminated.
+`value` must be non-null, including for an empty value (`"", 0`). Lengths above
+4096 return `InvalidValue` before reading the buffer. Embedded NULs within the
+explicit length are rejected. The Client accepts this same signature, a
+`std::string_view` (also accepting `std::string`), or a C string. The C-string
+overload reads through the first NUL; use a view or explicit length for data
+whose length is known. Caller inputs are borrowed only during the call.
+
+Successful changes are saved as ordinary JSON strings in the existing values
+file before the service publishes them or queues change notifications. A failed
+save returns `SaveFailed` with the previous value, file, and notifications
+unchanged. Equal values are successful no-ops. `Reset` saves the authored string
+default and invalidates that key; `ResetMod` saves all defaults atomically and
+requests a full refresh. Unchanged resets do not notify. String changes use the
+same subscriptions, coalescing, and readiness rules as other setting types.
+These methods extend the repository's pre-launch 1.0 API contract.
+
+The Scaleform row opens an editable text field. Enter or the **SAVE** button
+commits the draft; Escape, **CANCEL**, focus loss, and menu removal discard it.
+The editor displays the byte limit, keeps invalid or unsaved drafts open, and
+uses the native text-input context so typing does not trigger menu shortcuts.
+Reset restores the default outside an active edit. Entry uses a physical
+keyboard; no on-screen keyboard is supplied. Both normal and large-text SWFs
+contain the control. Fresh-game input, focus, glyph coverage, and controller
+behavior still require the SettingsSmoke harness when in-game testing is requested.
+
+### OSF UI language consumer
+
+Source inspection of `OSF UI/data/OSFUI/settings/osfui.json` found the declaration
+above. `Runtime::OnSettingChanged` detects the game language only for the exact
+string `"auto"`; other strings go through `LocalizationService::NormalizeLocale`
+(trimming, underscore-to-dash conversion, known aliases, and locale casing).
+Localization tries the requested locale, its base language, then English.
+Slim preserves the authored value and leaves that interpretation to the consumer;
+there is no fixed locale enumeration.
+
+[The language fixture](../tests/fixtures/osfui-language.json) copies only this
+declaration into a Slim `schemaVersion: 1` envelope. It is test data, not an
+installed OSF UI schema. OSF UI still needs a separate adapter/schema port;
+this change does not connect or modify its runtime.
+
+Run `xmake build osfsettings-string-tests` then `xmake run osfsettings-string-tests`
+for focused schema, UTF-8, byte-limit, persistence/reload, save-failure, reset,
+notification, type-separation, and caller-buffer checks. The development design
+preview includes the language field under **Advanced**.
 
 ## Restart-required settings
 
@@ -60,8 +160,8 @@ under **Advanced**.
 | `UnknownMod` | No loaded schema for this mod. |
 | `UnknownSetting` | Key not found in the mod's schema. |
 | `TypeMismatch` | Getter/setter type does not match the setting. |
-| `InvalidValue` | Value fails the setting's bounds or allowed options. |
-| `BufferTooSmall` | Enum buffer needs `required` bytes; the string overload handles this. |
+| `InvalidValue` | Value fails the setting's bounds, text validation, or allowed options. |
+| `BufferTooSmall` | Enum or string buffer needs `required` bytes; the owning overload handles this. |
 | `SaveFailed` | Could not save; previous value is unchanged. |
 | `UnknownSubscription` | Subscription token not found. |
 | `UnknownHotkeyBlock` | Block token is zero, unknown, or already released. |

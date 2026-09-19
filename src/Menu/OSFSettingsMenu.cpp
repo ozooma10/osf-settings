@@ -18,7 +18,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput };
+            RequestBindings, PollBindings, TextInput, SetString };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -71,7 +71,7 @@ namespace OSFSettings
             auto current = ui->GetMenu(name);
             if (!current || !ui->IsMenuOpen(name)) return;
             auto* menu = static_cast<OSFSettingsMenu*>(current.get());
-            if (menu->m_textRequests != request || menu->m_searchActive == enabled) return;
+            if (menu->m_textRequests != request || menu->m_textInputActive == enabled) return;
             // Text editing must not inherit Accept/E or navigation/WASD.
             menu->inputContexts.end = menu->inputContexts.begin;
             if (enabled) {
@@ -81,7 +81,7 @@ namespace OSFSettings
                     menu->AddInputContext(context);
                 }
             }
-            menu->m_searchActive = enabled;
+            menu->m_textInputActive = enabled;
         });
         return true;
     }
@@ -97,6 +97,7 @@ namespace OSFSettings
         RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
         RegisterNativeFunction("setFloat", static_cast<std::uint64_t>(Function::SetFloat));
         RegisterNativeFunction("setEnum", static_cast<std::uint64_t>(Function::SetEnum));
+        RegisterNativeFunction("setString", static_cast<std::uint64_t>(Function::SetString));
         RegisterNativeFunction("setKey", static_cast<std::uint64_t>(Function::SetKey));
         RegisterNativeFunction("beginKeyCapture", static_cast<std::uint64_t>(Function::BeginKeyCapture));
         RegisterNativeFunction("pollKeyCapture", static_cast<std::uint64_t>(Function::PollKeyCapture));
@@ -292,6 +293,12 @@ namespace OSFSettings
                                 row.SetMember("sliderScale", RE::Scaleform::GFx::Value(static_cast<double>(slider->scale)));
                                 row.SetMember("sliderSteps", RE::Scaleform::GFx::Value(static_cast<double>(slider->steps)));
                             }
+                        } else if (const auto* text = std::get_if<StringDefinition>(&setting.definition)) {
+                            Text(row, "type", "string");
+                            Text(row, "value", std::get<std::string>(value->second));
+                            Text(row, "defaultValue", text->defaultValue);
+                            row.SetMember("maxLength", RE::Scaleform::GFx::Value(text->maxLength));
+                            row.SetMember("editable", RE::Scaleform::GFx::Value(true));
                         } else if (const auto* binding = std::get_if<KeyDefinition>(&setting.definition)) {
                             Text(row, "type", "key");
                             const auto keyCode = std::get<KeyBinding>(value->second).keyCode;
@@ -303,8 +310,8 @@ namespace OSFSettings
                             row.SetMember("allowUnbound", RE::Scaleform::GFx::Value(binding->allowUnbound));
                         } else if (const auto* enumeration = std::get_if<EnumDefinition>(&setting.definition)) {
                             Text(row, "type", "enum");
-                            Text(row, "value", std::get<std::string>(value->second));
-                            Text(row, "defaultValue", enumeration->defaultValue);
+                            Text(row, "value", std::get<EnumValue>(value->second).value);
+                            Text(row, "defaultValue", enumeration->defaultValue.value);
                             row.SetMember("editable", RE::Scaleform::GFx::Value(enumeration->options.size() > 1));
                             RE::Scaleform::GFx::Value options;
                             root->CreateArray(&options);
@@ -345,9 +352,10 @@ namespace OSFSettings
         case Function::SetInt:
         case Function::SetFloat:
         case Function::SetEnum:
+        case Function::SetString:
         case Function::SetKey: {
             auto result = SettingsError::InvalidArgument;
-            if (params.argCount == 3 && params.args[0].IsString() && params.args[1].IsString()) {
+            if (params.argCount == (function == Function::SetString ? 4u : 3u) && params.args[0].IsString() && params.args[1].IsString()) {
                 if (function == Function::SetBool && params.args[2].IsBoolean()) {
                     result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetBoolean());
                 } else if (function == Function::SetInt && params.args[2].IsString()) {
@@ -357,7 +365,13 @@ namespace OSFSettings
                 } else if (function == Function::SetFloat && params.args[2].IsNumber()) {
                     result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetNumber());
                 } else if (function == Function::SetEnum && params.args[2].IsString()) {
-                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), ArgString(params, 2));
+                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), EnumValue{ ArgString(params, 2) });
+                } else if (function == Function::SetString && params.args[2].IsString() && params.args[3].IsNumber()) {
+                    // GFx exposes a C string. The movie also supplies its UTF-8 byte count so embedded NUL cannot turn a rejected draft into a prefix.
+                    auto text = ArgString(params, 2);
+                    if (params.args[3].GetNumber() == static_cast<double>(text.size())) {
+                        result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), std::move(text));
+                    }
                 } else if (function == Function::SetKey && params.args[2].IsNumber()) {
                     const auto code = params.args[2].GetNumber();
                     if (std::isfinite(code) && code == std::floor(code) && code >= 0 && code <= KeyBinding::Unbound) {
@@ -378,8 +392,8 @@ namespace OSFSettings
     bool OSFSettingsMenu::WantsMovieEventForward(const RE::InputEvent* event)
     {
         if (!event) return false;
-        if (event->eventType == RE::InputEvent::EventType::kChar) return m_searchActive;
-        if (m_searchActive && event->eventType == RE::InputEvent::EventType::kButton && event->deviceType == RE::InputEvent::DeviceType::kKeyboard) {
+        if (event->eventType == RE::InputEvent::EventType::kChar) return m_textInputActive;
+        if (m_textInputActive && event->eventType == RE::InputEvent::EventType::kButton && event->deviceType == RE::InputEvent::DeviceType::kKeyboard) {
             // Native movie forwarding synthesizes Enter for the underlying gameplay Activate action even when the text context disables it.
             const auto* button = static_cast<const RE::ButtonEvent*>(event);
             if (button->disabled && button->strUserEvent == "Activate") return false;
@@ -409,7 +423,7 @@ namespace OSFSettings
     void OSFSettingsMenu::OnRemovedFromMenuStack()
     {
         ++*m_textRequests;
-        m_searchActive = false;
+        m_textInputActive = false;
         m_bindings->Invalidate();
         m_bindingEditor.End(true);
         m_capture.ResetForMenuClose();

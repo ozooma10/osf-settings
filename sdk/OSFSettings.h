@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <limits>
 #include "REX/W32/KERNEL32.h"
 
 namespace OSFSettings::API
@@ -85,6 +87,9 @@ namespace OSFSettings::API
         // Exact IDs of a loaded hotkeys declaration without a menu target. Initialize at kPostPostLoad.
         virtual Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept = 0;
 
+        virtual Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept = 0;
+        virtual Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept = 0;
+
     protected:
         ~ISettings() = default;
     };
@@ -161,6 +166,39 @@ namespace OSFSettings::API
         Status GetKey(const char* mod, const char* key, std::uint32_t* out) const noexcept
         {
             return m_api ? m_api->GetKey(mod, key, out) : Status::NotReady;
+        }
+
+        Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) const noexcept
+        {
+            return m_api ? m_api->GetString(mod, key, out, capacity, required) : Status::NotReady;
+        }
+        Status GetString(const char* mod, const char* key, std::string& out) const noexcept
+        {
+            std::string buffer;
+            std::uint32_t required{};
+            auto status = GetString(mod, key, nullptr, 0, &required);
+            while (status == Status::BufferTooSmall) {
+                buffer.resize(required);
+                status = GetString(mod, key, buffer.data(), static_cast<std::uint32_t>(buffer.size()), &required);
+            }
+            if (status == Status::Ok) {
+                buffer.resize(required - 1);
+                out.swap(buffer);
+            }
+            return status;
+        }
+        Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) const noexcept
+        {
+            return m_api ? m_api->SetString(mod, key, value, length) : Status::NotReady;
+        }
+        Status SetString(const char* mod, const char* key, std::string_view value) const noexcept
+        {
+            if (value.size() > std::numeric_limits<std::uint32_t>::max()) return Status::InvalidValue;
+            return SetString(mod, key, value.empty() ? "" : value.data(), static_cast<std::uint32_t>(value.size()));
+        }
+        Status SetString(const char* mod, const char* key, const char* value) const noexcept
+        {
+            return value ? SetString(mod, key, std::string_view(value)) : Status::InvalidArgument;
         }
         Status SetKey(const char* mod, const char* key, std::uint32_t value) const noexcept
         {

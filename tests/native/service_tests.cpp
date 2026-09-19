@@ -315,13 +315,13 @@ int TestSettingsService()
     check(blocking.calls == 1, "no callbacks occur after unsubscribe returns");
 
     const auto owned = backend.GetValue("sample", "mode");
-    check(owned && std::get<std::string>(*owned) == "quiet" &&
-        backend.SetValue("sample", "mode", std::string("verbose-mode")) == SettingsError::None &&
+    check(owned && std::get<EnumValue>(*owned).value == "quiet" &&
+        backend.SetValue("sample", "mode", EnumValue{ "verbose-mode" }) == SettingsError::None &&
         service.GetEnum("sample", "mode", text, sizeof(text), &required) == Status::Ok &&
-        std::string_view(text) == "verbose-mode" && std::get<std::string>(*owned) == "quiet",
+        std::string_view(text) == "verbose-mode" && std::get<EnumValue>(*owned).value == "quiet",
         "internal reads own their values and internal writes reach the native adapter");
     check(service.SetEnum("sample", "mode", "quiet") == Status::Ok &&
-        std::get<std::string>(backend.GetValue("sample", "mode").value()) == "quiet",
+        std::get<EnumValue>(backend.GetValue("sample", "mode").value()).value == "quiet",
         "native writes reach the internal service");
 
     SettingsService::Subscription internalToken{};

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "osfui",
+  "title": "OSF UI",
+  "groups": [
+    {
+      "id": "interface",
+      "label": "Interface",
+      "settings": [
+        {
+          "key": "language",
+          "label": "Language",
+          "type": "string",
+          "default": "auto",
+          "maxLength": 32,
+          "hint": "Use auto for Starfield's language, or enter a locale such as en, de, or pt-BR."
+        }
+      ]
+    }
+  ]
+}

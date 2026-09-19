@@ -32,6 +32,8 @@ namespace OSFSettings
                 std::visit([&](const auto& current) {
                     if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) {
                         REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current.keyCode);
+                    } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
+                        REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current.value);
                     } else {
                         REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current);
                     }
@@ -56,6 +58,8 @@ namespace OSFSettings
             std::visit([&](const auto& current) {
                 if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) {
                     REX::INFO("OSF Settings saved {} / {} = {}", mod, key, current.keyCode);
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
+                    REX::INFO("OSF Settings saved {} / {} = {}", mod, key, current.value);
                 } else {
                     REX::INFO("OSF Settings saved {} / {} = {}", mod, key, current);
                 }

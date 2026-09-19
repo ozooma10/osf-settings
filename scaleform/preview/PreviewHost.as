@@ -85,14 +85,14 @@ package
             for each (var row:XML in config.rows.row) {
                 var value:*;
                 if (String(row.@type) == "float" || String(row.@type) == "key") value = Number(row.@value);
-                else if (String(row.@type) == "int" || String(row.@type) == "enum") value = String(row.@value);
+                else if (String(row.@type) == "int" || String(row.@type) == "enum" || String(row.@type) == "string") value = String(row.@value);
                 else value = String(row.@value) == "true";
                 var choices:Array = [];
                 for each (var option:XML in row.option) choices.push({value:String(option.@value), label:String(option.@label)});
                 rows.push({modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
                     group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
-                    requiresRestart:String(row.@requiresRestart) == "true",
+                    requiresRestart:String(row.@requiresRestart) == "true", maxLength:int(row.@maxLength),
                     type:String(row.@type), editable:String(row.@editable) == "true", allowUnbound:String(row.@allowUnbound) == "true",
                     minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value, options:choices,
                     valueName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",
@@ -154,7 +154,7 @@ package
         private function menuLoaded(event:Event):void
         {
             menu = event.target.content;
-            menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, close:closeMenu,
+            menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
                 startup:startup, startupFailed:report, setKey:setKey,
                 beginKeyCapture:beginKeyCapture, pollKeyCapture:function():Object { return captureState; },
                 commitKeyCapture:commitKeyCapture, cancelKeyCapture:function():void { captureState.state = "idle"; },
@@ -282,6 +282,18 @@ package
                 }
             }
             return {ok:false, error:"Invalid preview key setting."};
+        }
+        private function setString(mod:String, key:String, value:String, bytes:int):Object
+        {
+            // The loaded menu owns the same text validation as the in-game editor.
+            var strings:Class = domain.getDefinition("StringSetting") as Class;
+            var actual:int = Object(strings).byteLength(value);
+            for each (var row:Object in rows) {
+                if (row.mod == mod && row.key == key && row.type == "string" && actual >= 0 && actual == bytes && actual <= row.maxLength) {
+                    row.value = value; return {ok:true};
+                }
+            }
+            return {ok:false, error:"Invalid preview string setting."};
         }
         private function beginKeyCapture(mod:String, key:String):Object
         {

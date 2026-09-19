@@ -46,6 +46,14 @@ clang++ -std=c++23 -Wall -Wextra -Wpedantic -Werror -pthread -Itests/stubs -Isrc
 /tmp/osfsettings-hotkey-callback-tests
 ```
 
+Free-form string settings use a bounded UTF-8 contract and an editable Scaleform
+field. See [strings in the C++ API](docs/API.md#free-form-strings). Focused checks:
+
+```powershell
+xmake build osfsettings-string-tests
+xmake run osfsettings-string-tests
+```
+
 ## Menu design and offline preview
 
 Preview the layout with development-only sample settings:

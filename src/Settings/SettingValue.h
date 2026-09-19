@@ -14,6 +14,12 @@ namespace OSFSettings
         bool operator==(const KeyBinding&) const = default;
     };
 
-    using SettingValue = std::variant<bool, std::int64_t, double, std::string, KeyBinding>;
+    struct EnumValue
+    {
+        std::string value;
+        bool operator==(const EnumValue&) const = default;
+    };
+
+    using SettingValue = std::variant<bool, std::int64_t, double, std::string, KeyBinding, EnumValue>;
     using SettingValues = std::map<std::string, SettingValue, std::less<>>;
 }

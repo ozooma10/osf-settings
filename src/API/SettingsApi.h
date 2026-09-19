@@ -31,10 +31,13 @@ namespace OSFSettings::API
         Status AcquireHotkeyBlock(HotkeyBlock* out) noexcept override;
         Status ReleaseHotkeyBlock(HotkeyBlock block) noexcept override;
         Status RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* user) noexcept override;
+        Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override;
+        Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept override;
 
     private:
         template <class T> Status Read(const char* mod, const char* key, T* out) noexcept;
         template <class T> Status Write(const char* mod, const char* key, T value) noexcept;
+        template <class T> Status ReadText(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept;
         SettingsService& m_service;
         HotkeyInputState& m_input;
     };

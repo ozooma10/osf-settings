@@ -28,6 +28,9 @@ namespace OSFSettings::SettingsJson
 
     std::optional<SettingValue> DecodeValue(const nlohmann::json& value, const SettingDefinition& setting)
     {
+        if (std::holds_alternative<StringDefinition>(setting.definition) && value.is_string()) {
+            return value.get<std::string>();
+        }
         if (std::holds_alternative<BoolDefinition>(setting.definition) && value.is_boolean()) {
             return value.get<bool>();
         }
@@ -42,7 +45,7 @@ namespace OSFSettings::SettingsJson
             }
         }
         if (std::holds_alternative<EnumDefinition>(setting.definition) && value.is_string()) {
-            return value.get<std::string>();
+            return EnumValue{ value.get<std::string>() };
         }
         if (std::holds_alternative<KeyDefinition>(setting.definition)) {
             if (const auto code = DecodeInteger(value); code && *code >= 0 && *code <= KeyBinding::Unbound) {

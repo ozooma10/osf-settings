@@ -56,11 +56,32 @@ namespace OSFSettings::API
 
     Status SettingsApi::GetEnum(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept
     {
+        return ReadText<EnumValue>(mod, key, out, capacity, required);
+    }
+
+    Status SettingsApi::GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept
+    {
+        return ReadText<std::string>(mod, key, out, capacity, required);
+    }
+
+    template <class T>
+    Status SettingsApi::ReadText(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept
+    {
         if (!mod || !key || !required || (!out && capacity)) return Status::InvalidArgument;
         const auto result = m_service.GetValue(mod, key);
-        if (!result) return ToStatus(result.error());
-        const auto* text = std::get_if<std::string>(&*result);
-        if (!text) return Status::TypeMismatch;
+        if (!result) {
+            return ToStatus(result.error());
+        }
+        const auto* value = std::get_if<T>(&*result);
+        if (!value) {
+            return Status::TypeMismatch;
+        }
+        const std::string* text;
+        if constexpr (std::is_same_v<T, EnumValue>) {
+            text = &value->value;
+        } else {
+            text = value;
+        }
         if (text->size() >= std::numeric_limits<std::uint32_t>::max()) return Status::InternalError;
         *required = static_cast<std::uint32_t>(text->size() + 1);
         if (capacity < *required) return Status::BufferTooSmall;
@@ -95,7 +116,14 @@ namespace OSFSettings::API
     Status SettingsApi::SetEnum(const char* mod, const char* key, const char* value) noexcept
     {
         if (!value) return Status::InvalidArgument;
-        return Write(mod, key, value);
+        return Write(mod, key, EnumValue{ value });
+    }
+
+    Status SettingsApi::SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept
+    {
+        if (!mod || !key || !value) return Status::InvalidArgument;
+        if (length > StringDefinition::MaxLength) return Status::InvalidValue;
+        return Write(mod, key, std::string(value, length));
     }
 
     Status SettingsApi::Reset(const char* mod, const char* key) noexcept

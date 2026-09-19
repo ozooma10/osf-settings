@@ -42,7 +42,7 @@ namespace OSFSettings
         NativeBindingEditor m_bindingEditor;
         std::shared_ptr<BindingSnapshot> m_bindings = std::make_shared<BindingSnapshot>();
         std::shared_ptr<std::atomic_uint32_t> m_textRequests = std::make_shared<std::atomic_uint32_t>();
-        std::atomic_bool m_searchActive{};
+        std::atomic_bool m_textInputActive{};
         std::string m_captureMod;
         std::string m_captureKey;
     };

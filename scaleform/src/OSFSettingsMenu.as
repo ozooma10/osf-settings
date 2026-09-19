@@ -40,6 +40,8 @@ package
         private var options:Object;
         private var nativeHotkeys:NativeHotkeysList;
         private var keybindings:KeybindingsPage;
+        private var stringEditor:StringSetting;
+        private var stringConfirmHeld:Boolean;
         private var searchExitFrame:int = -10;
         private var navigationFrame:int = -1;
         private var bindingSelection:String = "";
@@ -190,6 +192,7 @@ package
             nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
             keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
             addChild(keybindings);
+            stringEditor = new StringSetting(); addChild(stringEditor);
             options.addEventListener("SettingsControlListEnty_ActiveBindingChanged", selectionChanged);
             var popup:MovieClip = nativeHotkeys.popup as MovieClip;
             addChild(popup);
@@ -235,6 +238,7 @@ package
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
         private function searching():Boolean { return keybindings && keybindings.searching; }
+        private function editingString():Boolean { return stringEditor && stringEditor.visible; }
         private function focusResults():void
         {
             searchExitFrame = frame;
@@ -388,12 +392,12 @@ package
         }
         private function tabClicked(event:MouseEvent):void
         {
-            if (captureRow || bindingBusy() || searching() || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || searching() || editingString() || requestedRefresh || dragging()) return;
             selectPage(event.currentTarget.name);
         }
         private function changePage(direction:int):void
         {
-            if (captureRow || bindingBusy() || searching() || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || searching() || editingString() || requestedRefresh || dragging()) return;
             var choices:Array = pages();
             if (choices.length < 2) return;
             for (var i:int = 0; i < choices.length; ++i) {
@@ -418,17 +422,17 @@ package
             MenuStyle.setText(detailHint, (row && row.requiresRestart ? "Changes take effect after restarting Starfield." + (hint ? "\n\n" : "") : "") + hint);
             detailHint.scrollV = 1;
             MenuStyle.setText(defaultLabel, modID ? "DEFAULT" : "SETTINGS");
-            defaultValue.x = row && (row.type == "enum" || row.type == "key") ? 1434 : 1674;
-            defaultValue.width = row && (row.type == "enum" || row.type == "key") ? 410 : 170;
+            defaultValue.x = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 1434 : 1674;
+            defaultValue.width = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 410 : 170;
             MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
             resetButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row && row.editable && row.type != "hotkey");
             clearButton.Visible = Boolean(!captureRow && !bindingBusy() && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
-            buttonData.Accept.sButtonText = captureRow ? "CONFIRM BINDING" : bindingsPage() ? "CHANGE BINDING" : !modID ? "OPEN" : row && (row.type == "key" || row.type == "hotkey") ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
-            buttonData.Cancel.sButtonText = captureRow || nativeHotkeys && nativeHotkeys.busy ? "CANCEL" : modID ? "ALL MODS" : "BACK";
+            buttonData.Accept.sButtonText = editingString() ? "SAVE" : row && row.type == "string" ? "EDIT TEXT" : captureRow ? "CONFIRM BINDING" : bindingsPage() ? "CHANGE BINDING" : !modID ? "OPEN" : row && (row.type == "key" || row.type == "hotkey") ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
+            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? "CANCEL" : modID ? "ALL MODS" : "BACK";
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-            acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey"))));
+            acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string"))));
             backButton.Visible = !bindingBusy();
             buttonData.YButton.sButtonText = reporting ? "SCROLL UP" : "RESET SETTING";
             buttonData.XButton.sButtonText = reporting ? "SCROLL DOWN" : "CLEAR BINDING";
@@ -445,6 +449,7 @@ package
                 clearButton.Visible = clearButton.Visible && !searching();
             }
             pageBar.visible = !captureRow && !bindingBusy() && !searching() && pages().length > 1;
+            if (editingString()) { resetButton.Visible = clearButton.Visible = false; pageBar.visible = false; }
             bar.RefreshButtons();
         }
         private function scrollDescription(event:MouseEvent):void
@@ -456,6 +461,7 @@ package
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
         {
+            if (editingString()) { saveString(); return; }
             if (bindingBusy() || issuesPage() || searching() || frame <= searchExitFrame + 1) return;
             if (captureRow) { confirmBinding(); return; }
             if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
@@ -465,6 +471,7 @@ package
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
+            else if (row.type == "string" && row.editable) beginString(row);
             else if (row.type == "enum" && row.editable) {
                 var clip:Object = options.FindClipForEntry(options.selectedIndex);
                 if (clip) clip.LargeStepper_mc.PressHandler();
@@ -472,7 +479,7 @@ package
         }
         private function reset():void
         {
-            if (searching()) return;
+            if (searching() || editingString()) return;
             if (issuesPage()) { issueDetails.scroll(-160); return; }
             if (captureRow || bindingBusy() || current() && current().type == "hotkey") return;
             var row:Object = current();
@@ -481,7 +488,7 @@ package
         private function valueChanged(event:Event):void
         {
             event.stopPropagation();
-            if (refreshing || captureRow || bindingBusy()) return;
+            if (refreshing || captureRow || bindingBusy() || editingString()) return;
             var data:Object = Object(event).params;
             var item:Object = options.GetDataForEntry(int(data.id));
             if (!modID || !item || !item.row.editable) return;
@@ -507,6 +514,7 @@ package
             if (row.type == "float") result = BGSCodeObj.setFloat(row.mod, row.key, Number(value));
             else if (row.type == "int") result = BGSCodeObj.setInt(row.mod, row.key, String(value));
             else if (row.type == "enum") result = BGSCodeObj.setEnum(row.mod, row.key, String(value));
+            else if (row.type == "string") result = BGSCodeObj.setString(row.mod, row.key, String(value), Number(StringSetting.byteLength(String(value))));
             else if (row.type == "key") result = BGSCodeObj.setKey(row.mod, row.key, Number(value));
             else result = BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
             if (result && result.ok) {
@@ -517,8 +525,48 @@ package
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
             requestedRefresh = true;
         }
+        private function beginString(row:Object):void
+        {
+            if (!BGSCodeObj.textInput(true)) return;
+            stringConfirmHeld = false;
+            options.disableInput = options.disableSelection = true;
+            MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = false;
+            tabs.mouseChildren = false;
+            stringEditor.open(row); describe();
+            MenuStyle.setText(status, "Edit the value, then save or cancel.");
+            status.textColor = MenuStyle.MUTED;
+        }
+        private function saveString():void
+        {
+            if (!editingString() || frame <= activationFrame + 1) return;
+            if (!stringEditor.valid) {
+                stringEditor.showError("Use valid single-line text within " + stringEditor.row.maxLength + " UTF-8 bytes.");
+                menuStage.focus = stringEditor.input; return;
+            }
+            var row:Object = stringEditor.row;
+            var value:String = stringEditor.input.text;
+            var result:Object = BGSCodeObj.setString(row.mod, row.key, value, Number(StringSetting.byteLength(value)));
+            if (!result || !result.ok) {
+                stringEditor.showError(result ? result.error : "Could not save. Your previous value is unchanged.");
+                menuStage.focus = stringEditor.input; return;
+            }
+            finishString(false);
+        }
+        private function finishString(cancel:Boolean):void
+        {
+            stringEditor.close(); stringConfirmHeld = false;
+            BGSCodeObj.textInput(false);
+            options.disableSelection = false;
+            MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = true;
+            tabs.mouseChildren = true;
+            searchExitFrame = activationFrame = frame;
+            refresh();
+            MenuStyle.setText(status, cancel ? "Text unchanged." : "Changes are saved automatically.");
+            status.textColor = MenuStyle.MUTED;
+        }
         private function back():void
         {
+            if (editingString()) { finishString(true); return; }
             if (nativeHotkeys.busy) { nativeHotkeys.cancel(); return; }
             if (nativeHotkeys.saving) return;
             if (captureRow) { finishBinding(true); return; }
@@ -530,6 +578,10 @@ package
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (!initialized || closing) return false;
+            if (editingString()) {
+                if (name == "Cancel") { if (!pressed) finishString(true); return true; }
+                return false; // Native raw keyboard/character events go to the field.
+            }
             if (nativeHotkeys.popup.active) return Boolean(nativeHotkeys.popup.ProcessUserEvent(name, pressed));
             if (bindingBusy()) {
                 if (pressed && name == "Cancel") nativeHotkeys.cancel();
@@ -559,7 +611,7 @@ package
         private function mouseFocus(event:MouseEvent):void
         {
             CONFIG::testHarness { testMouseDown = testMouseEvent(event, testMouseDown); }
-            if (captureRow || bindingBusy()) return;
+            if (captureRow || bindingBusy() || editingString()) return;
             if (!initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
             if (!target || !MovieClip(options).contains(target)) return;
@@ -571,6 +623,13 @@ package
         }
         private function keyDown(event:KeyboardEvent):void
         {
+            if (editingString()) {
+                if (event.keyCode == Keyboard.ENTER || event.keyCode == Keyboard.ESCAPE) {
+                    if (event.keyCode == Keyboard.ENTER && frame > activationFrame + 1) stringConfirmHeld = true;
+                    event.stopImmediatePropagation(); event.preventDefault();
+                }
+                return;
+            }
             if (bindingBusy()) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (keybindings && keybindings.searchKey(event)) return;
@@ -601,6 +660,17 @@ package
         }
         private function keyUp(event:KeyboardEvent):void
         {
+            if (editingString()) {
+                if (event.keyCode == Keyboard.ENTER || event.keyCode == Keyboard.ESCAPE) {
+                    event.stopImmediatePropagation(); event.preventDefault();
+                    if (frame > activationFrame + 1) {
+                        if (event.keyCode == Keyboard.ENTER) { if (stringConfirmHeld) saveString(); }
+                        else finishString(true);
+                    }
+                    stringConfirmHeld = false;
+                }
+                return;
+            }
             if (keybindings && keybindings.searchKey(event)) return;
             if (frame <= searchExitFrame + 1 || captureRow || bindingBusy() || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
         }
@@ -629,9 +699,9 @@ package
             ++frame;
             if (initialized && !closing) {
                 keybindings.advance(allRows,bindingBusy());
-                options.disableInput = bindingBusy() || searching() || Boolean(captureRow);
+                options.disableInput = bindingBusy() || searching() || Boolean(captureRow) || editingString();
                 if (captureRow) pollBinding();
-                else {
+                else if (!editingString()) {
                     if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
                     if (getTimer() >= nextIssuePoll && !bindingBusy() && !dragging() && readIssues()) {
                         if (issuesPage()) populate(true);
@@ -644,7 +714,7 @@ package
         }
         private function clearBinding():void
         {
-            if (searching()) return;
+            if (searching() || editingString()) return;
             if (issuesPage()) { issueDetails.scroll(160); return; }
             if (current() && current().type == "hotkey") { nativeHotkeys.clearBinding(); return; }
             var row:Object = current();
@@ -692,6 +762,7 @@ package
         }
         private function focusLost(event:Event):void
         {
+            if (editingString()) finishString(true);
             nativeHotkeys.cancel();
             if (searching()) focusResults();
             if (captureRow) finishBinding(true);
@@ -774,6 +845,7 @@ package
         private function removed(event:Event):void
         {
             if (event.target != this) return;
+            if (editingString()) { stringEditor.close(); BGSCodeObj.textInput(false); }
             if (nativeHotkeys) nativeHotkeys.dispose();
             if (captureRow) BGSCodeObj.cancelKeyCapture();
             if (menuStage) {

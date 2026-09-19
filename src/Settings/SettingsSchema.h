@@ -38,7 +38,7 @@ namespace OSFSettings
 
     struct EnumDefinition
     {
-        std::string defaultValue;
+        EnumValue defaultValue;
         std::vector<EnumOption> options;
     };
 
@@ -46,6 +46,14 @@ namespace OSFSettings
     {
         KeyBinding defaultValue;
         bool allowUnbound{};
+    };
+
+    struct StringDefinition
+    {
+        static constexpr std::uint32_t DefaultMaxLength = 256;
+        static constexpr std::uint32_t MaxLength = 4096;
+        std::string defaultValue;
+        std::uint32_t maxLength{ DefaultMaxLength }; // UTF-8 bytes, excluding NUL.
     };
 
     struct HotkeyDefinition
@@ -63,12 +71,13 @@ namespace OSFSettings
         std::string label;
         std::string hint;
         bool requiresRestart{};
-        std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition, KeyDefinition> definition;
+        std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition, KeyDefinition, StringDefinition> definition;
 
         SettingValue DefaultValue() const;
     };
 
     bool IsValidModId(std::string_view id);
+    bool IsValidString(std::string_view text, std::uint32_t maxLength);
     bool IsValidValue(const SettingDefinition& setting, const SettingValue& value);
 
     struct SettingsGroup

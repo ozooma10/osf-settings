@@ -96,9 +96,16 @@ namespace OSFSettings::SettingsJson
                     Require(setting.key.find('\0') == std::string::npos, "setting key must not contain NUL");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
                     const auto type = RequiredText(sourceSetting, "type");
-                    Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key", "only types bool, int, float, enum, and key are supported: " + setting.key);
+                    Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key" || type == "string", "only types bool, int, float, enum, key, and string are supported: " + setting.key);
                     std::string defaultError = "default must be a boolean: ";
-                    if (type == "int") {
+                    if (type == "string") {
+                        defaultError = "default must be valid single-line UTF-8 within maxLength bytes: ";
+                        StringDefinition definition;
+                        const auto limit = ReadInteger(sourceSetting, "maxLength").value_or(StringDefinition::DefaultMaxLength);
+                        Require(limit >= 1 && limit <= StringDefinition::MaxLength, "maxLength must be an integer from 1 to 4096 UTF-8 bytes: " + setting.key);
+                        definition.maxLength = static_cast<std::uint32_t>(limit);
+                        setting.definition = definition;
+                    } else if (type == "int") {
                         defaultError = "default must be an integer within its bounds: ";
                         IntDefinition definition;
                         definition.minimum = ReadInteger(sourceSetting, "min");

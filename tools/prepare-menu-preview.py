@@ -230,6 +230,13 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
                     if maximum is not None:
                         attributes["maximum"] = str(maximum)
                     attributes.update(float_slider(minimum, maximum, step))
+                elif kind == "string":
+                    limit = setting.get("maxLength", 256)
+                    if (type(limit) is not int or not 1 <= limit <= 4096 or not isinstance(default, str) or
+                            len(default.encode("utf-8")) > limit or
+                            any(ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F or ord(c) in (0x2028, 0x2029) for c in default)):
+                        raise ValueError(f"Invalid preview string default or maxLength: {path}")
+                    attributes.update(value=default, maxLength=str(limit))
                 elif kind == "enum":
                     options = setting.get("options")
                     if (not isinstance(options, list) or not options or
@@ -249,7 +256,7 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
                         raise ValueError(f"Invalid preview key default: {path} / {setting['key']}") from error
                     attributes.update(value=str(default), allowUnbound=str(allow_unbound).lower())
                 elif kind != "bool" or type(default) is not bool:
-                    raise ValueError(f"Preview supports boolean, integer, float, enum, and key settings only: {path}")
+                    raise ValueError(f"Preview supports boolean, integer, float, enum, key, and string settings only: {path}")
                 row = ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
                               modDescription=schema.get("description", ""),
                               group=group["id"], groupTitle=group["label"], key=setting["key"],
