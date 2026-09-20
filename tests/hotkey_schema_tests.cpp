@@ -5,6 +5,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
 
@@ -25,7 +26,7 @@ namespace OSFSettings
 int main()
 {
     using namespace OSFSettings;
-    using Json = nlohmann::json;
+    using Json = nlohmann::ordered_json;
     namespace fs = std::filesystem;
     int checks{};
     const auto check = [&](bool passed, const char* message) {
@@ -42,8 +43,8 @@ int main()
         check(action.id == "openMenu" && action.label == "Open mod settings" && action.defaultKey == "F10" && action.menu == "OSFSettingsMenu",
             "identity, label, default name and registered menu target are preserved");
         check(!parsed->FindSetting("openMenu"), "hotkeys are separate from ordinary setting definitions");
-        check(parsed->groups.size() == 1 && parsed->groups[0].id == "general" &&
-            parsed->groups[0].label == "General" && parsed->groups[0].settings.empty() && action.group == "general",
+        check(parsed->groups.size() == 1 && parsed->groups[0].id == "General" &&
+            parsed->groups[0].label == "General" && parsed->groups[0].settings.empty() && action.group == "General",
             "hotkey-only schemas use an implicit General group");
 
         auto changed = document;
@@ -91,37 +92,73 @@ int main()
         check(result && result->hotkeys.size() == 2 && !result->hotkeys[1].defaultKey && error.empty(),
             "distinct actions retain order and clear a previous parse error");
 
-        changed["groups"] = Json::array({
-            {{"id", "first"}, {"label", "First page"}, {"settings", Json::array()}},
-            {{"id", "second"}, {"settings", Json::array()}}
+        changed["groups"] = Json::object({
+            {"Z first page / détails", Json::array()},
+            {"A second page", Json::array()}
         });
-        changed["hotkeys"][1]["group"] = "second";
+        changed["hotkeys"][1]["group"] = "A second page";
         result = SettingsJson::ParseSchema(changed, error);
-        check(result && result->groups.size() == 2 && result->groups[0].id == "first" &&
-            result->hotkeys[0].group == "first" && result->hotkeys[1].group == "second",
+        check(result && result->groups.size() == 2 && result->groups[0].id == "Z first page / détails" && result->groups[0].label == "Z first page / détails" &&
+            result->hotkeys[0].group == "Z first page / détails" && result->hotkeys[1].group == "A second page",
             "omitted groups use the first declared group, while explicit groups retain their target");
-        changed["groups"][0]["settings"] = Json::array({{{"key", "enabled"}, {"type", "bool"}, {"default", true}}});
+        changed["groups"]["Z first page / détails"] = Json::array({{{"key", "enabled"}, {"type", "bool"}, {"default", true}}});
         result = SettingsJson::ParseSchema(changed, error);
-        check(result && result->hotkeys[0].group == "first" && result->groups[0].settings.size() == 1,
+        check(result && result->hotkeys[0].group == "Z first page / détails" && result->groups[0].settings.size() == 1,
             "ordinary settings and hotkeys share a group");
         check(!result->groups[0].settings[0].requiresRestart, "settings omit the restart notice by default");
-        changed["groups"][0]["settings"][0]["requires"] = "restart";
+        changed["groups"]["Z first page / détails"][0]["requires"] = "restart";
         result = SettingsJson::ParseSchema(changed, error);
         check(result && result->groups[0].settings[0].requiresRestart, "restart metadata is retained on an ordinary setting");
         for (const auto& value : {Json(nullptr), Json(false), Json(1), Json(""), Json("reload"), Json("Restart"), Json::array()}) {
             auto invalid = changed;
-            invalid["groups"][0]["settings"][0]["requires"] = value;
+            invalid["groups"]["Z first page / détails"][0]["requires"] = value;
             reject(invalid);
         }
         changed["hotkeys"][1]["group"] = "missing";
         reject(changed);
         check(error == "unknown hotkey group: missing", "unknown group names report the invalid reference");
-        changed["hotkeys"][1]["group"] = "Second";
+        changed["hotkeys"][1]["group"] = "a second page";
         reject(changed);
         changed = document;
         changed["hotkeys"][0]["group"] = "general";
         reject(changed);
         check(error == "unknown hotkey group: general", "explicit groups must reference a declared group");
+
+        for (const auto& value : {Json(nullptr), Json(true), Json(1), Json("Panel"), Json::array()}) {
+            changed = document; changed["groups"] = value; reject(changed);
+            check(error == "groups must be an object", "groups require a dictionary, including when empty");
+        }
+        changed = document; changed.erase("groups"); reject(changed);
+        for (const auto& value : {Json(nullptr), Json(true), Json(1), Json("setting"), Json::object()}) {
+            changed = document; changed["groups"] = {{"Panel", value}}; reject(changed);
+            check(error == "group settings must be an array: Panel", "each group contains a settings array");
+        }
+        for (const auto& name : {std::string{}, std::string("Panel\0suffix", 12)}) {
+            changed = document; changed["groups"] = {{name, Json::array()}}; reject(changed);
+        }
+        const auto parseText = [&](const char* source) {
+            std::istringstream input(source);
+            return SettingsJson::ParseSchema(input, error);
+        };
+        result = parseText(R"({"schemaVersion":1,"id":"sample","groups":{"Z page / 日本語":[],"A page":[]},
+            "hotkeys":[{"id":"default","label":"Default"},{"id":"explicit","label":"Explicit","group":"A page"}]})");
+        check(result && error.empty() && result->groups.size() == 2 &&
+            result->groups[0].id == "Z page / 日本語" && result->groups[0].label == result->groups[0].id &&
+            result->groups[1].id == "A page" && result->hotkeys[0].group == result->groups[0].id &&
+            result->hotkeys[1].group == "A page", "source parsing preserves authored order and Unicode names");
+        for (const auto* source : {
+            R"({"schemaVersion":1,"id":"sample","groups":{"Panel":[],"Panel":[]}})",
+            R"({"schemaVersion":1,"id":"sample","groups":{"Panel":[],"\u0050anel":[]}})"
+        }) {
+            check(!parseText(source) && error == "duplicate group name: Panel", "duplicate source names cannot overwrite a group");
+        }
+        check(!parseText(R"({"schemaVersion":1,"id":"sample","groups":{"Panel":[]})") && !error.empty(),
+            "malformed JSON reports a load error");
+        result = parseText(R"({"schemaVersion":1,"id":"sample","groups":{"Panel":[],"panel":[]}})");
+        check(result && result->groups.size() == 2 && error.empty(), "group names are case-sensitive and successful parsing clears errors");
+        result = parseText(R"({"schemaVersion":1,"id":"sample","groups":{"Panel":[{"key":"enabled","type":"bool","default":true}],
+            "Other":[{"key":"enabled","type":"bool","default":false}]}})");
+        check(!result && error == "duplicate setting key: enabled", "setting keys remain unique across groups");
 
         const auto root = fs::temp_directory_path() /
             ("osf-hotkey-schema-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -137,14 +174,21 @@ int main()
         } cleanup{root};
         fs::create_directories(root / "schemas");
         changed = document;
-        changed["groups"] = Json::array({{{"id", "general"}, {"settings", Json::array({
-            {{"key", "enabled"}, {"type", "bool"}, {"default", true}, {"requires", "restart"}}
-        })}}});
+        changed["groups"] = Json::object({
+            {"Z first page / détails", Json::array({
+                {{"key", "enabled"}, {"type", "bool"}, {"default", true}, {"requires", "restart"}}
+            })},
+            {"A second page", Json::array()}
+        });
         { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
         SettingsStore store;
         store.LoadAll(root / "schemas", root / "values");
         check(store.LoadErrors().empty() && store.Mods().size() == 1 && store.Mods()[0].schema.hotkeys.size() == 1,
             "normal schema loading retains hotkey declarations");
+        check(store.Mods()[0].schema.groups[0].id == "Z first page / détails" &&
+            store.Mods()[0].schema.groups[1].id == "A second page" &&
+            store.Mods()[0].schema.hotkeys[0].group == "Z first page / détails",
+            "file loading preserves declaration order and the default hotkey group");
         check(store.Mods()[0].values.size() == 1 && !store.GetValue("osfsettings", "openMenu"),
             "hotkeys do not create persisted setting values");
         check(store.Mods()[0].schema.FindSetting("enabled")->requiresRestart &&
@@ -152,6 +196,16 @@ int main()
             "restart-required settings still save and publish the new value immediately");
         std::ifstream saved(root / "values/osfsettings.json");
         check(Json::parse(saved)["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey declarations");
+        changed["groups"] = {{"Renamed page", changed["groups"]["Z first page / détails"]}};
+        { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
+        store.LoadAll(root / "schemas", root / "values");
+        check(store.LoadErrors().empty() && store.GetValue("osfsettings", "enabled") == SettingValue{false},
+            "renaming a group preserves saved settings");
+        { std::ofstream file(root / "schemas/osfsettings.json");
+            file << R"({"schemaVersion":1,"id":"osfsettings","groups":{"Panel":[],"Panel":[]}})"; }
+        store.LoadAll(root / "schemas", root / "values");
+        check(store.Mods().empty() && store.LoadErrors().size() == 1 &&
+            store.LoadErrors()[0].message == "duplicate group name: Panel", "file loading rejects duplicate group names");
         std::cout << checks << '/' << checks << " schema checks passed\n";
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';

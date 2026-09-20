@@ -16,7 +16,7 @@ namespace OSFSettings::SettingsJson
             if (!condition) throw std::runtime_error(message);
         }
 
-        std::string RequiredText(const nlohmann::json& object, const char* key)
+        std::string RequiredText(const nlohmann::ordered_json& object, const char* key)
         {
             const auto field = object.find(key);
             Require(field != object.end() && field->is_string(), std::string(key) + " must be a string");
@@ -25,7 +25,7 @@ namespace OSFSettings::SettingsJson
             return value;
         }
 
-        std::optional<std::int64_t> ReadInteger(const nlohmann::json& object, const char* key)
+        std::optional<std::int64_t> ReadInteger(const nlohmann::ordered_json& object, const char* key)
         {
             const auto field = object.find(key);
             if (field == object.end()) return std::nullopt;
@@ -34,7 +34,7 @@ namespace OSFSettings::SettingsJson
             return value;
         }
 
-        std::optional<double> ReadFloat(const nlohmann::json& object, const char* key)
+        std::optional<double> ReadFloat(const nlohmann::ordered_json& object, const char* key)
         {
             const auto field = object.find(key);
             if (field == object.end()) return std::nullopt;
@@ -43,7 +43,7 @@ namespace OSFSettings::SettingsJson
             return value;
         }
 
-        std::string OptionalText(const nlohmann::json& object, const char* key, const std::string& fallback = {})
+        std::string OptionalText(const nlohmann::ordered_json& object, const char* key, const std::string& fallback = {})
         {
             const auto field = object.find(key);
             if (field == object.end()) return fallback;
@@ -51,7 +51,7 @@ namespace OSFSettings::SettingsJson
             return field->get<std::string>();
         }
 
-        std::optional<SettingValue> DecodeDefault(const nlohmann::json& value, const SettingDefinition& setting)
+        std::optional<SettingValue> DecodeDefault(const nlohmann::ordered_json& value, const SettingDefinition& setting)
         {
             if (std::holds_alternative<KeyDefinition>(setting.definition) && value.is_string()) {
                 const auto code = KeyCodeFromName(value.get_ref<const std::string&>());
@@ -62,7 +62,32 @@ namespace OSFSettings::SettingsJson
         }
     }
 
-    std::optional<ModSchema> ParseSchema(const nlohmann::json& document, std::string& error)
+    std::optional<ModSchema> ParseSchema(std::istream& input, std::string& error)
+    {
+        error.clear();
+        try {
+            std::set<std::string> groupNames;
+            bool inGroups{};
+            const auto document = nlohmann::ordered_json::parse(input,
+                [&](int depth, nlohmann::ordered_json::parse_event_t event, nlohmann::ordered_json& value) {
+                    if (event == nlohmann::ordered_json::parse_event_t::key) {
+                        if (depth == 1) {
+                            inGroups = value == "groups";
+                        } else if (depth == 2 && inGroups) {
+                            const auto& name = value.get_ref<const std::string&>();
+                            Require(groupNames.insert(name).second, "duplicate group name: " + name);
+                        }
+                    }
+                    return true;
+                });
+            return ParseSchema(document, error);
+        } catch (const std::exception& exception) {
+            error = exception.what();
+            return std::nullopt;
+        }
+    }
+
+    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string& error)
     {
         error.clear();
         try {
@@ -77,19 +102,17 @@ namespace OSFSettings::SettingsJson
             mod.description = OptionalText(document, "description");
 
             const auto groups = document.find("groups");
-            Require(groups != document.end() && groups->is_array(), "groups must be an array");
-            std::set<std::string> groupIds;
+            Require(groups != document.end() && groups->is_object(), "groups must be an object");
             std::set<std::string> settingKeys;
-            for (const auto& sourceGroup : *groups) {
-                Require(sourceGroup.is_object(), "each group must be an object");
+            for (const auto& [name, settings] : groups->items()) {
+                Require(!name.empty(), "group name must not be empty");
+                Require(name.find('\0') == std::string::npos, "group name must not contain NUL");
                 SettingsGroup group;
-                group.id = RequiredText(sourceGroup, "id");
-                Require(groupIds.insert(group.id).second, "duplicate group id: " + group.id);
-                group.label = OptionalText(sourceGroup, "label", group.id);
+                group.id = name;
+                group.label = name;
 
-                const auto settings = sourceGroup.find("settings");
-                Require(settings != sourceGroup.end() && settings->is_array(), "group settings must be an array");
-                for (const auto& sourceSetting : *settings) {
+                Require(settings.is_array(), "group settings must be an array: " + name);
+                for (const auto& sourceSetting : settings) {
                     Require(sourceSetting.is_object(), "each setting must be an object");
                     SettingDefinition setting;
                     setting.key = RequiredText(sourceSetting, "key");
@@ -192,15 +215,15 @@ namespace OSFSettings::SettingsJson
                     }
                     if (source.contains("group")) {
                         hotkey.group = RequiredText(source, "group");
-                        Require(groupIds.contains(hotkey.group), "unknown hotkey group: " + hotkey.group);
+                        Require(groups->contains(hotkey.group), "unknown hotkey group: " + hotkey.group);
                     } else {
-                        hotkey.group = mod.groups.empty() ? "general" : mod.groups.front().id;
+                        hotkey.group = mod.groups.empty() ? "General" : mod.groups.front().id;
                     }
                     mod.hotkeys.push_back(std::move(hotkey));
                 }
             }
             if (mod.groups.empty() && !mod.hotkeys.empty()) {
-                mod.groups.push_back({ "general", "General", {} });
+                mod.groups.push_back({ "General", "General", {} });
             }
             return mod;
         } catch (const std::exception& exception) {

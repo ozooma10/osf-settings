@@ -138,7 +138,7 @@ int main()
         fs::create_directories(root / "schemas");
         {
             std::ofstream file(root / "schemas/sample.json");
-            file << R"({"schemaVersion":1,"id":"sample","groups":[],"hotkeys":[
+            file << R"({"schemaVersion":1,"id":"sample","groups":{},"hotkeys":[
                 {"id":"toggleFeature","label":"Toggle feature","default":"F6"},
                 {"id":"openMenu","label":"Open menu","menu":"SampleMenu"},
                 {"id":"invalid","label":"Invalid key","default":"Unknown"}]})";

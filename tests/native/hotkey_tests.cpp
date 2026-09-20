@@ -42,11 +42,11 @@ int TestHotkeys()
     std::filesystem::create_directories(root / "schemas");
     {
         std::ofstream file(root / "schemas" / "sample.json");
-        file << R"({"schemaVersion":1,"id":"sample","groups":[{"id":"general","settings":[
+        file << R"({"schemaVersion":1,"id":"sample","groups":{"general":[
             {"key":"first","type":"key","default":115,"allowUnbound":true},
             {"key":"second","type":"key","default":115},
             {"key":"enabled","type":"bool","default":true}
-        ]}]})";
+        ]}})";
     }
     SettingsService settings;
     HotkeyService hotkeys{ settings };

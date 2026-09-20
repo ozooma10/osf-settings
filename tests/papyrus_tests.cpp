@@ -14,7 +14,7 @@ namespace
     using namespace OSFSettings;
     using namespace OSFSettings::Papyrus;
     using Kind = Subscriptions::Kind;
-    using TestJson = nlohmann::json;
+    using TestJson = nlohmann::ordered_json;
     constexpr auto Mod = "papyrusexample";
 }
 
@@ -36,8 +36,8 @@ int main()
         const auto schemas = root / "schemas", values = root / "values";
         std::filesystem::create_directories(schemas);
         auto schema = TestJson::parse(std::ifstream("examples/papyrus/papyrusexample.json"));
-        schema["groups"][0]["settings"].push_back({{"key", "wideInt"}, {"type", "int"}, {"default", INT64_MAX}});
-        schema["groups"][0]["settings"].push_back({{"key", "wideFloat"}, {"type", "float"}, {"default", 1e100}});
+        schema["groups"]["General"].push_back({{"key", "wideInt"}, {"type", "int"}, {"default", INT64_MAX}});
+        schema["groups"]["General"].push_back({{"key", "wideFloat"}, {"type", "float"}, {"default", 1e100}});
         { std::ofstream file(schemas / "papyrusexample.json"); file << schema; }
 
         SettingsService settings;

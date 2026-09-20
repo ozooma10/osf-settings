@@ -56,7 +56,7 @@ They contain this metadata:
 | Descriptor | Fields and meaning |
 | --- | --- |
 | `ModView` | Authored ID, title, description, and groups |
-| `GroupView` | Authored ID, label, and settings, including empty groups |
+| `GroupView` | Group name as both ID and label, and settings, including empty groups |
 | `SettingView` | Key, label, hint, exact `SettingType`, restart requirement, current value, and default value |
 | Integer metadata | Optional inclusive `int64_t` minimum/maximum; editor increment is implicitly 1 |
 | Float metadata | Optional inclusive `double` minimum/maximum and editor `step`; step is not a storage-validity grid |
@@ -345,17 +345,17 @@ at the start of vanilla's defaults before its parser runs, including on control
 reset. The original caller continues loading saved overrides and resolving links.
 
 Hotkeys appear alongside ordinary settings in the mod's groups. An optional
-`group` field names an existing group ID (case-sensitive):
+`group` field names an existing key in the `groups` object (case-sensitive):
 
 ```json
-{ "id": "openMenu", "label": "Open mod settings", "default": "F10", "menu": "OSFSettingsMenu", "group": "general" }
+{ "id": "openMenu", "label": "Open mod settings", "default": "F10", "menu": "OSFSettingsMenu", "group": "General" }
 ```
 
 Omitting `group` appends the hotkey after the first declared group's settings.
 Explicitly assigned hotkeys are appended after their target group's settings;
 hotkeys within a group retain declaration order. If `groups` is empty, unassigned
 hotkeys use an implicit **General** group. An explicit `group` must be a nonempty
-string referring to a declared group; unknown IDs are schema errors. Group
+string referring to a declared group name; unknown names are schema errors. Group
 placement does not change the native action name or binding persistence.
 
 An optional `menu` field names a **registered native menu**, not a SWF filename:
@@ -421,7 +421,7 @@ sections, using `<mod title>: <hotkey label>` for each row. Mods are sorted by t
 Schema groups organize the OSF menu only. This is presentation: native action IDs,
 MainGameplay contexts, conflicts, and saved bindings retain their existing meaning.
 See [inline binding editor](NATIVE-BINDING-EDITOR.md) for the checkpoint's scope
-and pending in-game checks. The required `groups` array may be
+and pending in-game checks. The required `groups` object may be
 empty for a hotkey-only schema. Declarations are read once at startup; changes
 require restarting the game.
 
@@ -435,7 +435,7 @@ type field is needed in JSON:
   "schemaVersion": 1,
   "id": "mymod",
   "title": "My mod",
-  "groups": [],
+  "groups": {},
   "hotkeys": [
     { "id": "toggleFeature", "label": "Toggle feature", "default": "F6" }
   ]

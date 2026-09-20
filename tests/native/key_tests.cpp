@@ -69,7 +69,7 @@ int TestKeySettings()
 {
     using namespace OSFSettings;
     using API::Status;
-    using Json = nlohmann::json;
+    using Json = nlohmann::ordered_json;
     int checks{};
     const auto check = [&](bool passed, const char* message) {
         ++checks;
@@ -125,11 +125,11 @@ int TestKeySettings()
     check(!KeyName(0xA3).empty() && KeyName(0xFF) == "UNBOUND" && KeyName(0) == "Key 0x00",
         "display names have unbound and numeric fallbacks");
 
-    auto document = Json::parse(R"({"schemaVersion":1,"id":"keys","groups":[{"id":"main","settings":[
+    auto document = Json::parse(R"({"schemaVersion":1,"id":"keys","groups":{"main":[
         {"key":"toggle","type":"key","default":"F4","allowUnbound":true},
         {"key":"required","type":"key","default":163},
         {"key":"mode","type":"enum","default":"F4","options":["F4","F5"]}
-    ]}]})");
+    ]}})");
     std::string error;
     const auto schema = SettingsJson::ParseSchema(document, error);
     check(schema && error.empty() && std::get<KeyBinding>(schema->FindSetting("toggle")->DefaultValue()).keyCode == 0x73, "schema stores virtual-key defaults");
@@ -139,7 +139,7 @@ int TestKeySettings()
     };
     for (const auto& [source, expected] : defaults) {
         auto named = document;
-        named["groups"][0]["settings"][0]["default"] = source;
+        named["groups"]["main"][0]["default"] = source;
         const auto parsed = SettingsJson::ParseSchema(named, error);
         check(parsed && std::get<KeyBinding>(parsed->FindSetting("toggle")->DefaultValue()).keyCode == expected,
             "names and numeric defaults resolve to native virtual-key identity");
@@ -148,17 +148,17 @@ int TestKeySettings()
         Json(""), Json("unknown"), Json(std::string("F4\0", 3)),
         Json(nullptr), Json(std::uint64_t{ 0xFFFFFFFFFFFFFFFF }) }) {
         auto bad = document;
-        bad["groups"][0]["settings"][0]["default"] = invalid;
+        bad["groups"]["main"][0]["default"] = invalid;
         check(!SettingsJson::ParseSchema(bad, error), "invalid key default rejects schema");
     }
     auto bad = document;
-    bad["groups"][0]["settings"][1]["default"] = 255;
+    bad["groups"]["main"][1]["default"] = 255;
     check(!SettingsJson::ParseSchema(bad, error), "unbinding is opt-in");
-    bad["groups"][0]["settings"][1]["default"] = "UNBOUND";
+    bad["groups"]["main"][1]["default"] = "UNBOUND";
     check(!SettingsJson::ParseSchema(bad, error), "named unbound defaults also require opt-in");
-    bad["groups"][0]["settings"][1]["allowUnbound"] = true;
+    bad["groups"]["main"][1]["allowUnbound"] = true;
     check(SettingsJson::ParseSchema(bad, error).has_value(), "unbound default permitted explicitly");
-    bad["groups"][0]["settings"][1]["allowUnbound"] = "true";
+    bad["groups"]["main"][1]["allowUnbound"] = "true";
     check(!SettingsJson::ParseSchema(bad, error), "allowUnbound must be boolean");
 
     const auto root = std::filesystem::temp_directory_path() /

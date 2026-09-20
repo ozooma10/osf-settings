@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "osfsettings",
   "title": "OSF Settings",
-  "groups": [],
+  "groups": {},
   "hotkeys": [
     {
       "id": "openMenu",

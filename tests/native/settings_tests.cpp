@@ -27,7 +27,7 @@ int TestHotkeys();
 namespace
 {
     namespace fs = std::filesystem;
-    using Json = nlohmann::json;
+    using Json = nlohmann::ordered_json;
     using OSFSettings::SettingValue;
     int checks{};
     int failures{};
@@ -193,19 +193,18 @@ namespace
         Check(schema->FindSetting("unknown") == nullptr, "unknown definition is absent");
 
         auto document = example;
-        document["groups"][0]["settings"][0]["default"] = false;
+        document["groups"]["General"][0]["default"] = false;
         auto parsed = OSFSettings::SettingsJson::ParseSchema(document, error);
         Check(parsed && !std::get<OSFSettings::BoolDefinition>(parsed->groups[0].settings[0].definition).defaultValue, "false is a valid default");
 
         document = example;
         document.erase("title");
         document.erase("description");
-        document["groups"][0].erase("label");
-        document["groups"][0]["settings"][0].erase("label");
-        document["groups"][0]["settings"][0].erase("hint");
+        document["groups"]["General"][0].erase("label");
+        document["groups"]["General"][0].erase("hint");
         parsed = OSFSettings::SettingsJson::ParseSchema(document, error);
         Check(parsed && parsed->title == "learning" && parsed->description.empty() &&
-            parsed->groups[0].label == "general" && parsed->groups[0].settings[0].label == "notifications" &&
+            parsed->groups[0].label == "General" && parsed->groups[0].settings[0].label == "notifications" &&
             parsed->groups[0].settings[0].hint.empty(), "optional display text uses readable defaults");
 
         Reject(Json::array(), "schema must be an object");
@@ -221,34 +220,31 @@ namespace
         document["id"] = "../learning";
         Reject(document, "mod id");
         document = example;
-        document["groups"] = Json::object();
-        Reject(document, "groups must be an array");
+        document["groups"] = Json::array();
+        Reject(document, "groups must be an object");
         document = example;
-        document["groups"][0]["settings"] = Json::object();
+        document["groups"]["General"] = Json::object();
         Reject(document, "settings must be an array");
 
         for (const auto* type : { "string", "flags", "action", "note" }) {
             document = example;
-            document["groups"][0]["settings"][0]["type"] = type;
+            document["groups"]["General"][0]["type"] = type;
             Reject(document, "only types bool, int, float, enum, and key");
         }
         for (const auto& value : { Json("true"), Json(1), Json(nullptr) }) {
             document = example;
-            document["groups"][0]["settings"][0]["default"] = value;
+            document["groups"]["General"][0]["default"] = value;
             Reject(document, "default must be a boolean");
         }
         document = example;
-        document["groups"][0]["settings"][0].erase("default");
+        document["groups"]["General"][0].erase("default");
         Reject(document, "default must be a boolean");
         document = example;
-        document["groups"][0]["settings"][0]["label"] = 12;
+        document["groups"]["General"][0]["label"] = 12;
         Reject(document, "label must be a string");
 
         document = example;
-        auto duplicate = document["groups"][0];
-        document["groups"].push_back(duplicate);
-        Reject(document, "duplicate group id");
-        document["groups"][1]["id"] = "second";
+        document["groups"]["Second"] = document["groups"]["General"];
         Reject(document, "duplicate setting key");
     }
 
@@ -256,7 +252,7 @@ namespace
     {
         auto schema = example;
 
-        schema["groups"][0]["settings"].push_back({ { "key", "counter" }, { "type", "int" }, { "default", 0 } });
+        schema["groups"]["General"].push_back({ { "key", "counter" }, { "type", "int" }, { "default", 0 } });
         std::string error;
         const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
         Check(parsed.has_value() && error.empty(), "a schema can mix booleans and integers");
@@ -270,19 +266,19 @@ namespace
             std::numeric_limits<std::uint64_t>::max() };
         for (const auto& value : invalidDefaults) {
             auto document = schema;
-            document["groups"][0]["settings"][1]["default"] = value;
+            document["groups"]["General"][1]["default"] = value;
             Reject(document, "default must be an integer within its bounds");
         }
         auto document = schema;
-        document["groups"][0]["settings"][1].erase("default");
+        document["groups"]["General"][1].erase("default");
         Reject(document, "default must be an integer within its bounds");
         document = schema;
-        document["groups"][0]["settings"][1]["min"] = 11;
+        document["groups"]["General"][1]["min"] = 11;
         Reject(document, "min must not exceed max");
         for (const auto* bound : { "min", "max" }) {
             for (const auto& value : std::vector<Json>{ true, 1.0, "1", nullptr, std::numeric_limits<std::uint64_t>::max() }) {
                 document = schema;
-                document["groups"][0]["settings"][1][bound] = value;
+                document["groups"]["General"][1][bound] = value;
                 Reject(document, std::string(bound) + " must be a signed 64-bit integer");
             }
         }
@@ -290,7 +286,7 @@ namespace
             -9007199254740993LL, 0, 9007199254740993LL, std::numeric_limits<std::int64_t>::max() };
         for (const auto value : exactValues) {
             document = schema;
-            auto& setting = document["groups"][0]["settings"][1];
+            auto& setting = document["groups"]["General"][1];
             setting.erase("min"); setting.erase("max"); setting["default"] = value;
             const auto unbounded = OSFSettings::SettingsJson::ParseSchema(Json::parse(document.dump()), error);
             Check(unbounded && unbounded->FindSetting("notificationLimit")->DefaultValue() == SettingValue{ value },
@@ -298,12 +294,12 @@ namespace
         }
         for (const auto* absent : { "min", "max" }) {
             document = schema;
-            document["groups"][0]["settings"][1].erase(absent);
+            document["groups"]["General"][1].erase(absent);
             Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "each integer bound is optional");
         }
         document = schema;
-        document["groups"][0]["settings"][1]["min"] = 3;
-        document["groups"][0]["settings"][1]["max"] = 3;
+        document["groups"]["General"][1]["min"] = 3;
+        document["groups"]["General"][1]["max"] = 3;
         Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "equal bounds allow their one valid integer");
 
         const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -424,10 +420,10 @@ namespace
     void TestFloats(const Json& example)
     {
         auto schema = example;
-        const auto gainIndex = schema["groups"][0]["settings"].size();
-        schema["groups"][0]["settings"].push_back({ { "key", "gain" }, { "type", "float" },
+        const auto gainIndex = schema["groups"]["General"].size();
+        schema["groups"]["General"].push_back({ { "key", "gain" }, { "type", "float" },
             { "default", 0.75 }, { "min", 0 }, { "max", 1.0 } });
-        schema["groups"][0]["settings"].push_back({ { "key", "scale" }, { "type", "float" }, { "default", 0.0 } });
+        schema["groups"]["General"].push_back({ { "key", "scale" }, { "type", "float" }, { "default", 0.0 } });
         std::string error;
         const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
         Check(parsed.has_value() && error.empty(), "a schema can mix booleans, integers, and floats");
@@ -442,49 +438,49 @@ namespace
         const auto infinity = std::numeric_limits<double>::infinity();
         for (const auto& step : std::vector<Json>{ 0, -0.1, true, "0.1", nullptr, nan, infinity, -infinity }) {
             auto document = schema;
-            document["groups"][0]["settings"][gainIndex]["step"] = step;
+            document["groups"]["General"][gainIndex]["step"] = step;
             Reject(document, "step must");
         }
         const std::vector<Json> invalidDefaults{ true, "0.5", nullptr, -0.01, 1.01, Json::array(), Json::object(), nan, infinity, -infinity };
         for (const auto& value : invalidDefaults) {
             auto document = schema;
-            document["groups"][0]["settings"][gainIndex]["default"] = value;
+            document["groups"]["General"][gainIndex]["default"] = value;
             Reject(document, "default must be a finite number within its bounds");
         }
         auto document = schema;
-        document["groups"][0]["settings"][gainIndex].erase("default");
+        document["groups"]["General"][gainIndex].erase("default");
         Reject(document, "default must be a finite number within its bounds");
         document = schema;
-        document["groups"][0]["settings"][gainIndex]["min"] = 2.0;
+        document["groups"]["General"][gainIndex]["min"] = 2.0;
         Reject(document, "min must not exceed max");
         for (const auto* bound : { "min", "max" }) {
             for (const auto& value : std::vector<Json>{ true, "1", nullptr, nan, infinity, -infinity }) {
                 document = schema;
-                document["groups"][0]["settings"][gainIndex][bound] = value;
+                document["groups"]["General"][gainIndex][bound] = value;
                 Reject(document, std::string(bound) + " must be a finite number");
             }
             document = schema;
-            document["groups"][0]["settings"][gainIndex].erase(bound);
+            document["groups"]["General"][gainIndex].erase(bound);
             Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "each float bound is optional");
         }
         document = schema;
-        auto& fixed = document["groups"][0]["settings"][gainIndex];
+        auto& fixed = document["groups"]["General"][gainIndex];
         fixed["min"] = 0.75; fixed["max"] = 0.75;
         Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "equal bounds allow their one valid float");
         document = schema;
-        auto& negative = document["groups"][0]["settings"][gainIndex];
+        auto& negative = document["groups"]["General"][gainIndex];
         negative["default"] = -0.75; negative["min"] = -1; negative["max"] = -0.5;
         Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "float ranges and defaults can be negative");
         for (const auto* literal : { "0", "1", "1.0", "1e0", "0.1" }) {
             document = schema;
             const auto value = Json::parse(literal);
-            document["groups"][0]["settings"][gainIndex]["default"] = value;
+            document["groups"]["General"][gainIndex]["default"] = value;
             const auto decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
             Check(decoded && decoded->FindSetting("gain")->DefaultValue() == SettingValue{ value.get<double>() },
                 "integer, decimal, and exponent JSON defaults become doubles for float definitions");
         }
         document = schema;
-        document["groups"][0]["settings"][gainIndex + 1]["default"] = std::numeric_limits<std::uint64_t>::max();
+        document["groups"]["General"][gainIndex + 1]["default"] = std::numeric_limits<std::uint64_t>::max();
         const auto wide = OSFSettings::SettingsJson::ParseSchema(document, error);
         Check(wide && wide->FindSetting("scale")->DefaultValue() == SettingValue{ static_cast<double>(std::numeric_limits<std::uint64_t>::max()) },
             "float JSON decoding is not limited by signed integer storage");
@@ -585,7 +581,7 @@ namespace
     void TestEnums(const Json& example)
     {
         auto schema = example;
-        const auto& settings = schema["groups"][0]["settings"];
+        const auto& settings = schema["groups"]["General"];
         const auto modeEntry = std::ranges::find_if(settings, [](const Json& setting) { return setting["key"] == "notificationMode"; });
         const auto modeIndex = static_cast<std::size_t>(std::distance(settings.begin(), modeEntry));
         std::string error;
@@ -604,56 +600,56 @@ namespace
         if (!enumeration) return;
 
         auto document = schema;
-        document["groups"][0]["settings"][modeIndex].erase("optionLabels");
+        document["groups"]["General"][modeIndex].erase("optionLabels");
         auto decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
         Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
             "omitted option labels use the option values");
         document = schema;
-        document["groups"][0]["settings"][modeIndex]["optionLabels"] = { "", "Same label", "Same label" };
+        document["groups"]["General"][modeIndex]["optionLabels"] = { "", "Same label", "Same label" };
         decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
         Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
             "empty labels use the option value and display labels need not be unique");
         document = schema;
-        auto& single = document["groups"][0]["settings"][modeIndex];
+        auto& single = document["groups"]["General"][modeIndex];
         single.erase("optionLabels"); single["options"] = { "normal" };
         Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "an enum can have a single option");
         single["options"] = { "normal", "Normal" };
         Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "enum option identities are case-sensitive");
 
         document = schema;
-        document["groups"][0]["settings"][modeIndex].erase("options");
+        document["groups"]["General"][modeIndex].erase("options");
         Reject(document, "options must be a non-empty array");
         for (const auto& options : std::vector<Json>{ Json::array(), Json::object(), nullptr, true, 1, "quiet" }) {
             document = schema;
-            document["groups"][0]["settings"][modeIndex]["options"] = options;
+            document["groups"]["General"][modeIndex]["options"] = options;
             Reject(document, "options must be a non-empty array");
         }
         for (const auto& option : std::vector<Json>{ "", true, 1, 1.0, nullptr, Json::array(), Json::object() }) {
             document = schema;
-            document["groups"][0]["settings"][modeIndex]["options"][0] = option;
+            document["groups"]["General"][modeIndex]["options"][0] = option;
             Reject(document, "each option must be a non-empty string");
         }
         document = schema;
-        document["groups"][0]["settings"][modeIndex]["options"][0] = "normal";
+        document["groups"]["General"][modeIndex]["options"][0] = "normal";
         Reject(document, "duplicate option");
         for (const auto& labels : std::vector<Json>{ Json::array(), Json::array({ "Quiet", "Normal" }),
             Json::array({ "Quiet", "Normal", "Verbose", "Extra" }), Json::object(), nullptr, true, "labels" }) {
             document = schema;
-            document["groups"][0]["settings"][modeIndex]["optionLabels"] = labels;
+            document["groups"]["General"][modeIndex]["optionLabels"] = labels;
             Reject(document, "optionLabels must be an array with one label per option");
         }
         for (const auto& label : std::vector<Json>{ nullptr, true, 1, Json::array(), Json::object() }) {
             document = schema;
-            document["groups"][0]["settings"][modeIndex]["optionLabels"][0] = label;
+            document["groups"]["General"][modeIndex]["optionLabels"][0] = label;
             Reject(document, "each option label must be a string");
         }
         document = schema;
-        document["groups"][0]["settings"][modeIndex].erase("default");
+        document["groups"]["General"][modeIndex].erase("default");
         Reject(document, "default must be a string matching an option");
         const std::vector<Json> invalidValues{ true, 1, 1.0, nullptr, "", "Normal", "removed", Json::array(), Json::object() };
         for (const auto& value : invalidValues) {
             document = schema;
-            document["groups"][0]["settings"][modeIndex]["default"] = value;
+            document["groups"]["General"][modeIndex]["default"] = value;
             Reject(document, "default must be a string matching an option");
         }
 
@@ -714,7 +710,7 @@ namespace
 
         const auto savedSelection = Read(valuesFile);
         document = schema;
-        auto& reordered = document["groups"][0]["settings"][modeIndex];
+        auto& reordered = document["groups"]["General"][modeIndex];
         reordered["options"] = { "verbose", "quiet", "normal" };
         reordered["optionLabels"] = { "Detailed", "Minimal", "Standard" };
         Write(schemaFile, document.dump(2));
@@ -777,7 +773,7 @@ namespace
             "changing a returned copy does not edit the store");
 
         document = example;
-        document["groups"][0]["settings"][0]["default"] = false;
+        document["groups"]["General"][0]["default"] = false;
         Write(schemas / "learning.json", document.dump());
         store.LoadAll(schemas, values);
         Check(store.Mods().size() == 1 && store.GetValue("learning", "notifications") == SettingValue{ false },
@@ -808,7 +804,7 @@ namespace
         fs::create_directories(schemas);
 
         auto schema = example;
-        schema["groups"][0]["settings"].push_back({ { "key", "quiet" }, { "type", "bool" }, { "default", false } });
+        schema["groups"]["General"].push_back({ { "key", "quiet" }, { "type", "bool" }, { "default", false } });
         Write(schemas / "learning.json", schema.dump(2));
         const auto originalSchema = Read(schemas / "learning.json");
         schema["id"] = "other";
@@ -943,7 +939,7 @@ int main(int argc, char** argv)
             "data/SFSE/Plugins/OSF/Settings/schemas/learning.json";
         std::ifstream input(examplePath);
         if (!input) throw std::runtime_error("cannot open example schema: " + examplePath.string());
-        const auto example = nlohmann::json::parse(input);
+        const auto example = nlohmann::ordered_json::parse(input);
         TestSDK();
         checks += TestSettingsService();
         checks += TestKeySettings();

@@ -19,7 +19,7 @@ namespace
 {
     namespace API = OSFSettings::API;
     using API::Status;
-    using TestJson = nlohmann::json;
+    using TestJson = nlohmann::ordered_json;
 
     template <class... T>
     constexpr bool PublicRecords = ((std::is_standard_layout_v<T> && std::is_trivially_copyable_v<T>) && ...);
@@ -155,33 +155,33 @@ int main()
         std::filesystem::create_directories(values);
         auto schema = TestJson::parse(R"({
             "schemaVersion":1,"id":"alpha","title":"Alpha title","description":"Description",
-            "groups":[{"id":"second","label":"First group","settings":[
+            "groups":{"First group":[
                 {"key":"enabled","type":"bool","label":"Enabled","hint":"A hint","requires":"restart","default":false},
                 {"key":"count","type":"int","default":-9007199254740993,"min":-9223372036854775808,"max":9223372036854775807},
                 {"key":"scale","type":"float","default":0.15,"min":-1.25,"max":2.5,"step":0.125},
                 {"key":"mode","type":"enum","default":"quiet","options":["verbose","quiet"],"optionLabels":["Verbose label","Quiet label"]},
                 {"key":"key","type":"key","default":"UNBOUND","allowUnbound":true},
                 {"key":"text","type":"string","default":"Original text","maxLength":32}
-            ]},{"id":"first","settings":[]},{"id":"extra","settings":[
+            ],"first":[],"extra":[
                 {"key":"unbounded","type":"int","default":0},
                 {"key":"lower","type":"float","default":0,"min":-1},
                 {"key":"upper","type":"int","default":0,"max":1},
                 {"key":"empty","type":"string","default":""},
                 {"key":"bound","type":"key","default":115}
-            ]}]
+            ]}
         })");
         const std::string embedded("prefix\0suffix", 13);
         const std::string unicode = "\xC3\xA9\xE4\xB8\xAD\xF0\x9F\x98\x80";
         schema["title"] = embedded;
         schema["description"] = unicode;
-        schema["groups"][0]["settings"][0]["label"] = embedded;
-        schema["groups"][0]["settings"][0]["hint"] = unicode;
-        schema["groups"][0]["settings"][3]["optionLabels"][1] = embedded;
-        schema["groups"][1]["id"] = embedded;
-        schema["groups"][1]["label"] = unicode;
+        schema["groups"]["First group"][0]["label"] = embedded;
+        schema["groups"]["First group"][0]["hint"] = unicode;
+        schema["groups"]["First group"][3]["optionLabels"][1] = embedded;
+        schema["groups"] = {{"First group", schema["groups"]["First group"]},
+            {unicode, TestJson::array()}, {"extra", schema["groups"]["extra"]}};
         Write(schemas / "alpha.json", schema);
-        Write(schemas / "beta.json", TestJson::parse(R"({"schemaVersion":1,"id":"beta","groups":[]})"));
-        Write(schemas / "hotkeys.json", TestJson::parse(R"({"schemaVersion":1,"id":"hotkeys","groups":[],"hotkeys":[{"id":"open","label":"Open","default":"F10"}]})"));
+        Write(schemas / "beta.json", TestJson::parse(R"({"schemaVersion":1,"id":"beta","groups":{}})"));
+        Write(schemas / "hotkeys.json", TestJson::parse(R"({"schemaVersion":1,"id":"hotkeys","groups":{},"hotkeys":[{"id":"open","label":"Open","default":"F10"}]})"));
         Write(values / "alpha.json", {{"formatVersion",1},{"values",{{"enabled",true},{"count",9007199254740993LL},{"scale",1.75},{"mode","verbose"},{"key",65},{"text",unicode}}}});
 
         OSFSettings::SettingsService backend;
@@ -218,9 +218,9 @@ int main()
         const auto& mod = all.mods[0];
         const auto& groups = mod["groups"];
         const auto& settings = groups[0]["settings"];
-        check(mod["title"] == embedded && mod["description"] == unicode && groups[1]["id"] == embedded && groups[1]["label"] == unicode,
+        check(mod["title"] == embedded && mod["description"] == unicode && groups[1]["id"] == unicode && groups[1]["label"] == unicode,
             "length-aware mod and group text");
-        check(groups[0]["id"] == "second" && groups[2]["id"] == "extra" && groups[1]["settings"].empty(), "group order and empty groups");
+        check(groups[0]["id"] == "First group" && groups[0]["label"] == "First group" && groups[2]["id"] == "extra" && groups[1]["settings"].empty(), "group order and empty groups");
         const std::array types{API::SettingType::Bool, API::SettingType::Int, API::SettingType::Float, API::SettingType::Enum, API::SettingType::Key, API::SettingType::String};
         const std::array keys{"enabled", "count", "scale", "mode", "key", "text"};
         for (std::size_t i = 0; i < types.size(); ++i) check(settings[i]["type"] == types[i] && settings[i]["key"] == keys[i], "setting identity, type and authored order");

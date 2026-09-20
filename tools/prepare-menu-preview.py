@@ -199,8 +199,8 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
     rows = ET.SubElement(config, "rows")
     for path in schema_paths:
         schema = json.loads(path.read_text(encoding="utf-8-sig"))
-        for group in schema["groups"]:
-            for setting in group["settings"]:
+        for name, settings in schema["groups"].items():
+            for setting in settings:
                 if "requires" in setting and setting["requires"] != "restart":
                     raise ValueError(f'Preview requires must be "restart" when present: {path} / {setting["key"]}')
                 kind, default = setting["type"], setting["default"]
@@ -259,7 +259,7 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
                     raise ValueError(f"Preview supports boolean, integer, float, enum, key, and string settings only: {path}")
                 row = ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
                               modDescription=schema.get("description", ""),
-                              group=group["id"], groupTitle=group["label"], key=setting["key"],
+                              group=name, groupTitle=name, key=setting["key"],
                               title=setting["label"], hint=setting.get("hint", ""),
                               requiresRestart=str(setting.get("requires") == "restart").lower(),
                               **attributes)

@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <fstream>
 #include <utility>
-#include <nlohmann/json.hpp>
 
 namespace OSFSettings
 {
@@ -38,9 +37,8 @@ namespace OSFSettings
                     m_loadErrors.push_back({ path, "cannot open schema file" });
                     continue;
                 }
-                const auto document = nlohmann::json::parse(input);
                 std::string message;
-                auto schema = SettingsJson::ParseSchema(document, message);
+                auto schema = SettingsJson::ParseSchema(input, message);
                 if (!schema) {
                     m_loadErrors.push_back({ path, std::move(message) });
                     continue;

@@ -16,7 +16,7 @@ namespace
 {
     using namespace OSFSettings;
     using API::Status;
-    using Json = nlohmann::json;
+    using Json = nlohmann::ordered_json;
     using namespace std::chrono_literals;
 
     struct Events
@@ -63,12 +63,12 @@ int TestSettingsService()
     const auto saved = values / "sample.json";
     std::filesystem::create_directories(schemas);
     const auto schema = Json::parse(R"({
-        "schemaVersion": 1, "id": "sample", "groups": [{"id": "main", "settings": [
+        "schemaVersion": 1, "id": "sample", "groups": {"main": [
             {"key": "enabled", "type": "bool", "default": false},
             {"key": "count", "type": "int", "default": 3, "min": 0, "max": 10},
             {"key": "scale", "type": "float", "default": 0.15, "min": 0, "max": 1, "step": 0.1},
             {"key": "mode", "type": "enum", "default": "quiet", "options": ["quiet", "verbose-mode"]}
-        ]}]
+        ]}
     })");
     { std::ofstream output(schemas / "sample.json"); output << schema.dump(); }
 
@@ -367,11 +367,11 @@ int TestSettingsService()
         "subscriptions belong to the service and outlive their adapter");
 
     auto invalid = schema;
-    invalid["groups"][0]["settings"][0]["key"] = std::string("enabled\0suffix", 14);
+    invalid["groups"]["main"][0]["key"] = std::string("enabled\0suffix", 14);
     std::string error;
     check(!SettingsJson::ParseSchema(invalid, error) && error.find("NUL") != std::string::npos, "schema rejects keys truncated by the ABI");
     invalid = schema;
-    invalid["groups"][0]["settings"][3]["options"][1] = std::string("bad\0option", 10);
+    invalid["groups"]["main"][3]["options"][1] = std::string("bad\0option", 10);
     check(!SettingsJson::ParseSchema(invalid, error) && error.find("NUL") != std::string::npos, "schema rejects enum values truncated by the ABI");
     return checks;
 }
