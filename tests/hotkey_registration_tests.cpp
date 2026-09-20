@@ -4,7 +4,7 @@
 #include "../src/Input/NativeHotkeys.cpp"
 #include "Settings/SettingsService.h"
 #include "RE/C/ControlMap.h"
-#include "SFSE/InputMap.h"
+#include "Input/KeyNames.h"
 #include "REL/ASM.h"
 #include "REL/Trampoline.h"
 #include "HotkeyTasks.h"
@@ -103,12 +103,12 @@ int main()
         const auto load = reinterpret_cast<void (*)(RE::ControlMap*, const char*)>(loader);
         HookFixture fixture;
 
-        check(SFSE::InputMap::GetKeyboardVirtualKey("f10") == 0x79 &&
-            SFSE::InputMap::GetKeyboardVirtualKey("L Ctrl") == 0xA2 &&
-            SFSE::InputMap::GetKeyboardVirtualKey("/") == 0xBF,
+        check(OSFSettings::GetKeyboardVirtualKey("f10") == 0x79 &&
+            OSFSettings::GetKeyboardVirtualKey("L Ctrl") == 0xA2 &&
+            OSFSettings::GetKeyboardVirtualKey("/") == 0xBF,
             "native table lookup handles case, spaced names and a final row without newline");
-        check(SFSE::InputMap::GetKeyboardVirtualKey("") == 0xFFFFFFFF &&
-            SFSE::InputMap::GetKeyboardVirtualKey("Unknown") == 0xFFFFFFFF,
+        check(OSFSettings::GetKeyboardVirtualKey("") == 0xFFFFFFFF &&
+            OSFSettings::GetKeyboardVirtualKey("Unknown") == 0xFFFFFFFF,
             "unknown names cannot silently become key zero");
 
         RE::ControlMap first{}, reset{};

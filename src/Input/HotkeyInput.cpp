@@ -3,7 +3,7 @@
 #include "NativeHotkeys.h"
 #include "NativeBindingEditor.h"
 #include "harness/TestHarness.h"
-#include "RE/B/BSInputEventUserStandalone.h"
+#include "BSInputEventUserStandalone.h"
 #include "RE/M/MenuControls.h"
 #include "RE/U/UIMessageQueue.h"
 #include "REL/THook.h"
@@ -22,7 +22,7 @@ namespace OSFSettings::HotkeyInput
         using InitializeHook = REL::THook<void(RE::MenuControls*)>;
         std::optional<InitializeHook> g_initializeHook;
 
-        class HotkeyHandler final : public RE::BSInputEventUserStandalone
+        class HotkeyHandler final : public BSInputEventUserStandalone
         {
         public:
             bool ShouldHandleEvent(const RE::InputEvent* event) override

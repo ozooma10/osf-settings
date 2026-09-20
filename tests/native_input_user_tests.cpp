@@ -1,5 +1,5 @@
 #include "SFSE/Impl/PCH.h"
-#include "RE/B/BSInputEventUserStandalone.h"
+#include "Input/BSInputEventUserStandalone.h"
 #include "RE/M/MenuControls.h"
 
 #include <iostream>
@@ -78,7 +78,7 @@ namespace
         return user;
     }
 
-    class Handler final : public RE::BSInputEventUserStandalone
+    class Handler final : public OSFSettings::BSInputEventUserStandalone
     {
     public:
         bool ShouldHandleEvent(const RE::InputEvent*) override { return pad08[0] == 0xA5; }

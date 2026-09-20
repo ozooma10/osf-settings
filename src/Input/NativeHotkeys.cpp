@@ -3,7 +3,7 @@
 #include "Settings/SettingsService.h"
 #include "RE/C/ControlMap.h"
 #include "RE/U/UserEvents.h"
-#include "SFSE/InputMap.h"
+#include "KeyNames.h"
 #include "SFSE/API.h"
 #include "REL/THook.h"
 
@@ -48,7 +48,7 @@ namespace OSFSettings::NativeHotkeys
                 const auto event = mod.schema.id + "/" + hotkey.id;
                 auto& target = targets[hotkey.id];
                 target = hotkey.menu ? HotkeyInputState::Target::Menu : HotkeyInputState::Target::Invalid;
-                const auto key = hotkey.defaultKey ? SFSE::InputMap::GetKeyboardVirtualKey(*hotkey.defaultKey) : kUnbound;
+                const auto key = hotkey.defaultKey ? GetKeyboardVirtualKey(*hotkey.defaultKey) : kUnbound;
                 if (key == kUnknownKey) {
                     REX::ERROR("Hotkeys: unknown default key '{}' for {}", *hotkey.defaultKey, event);
                     continue;

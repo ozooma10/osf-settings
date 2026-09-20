@@ -372,7 +372,7 @@ input. OSF does not create a menu class or register a factory from the SWF name.
 The bundled Settings declaration targets `OSFSettingsMenu` through this same path.
 `menu` must be a nonempty string without embedded NUL characters.
 
-`HotkeyInput` installs its own `BSInputEventUserStandalone` in `MenuControls`.
+`HotkeyInput` installs its own `OSFSettings::BSInputEventUserStandalone` in `MenuControls`.
 It accepts enabled keyboard events for registered declarations. For menu targets,
 all edges reach native held-action tracking; a release (`value == 0`, nonnegative
 `heldDownSecs`) sends `UIMessageQueue::AddMessage(menu, kShow)` and marks the
