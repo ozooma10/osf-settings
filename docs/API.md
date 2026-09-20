@@ -1,7 +1,7 @@
 # API
 
 C++ SDK: [OSFSettings.h](../sdk/OSFSettings.h). Requires CommonLibSF.
-Papyrus is planned.
+Papyrus: [script API, callbacks, and lifecycle](PAPYRUS.md).
 
 For native issue reporting, see [Mod Issues](DIAGNOSTICS.md).
 
@@ -563,13 +563,7 @@ void OnChanged(const char* mod, const char* key, void* context) noexcept;
 - API calls may come from any thread. Callbacks run serially on an SFSE task; no main-thread guarantee.
 - Callback strings last only for that callback. Exceptions must not escape.
 - Keep `context` alive until `Unsubscribe` returns. When unsubscribing inside a callback, keep it alive until that callback returns.
-k that consumer effects run in their required context. Verify both menu sizes and controller input.
-Compilation and file deployment do not replace this check.
 
-The Papyrus bridge still needs native registration, conversion handling, receiver
-validation, VM lifecycle handling, and a save/load consumer test.
-k that consumer effects run in their required context. Verify both menu sizes and controller input.
-Compilation and file deployment do not replace this check.
-
-The Papyrus bridge still needs native registration, conversion handling, receiver
-validation, VM lifecycle handling, and a save/load consumer test.
+Papyrus uses the same change service through session-scoped registrations.
+See [Papyrus acceptance](PAPYRUS.md#build-and-acceptance) for its host checks and
+the outstanding fresh-game VM/lifecycle acceptance.

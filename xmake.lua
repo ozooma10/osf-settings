@@ -49,11 +49,13 @@ target("OSF Settings")
     end
     add_headerfiles("tests/harness/*.h")
     before_build(function(target)
+        os.execv("pwsh", { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-papyrus.ps1") })
         local args = { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-scaleform.ps1") }
         if has_config("test_harness") then table.insert(args, "-TestHarness") end
         os.execv("pwsh", args)
     end)
     add_installfiles("data/(**)")
+    add_installfiles("build/papyrus/OSFSettings.pex", { prefixdir = "Scripts" })
     add_installfiles("build/scaleform/OSFSettingsMenu.swf", "build/scaleform/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })
 
 target("osfsettings-diagnostics-example")
@@ -227,3 +229,14 @@ target("osfsettings-registry-example")
     on_config(function(target)
         target:set("installfiles", {})
     end)
+
+target("osfsettings-papyrus-tests")
+    set_kind("binary")
+    set_default(false)
+    add_deps("commonlibsf")
+    add_files("tests/papyrus_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp",
+        "src/Papyrus/Values.cpp", "src/Papyrus/Subscriptions.cpp", "src/Input/KeyNames.cpp", "src/Settings/*.cpp")
+    add_includedirs("src")
+    set_pcxxheader("src/pch.h")
+    add_packages("nlohmann_json")
+    set_rundir(os.projectdir())

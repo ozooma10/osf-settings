@@ -22,6 +22,14 @@ namespace OSFSettings
     {
         if (mod.empty() || id.empty() || !callback) return SettingsError::InvalidArgument;
         std::lock_guard lock(m_mutex);
+        const auto result = Validate(mod, id);
+        if (result != SettingsError::None) return result;
+        m_callbacks[std::string(mod) + "/" + std::string(id)].push_back({ callback, context });
+        return SettingsError::None;
+    }
+
+    SettingsError HotkeyInputState::Validate(std::string_view mod, std::string_view id) const
+    {
         if (!m_initialized) return SettingsError::NotReady;
         const auto foundMod = m_declarations.find(mod);
         if (foundMod == m_declarations.end()) return SettingsError::UnknownMod;
@@ -29,8 +37,32 @@ namespace OSFSettings
         if (found == foundMod->second.end()) return SettingsError::UnknownHotkey;
         if (found->second == Target::Menu) return SettingsError::TypeMismatch;
         if (found->second == Target::Invalid) return SettingsError::InvalidValue;
-        m_callbacks[std::string(mod) + "/" + std::string(id)].push_back({ callback, context });
         return SettingsError::None;
+    }
+
+    SettingsError HotkeyInputState::Subscribe(std::string_view mod, std::string_view id, std::function<void()> callback, Subscription& out)
+    {
+        if (mod.empty() || id.empty() || !callback) return SettingsError::InvalidArgument;
+        std::lock_guard lock(m_mutex);
+        const auto result = Validate(mod, id);
+        if (result != SettingsError::None) return result;
+        if (!m_nextSubscription) return SettingsError::InternalError;
+        auto observer = std::make_shared<Observer>();
+        observer->action = std::string(mod) + "/" + std::string(id);
+        observer->callback = std::move(callback);
+        m_observers.emplace(m_nextSubscription, std::move(observer));
+        out = m_nextSubscription++;
+        return SettingsError::None;
+    }
+
+    bool HotkeyInputState::Unsubscribe(Subscription subscription)
+    {
+        std::lock_guard lock(m_mutex);
+        const auto found = m_observers.find(subscription);
+        if (found == m_observers.end()) return false;
+        found->second->active.store(false);
+        m_observers.erase(found);
+        return true;
     }
 
     HotkeyInputState::Block HotkeyInputState::AcquireBlock()
@@ -67,14 +99,30 @@ namespace OSFSettings
         if (hotkey->second == Target::Callback) {
             if (!(value > 0) || heldSeconds != 0) return false;
             const auto callbacks = m_callbacks.find(action);
-            if (callbacks == m_callbacks.end()) return false;
-            auto task = [listeners = callbacks->second, mod = mod->first, id = hotkey->first] {
+            std::vector<Listener> listeners;
+            if (callbacks != m_callbacks.end()) {
+                listeners = callbacks->second;
+            }
+            std::vector<std::shared_ptr<Observer>> observers;
+            for (const auto& [token, observer] : m_observers) {
+                if (observer->action == action) {
+                    observers.push_back(observer);
+                }
+            }
+            if (listeners.empty() && observers.empty()) return false;
+            const bool hasNative = !listeners.empty();
+            auto task = [listeners = std::move(listeners), mod = mod->first, id = hotkey->first] {
                 for (const auto& listener : listeners) {
                     listener.callback(mod.c_str(), id.c_str(), listener.context);
                 }
             };
             lock.unlock();
-            SFSE::GetTaskInterface()->AddTask(std::move(task));
+            for (const auto& observer : observers) {
+                if (observer->active.load()) {
+                    observer->callback();
+                }
+            }
+            if (hasNative) SFSE::GetTaskInterface()->AddTask(std::move(task));
             return true;
         }
 

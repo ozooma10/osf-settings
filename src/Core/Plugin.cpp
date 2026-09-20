@@ -6,6 +6,7 @@
 #include "Input/NativeBindingsMenu.h"
 #include "Input/PauseMenu.h"
 #include "Menu/OSFSettingsMenu.h"
+#include "Papyrus/Papyrus.h"
 
 namespace OSFSettings::Plugin
 {
@@ -15,7 +16,14 @@ namespace OSFSettings::Plugin
         {
             if(!message) { return; }
 
+            if (message->type == SFSE::MessagingInterface::kPostDataLoad) {
+                Papyrus::RegisterSinks();
+            }
+
             if(message->type == SFSE::MessagingInterface::kPostPostDataLoad) {
+                if (!Papyrus::RegisterSinks()) {
+                    REX::ERROR("Papyrus subscription event sources are unavailable");
+                }
                 const bool available = OSFSettingsMenu::Register() && PauseMenu::RegisterSink();
                 REX::INFO("[kPostPostDataLoad] Settings menu integration available={}", available);
             } 
@@ -27,6 +35,7 @@ namespace OSFSettings::Plugin
     {
         const auto* messaging = SFSE::GetMessagingInterface();
         if (!messaging || !Runtime::Get().Initialize() || !messaging->RegisterListener(OnMessage)) return false;
+        if (!Papyrus::Install()) REX::ERROR("Papyrus native registration hook is unavailable");
         if (!PauseMenu::Install()) REX::ERROR("Pause menu hook is unavailable");
         if (!NativeHotkeys::Install()) REX::ERROR("Native hotkey registration is unavailable");
         if (!NativeBindingsMenu::Install()) REX::ERROR("Mod bindings presentation is unavailable");

@@ -18,6 +18,11 @@ MO2 mod folder. The build target and DLL remain `OSF Settings` and `OSFSettings.
 Run the install step after building to deploy SWF-only changes too; CommonLibSF's
 automatic install is triggered by changes to the native DLL.
 
+The build also compiles and installs the [Papyrus API](docs/PAPYRUS.md).
+Compile the [instance and Global examples](examples/papyrus/README.md) with
+the Papyrus build helper. Focused checks use the osfsettings-papyrus-tests target.
+The helper accepts alternate CK compiler and vanilla import locations.
+
 The [native hotkey callback API](docs/API.md#native-hotkey-callbacks) uses schema
 hotkeys without a `menu` target. A buildable consumer lives in
 [examples/hotkeys](examples/hotkeys/README.md).
