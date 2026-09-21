@@ -44,6 +44,7 @@ target("OSF Settings")
         add_files("tests/harness/*.cpp")
         add_installfiles("build/papyrus/harness/*.pex", { prefixdir = "Scripts" })
         add_installfiles("build/papyrus/harness/OSFSettingsAcceptance.esm")
+        add_installfiles("data/SFSE/Plugins/OSF/Settings/schemas/learning.json", { prefixdir = "SFSE/Plugins/OSF/Settings/schemas" })
     end
     add_headerfiles("tests/harness/*.h")
     before_build(function(target)
@@ -54,7 +55,8 @@ target("OSF Settings")
         if has_config("test_harness") then table.insert(args, "-TestHarness") end
         os.execv("pwsh", args)
     end)
-    add_installfiles("data/(**)")
+    add_installfiles("data/SFSE/Plugins/OSF/Settings/schemas/osfsettings.json", { prefixdir = "SFSE/Plugins/OSF/Settings/schemas" })
+    add_installfiles("data/Scripts/Source/OSFSettings.psc", { prefixdir = "Scripts/Source" })
     add_installfiles("build/papyrus/OSFSettings.pex", { prefixdir = "Scripts" })
     add_installfiles("build/scaleform/OSFSettingsMenu.swf", "build/scaleform/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })
 

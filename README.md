@@ -14,13 +14,24 @@ or Papyrus to read values and respond to changes.
 | [Settings registry](docs/REGISTRY.md) | Discover mods, metadata, and current values |
 | [Issue reporting](docs/DIAGNOSTICS.md) | Report and clear problems shown in Mod Issues |
 
+The [quickstart](docs/QUICKSTART.md) walks through a first settings page.
+
+## Release package
+
+```powershell
+pwsh -NoProfile -File packaging/build-archive.ps1
+```
+
+Builds a production ZIP, checksum and manifest in isolated staging under
+`build/packages`. See [packaging](docs/PACKAGING.md) for contents and release checks.
+
 ## Build and test
 
 Use XMake 3.0.0+ and an MSVC compiler with C++23 support. Run from this repository:
 
 ```powershell
 pwsh tools/setup-scaleform.ps1
-xmake f -y -m releasedbg
+xmake f -y -m releasedbg --test_harness=n
 xmake build
 ```
 

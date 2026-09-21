@@ -32,8 +32,9 @@ pre-existing key/value identity. No map mutation occurs after publication.
 and native manager checks from the existing menu callback. `ui.translations` comes
 from real Flash text fields and native row clips. An additional private resource
 load during construction tests merging; it is not proof of an in-session translator
-reload. The extracted helpers have host coverage; the refactored production and
-observation paths still require a fresh requested in-game run.
+reload. The extracted helpers have host coverage; the translation-registration
+runtime check passed in `20260921-004831-687-SettingsSmoke`. See
+[release acceptance](../../docs/RELEASE_ACCEPTANCE.md) for the full evidence index.
 
 ## Building and observations
 
