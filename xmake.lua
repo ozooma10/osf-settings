@@ -21,21 +21,17 @@ option("test_harness")
     set_description("Expose passive local testing observations; normal input remains active")
 option_end()
 
+includes("tests")
+
 -- define targets
 target("OSF Settings")
     set_basename("OSFSettings")
     add_rules("commonlibsf.plugin", {
         name = "OSF Settings",
         author = "ozooma10",
-        description = "Mod Settings Menu for Starfield",
+        description = "Native MCM and Keybindings for Starfield",
         email = "ozooma10@protonmail.com"
     })
-    on_config(function(target)
-        -- Keep this checkout's MO2 payload separate from the historical Settings mod.
-        if os.getenv("XSE_SF_MODS_PATH") then
-            target:set("installdir", path.join(os.getenv("XSE_SF_MODS_PATH"), "OSF Settings Slim"))
-        end
-    end)
 
     -- add src files
     add_files("src/**.cpp")
@@ -91,129 +87,6 @@ target("osfsettings-hotkeys-example")
         target:set("installfiles", {})
     end)
 
-target("osfsettings-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/native/*.cpp", "src/Settings/*.cpp", "src/API/*.cpp", "src/Diagnostics/*.cpp", "src/Input/KeyNames.cpp", "src/Input/KeyCapture.cpp", "src/Input/HotkeyService.cpp", "src/Menu/FloatSlider.cpp")
-    add_includedirs("src")
-    add_packages("nlohmann_json")
-    set_rundir(os.projectdir())
-
-target("osfsettings-schema-tests")
-    set_kind("binary")
-    set_default(false)
-    add_files("tests/hotkey_schema_tests.cpp", "src/Settings/SettingsSchema.cpp", "src/Settings/SettingsSchemaJson.cpp",
-        "src/Settings/SettingsJson.cpp", "src/Settings/SettingsStore.cpp", "src/Settings/SettingsValuesJson.cpp")
-    add_includedirs("src")
-    add_packages("nlohmann_json")
-    set_rundir(os.projectdir())
-
-target("osfsettings-issues-tests")
-    set_kind("binary")
-    set_default(false)
-    add_files("tests/mod_issue_tests.cpp", "tests/diagnostics_service_tests.cpp", "src/Diagnostics/*.cpp", "src/Settings/SettingsSchema.cpp")
-    add_includedirs("src")
-    set_rundir(os.projectdir())
-
-target("osfsettings-registration-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/hotkey_registration_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp", "src/Input/KeyNames.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-
-target("osfsettings-input-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/native_input_user_tests.cpp", "src/Input/BSInputEventUserStandalone.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-
-target("osfsettings-lifecycle-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/hotkey_lifecycle_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp", "src/Input/BSInputEventUserStandalone.cpp")
-    add_includedirs("src", "tests")
-    add_defines("OSFSETTINGS_TEST_HARNESS")
-    set_pcxxheader("src/pch.h")
-
-target("osfsettings-binding-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/native_binding_editor_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-
-target("osfsettings-bindings-menu-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/native_bindings_menu_tests.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-
-target("osfsettings-binding-snapshot-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/binding_snapshot_tests.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-
-target("osfsettings-diagnostics-api-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/diagnostics_api_tests.cpp", "src/API/DiagnosticsApi.cpp", "src/API/DiagnosticsExports.cpp",
-        "src/Diagnostics/*.cpp", "src/Settings/SettingsSchema.cpp")
-    add_includedirs("src")
-    set_rundir(os.projectdir())
-
-target("osfsettings-hotkey-block-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/hotkey_block_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp", "src/Input/KeyNames.cpp",
-        "src/API/SettingsApi.cpp", "src/API/Exports.cpp", "src/Settings/*.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-    add_packages("nlohmann_json")
-    set_rundir(os.projectdir())
-
-target("osfsettings-hotkey-callback-tests")
-    set_kind("binary")
-    set_default(false)
-    add_files("tests/hotkey_callback_tests.cpp", "src/Input/HotkeyInputState.cpp")
-    add_includedirs("tests/stubs", "src")
-    set_rundir(os.projectdir())
-
-target("osfsettings-string-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/string_settings_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp", "src/Input/KeyNames.cpp",
-        "src/API/SettingsApi.cpp", "src/API/Exports.cpp", "src/Settings/*.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-    add_packages("nlohmann_json")
-    set_rundir(os.projectdir())
-
-target("osfsettings-registry-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/registry_api_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp", "src/Input/KeyNames.cpp",
-        "src/API/SettingsApi.cpp", "src/API/Exports.cpp", "src/Settings/*.cpp")
-    add_includedirs("src", "sdk", "examples/registry")
-    set_pcxxheader("src/pch.h")
-    add_packages("nlohmann_json")
-    set_rundir(os.projectdir())
-
 target("osfsettings-registry-example")
     set_default(false)
     set_basename("OSFSettingsRegistryExample")
@@ -229,14 +102,3 @@ target("osfsettings-registry-example")
     on_config(function(target)
         target:set("installfiles", {})
     end)
-
-target("osfsettings-papyrus-tests")
-    set_kind("binary")
-    set_default(false)
-    add_deps("commonlibsf")
-    add_files("tests/papyrus_tests.cpp", "tests/HotkeyTasks.cpp", "src/Input/HotkeyInputState.cpp",
-        "src/Papyrus/Values.cpp", "src/Papyrus/Subscriptions.cpp", "src/Input/KeyNames.cpp", "src/Settings/*.cpp")
-    add_includedirs("src")
-    set_pcxxheader("src/pch.h")
-    add_packages("nlohmann_json")
-    set_rundir(os.projectdir())

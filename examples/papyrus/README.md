@@ -1,37 +1,22 @@
-# Papyrus consumer example
+# Papyrus example
 
-This development-only example uses every value type, writes/resets, change
-subscriptions, and a schema hotkey. It demonstrates callbacks on a player
-reference alias and on a Global script.
+Demonstrates values, resets, change notifications, and hotkeys on a player alias
+and a Global script. See the [Papyrus guide](../../docs/PAPYRUS.md).
 
-Compile the public API and both example scripts:
+Compile from the repository root:
 
-~~~powershell
+```powershell
 pwsh tools/build-papyrus.ps1 -Examples
-~~~
+```
 
-The API PEX is installed by the normal OSF Settings build. Example PEX files
-land in build/papyrus/examples and are excluded from framework installation.
+Example PEX files are written to `build/papyrus/examples` and are not installed
+automatically. The helper accepts `-Compiler` and `-Imports` for alternate CK paths.
 
-For a consumer mod:
+1. Put [papyrusexample.json](papyrusexample.json) in `Data/SFSE/Plugins/OSF/Settings/schemas`.
+2. Put both example PEX files in `Data/Scripts`.
+3. Attach `OSFSettingsExample` to a player reference alias in your running quest.
+   Its `OnInit` and `OnPlayerLoadGame` register both scripts before reading values.
+4. Bind **Toggle example** in Settings; it starts unbound.
 
-1. Ship papyrusexample.json under Data/SFSE/Plugins/OSF/Settings/schemas.
-2. Ship both example PEX files under Data/Scripts.
-3. Attach OSFSettingsExample to a player reference alias in your own running
-   quest. Its OnInit and OnPlayerLoadGame register both instance and Global
-   callbacks before reading values.
-4. Bind "Toggle example" in Settings. It starts unbound. Each fresh press toggles
-   Enabled through the instance callback; the Global observer only logs delivery.
-
-No example ESM is supplied or installed. Global functions do not initialize
-themselves; OSFSettingsExampleGlobal.InitializeSettings is called by the alias.
-For Global-only use, your existing initialization/load script can call it instead.
-
-WriteExampleValues and ResetExampleValues demonstrate the remaining setters
-and resets. Registration returns Bool; repeated calls do not add duplicate
-listeners. Instance and Global registrations are cleaned up automatically when
-the session ends. Register again after each load.
-
-See the [API and lifecycle contract](../../docs/PAPYRUS.md).
-Compilation is host proof only; the owning quest, load timing, and callbacks
-need the SettingsSmoke in-game acceptance fixture before claiming runtime proof.
+No example ESM is supplied. Global-only consumers must call
+`OSFSettingsExampleGlobal.InitializeSettings()` from their own initialization/load script.
