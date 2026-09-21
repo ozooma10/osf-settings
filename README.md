@@ -11,6 +11,7 @@ or Papyrus to read values and respond to changes.
 | [C++ settings](docs/API.md) | Read, write, and watch settings from an SFSE plugin |
 | [Papyrus settings](docs/PAPYRUS.md) | Read, write, and watch settings from scripts |
 | [Hotkeys](docs/Keybindings.md) | Register rebindable actions or open a native menu |
+| [Action buttons](docs/ACTIONS.md) | Run a confirmed operation and report completion |
 | [Settings registry](docs/REGISTRY.md) | Discover mods, metadata, and current values |
 | [Issue reporting](docs/DIAGNOSTICS.md) | Report and clear problems shown in Mod Issues |
 

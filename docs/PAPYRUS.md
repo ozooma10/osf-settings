@@ -56,3 +56,7 @@ Papyrus schedules callbacks; delivery is not synchronous.
 
 See the [instance and Global example](../examples/papyrus/README.md) for a complete
 consumer, including initialization and load events.
+
+For menu buttons, use [`RegisterAction` / `RegisterActionStatic` and
+`CompleteAction`](ACTIONS.md#papyrus). Each action has one handler and an opaque
+invocation token; closing Settings does not invalidate pending completion.

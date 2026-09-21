@@ -34,6 +34,8 @@ namespace OSFSettings::API
         Status GetString(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override;
         Status SetString(const char* mod, const char* key, const char* value, std::uint32_t length) noexcept override;
         Status ReadRegistry(const char* mod, RegistryFn callback, void* context) noexcept override;
+        Status RegisterAction(const char* mod, const char* id, ActionFn callback, void* context) noexcept override;
+        Status CompleteAction(Invocation invocation, bool succeeded, const char* message) noexcept override;
 
     private:
         template <class T> Status Read(const char* mod, const char* key, T* out) noexcept;

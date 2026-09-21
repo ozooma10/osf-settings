@@ -1,5 +1,6 @@
 #include "Runtime.h"
 #include "SettingsDispatcher.h"
+#include "Actions/ActionService.h"
 #include "Utils/Paths.h"
 
 namespace OSFSettings
@@ -46,6 +47,7 @@ namespace OSFSettings
             REX::ERROR("Settings notification dispatcher is unavailable");
             return false;
         }
+        ActionService::Get().Initialize(mods);
         settings.Start();
         m_initialized = true;
         return true;

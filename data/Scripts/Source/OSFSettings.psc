@@ -33,3 +33,11 @@ Bool Function RegisterForChangesStatic(String targetScript, String modId) Global
 ; The hotkey must be declared in the schema without a menu target.
 Bool Function RegisterHotkey(ScriptObject receiver, String modId, String hotkeyId) Global Native
 Bool Function RegisterHotkeyStatic(String targetScript, String modId, String hotkeyId) Global Native
+
+; Exactly one handler per declared action. Repeating the same registration succeeds.
+; Callback: Function OnOSFAction(String modId, String actionId, String invocation).
+; Register again after load. Closing Settings does not retire actions.
+Bool Function RegisterAction(ScriptObject receiver, String modId, String actionId) Global Native
+Bool Function RegisterActionStatic(String targetScript, String modId, String actionId) Global Native
+; Call once when finished, including immediate completion. Keep invocation as an opaque string. Stale/duplicate completion returns false.
+Bool Function CompleteAction(String invocation, Bool succeeded, String message = "") Global Native

@@ -96,6 +96,8 @@ namespace
             Status UnsubscribeHotkey(Subscription) noexcept override { return Status::NotReady; }
             Status AcquireHotkeySuppression(Suppression*) noexcept override { return Status::NotReady; }
             Status ReleaseHotkeySuppression(Suppression) noexcept override { return Status::NotReady; }
+            Status RegisterAction(const char*, const char*, ActionFn, void*) noexcept override { return Status::NotReady; }
+            Status CompleteAction(Invocation, bool, const char*) noexcept override { return Status::NotReady; }
         } provider;
 
         Client client;

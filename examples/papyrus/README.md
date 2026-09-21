@@ -1,7 +1,11 @@
 # Papyrus example
 
-Demonstrates values, resets, change notifications, and hotkeys on a player alias
+Demonstrates values, resets, change notifications, hotkeys, and action buttons on a player alias
 and a Global script. See the [Papyrus guide](../../docs/PAPYRUS.md).
+
+The instance owns a confirmed reset action. The Global script owns a separate
+action with delayed completion using `Utility.WaitMenuPause`. Action ownership
+is exclusive; both scripts re-register after load.
 
 Compile from the repository root:
 

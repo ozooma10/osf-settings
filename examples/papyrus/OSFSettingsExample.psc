@@ -15,6 +15,8 @@ Function InitializeSettings()
     EndIf
     Bool changes = OSFSettings.RegisterForChanges(Self, "papyrusexample")
     Bool hotkey = OSFSettings.RegisterHotkey(Self, "papyrusexample", "toggle")
+    Bool registeredAction = OSFSettings.RegisterAction(Self, "papyrusexample", "reset")
+    Debug.Trace("OSF Settings example: action registered = " + registeredAction)
     Debug.Trace("OSF Settings example: registrations " + changes + ", " + hotkey)
     OSFSettingsExampleGlobal.InitializeSettings()
     ReadSettings()
@@ -55,4 +57,13 @@ Function ResetExampleValues()
     Bool saved = OSFSettings.Reset("papyrusexample", "caption")
     saved = OSFSettings.ResetMod("papyrusexample") && saved
     Debug.Trace("OSF Settings example: resets saved = " + saved)
+EndFunction
+
+Function OnOSFAction(String modId, String actionId, String invocation)
+    Bool saved = OSFSettings.ResetMod(modId)
+    String resultText = "Example settings reset."
+    If !saved
+        resultText = "Could not save the example defaults."
+    EndIf
+    Bool completed = OSFSettings.CompleteAction(invocation, saved, resultText)
 EndFunction

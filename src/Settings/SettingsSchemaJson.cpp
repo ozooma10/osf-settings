@@ -222,7 +222,35 @@ namespace OSFSettings::SettingsJson
                     mod.hotkeys.push_back(std::move(hotkey));
                 }
             }
-            if (mod.groups.empty() && !mod.hotkeys.empty()) {
+            if (const auto actions = document.find("actions"); actions != document.end()) {
+                Require(actions->is_array(), "actions must be an array");
+                std::set<std::string> ids;
+                for (const auto& source : *actions) {
+                    Require(source.is_object(), "each action must be an object");
+                    ActionDefinition action;
+                    action.id = RequiredText(source, "id");
+                    Require(action.id.size() <= 128 && action.id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos,
+                        "action id must use 1-128 ASCII letters, digits, underscores, or hyphens");
+                    auto folded = action.id;
+                    for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';
+                    Require(ids.insert(folded).second, "duplicate action id: " + action.id);
+                    action.label = RequiredText(source, "label");
+                    action.hint = OptionalText(source, "hint");
+                    action.confirmation = OptionalText(source, "confirmation");
+                    Require(IsValidString(action.label, 256) && IsValidString(action.hint, 4096) && IsValidString(action.confirmation, 4096),
+                        "action text must be single-line UTF-8 (label: 256 bytes; hint/confirmation: 4096 bytes)");
+                    if (source.contains("confirmation")) Require(!action.confirmation.empty(), "confirmation must not be empty when present");
+                    if (source.contains("group")) {
+                        action.group = RequiredText(source, "group");
+                        Require(groups->contains(action.group), "unknown action group: " + action.group);
+                    } else {
+                        action.group = mod.groups.empty() ? "General" : mod.groups.front().id;
+                    }
+                    Require(!source.contains("default"), "actions do not have a default value");
+                    mod.actions.push_back(std::move(action));
+                }
+            }
+            if (mod.groups.empty() && (!mod.hotkeys.empty() || !mod.actions.empty())) {
                 mod.groups.push_back({ "General", "General", {} });
             }
             return mod;

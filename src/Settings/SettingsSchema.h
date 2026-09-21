@@ -65,6 +65,15 @@ namespace OSFSettings
         std::string group; // Resolved display group; omitted declarations use the first group.
     };
 
+    struct ActionDefinition
+    {
+        std::string id;
+        std::string label;
+        std::string hint;
+        std::string group;
+        std::string confirmation; // Empty means invoke without a confirmation dialog.
+    };
+
     struct SettingDefinition
     {
         std::string key;
@@ -94,6 +103,7 @@ namespace OSFSettings
         std::string description;
         std::vector<SettingsGroup> groups;
         std::vector<HotkeyDefinition> hotkeys;
+        std::vector<ActionDefinition> actions;
         const SettingDefinition* FindSetting(std::string_view key) const;
     };
 

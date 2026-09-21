@@ -1,6 +1,8 @@
 #include "Papyrus.h"
 #include "Subscriptions.h"
 #include "Values.h"
+#include "Actions.h"
+#include <charconv>
 #include "RE/B/BSScriptUtil.h"
 #include "RE/E/Events.h"
 #include "REL/THook.h"
@@ -27,6 +29,30 @@ namespace OSFSettings::Papyrus
             return *listeners;
         }
         Values Access() { return Values(SettingsService::Get()); }
+
+        bool DispatchAction(const Receiver& receiver, ActionService::Invocation invocation, const std::string& mod, const std::string& id)
+        {
+            auto* game = RE::GameVM::GetSingleton();
+            auto* vm = game ? game->GetVM() : nullptr;
+            if (!vm) return false;
+            const auto args = [mod, id, token = std::to_string(invocation)](RE::BSScrapArray<RE::BSScript::Variable>& out) {
+                out.resize(3);
+                out[0] = String(mod); 
+                out[1] = String(id); 
+                out[2] = String(token);
+                return true;
+            };
+            const RE::BSFixedString function("OnOSFAction");
+            const RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> noCallback;
+            return receiver.handle ?
+                vm->DispatchMethodCall(receiver.handle, RE::BSFixedString(receiver.script), function, args, noCallback, 0) :
+                vm->DispatchStaticCall(RE::BSFixedString(receiver.script), function, args, noCallback, 0);
+        }
+        Actions& ActionHandlers()
+        {
+            static auto* handlers = new Actions(ActionService::Get(), DispatchAction);
+            return *handlers;
+        }
 
         std::string FoldScript(std::string text)
         {
@@ -131,6 +157,29 @@ namespace OSFSettings::Papyrus
             return RegisterTarget("RegisterHotkeyStatic", Global(vm, script), Subscriptions::Kind::Hotkey, mod, key); 
         }
 
+        bool RegisterActionTarget(std::optional<Receiver> receiver, String mod, String id)
+        {
+            if (!receiver || Listeners().IsSuspended()) return false;
+            const auto result = ActionHandlers().Register(std::move(*receiver), mod.c_str(), id.c_str());
+            if (result != ActionError::None) REX::WARN("Papyrus RegisterAction({}/{}): status {}", mod.c_str(), id.c_str(), static_cast<int>(result));
+            return result == ActionError::None;
+        }
+        bool RegisterAction(VM& vm, std::uint32_t, std::monostate, Object object, String mod, String id)
+        {
+            return RegisterActionTarget(Instance(vm, object), mod, id);
+        }
+        bool RegisterActionStatic(VM& vm, std::uint32_t, std::monostate, String script, String mod, String id)
+        {
+            return RegisterActionTarget(Global(vm, script), mod, id);
+        }
+        bool CompleteAction(VM&, std::uint32_t, std::monostate, String token, bool succeeded, String message)
+        {
+            const std::string_view text(token.c_str());
+            ActionService::Invocation invocation{};
+            const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), invocation);
+            return error == std::errc{} && end == text.data() + text.size() && invocation && ActionService::Get().Complete(invocation, succeeded, message.c_str()) == ActionError::None;
+        }
+
         void Bind(VM& vm)
         {
             vm.BindNativeMethod(Script, "GetVersion", &GetVersion, false, false);
@@ -151,6 +200,9 @@ namespace OSFSettings::Papyrus
             vm.BindNativeMethod(Script, "RegisterForChangesStatic", &RegisterForChangesStatic, false, false);
             vm.BindNativeMethod(Script, "RegisterHotkey", &RegisterHotkey, false, false);
             vm.BindNativeMethod(Script, "RegisterHotkeyStatic", &RegisterHotkeyStatic, false, false);
+            vm.BindNativeMethod(Script, "RegisterAction", &RegisterAction, false, false);
+            vm.BindNativeMethod(Script, "RegisterActionStatic", &RegisterActionStatic, false, false);
+            vm.BindNativeMethod(Script, "CompleteAction", &CompleteAction, false, false);
             REX::INFO("Papyrus: OSFSettings native registration attempted");
             TestHarness::BindPapyrus(vm);
         }
@@ -198,8 +250,10 @@ namespace OSFSettings::Papyrus
                     const auto operation = static_cast<std::uint8_t>(event.opType);
                     if (event.status == Status::kBegin) {
                         Listeners().Suspend(operation);
+                        ActionService::Get().Suspend(operation);
                     } else if (event.status == Status::kFailed || event.status == Status::kLoadDispatchRefused) {
                         Listeners().Resume(operation);
+                        ActionService::Get().Resume(operation);
                     }
                 }
                 return RE::BSEventNotifyControl::kContinue;
@@ -207,6 +261,7 @@ namespace OSFSettings::Papyrus
             RE::BSEventNotifyControl ProcessEvent(const RE::TESLoadGameEvent&, RE::BSTEventSource<RE::TESLoadGameEvent>*) override
             {
                 Listeners().Clear();
+                ActionHandlers().ClearSession();
                 Listeners().Resume();
                 return RE::BSEventNotifyControl::kContinue;
             }
@@ -214,6 +269,7 @@ namespace OSFSettings::Papyrus
             {
                 if (event.opening && event.menuName == "MainMenu") {
                     Listeners().Clear();
+                    ActionHandlers().ClearSession();
                     Listeners().Resume();
                 }
                 return RE::BSEventNotifyControl::kContinue;

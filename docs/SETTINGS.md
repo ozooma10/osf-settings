@@ -66,6 +66,9 @@ integers; `"UNBOUND"` / `255` requires `allowUnbound: true`.
 Add `"requires": "restart"` to show a restart notice. This is only a notice:
 values still save immediately, and your mod decides when to apply them.
 
+Use a top-level [`actions` array](ACTIONS.md) for buttons with optional
+confirmation and asynchronous completion. Actions have no stored value/default.
+
 Schemas load at startup; restart Starfield after editing them. Player values are
 saved in `Data/SFSE/Plugins/OSF/Settings/values/<modId>.json` and shared across
 save games. Ship the schema; OSF manages the values file. Load failures are

@@ -25,10 +25,10 @@ package
         }
         public function update(row:Object, selected:Boolean, modList:Boolean):void
         {
-            var changed:Boolean = !modList && row.type != "hotkey" && row.value != row.defaultValue;
+            var changed:Boolean = !modList && row.type != "hotkey" && row.type != "action" && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
-            var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string");
-            var displayValue:String = modList ? String(row.count) : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
+            var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action");
+            var displayValue:String = modList ? String(row.count) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
             var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.potential, row.shared].join("|");
             if (signature == previous) return;
             previous = signature;

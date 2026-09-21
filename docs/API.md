@@ -1,5 +1,8 @@
 # C++ settings
 
+For menu buttons with confirmation/completion, use the same client's
+`RegisterAction` and `CompleteAction` methods; see [action buttons](ACTIONS.md).
+
 Add [OSFSettings.h](../sdk/OSFSettings.h) to your plugin's includes. It requires
 CommonLibSF. [Declare your settings](SETTINGS.md), then initialize the client
 at SFSE `kPostPostLoad`:

@@ -108,3 +108,19 @@ target("osfsettings-registry-example")
     on_config(function(target)
         target:set("installfiles", {})
     end)
+
+target("osfsettings-actions-example")
+    set_default(false)
+    set_basename("OSFSettingsActionsExample")
+    add_rules("commonlibsf.plugin", {
+        name = "OSFSettingsActionsExample",
+        author = "ozooma10",
+        description = "Development-only action buttons SDK example",
+        options = { address_library = false, no_struct_use = true }
+    })
+    add_files("examples/actions/main.cpp")
+    add_includedirs("sdk")
+    set_values("commonlib.plugin.install", false)
+    on_config(function(target)
+        target:set("installfiles", {})
+    end)

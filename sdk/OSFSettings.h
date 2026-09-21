@@ -36,16 +36,24 @@ namespace OSFSettings::API
         UnknownSubscription = 9,
         InternalError = 10,
         UnknownHotkeyBlock = 11,
-        UnknownHotkey = 12
+        UnknownHotkey = 12,
+        UnknownAction = 13,
+        AlreadyRegistered = 14,
+        UnknownInvocation = 15
     };
 
     using Subscription = std::uint64_t; // Zero is never a valid subscription.
     using HotkeyBlock = std::uint64_t; // Each owner releases its own nonzero token.
+    using Invocation = std::uint64_t;
 
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
     // Callbacks run serially from an SFSE task; no main-thread guarantee.
     using ChangedFn = void (*)(const char* mod, const char* key, void* context) noexcept;
     using HotkeyFn = void (*)(const char* mod, const char* id, void* context) noexcept;
+
+    // Submitted on an SFSE task, with no main-thread guarantee. Return promptly;
+    // CompleteAction may be called inside this callback or later from another thread.
+    using ActionFn = void (*)(Invocation invocation, const char* mod, const char* id, void* context) noexcept;
 
     // Include OSFSettingsRegistry.h to inspect registry records.
     struct RegistryView;
@@ -98,6 +106,11 @@ namespace OSFSettings::API
         // nullptr mod selects all mods; otherwise an exact mod ID.
         // Copy retained data in the callback;
         virtual Status ReadRegistry(const char* mod, RegistryFn callback, void* context) noexcept = 0;
+
+        // Register once at kPostPostLoad. Exactly one native OR Papyrus handler per declaration.
+        virtual Status RegisterAction(const char* mod, const char* id, ActionFn callback, void* context) noexcept = 0;
+        // Only the first completion succeeds. Tokens expire on load.
+        virtual Status CompleteAction(Invocation invocation, bool succeeded, const char* message) noexcept = 0;
 
     protected:
         ~ISettings() = default;
@@ -265,6 +278,15 @@ namespace OSFSettings::API
         Status ReadRegistry(const char* mod, RegistryFn callback, void* context) const noexcept
         {
             return m_api ? m_api->ReadRegistry(mod, callback, context) : Status::NotReady;
+        }
+
+        Status RegisterAction(const char* mod, const char* id, ActionFn callback, void* context) const noexcept
+        {
+            return m_api ? m_api->RegisterAction(mod, id, callback, context) : Status::NotReady;
+        }
+        Status CompleteAction(Invocation invocation, bool succeeded, const char* message = nullptr) const noexcept
+        {
+            return m_api ? m_api->CompleteAction(invocation, succeeded, message) : Status::NotReady;
         }
 
     private:

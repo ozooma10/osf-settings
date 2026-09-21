@@ -4,6 +4,8 @@ ScriptName OSFSettingsExampleGlobal Hidden
 Function InitializeSettings() Global
     Bool changes = OSFSettings.RegisterForChangesStatic("OSFSettingsExampleGlobal", "papyrusexample")
     Bool hotkey = OSFSettings.RegisterHotkeyStatic("OSFSettingsExampleGlobal", "papyrusexample", "toggle")
+    Bool registeredAction = OSFSettings.RegisterActionStatic("OSFSettingsExampleGlobal", "papyrusexample", "delayed")
+    Debug.Trace("OSF Settings Global example: action registered = " + registeredAction)
     Debug.Trace("OSF Settings Global example: registrations " + changes + ", " + hotkey)
 EndFunction
 
@@ -14,4 +16,11 @@ EndFunction
 Function OnOSFHotkey(String modId, String hotkeyId) Global
     ; Only the instance example toggles the setting; this observer just records delivery.
     Debug.Trace("OSF Settings Global example: hotkey " + modId + "/" + hotkeyId)
+EndFunction
+
+Function OnOSFAction(String modId, String actionId, String invocation) Global
+    ; Starfield's menu-aware wait can progress while Settings pauses the game.
+    Utility.WaitMenuPause(2.0)
+    Bool completed = OSFSettings.CompleteAction(invocation, true, "The delayed Global action completed.")
+    Debug.Trace("OSF Settings Global example: completion accepted = " + completed)
 EndFunction

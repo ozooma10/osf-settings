@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "osfsettings-actions-example",
+  "title": "Native actions example",
+  "groups": {},
+  "actions": [
+    {
+      "id": "run",
+      "label": "Run native example",
+      "hint": "Log one callback and report completion.",
+      "confirmation": "Run the example action?"
+    }
+  ]
+}

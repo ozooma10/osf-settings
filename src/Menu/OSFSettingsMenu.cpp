@@ -6,6 +6,7 @@
 #include <cmath>
 #include "Core/Runtime.h"
 #include "Diagnostics/DiagnosticsService.h"
+#include "Actions/ActionService.h"
 #include <charconv>
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
@@ -18,7 +19,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, ActionRevision };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -90,6 +91,8 @@ namespace OSFSettings
     {
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
+        RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
+        RegisterNativeFunction("actionRevision", static_cast<std::uint64_t>(Function::ActionRevision));
         RegisterNativeFunction("requestBindings", static_cast<std::uint64_t>(Function::RequestBindings));
         RegisterNativeFunction("pollBindings", static_cast<std::uint64_t>(Function::PollBindings));
         RegisterNativeFunction("textInput", static_cast<std::uint64_t>(Function::TextInput));
@@ -136,6 +139,28 @@ namespace OSFSettings
         const auto function = static_cast<Function>(reinterpret_cast<std::uintptr_t>(params.userData));
         auto& runtime = Runtime::Get();
         switch (function) {
+        case Function::ActionRevision:
+            root->CreateString(params.ret, std::to_string(ActionService::Get().Revision()).c_str());
+            break;
+        case Function::InvokeAction: {
+            ActionService::Invocation invocation{};
+            auto result = ActionError::InvalidArgument;
+            std::string error;
+            const auto* tasks = SFSE::GetTaskInterface();
+            if (params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString() && tasks) {
+                result = ActionService::Get().Begin(ArgString(params, 0), ArgString(params, 1), invocation);
+                if (result == ActionError::None) {
+                    tasks->AddTask([invocation] { ActionService::Get().Dispatch(invocation); });
+                }
+            }
+            if (result != ActionError::None) {
+                error = result == ActionError::Busy ? "This action is already running." : "This action is currently unavailable.";
+            }
+            root->CreateObject(params.ret);
+            params.ret->SetMember("ok", RE::Scaleform::GFx::Value(result == ActionError::None));
+            Text(*params.ret, "error", error);
+            break;
+        }
         case Function::TextInput:
             *params.ret = RE::Scaleform::GFx::Value(RequestTextInput(params.argCount && params.args[0].IsBoolean() && params.args[0].GetBoolean()));
             break;
@@ -324,6 +349,27 @@ namespace OSFSettings
                             }
                             row.SetMember("options", options);
                         }
+                        params.ret->PushBack(row);
+                    }
+                    for (const auto& action : mod.schema.actions) {
+                        if (action.group != group.id) continue;
+                        const auto state = ActionService::Get().Status(mod.schema.id, action.id);
+                        RE::Scaleform::GFx::Value row;
+                        root->CreateObject(&row);
+                        Text(row, "mod", mod.schema.id);
+                        Text(row, "modTitle", mod.schema.title);
+                        Text(row, "modDescription", mod.schema.description);
+                        Text(row, "group", group.id);
+                        Text(row, "groupTitle", group.label);
+                        Text(row, "key", action.id);
+                        Text(row, "title", action.label);
+                        Text(row, "type", "action");
+                        Text(row, "hint", action.hint);
+                        Text(row, "confirmation", action.confirmation);
+                        Text(row, "message", state.message);
+                        Text(row, "actionState", state.state == ActionState::Running ? "Working..." : !state.available ? "Unavailable" :
+                            state.state == ActionState::Succeeded ? "Completed" : state.state == ActionState::Failed ? "Failed" : "Run");
+                        row.SetMember("editable", RE::Scaleform::GFx::Value(state.available));
                         params.ret->PushBack(row);
                     }
                     for (const auto& hotkey : mod.schema.hotkeys) {

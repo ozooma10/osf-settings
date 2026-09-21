@@ -11,5 +11,9 @@
       { "key": "caption", "label": "Caption", "type": "string", "default": "Hello", "maxLength": 128 }
     ]
   },
-  "hotkeys": [{ "id": "toggle", "label": "Toggle example", "group": "General" }]
+  "hotkeys": [{ "id": "toggle", "label": "Toggle example", "group": "General" }],
+  "actions": [
+    { "id": "reset", "label": "Reset example settings", "confirmation": "Restore this example's default settings?" },
+    { "id": "delayed", "label": "Run delayed Global example", "hint": "Completes after a short menu-aware Papyrus wait." }
+  ]
 }
