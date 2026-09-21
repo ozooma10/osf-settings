@@ -48,7 +48,9 @@ package
             dataManager = definition("Shared.AS3.Data.BSUIDataManager");
             global = definition("Shared.GlobalFunc");
             popup = create("RemapConfirmation");
-            popup.PopulateButtonBar(1, 38); popup.active = false;
+            // The popup's authored button-bar anchor is at the center of its box.
+            popup.PopulateButtonBar(definition("Shared.Components.ButtonControls.ButtonBar.ButtonBar").JUSTIFY_CENTER, 38);
+            popup.active = false;
             dataManager.Subscribe("ControlBindingsData", bindingsChanged);
             dataManager.Subscribe("RemapErrorData", remapError);
             dataManager.Subscribe("RemapConfirmationData", confirmationChanged);
