@@ -1,5 +1,6 @@
 #include "TestHarness.h"
 #include "TranslationRegistration.h"
+#include "Acceptance.h"
 
 #include "Settings/SettingsService.h"
 #include "Utils/Paths.h"
@@ -64,7 +65,8 @@ namespace OSFSettings::TestHarness
                     "rootPage", "issueCount", "alternate", "action", "source", "potential", "records", "device", "slot", "modifier", "context",
                     "translations", "heading", "originalContext", "kbm", "gamepad", "unicode", "unknown", "vanilla", "requiredHeading", "conflictText",
                     "nativeRows", "divider", "presentationContext",
-                    "bindings", "count", "required", "requiredActions", "selectedKey", "query", "searching", "searchRect", "sourceRect", "clearRect", "primaryRect", "alternateRect"}) {
+                    "bindings", "count", "required", "requiredActions", "selectedKey", "query", "searching", "searchRect", "sourceRect", "clearRect", "primaryRect", "alternateRect",
+                    "largeText", "stringEditor", "text", "valid", "feedback", "focused", "maxLength", "issueId", "severity", "impact", "nextSteps", "issueDetails", "extent", "position", "emptyText", "detailHint"}) {
                     Value member;
                     if (value.GetMember(field, &member) && !member.IsUndefined()) result[field] = CopyValue(member, depth + 1);
                 }
@@ -81,6 +83,7 @@ namespace OSFSettings::TestHarness
             try {
                 Json binding = nullptr;
                 std::uint32_t testBinding = 255;
+                std::uint32_t acceptanceBinding = 255;
                 std::uint32_t freeTestKey = 255;
                 auto menuBindings = Json::object();
                 if (const auto* map = RE::ControlMap::GetSingleton()) {
@@ -96,6 +99,8 @@ namespace OSFSettings::TestHarness
                             entry.bindingSlot == RE::ControlMap::BindingSlot::kMain) {
                             testBinding = entry.keyCode;
                         }
+                        if (std::string_view(entry.eventID.c_str()) == "osfacceptance/pulse" &&
+                            entry.bindingSlot == RE::ControlMap::BindingSlot::kMain) acceptanceBinding = entry.keyCode;
                     }
                     for (const std::uint32_t key : { 117u, 118u, 119u, 122u }) {
                         if (!occupied[key]) { freeTestKey = key; break; }
@@ -115,6 +120,7 @@ namespace OSFSettings::TestHarness
                 std::scoped_lock lock(g_mutex);
                 g_state["openKeyCode"] = std::move(binding);
                 g_state["testHotkeyCode"] = testBinding;
+                g_state["acceptanceHotkeyCode"] = acceptanceBinding;
                 g_state["freeTestKey"] = freeTestKey;
                 g_state["menuBindings"] = std::move(menuBindings);
                 g_state["menuBindingsObservedAtMs"] = ::GetTickCount64();
@@ -203,6 +209,7 @@ namespace OSFSettings::TestHarness
             }
             result["learning"] = std::move(values);
             result["translationRegistration"] = TranslationRegistrationSnapshot();
+            result["acceptance"] = AcceptanceSnapshot();
             const auto text = result.dump();
             const auto required = static_cast<std::uint32_t>(text.size() + 1);
             if (buffer && capacity >= required) std::memcpy(buffer, text.c_str(), required);

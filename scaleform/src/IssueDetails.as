@@ -27,6 +27,9 @@ package
         }
 
         public function get scrollable():Boolean { return extent > HEIGHT; }
+        CONFIG::testHarness {
+            public function testState():Object { return {position:position, extent:extent, height:HEIGHT}; }
+        }
 
         public function show(row:Object):void
         {

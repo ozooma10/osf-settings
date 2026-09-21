@@ -11,6 +11,7 @@ namespace OSFSettings::Papyrus
 {
     const char* ErrorName(SettingsError error) noexcept;
     bool Report(std::string_view function, std::string_view mod, std::string_view key, SettingsError error);
+    std::string FoldIdentifier(std::string_view value);
 
     // Check narrowing before CommonLib's native return-value marshaler runs.
     template <class T>
@@ -39,7 +40,8 @@ namespace OSFSettings::Papyrus
         template <class T>
         T Read(std::string_view function, std::string_view mod, std::string_view key, T fallback) const
         {
-            const auto value = m_service.GetValue(mod, key);
+            const auto resolved = Resolve(mod, key);
+            const auto value = resolved ? m_service.GetValue(resolved->first, resolved->second) : std::expected<SettingValue, SettingsError>(std::unexpected(resolved.error()));
             const auto result = value ? Convert<T>(*value) : std::expected<T, SettingsError>(std::unexpected(value.error()));
             if (result) return *result;
             Report(function, mod, key, result.error());
@@ -48,18 +50,21 @@ namespace OSFSettings::Papyrus
 
         bool Write(std::string_view function, std::string_view mod, std::string_view key, SettingValue value)
         {
-            return Report(function, mod, key, m_service.SetValue(mod, key, std::move(value)));
+            const auto resolved = Resolve(mod, key, &value);
+            return Report(function, mod, key, resolved ? m_service.SetValue(resolved->first, resolved->second, std::move(value)) : resolved.error());
         }
         bool Reset(std::string_view mod, std::string_view key)
         {
-            return Report("Reset", mod, key, m_service.Reset(mod, key));
+            const auto resolved = Resolve(mod, key);
+            return Report("Reset", mod, key, resolved ? m_service.Reset(resolved->first, resolved->second) : resolved.error());
         }
         bool ResetMod(std::string_view mod)
         {
-            return Report("ResetMod", mod, {}, m_service.ResetMod(mod));
+            return Report("ResetMod", mod, {}, m_service.ResetMod(FoldIdentifier(mod)));
         }
 
     private:
+        std::expected<std::pair<std::string, std::string>, SettingsError> Resolve(std::string_view mod, std::string_view key, SettingValue* value = nullptr) const;
         SettingsService& m_service;
     };
 }

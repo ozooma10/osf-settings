@@ -39,6 +39,12 @@ package
             stage.focus = input; input.setSelection(0, input.length); changed();
         }
         public function close():void { row = null; visible = false; }
+        CONFIG::testHarness {
+            public function testState():Object {
+                return {active:visible, text:input.text, valid:valid, feedback:feedback.text,
+                    focused:stage && stage.focus == input, maxLength:row ? row.maxLength : 0};
+            }
+        }
         public function get valid():Boolean
         {
             var bytes:int = byteLength(input.text);

@@ -1,4 +1,5 @@
 #include "TestHarness.h"
+#include "Acceptance.h"
 #include "Menu/OSFSettingsMenu.h"
 #include "RE/E/Events.h"
 #include "RE/U/UI.h"
@@ -31,6 +32,7 @@ namespace OSFSettings::TestHarness
         static bool observing{};
         if (registered && !observing) {
             ui.RegisterSink(new MenuObserver);
+            RegisterAcceptanceEvents();
             observing = true;
         }
     }

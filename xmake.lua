@@ -42,10 +42,14 @@ target("OSF Settings")
     if has_config("test_harness") then
         add_defines("OSFSETTINGS_TEST_HARNESS")
         add_files("tests/harness/*.cpp")
+        add_installfiles("build/papyrus/harness/*.pex", { prefixdir = "Scripts" })
+        add_installfiles("build/papyrus/harness/OSFSettingsAcceptance.esm")
     end
     add_headerfiles("tests/harness/*.h")
     before_build(function(target)
-        os.execv("pwsh", { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-papyrus.ps1") })
+        local papyrusArgs = { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-papyrus.ps1") }
+        if has_config("test_harness") then table.insert(papyrusArgs, "-TestHarness") end
+        os.execv("pwsh", papyrusArgs)
         local args = { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-scaleform.ps1") }
         if has_config("test_harness") then table.insert(args, "-TestHarness") end
         os.execv("pwsh", args)

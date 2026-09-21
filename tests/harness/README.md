@@ -101,3 +101,28 @@ scenario to choose a real required action without modifying native definitions.
 Row observations include action/source, numeric records and the required flag.
 The scenario covers both sources, native clearing/validation, focus cancellation,
 restart persistence and Pause entry. Physical controller input remains separate.
+
+## Release acceptance fixtures
+
+The harness's `SettingsSmoke -Acceptance` mode uses `Acceptance.cpp` and the
+scripts under `papyrus/`. A generated, test-only ESM defines one start-enabled
+quest with an optional player alias. The bootstrap fills it through `ForceRefTo`
+because the pinned save predates the fixture. Its engine-dispatched `OnInit` and
+`OnPlayerLoadGame` callbacks register through the public Papyrus API; reload checks
+do not invoke the bootstrap or simulate those events. The separately bound instance and Global
+consumer test explicit registration and retirement of outgoing listeners.
+
+`OSFSettings_TestCommand` accepts only the named fixture operations and executes
+on the verified native task queue. Records contain copied values and bounded
+callback/event history. UI editing, capture, navigation, and console save/load
+use the harness's real input path. Production builds omit the export, fixture,
+probe binding, and movie observations.
+
+`build-fixture.ps1` generates the minimal ESM from the QUST/VMAD layouts documented
+by [xEdit](https://github.com/TES5Edit/TES5Edit/blob/dev-4.1.5/Core/wbDefinitionsSF1.pas).
+It contains no vanilla overrides and is enabled only in the private acceptance
+profile. Do not ship the acceptance ESM or scripts in a release archive.
+
+Run the sibling harness's `Test-SettingsRelease.ps1` for the complete automated
+suite. See [release acceptance](../../docs/RELEASE_ACCEPTANCE.md) for recorded
+results, the tested profile, and remaining hardware/engine boundaries.

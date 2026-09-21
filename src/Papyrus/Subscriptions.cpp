@@ -1,4 +1,5 @@
 #include "Subscriptions.h"
+#include "Values.h"
 #include <algorithm>
 
 namespace OSFSettings::Papyrus
@@ -13,13 +14,26 @@ namespace OSFSettings::Papyrus
 
     SettingsError Subscriptions::Register(Receiver receiver, Kind kind, std::string mod, std::string key)
     {
+        mod = FoldIdentifier(mod);
         if (receiver.script.empty() || !IsValidModId(mod) || (kind == Kind::Hotkey && key.empty())) {
             return SettingsError::InvalidArgument;
         }
         if (!m_settings.IsReady()) return SettingsError::NotReady;
         const auto mods = m_settings.Snapshot();
-        if (std::ranges::none_of(mods, [&](const auto& item) { return item.schema.id == mod; })) {
+        const auto schema = std::ranges::find_if(mods, [&](const auto& item) { return item.schema.id == mod; });
+        if (schema == mods.end()) {
             return SettingsError::UnknownMod;
+        }
+        if (kind == Kind::Hotkey) {
+            const auto id = FoldIdentifier(key);
+            const HotkeyDefinition* found{};
+            for (const auto& hotkey : schema->schema.hotkeys) {
+                if (FoldIdentifier(hotkey.id) != id) continue;
+                if (found) return SettingsError::InvalidArgument;
+                found = &hotkey;
+            }
+            if (!found) return SettingsError::UnknownHotkey;
+            key = found->id;
         }
 
         std::lock_guard lock(m_state->mutex);

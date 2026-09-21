@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$Examples,
+    [switch]$TestHarness,
     [string]$Compiler = 'C:\Program Files (x86)\Steam\steamapps\common\Starfield\Tools\Papyrus Compiler\PapyrusCompiler.exe',
     [string]$Imports = 'C:\Modding\Starfield\PapyrusSource'
 )
@@ -23,4 +24,12 @@ if ($Examples) {
     New-Item -ItemType Directory -Force -Path $exampleOutput | Out-Null
     & $Compiler $exampleSource "-i=$exampleSource;$source;$Imports" "-o=$exampleOutput" "-f=$flags" -all
     if ($LASTEXITCODE -ne 0) { throw 'Papyrus example compilation failed.' }
+}
+if ($TestHarness) {
+    $testSource = Join-Path $repo 'tests\harness\papyrus'
+    $testOutput = Join-Path $output 'harness'
+    New-Item -ItemType Directory -Force -Path $testOutput | Out-Null
+    & $Compiler $testSource "-i=$testSource;$source;$Imports" "-o=$testOutput" "-f=$flags" -all
+    if ($LASTEXITCODE -ne 0) { throw 'Papyrus acceptance fixture compilation failed.' }
+    & (Join-Path $repo 'tests\harness\build-fixture.ps1') -OutputDirectory $testOutput
 }

@@ -5,6 +5,7 @@
 
 namespace RE
 {
+    namespace BSScript { class IVirtualMachine; }
     class ButtonEvent;
     class GameMenuBase;
     class UI;
@@ -13,6 +14,7 @@ namespace RE
 namespace OSFSettings::TestHarness
 {
 #ifdef OSFSETTINGS_TEST_HARNESS
+    void BindPapyrus(RE::BSScript::IVirtualMachine& vm);
     bool InitializeValues(const std::filesystem::path& gameDirectory, std::filesystem::path& valuesDirectory);
     void RegisterMenuObserver(RE::UI& ui, bool registered);
     void RegisterMenuFunctions(RE::GameMenuBase& menu);
@@ -26,6 +28,7 @@ namespace OSFSettings::TestHarness
     // Only called synchronously by the movie's code-object callback on its UI lane.
     void ObserveUI(std::uint64_t frame, const RE::Scaleform::GFx::Value* state) noexcept;
 #else
+    inline void BindPapyrus(RE::BSScript::IVirtualMachine&) {}
     inline bool InitializeValues(const std::filesystem::path&, std::filesystem::path&) { return true; }
     inline void RegisterMenuObserver(RE::UI&, bool) {}
     inline void RegisterMenuFunctions(RE::GameMenuBase&) {}

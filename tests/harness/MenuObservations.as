@@ -69,7 +69,7 @@ private function testRow(row:Object):Object
 {
     if (!row) return null;
     return {kind:bindingsPage() ? "binding" : issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
-        issueId:String(row.id || ""), severity:String(row.severity || ""),
+        issueId:String(row.id || ""), severity:String(row.severity || ""), impact:String(row.impact || ""), nextSteps:String(row.nextSteps || ""),
         key:String(row.key || ""), type:String(row.type || ""), value:row.value,
         action:row.action, source:row.source, potential:Boolean(row.potential), records:row.records,
         alternate:row.alternate, required:Boolean(row.binding && row.binding.bRequired), title:row.title, editable:Boolean(row.editable), minimum:row.minimum, maximum:row.maximum};
@@ -101,6 +101,8 @@ private function reportTestState():void
         requiredActions.push({action:bindingRow.action,title:bindingRow.title});
     var visible:Rectangle = Object(extensions).visibleRect as Rectangle;
     BGSCodeObj.testSnapshot(frame, {initialized:initialized, closing:closing,
+        largeText:CONFIG::largeText, emptyText:empty ? empty.text : "", detailHint:detailHint ? detailHint.text : "",
+        stringEditor:stringEditor.testState(), issueDetails:issueDetails.testState(),
         translations:testTranslationState(),
         conflictText:nativeHotkeys.popup.active ? String(nativeHotkeys.popup.ControlInfo_mc.Label_mc.Text_tf.text) : "",
         refreshing:refreshing || requestedRefresh, startupPhase:startupPhase,

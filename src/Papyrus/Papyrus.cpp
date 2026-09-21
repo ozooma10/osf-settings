@@ -5,6 +5,7 @@
 #include "RE/E/Events.h"
 #include "REL/THook.h"
 #include "REX/FModule.h"
+#include "harness/TestHarness.h"
 
 namespace OSFSettings::Papyrus
 {
@@ -151,6 +152,7 @@ namespace OSFSettings::Papyrus
             vm.BindNativeMethod(Script, "RegisterHotkey", &RegisterHotkey, false, false);
             vm.BindNativeMethod(Script, "RegisterHotkeyStatic", &RegisterHotkeyStatic, false, false);
             REX::INFO("Papyrus: OSFSettings native registration attempted");
+            TestHarness::BindPapyrus(vm);
         }
 
         void BindEverythingToScript(VM** vm)

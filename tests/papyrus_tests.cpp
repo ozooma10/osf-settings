@@ -38,6 +38,9 @@ int main()
         auto schema = TestJson::parse(std::ifstream("examples/papyrus/papyrusexample.json"));
         schema["groups"]["General"].push_back({{"key", "wideInt"}, {"type", "int"}, {"default", INT64_MAX}});
         schema["groups"]["General"].push_back({{"key", "wideFloat"}, {"type", "float"}, {"default", 1e100}});
+        schema["groups"]["General"].push_back({{"key", "CaseKey"}, {"type", "bool"}, {"default", false}});
+        schema["groups"]["General"].push_back({{"key", "casekey"}, {"type", "bool"}, {"default", false}});
+        schema["hotkeys"].push_back({{"id", "menu"}, {"label", "Menu"}, {"menu", "ExampleMenu"}});
         { std::ofstream file(schemas / "papyrusexample.json"); file << schema; }
 
         SettingsService settings;
@@ -85,12 +88,16 @@ int main()
         check(api.Read("GetBool", "missing", "enabled", true), "unknown mod uses fallback");
         check(api.Read("GetInt", Mod, "missing", std::int32_t(99)) == 99, "unknown key uses fallback");
         check(!api.Write("SetInt", Mod, "count", std::int64_t(11)), "bounds reject writes");
-        check(!api.Write("SetEnum", Mod, "mode", EnumValue{"NORMAL"}), "enum values remain exact");
+        check(api.Write("SetEnum", "PAPYRUSEXAMPLE", "MODE", EnumValue{"NORMAL"}), "Papyrus identifiers resolve regardless of pooled casing");
+        check(api.Read("GetString", "PAPYRUSEXAMPLE", "CAPTION", std::string{}) == "Hello", "Papyrus getter resolves pooled casing");
+        check(!api.Write("SetBool", Mod, "CaseKey", true), "ambiguous case-only setting IDs are rejected");
+        check(!settings.GetValue("PAPYRUSEXAMPLE", "caption"), "native mod matching remains exact");
+        check(settings.SetValue(Mod, "mode", EnumValue{"NORMAL"}) == SettingsError::InvalidValue, "native enum matching remains exact");
         check(!api.Write("SetString", Mod, "mode", std::string("quiet")), "writes preserve enum/string separation");
         check(!api.Write("SetFloat", Mod, "volume", std::numeric_limits<double>::quiet_NaN()), "nonfinite writes fail");
 
         check(listeners.Register(instance, Kind::Changes, Mod) == SettingsError::None, "instance change registration succeeds");
-        check(listeners.Register(instance, Kind::Changes, Mod) == SettingsError::None, "identical registration succeeds");
+        check(listeners.Register(instance, Kind::Changes, "PAPYRUSEXAMPLE") == SettingsError::None, "pooled mod casing deduplicates registration");
         check(listeners.Register(instance, Kind::Changes, "missing") == SettingsError::UnknownMod, "unknown schema cannot be subscribed");
         check(listeners.Register({}, Kind::Changes, Mod) == SettingsError::InvalidArgument, "empty receiver identity rejected");
         check(listeners.Register(global, Kind::Changes, Mod) == SettingsError::None, "Global change registration succeeds");
@@ -130,7 +137,7 @@ int main()
         events.clear();
 
         check(listeners.Register(instance, Kind::Hotkey, Mod, "toggle") == SettingsError::None, "hotkey registration succeeds");
-        check(listeners.Register(instance, Kind::Hotkey, Mod, "toggle") == SettingsError::None, "duplicate hotkey registration succeeds");
+        check(listeners.Register(instance, Kind::Hotkey, "PAPYRUSEXAMPLE", "TOGGLE") == SettingsError::None, "pooled hotkey casing deduplicates registration");
         check(listeners.Register(global, Kind::Hotkey, Mod, "missing") == SettingsError::UnknownHotkey, "unknown hotkey fails");
         check(listeners.Register(global, Kind::Hotkey, Mod, "menu") == SettingsError::TypeMismatch, "menu hotkeys reject Papyrus handlers");
         const auto press = [&] { return input.ProcessButton(0x75, "papyrusexample/toggle", 1, 0); };
