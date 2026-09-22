@@ -32,6 +32,7 @@ The ZIP root maps directly to `Data`:
 SFSE/Plugins/OSFSettings.dll
 SFSE/Plugins/OSF/Settings/schemas/osfsettings.json
 SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json
+SFSE/Plugins/OSF/Settings/translations/ja/osfsettings.json
 Interface/OSFSettingsMenu.swf
 Interface/OSFSettingsMenu_LRG.swf
 Scripts/OSFSettings.pex

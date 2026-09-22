@@ -70,6 +70,7 @@ $files = @(
     'Scripts/Source/OSFSettings.psc'
     'SFSE/Plugins/OSF/Settings/schemas/osfsettings.json'
     'SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json'
+    'SFSE/Plugins/OSF/Settings/translations/ja/osfsettings.json'
     'SFSE/Plugins/OSFSettings.dll'
 )
 $allowedStageFiles = $files + 'SFSE/Plugins/OSFSettings.pdb'

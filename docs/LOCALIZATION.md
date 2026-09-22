@@ -2,8 +2,9 @@
 
 OSF follows Starfield's current `sLanguage:General` setting at startup. Restart
 the game after changing its language or installing/editing catalogs. There is no
-OSF language override or live reload. English interface text is included, with
-embedded English defaults if the installed catalog is missing or damaged.
+OSF language override or live reload. English and Japanese interface text is
+included, with embedded English defaults if the installed catalog is missing
+or damaged.
 
 ## Drop-in translations
 
@@ -93,6 +94,30 @@ this initial implementation. The existing launcher service remains available;
 its localization is follow-up work.
 
 See [the complete example](../examples/localization/README.md).
+
+## Japanese font check
+
+The shipped `translations/ja/osfsettings.json` covers every English interface
+message plus OSF's own group and hotkey labels. It includes kanji, hiragana,
+katakana, and Japanese punctuation; familiar keyboard key names retain their
+printed captions. Other mods need their own catalogs to translate their pages.
+
+Install the catalog at
+`Data/SFSE/Plugins/OSF/Settings/translations/ja/osfsettings.json` (normal builds
+and release packages include it). Select Japanese as Starfield's language and
+restart the game. OSF reads `sLanguage=ja` from `[General]`; there is no separate
+OSF language selector. In Steam, use Starfield's Properties > General > Language.
+Use the Japanese game language/resources for this check so the active font
+configuration matches the text.
+
+Open Settings with F10 and check `MOD設定`, `すべてのMOD`, `キー割り当て`,
+and `変更は自動的に保存されます。`. Open OSF Settings to check the `一般`
+group and `MOD設定を開く` hotkey, then inspect Keybindings and Mod Issues.
+Repeat with Starfield's large menu fonts enabled. Look for missing glyphs,
+clipping, and incorrect spacing in headings, rows, hints, and button captions.
+The startup log should report `Localization: game language=ja, catalog=ja`
+without catalog warnings. Switch the game language back and restart to return
+to English.
 
 ## Development checks
 

@@ -10,8 +10,8 @@ Launch through SFSE, load a save, then press F10 or choose MOD SETTINGS in Pause
 Rebind the opening key on the OSF Settings page or the KEYBINDINGS tab.
 No ESM/ESP activation is required for the framework itself.
 
-OSF follows the game's language at startup. English is included. Separate
-translation mods can provide UTF-8 JSON catalogs in
+OSF follows the game's language at startup. English and Japanese are included.
+Separate translation mods can provide UTF-8 JSON catalogs in
 SFSE/Plugins/OSF/Settings/translations/<language>/<modId>.json without changing a mod's
 schema. Restart after changing language or installing translations. The source
 repository's docs/LOCALIZATION.md describes the format and fallback rules.
