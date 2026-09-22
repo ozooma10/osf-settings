@@ -10,6 +10,7 @@ end
 test_target("osfsettings-tests")
     add_deps("commonlibsf")
     add_files("native/*.cpp", "../src/Settings/*.cpp", "../src/API/*.cpp", "../src/Actions/*.cpp", "../src/Diagnostics/*.cpp", "../src/Input/KeyNames.cpp", "../src/Input/KeyCapture.cpp", "../src/Input/HotkeyService.cpp", "../src/Menu/FloatSlider.cpp")
+    add_files("../src/Launcher/LauncherService.cpp")
     add_includedirs("../src")
     add_packages("nlohmann_json")
 
@@ -17,6 +18,14 @@ test_target("osfsettings-schema-tests")
     add_files("hotkey_schema_tests.cpp", "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp",
         "../src/Settings/SettingsJson.cpp", "../src/Settings/SettingsStore.cpp", "../src/Settings/SettingsValuesJson.cpp")
     add_includedirs("../src")
+    add_packages("nlohmann_json")
+
+test_target("osfsettings-launcher-tests")
+    add_deps("commonlibsf")
+    add_files("launcher_tests.cpp", "../src/Launcher/LauncherService.cpp",
+        "../src/API/LauncherApi.cpp", "../src/Settings/SettingsSchema.cpp")
+    add_includedirs("../src", "../sdk")
+    set_pcxxheader("../src/pch.h")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-action-tests")

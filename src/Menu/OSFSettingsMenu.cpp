@@ -19,7 +19,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, ActionRevision };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, ActionRevision, Launch, LauncherRevision };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -93,6 +93,8 @@ namespace OSFSettings
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
         RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
         RegisterNativeFunction("actionRevision", static_cast<std::uint64_t>(Function::ActionRevision));
+        RegisterNativeFunction("launch", static_cast<std::uint64_t>(Function::Launch));
+        RegisterNativeFunction("launcherRevision", static_cast<std::uint64_t>(Function::LauncherRevision));
         RegisterNativeFunction("requestBindings", static_cast<std::uint64_t>(Function::RequestBindings));
         RegisterNativeFunction("pollBindings", static_cast<std::uint64_t>(Function::PollBindings));
         RegisterNativeFunction("textInput", static_cast<std::uint64_t>(Function::TextInput));
@@ -139,6 +141,24 @@ namespace OSFSettings
         const auto function = static_cast<Function>(reinterpret_cast<std::uintptr_t>(params.userData));
         auto& runtime = Runtime::Get();
         switch (function) {
+        case Function::LauncherRevision:
+            root->CreateString(params.ret, std::to_string(LauncherService::Get().Revision()).c_str());
+            break;
+        case Function::Launch: {
+            bool accepted = false;
+            auto* ui = RE::UI::GetSingleton();
+            auto* queue = RE::UIMessageQueue::GetSingleton();
+            if (!m_launch && ui && queue && params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString()) {
+                auto destination = LauncherService::Get().Find(ArgString(params, 0), ArgString(params, 1));
+                if (destination && destination->available && (destination->open || ui->IsMenuRegistered(RE::BSFixedString(destination->menu.c_str())))) {
+                    m_launch = std::move(destination);
+                    Close();
+                    accepted = true;
+                }
+            }
+            *params.ret = RE::Scaleform::GFx::Value(accepted);
+            break;
+        }
         case Function::ActionRevision:
             root->CreateString(params.ret, std::to_string(ActionService::Get().Revision()).c_str());
             break;
@@ -393,6 +413,25 @@ namespace OSFSettings
                     }
                 }
             }
+            for (const auto& destination : LauncherService::Get().Snapshot()) {
+                RE::Scaleform::GFx::Value row;
+                root->CreateObject(&row);
+                Text(row, "mod", destination.mod);
+                Text(row, "modTitle", destination.modTitle);
+                Text(row, "modDescription", "");
+                Text(row, "group", "@launcher");
+                Text(row, "groupTitle", "Launcher");
+                Text(row, "key", destination.id);
+                Text(row, "title", destination.title);
+                Text(row, "type", "launcher");
+                const auto* ui = RE::UI::GetSingleton();
+                const bool registered = destination.menu.empty() || (ui && ui->IsMenuRegistered(RE::BSFixedString(destination.menu)));
+                const bool available = destination.available && registered;
+                Text(row, "hint", destination.description);
+                Text(row, "message", !registered ? "The owning mod has not registered this menu." : destination.reason);
+                row.SetMember("editable", RE::Scaleform::GFx::Value(available));
+                params.ret->PushBack(row);
+            }
             break;
         case Function::SetBool:
         case Function::SetInt:
@@ -473,7 +512,15 @@ namespace OSFSettings
         m_bindings->Invalidate();
         m_bindingEditor.End(true);
         m_capture.ResetForMenuClose();
+        auto destination = std::exchange(m_launch, std::nullopt);
         RE::GameMenuBase::OnRemovedFromMenuStack();
+        auto* ui = RE::UI::GetSingleton();
+        if (!destination || !ui || ui->IsMenuOpen("MainMenu") || ui->IsMenuOpen("LoadingMenu")) return;
+        if (destination->open) {
+            destination->open(destination->mod, destination->id);
+        } else if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
+            queue->AddMessage(RE::BSFixedString(destination->menu.c_str()), RE::UI_MESSAGE_TYPE::kShow);
+        }
     }
 
     RE::Scaleform::Ptr<RE::IMenu> OSFSettingsMenu::Create()

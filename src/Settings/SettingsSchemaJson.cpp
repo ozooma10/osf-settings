@@ -250,6 +250,26 @@ namespace OSFSettings::SettingsJson
                     mod.actions.push_back(std::move(action));
                 }
             }
+            if (const auto menus = document.find("menus"); menus != document.end()) {
+                Require(menus->is_array(), "menus must be an array");
+                if (!menus->empty()) Require(mod.id.size() <= 128 && IsValidString(mod.title, 256),
+                    "launcher owner id must fit 128 bytes and title must be single-line UTF-8 within 256 bytes");
+                std::set<std::string> ids;
+                for (const auto& source : *menus) {
+                    Require(source.is_object(), "each menu must be an object");
+                    MenuDefinition menu;
+                    menu.id = RequiredText(source, "id");
+                    menu.title = RequiredText(source, "title");
+                    menu.description = OptionalText(source, "description");
+                    menu.menu = RequiredText(source, "menu");
+                    Require(IsValidString(menu.id, 256) && IsValidString(menu.title, 256) &&
+                        IsValidString(menu.menu, 256) && IsValidString(menu.description, 4096),
+                        "menu text must be single-line UTF-8 (id/title/menu: 256 bytes; description: 4096 bytes)");
+                    Require(menu.menu != "OSFSettingsMenu", "a launcher cannot open OSFSettingsMenu itself");
+                    Require(ids.insert(menu.id).second, "duplicate menu id: " + menu.id);
+                    mod.menus.push_back(std::move(menu));
+                }
+            }
             if (mod.groups.empty() && (!mod.hotkeys.empty() || !mod.actions.empty())) {
                 mod.groups.push_back({ "General", "General", {} });
             }

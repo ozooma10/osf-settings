@@ -155,6 +155,11 @@ package
         {
             menu = event.target.content;
             menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
+                actionRevision:function():String { return "0"; }, launcherRevision:function():String { return "0"; },
+                launch:function(mod:String, id:String):Boolean {
+                    trace("[preview] launch " + mod + "/" + id);
+                    return false; // The preview cannot open engine/provider menus.
+                },
                 startup:startup, startupFailed:report, setKey:setKey,
                 beginKeyCapture:beginKeyCapture, pollKeyCapture:function():Object { return captureState; },
                 commitKeyCapture:commitKeyCapture, cancelKeyCapture:function():void { captureState.state = "idle"; },
@@ -194,7 +199,20 @@ package
                 for (var property:String in row) copy[property] = row[property];
                 result.push(copy);
             }
-            return result.concat(nativeBindings.definitions);
+            return result.concat(nativeBindings.definitions, launcherRows());
+        }
+
+        private function launcherRows():Array
+        {
+            // Launcher-only mods also exercise separation from the settings browser.
+            var names:Array = ["Absolute Control", "Character Studio", "OSF Animation Browser", "DevilzDad's Shop + Explorer",
+                "Starcade OS", "AISS Companion Log", "Camera Tools", "An interface with a deliberately long display title", "Unavailable Interface"];
+            var result:Array = [];
+            for (var i:int = 0; i < names.length; ++i) result.push({type:"launcher", mod:"launcher-preview-" + i,
+                modTitle:names[i], group:"@launcher", groupTitle:"Launcher", key:"open", title:names[i],
+                hint:"A preview registration for the shared Launcher. This interface owns its own controls and navigation.",
+                editable:i != names.length - 1, message:i == names.length - 1 ? "This interface is unavailable in the current context." : ""});
+            return result;
         }
 
         private function fitNativeBindingCell(cell:Object):void

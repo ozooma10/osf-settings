@@ -1,6 +1,7 @@
 #include "Runtime.h"
 #include "SettingsDispatcher.h"
 #include "Actions/ActionService.h"
+#include "Launcher/LauncherService.h"
 #include "Utils/Paths.h"
 
 namespace OSFSettings
@@ -48,6 +49,7 @@ namespace OSFSettings
             return false;
         }
         ActionService::Get().Initialize(mods);
+        LauncherService::Get().Initialize(mods);
         settings.Start();
         m_initialized = true;
         return true;

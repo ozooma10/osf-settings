@@ -160,6 +160,35 @@ int main()
             "Other":[{"key":"enabled","type":"bool","default":false}]}})");
         check(!result && error == "duplicate setting key: enabled", "setting keys remain unique across groups");
 
+        const auto menuDocument = Json::parse(R"({"schemaVersion":1,"id":"sample","title":"Sample Mod","groups":{},
+            "menus":[{"id":"panel","title":"Sample Panel","description":"Open the panel.","menu":"SampleMenu"}]})");
+        result = SettingsJson::ParseSchema(menuDocument, error);
+        check(result && result->menus.size() == 1 && result->menus[0].id == "panel" && result->menus[0].menu == "SampleMenu" &&
+            result->menus[0].title == "Sample Panel" && result->menus[0].description == "Open the panel.", "menu-only schema retains launcher metadata");
+        check(result->groups.empty() && !result->FindSetting("panel"), "menus create neither implicit groups nor setting values");
+        changed = menuDocument; changed["menus"][0].erase("description");
+        result = SettingsJson::ParseSchema(changed, error);
+        check(result && result->menus[0].description.empty(), "menu description is optional");
+        changed["menus"] = Json::array();
+        check(SettingsJson::ParseSchema(changed, error)->menus.empty(), "empty menu list is valid");
+        for (const auto& value : {Json(nullptr), Json(true), Json(10), Json("menu"), Json::object()}) {
+            changed = menuDocument; changed["menus"] = value; reject(changed);
+            changed = menuDocument; changed["menus"][0] = value; reject(changed);
+        }
+        for (const auto* field : {"id", "title", "menu"}) {
+            for (const auto& value : {Json(nullptr), Json(10), Json(""), Json(std::string("a\0b", 3)), Json(std::string(257, 'x'))}) {
+                changed = menuDocument; changed["menus"][0][field] = value; reject(changed);
+            }
+            changed = menuDocument; changed["menus"][0].erase(field); reject(changed);
+        }
+        for (const auto& value : {Json(nullptr), Json(true), Json(std::string("bad\ntext")), Json(std::string(4097, 'x'))}) {
+            changed = menuDocument; changed["menus"][0]["description"] = value; reject(changed);
+        }
+        changed = menuDocument; changed["menus"][0]["menu"] = "OSFSettingsMenu"; reject(changed);
+        changed = menuDocument; changed["menus"].push_back(changed["menus"][0]); reject(changed);
+        changed = menuDocument; changed["title"] = std::string(257, 'x'); reject(changed);
+        changed = menuDocument; changed["id"] = std::string(129, 'x'); reject(changed);
+
         const auto root = fs::temp_directory_path() /
             ("osf-hotkey-schema-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         struct Cleanup
@@ -180,11 +209,14 @@ int main()
             })},
             {"A second page", Json::array()}
         });
+        changed["menus"] = Json::array({{{"id", "enabled"}, {"title", "Open panel"}, {"menu", "SampleMenu"}}});
         { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
         SettingsStore store;
         store.LoadAll(root / "schemas", root / "values");
         check(store.LoadErrors().empty() && store.Mods().size() == 1 && store.Mods()[0].schema.hotkeys.size() == 1,
             "normal schema loading retains hotkey declarations");
+        check(store.Mods()[0].schema.menus.size() == 1 && store.Mods()[0].schema.menus[0].id == "enabled",
+            "normal settings discovery loads menus and allows IDs shared with setting keys");
         check(store.Mods()[0].schema.groups[0].id == "Z first page / détails" &&
             store.Mods()[0].schema.groups[1].id == "A second page" &&
             store.Mods()[0].schema.hotkeys[0].group == "Z first page / détails",
@@ -195,7 +227,7 @@ int main()
             store.Set("osfsettings", "enabled", false).ok && store.GetValue("osfsettings", "enabled") == SettingValue{false},
             "restart-required settings still save and publish the new value immediately");
         std::ifstream saved(root / "values/osfsettings.json");
-        check(Json::parse(saved)["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey declarations");
+        check(Json::parse(saved)["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey and menu declarations");
         changed["groups"] = {{"Renamed page", changed["groups"]["Z first page / détails"]}};
         { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
         store.LoadAll(root / "schemas", root / "values");

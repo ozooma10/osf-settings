@@ -1,6 +1,6 @@
 # OSF Settings
 
-A shared Starfield menu for mod settings, keybindings, and reported issues.
+A shared Starfield menu for mod settings, interface launchers, keybindings, and reported issues.
 
 For mod authors, start with [a settings schema](docs/SETTINGS.md), then use C++
 or Papyrus to read values and respond to changes.
@@ -12,6 +12,7 @@ or Papyrus to read values and respond to changes.
 | [Papyrus settings](docs/PAPYRUS.md) | Read, write, and watch settings from scripts |
 | [Hotkeys](docs/Keybindings.md) | Register rebindable actions or open a native menu |
 | [Action buttons](docs/ACTIONS.md) | Run a confirmed operation and report completion |
+| [Menu launchers](docs/LAUNCHERS.md) | Add native menus or provider-owned interfaces to the Launcher tab |
 | [Settings registry](docs/REGISTRY.md) | Discover mods, metadata, and current values |
 | [Issue reporting](docs/DIAGNOSTICS.md) | Report and clear problems shown in Mod Issues |
 

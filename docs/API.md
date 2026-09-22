@@ -2,6 +2,8 @@
 
 For menu buttons with confirmation/completion, use the same client's
 `RegisterAction` and `CompleteAction` methods; see [action buttons](ACTIONS.md).
+For native menus or custom interfaces with return navigation, use the separate
+[launcher service](LAUNCHERS.md).
 
 Add [OSFSettings.h](../sdk/OSFSettings.h) to your plugin's includes. It requires
 CommonLibSF. [Declare your settings](SETTINGS.md), then initialize the client

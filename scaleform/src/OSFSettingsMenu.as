@@ -44,6 +44,9 @@ package
         private var actionConfirmation:ActionConfirmation;
         private var actionAcceptHeld:Boolean = false;
         private var actionRevision:String = "";
+        private var launcherRevision:String = "";
+        private var launcher:LauncherPage;
+        private var launcherAcceptHeld:Boolean = false;
         private var nextActionPoll:int = 0;
         private var stringConfirmHeld:Boolean;
         private var searchExitFrame:int = -10;
@@ -196,6 +199,8 @@ package
             nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
             keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
             addChild(keybindings);
+            launcher = new LauncherPage(function():void { if (!refreshing) describe(); }, accept);
+            launcher.visible = false; addChild(launcher);
             stringEditor = new StringSetting(); addChild(stringEditor);
             options.addEventListener("SettingsControlListEnty_ActiveBindingChanged", selectionChanged);
             var popup:MovieClip = nativeHotkeys.popup as MovieClip;
@@ -242,6 +247,7 @@ package
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
+        private function launcherPage():Boolean { return !modID && rootPage == "launcher"; }
         private function searching():Boolean { return keybindings && keybindings.searching; }
         private function editingString():Boolean { return stringEditor && stringEditor.visible; }
         private function confirmingAction():Boolean { return actionConfirmation && actionConfirmation.visible; }
@@ -254,11 +260,12 @@ package
         private function issuesPage():Boolean { return !modID && rootPage == "issues"; }
         private function pages():Array
         {
-            return modID ? groups : [{id:"mods", title:"ALL MODS"}, {id:"bindings", title:"KEYBINDINGS"}, {id:"issues", title:"MOD ISSUES" + (issues.length ? " (" + issues.length + ")" : "")}];
+            return modID ? groups : [{id:"mods", title:"ALL MODS"}, {id:"launcher", title:"LAUNCHER"}, {id:"bindings", title:"KEYBINDINGS"}, {id:"issues", title:"MOD ISSUES" + (issues.length ? " (" + issues.length + ")" : "")}];
         }
         private function activePage():String { return modID ? groupID : rootPage; }
         private function selectPage(id:String):void
         {
+            launcherAcceptHeld = false;
             if (modID) groupID = id;
             else rootPage = id;
             if (bindingsPage()) keybindings.open(allRows);
@@ -295,9 +302,11 @@ package
         {
             // Read the revision first so a concurrent completion triggers another refresh.
             actionRevision = String(BGSCodeObj.actionRevision());
+            launcherRevision = String(BGSCodeObj.launcherRevision());
             allRows = BGSCodeObj.getRows() as Array || [];
             mods = []; var seen:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
+                if (row.type == "launcher") continue;
                 if (!seen[row.mod]) {
                     var mod:Object = {mod:row.mod, title:row.modTitle, hint:row.modDescription, count:0};
                     seen[row.mod] = mod; mods.push(mod);
@@ -307,6 +316,7 @@ package
             if (!seen[modID]) modID = "";
             groups = []; seen = new Dictionary();
             for each (row in allRows) {
+                if (row.type == "launcher") continue;
                 if (row.mod == modID && !seen[row.group]) {
                     seen[row.group] = true; groups.push({id:row.group, title:row.groupTitle});
                 }
@@ -320,6 +330,22 @@ package
             nativeHotkeys.populate(allRows);
             nativeHotkeys.fullPage = bindingsPage();
             keybindings.visible = bindingsPage();
+            launcher.visible = launcherPage();
+            launcher.mouseEnabled = launcher.mouseChildren = launcherPage();
+            MovieClip(options).visible = !launcherPage();
+            count.x = launcherPage() ? MenuStyle.RIGHT - count.width : 902;
+            if (launcherPage()) {
+                options.disableInput = options.disableSelection = true;
+                launcher.populate(allRows, preserve);
+                section.visible = count.visible = true;
+                empty.y = MenuStyle.LIST_TOP + 22;
+                MenuStyle.setText(empty, launcher.current ? "" : "No interfaces registered.\nInstalled mods can add their menus here.");
+                MenuStyle.setText(heading, "MOD SETTINGS");
+                MenuStyle.setText(section, "INTERFACES");
+                menuStage.focus = launcher;
+                refreshing = false; describe(); return;
+            }
+            options.disableSelection = bindingBusy();
             var listHeight:Number = bindingsPage() ? 250 : MenuStyle.LIST_HEIGHT;
             options.y = bindingsPage() ? 634 : MenuStyle.LIST_TOP;
             options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
@@ -333,6 +359,7 @@ package
             if (preserve && bindingsPage() && !selectedIssue && bindingSelection) selectedIssue = {identity:bindingSelection};
             var data:Array = []; var source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
             for each (var row:Object in source) {
+                if (row.type == "launcher") continue;
                 if (modID && (row.mod != modID || row.group != groupID)) continue;
                 if (row.type == "hotkey") hasHotkeys = true;
                 var slider:Boolean = modID != "" && NumericSetting.isSlider(row);
@@ -353,7 +380,7 @@ package
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             options.disableInput = bindingBusy() || searching();
             if (!searching()) menuStage.focus = options as MovieClip;
-            MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? "No issues reported." : "No settings to display.");
+            MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? "No issues reported." : "No items to display.");
             var title:String = "MOD SETTINGS"; var group:String = "ALL MODS";
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
@@ -414,12 +441,12 @@ package
                 }
             }
         }
-        private function current():Object { return options && options.selectedEntry ? options.selectedEntry.row : null; }
+        private function current():Object { return launcherPage() ? launcher.current : options && options.selectedEntry ? options.selectedEntry.row : null; }
         private function describe():void
         {
             var row:Object = current();
             var reporting:Boolean = issuesPage();
-            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage();
+            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage() && !launcherPage();
             MenuStyle.setText(detailLabel, modID ? row && row.type == "action" ? "SELECTED ACTION" : "SELECTED SETTING" : "SELECTED MOD");
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
@@ -427,7 +454,7 @@ package
             detailHint.y = 409 + Math.max(68, detailTitle.textHeight + 20);
             detailHint.height = Math.max(64, 630 - detailHint.y);
             var hint:String = row ? String(row.hint || "") : "";
-            if (row && row.type == "action") hint += (hint ? "\n\n" : "") + row.message;
+            if (row && row.type == "action" && row.message) hint += (hint ? "\n\n" : "") + row.message;
             MenuStyle.setText(detailHint, (row && row.requiresRestart ? "Changes take effect after restarting Starfield." + (hint ? "\n\n" : "") : "") + hint);
             detailHint.scrollV = 1;
             MenuStyle.setText(defaultLabel, modID ? "DEFAULT" : "ITEMS");
@@ -458,6 +485,13 @@ package
                 acceptButton.Visible = Boolean(!bindingBusy() && !searching() && row && row.editable);
                 clearButton.Visible = clearButton.Visible && !searching();
             }
+            if (launcherPage()) {
+                acceptButton.Visible = Boolean(row && row.editable);
+                resetButton.Visible = clearButton.Visible = changedLegend.visible = false;
+                MenuStyle.setText(count, launcher.countText);
+                MenuStyle.fit(status, row ? row.message ? row.message : row.hint ? row.hint : "Select an interface to open it." : "Registered interfaces appear here.");
+                status.textColor = row && !row.editable ? MenuStyle.ACCENT : MenuStyle.MUTED;
+            }
             pageBar.visible = !captureRow && !bindingBusy() && !searching() && pages().length > 1;
             if (editingString()) { resetButton.Visible = clearButton.Visible = false; pageBar.visible = false; }
             bar.RefreshButtons();
@@ -471,14 +505,15 @@ package
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
         {
-            if (confirmingAction()) return;
+            if (confirmingAction() || launcherPage() && launcherAcceptHeld) return;
             if (editingString()) { saveString(); return; }
             if (bindingBusy() || issuesPage() || searching() || frame <= searchExitFrame + 1) return;
             if (captureRow) { confirmBinding(); return; }
             if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
             var row:Object = current(); if (!row) return;
-            if (!modID && !bindingsPage()) { modID = row.mod; groupID = ""; refresh(false); }
+            if (launcherPage()) { if (row.editable) launch(row); }
+            else if (!modID && !bindingsPage()) { modID = row.mod; groupID = ""; refresh(false); }
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
@@ -603,6 +638,23 @@ package
             MenuStyle.setText(status, cancel ? "Text unchanged." : "Changes are saved automatically.");
             status.textColor = MenuStyle.MUTED;
         }
+        private function launch(row:Object):void
+        {
+            if (BGSCodeObj.launch(row.mod, row.key)) {
+                closing = true; options.disableInput = true;
+                launcher.mouseEnabled = launcher.mouseChildren = false;
+            } else {
+                MenuStyle.setText(status, "This menu is currently unavailable.");
+            }
+        }
+        private function launcherAccept(pressed:Boolean):void
+        {
+            if (pressed) launcherAcceptHeld = true;
+            else if (launcherAcceptHeld) {
+                launcherAcceptHeld = false;
+                accept(); // Hand off after the launch button is released.
+            }
+        }
         private function back():void
         {
             if (confirmingAction()) { actionConfirmation.cancel(); return; }
@@ -641,12 +693,15 @@ package
                 return false;
             }
             if (frame <= searchExitFrame + 1) return true;
+            if (launcherPage() && name == "Accept") { launcherAccept(pressed); return true; }
+            if (launcherPage() && navigateLauncher(name, pressed)) return true;
             if (bindingsPage() && navigateBindings(name, pressed)) return true;
             if (bar.ProcessUserEvent(name, pressed)) return true;
             if (name == "LShoulder" || name == "RShoulder") {
                 if (pageBar.visible) pageBar.ProcessUserEvent(name, pressed);
                 return true;
             }
+            if (launcherPage()) return false;
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
             return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
         }
@@ -656,6 +711,7 @@ package
             if (captureRow || bindingBusy() || editingString() || confirmingAction()) return;
             if (!initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
+            if (launcherPage()) { if (target && launcher.contains(target)) menuStage.focus = launcher; return; }
             if (!target || !MovieClip(options).contains(target)) return;
             menuStage.focus = options as MovieClip; options.disableInput = false;
             while (target && target != options) {
@@ -678,6 +734,13 @@ package
             if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (keybindings && keybindings.searchKey(event)) return;
             if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
+            if (launcherPage() && event.keyCode == Keyboard.ENTER) {
+                launcherAccept(true); event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
+            if (launcherPage() && (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT || event.keyCode == Keyboard.PAGE_UP || event.keyCode == Keyboard.PAGE_DOWN)) {
+                navigateLauncher(event.keyCode == Keyboard.UP ? "Up" : event.keyCode == Keyboard.DOWN ? "Down" : event.keyCode == Keyboard.LEFT ? "Left" : event.keyCode == Keyboard.RIGHT ? "Right" : event.keyCode == Keyboard.PAGE_UP ? "PageUp" : "PageDown", true);
+                event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
             if (bindingsPage() && (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT)) {
                 navigateBindings(event.keyCode == Keyboard.UP ? "Up" : event.keyCode == Keyboard.DOWN ? "Down" : event.keyCode == Keyboard.LEFT ? "Left" : "Right", true);
                 event.stopImmediatePropagation(); event.preventDefault(); return;
@@ -718,6 +781,9 @@ package
                 return;
             }
             if (keybindings && keybindings.searchKey(event)) return;
+            if (launcherPage() && event.keyCode == Keyboard.ENTER) {
+                launcherAccept(false); event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
             if (frame <= searchExitFrame + 1 || captureRow || bindingBusy() || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
         }
         private function confirmationKey(event:KeyboardEvent, pressed:Boolean):void
@@ -738,6 +804,14 @@ package
             }
             return true;
         }
+        private function navigateLauncher(name:String, pressed:Boolean):Boolean
+        {
+            if (name != "Up" && name != "Down" && name != "Left" && name != "Right" && name != "PageUp" && name != "PageDown") return false;
+            if (pressed && !refreshing && !requestedRefresh && navigationFrame != frame) {
+                navigationFrame = frame; launcher.navigate(name);
+            }
+            return true;
+        }
         private function dragging():Boolean
         {
             if (!options) return false;
@@ -753,12 +827,13 @@ package
             ++frame;
             if (initialized && !closing) {
                 keybindings.advance(allRows,bindingBusy());
-                options.disableInput = bindingBusy() || searching() || Boolean(captureRow) || editingString() || confirmingAction();
+                options.disableInput = launcherPage() || bindingBusy() || searching() || Boolean(captureRow) || editingString() || confirmingAction();
                 if (captureRow) pollBinding();
                 else if (!editingString() && !confirmingAction()) {
                     if (getTimer() >= nextActionPoll && !bindingBusy() && !dragging() && !searching()) {
                         nextActionPoll = getTimer() + 250;
                         if (String(BGSCodeObj.actionRevision()) != actionRevision) requestedRefresh = true;
+                        if (String(BGSCodeObj.launcherRevision()) != launcherRevision) requestedRefresh = true;
                     }
                     if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
                     if (getTimer() >= nextIssuePoll && !bindingBusy() && !dragging() && readIssues()) {
@@ -820,7 +895,7 @@ package
         }
         private function focusLost(event:Event):void
         {
-            actionAcceptHeld = false;
+            actionAcceptHeld = launcherAcceptHeld = false;
             if (confirmingAction()) actionConfirmation.cancel();
             if (editingString()) finishString(true);
             nativeHotkeys.cancel();
@@ -847,6 +922,7 @@ package
         }
         private function decorate():void
         {
+            if (launcherPage()) return;
             var needsLayout:Boolean = false;
             for (var i:int = 0; i < options.totalEntryClips; ++i) {
                 var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;

@@ -69,6 +69,11 @@ values still save immediately, and your mod decides when to apply them.
 Use a top-level [`actions` array](ACTIONS.md) for buttons with optional
 confirmation and asynchronous completion. Actions have no stored value/default.
 
+Use an optional top-level [`menus` array](LAUNCHERS.md) for native menu entries
+in the shared Launcher tab. Each entry has `id`, `title`, and a registered `menu`
+name; `description` is optional. This uses the same schema file and version.
+Menu-only mods can use `"groups": {}`. Menus do not create stored setting values.
+
 Schemas load at startup; restart Starfield after editing them. Player values are
 saved in `Data/SFSE/Plugins/OSF/Settings/values/<modId>.json` and shared across
 save games. Ship the schema; OSF manages the values file. Load failures are

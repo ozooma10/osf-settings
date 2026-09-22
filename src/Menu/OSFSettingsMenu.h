@@ -4,6 +4,7 @@
 #include "Input/KeyCapture.h"
 #include "Input/NativeBindingEditor.h"
 #include "Input/BindingSnapshot.h"
+#include "Launcher/LauncherService.h"
 
 namespace OSFSettings
 {
@@ -38,6 +39,7 @@ namespace OSFSettings
         bool RequestTextInput(bool enabled);
         void OnStartupFailed(std::string_view message);
         static RE::Scaleform::Ptr<RE::IMenu> Create();
+        std::optional<LaunchDestination> m_launch;
         KeyCapture m_capture;
         NativeBindingEditor m_bindingEditor;
         std::shared_ptr<BindingSnapshot> m_bindings = std::make_shared<BindingSnapshot>();

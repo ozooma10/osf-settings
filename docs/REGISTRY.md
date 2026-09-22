@@ -22,6 +22,7 @@ Walk `mods/modCount` → `groups/groupCount` → `settings/settingCount`.
 Each setting includes its key, label, hint, type, current/default values, restart
 notice, and applicable bounds/options/editor limits. Native hotkey declarations
 are separate and are not included as settings.
+Menu launcher registrations are also separate; they never appear as stored values.
 
 | `SettingView::type` | Active member of `value` / `defaultValue` |
 | --- | --- |

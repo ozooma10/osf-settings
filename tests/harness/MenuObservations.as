@@ -68,7 +68,7 @@ private function testClick(event:MouseEvent):void
 private function testRow(row:Object):Object
 {
     if (!row) return null;
-    return {kind:bindingsPage() ? "binding" : issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
+    return {kind:launcherPage() ? "launcher" : bindingsPage() ? "binding" : issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
         issueId:String(row.id || ""), severity:String(row.severity || ""), impact:String(row.impact || ""), nextSteps:String(row.nextSteps || ""),
         key:String(row.key || ""), type:String(row.type || ""), value:row.value,
         action:row.action, source:row.source, potential:Boolean(row.potential), records:row.records,
@@ -81,7 +81,13 @@ private function reportTestState():void
     // heartbeat every frame so stalled rendering remains distinguishable.
     if (frame % 6 != 1) { BGSCodeObj.testSnapshot(frame, null); return; }
     var visibleRows:Array = [];
-    if (options && menuStage) {
+    if (launcherPage() && menuStage) {
+        for each (var card:LauncherCard in launcher.visibleCards) {
+            var destination:Object = testRow(card.row); destination.index = card.index;
+            destination.rect = testRect(card.getBounds(menuStage)); destination.controlRect = destination.rect;
+            visibleRows.push(destination);
+        }
+    } else if (options && menuStage) {
         for (var i:int = 0; i < options.totalEntryClips; ++i) {
             var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;
             if (!clip || !clip.visible || Object(clip).itemIndex < 0) continue;
@@ -113,8 +119,8 @@ private function reportTestState():void
             sourceRect:testRect(keybindings.getChildByName("bindingSource").getBounds(menuStage)),
             clearRect:testRect(keybindings.getChildByName("clearBindingFilters").getBounds(menuStage)),
             primaryRect:testRect(nativeHotkeys.slotRect(0)), alternateRect:testRect(nativeHotkeys.slotRect(1))},
-        selectedIndex:options ? options.selectedIndex : -1,
-        scrollPosition:options ? options.scrollPosition : 0, selection:testRow(current()), rows:visibleRows,
+        selectedIndex:launcherPage() ? launcher.selectedIndex : options ? options.selectedIndex : -1,
+        scrollPosition:launcherPage() ? launcher.scrollPosition : options ? options.scrollPosition : 0, selection:testRow(current()), rows:visibleRows,
         stage:{width:1920, height:1080, visibleRect:visible ? testRect(visible) : null},
         mouse:{x:menuStage.mouseX, y:menuStage.mouseY}, mouseDown:testMouseDown, mouseClick:testMouseClick,
         capture:{active:Boolean(captureRow) || nativeHotkeys.busy, ready:captureReady, saving:nativeHotkeys.saving,

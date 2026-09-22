@@ -74,6 +74,14 @@ namespace OSFSettings
         std::string confirmation; // Empty means invoke without a confirmation dialog.
     };
 
+    struct MenuDefinition
+    {
+        std::string id;
+        std::string title;
+        std::string description;
+        std::string menu; // Registered native menu name; shown in the Launcher tab.
+    };
+
     struct SettingDefinition
     {
         std::string key;
@@ -104,6 +112,7 @@ namespace OSFSettings
         std::vector<SettingsGroup> groups;
         std::vector<HotkeyDefinition> hotkeys;
         std::vector<ActionDefinition> actions;
+        std::vector<MenuDefinition> menus;
         const SettingDefinition* FindSetting(std::string_view key) const;
     };
 
