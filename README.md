@@ -8,6 +8,7 @@ or Papyrus to read values and respond to changes.
 | Guide | Use it to |
 | --- | --- |
 | [Settings schemas](docs/SETTINGS.md) | Add your mod's settings to the menu |
+| [Localization](docs/LOCALIZATION.md) | Translate OSF or an existing mod with drop-in catalogs |
 | [C++ settings](docs/API.md) | Read, write, and watch settings from an SFSE plugin |
 | [Papyrus settings](docs/PAPYRUS.md) | Read, write, and watch settings from scripts |
 | [Hotkeys](docs/Keybindings.md) | Register rebindable actions or open a native menu |
@@ -29,7 +30,7 @@ Builds a production ZIP, checksum and manifest in isolated staging under
 
 ## Build and test
 
-Use XMake 3.0.0+ and an MSVC compiler with C++23 support. Run from this repository:
+Use XMake 3.0.0+, Python 3.9+, and an MSVC compiler with C++23 support. Run from this repository:
 
 ```powershell
 pwsh tools/setup-scaleform.ps1

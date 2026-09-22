@@ -164,7 +164,7 @@ namespace OSFSettings::TestHarness
             const auto translate = [&](const wchar_t* key) { return std::wstring(translator->impl->Translate(key).c_str()); };
             Require(translate(L"$OSFTranslationProbe_Unknown") == L"$OSFTranslationProbe_Unknown", "unknown key fallback changed");
             Require(translate(L"$osfmodbindings") == L"$osfmodbindings", "case-sensitive fallback changed");
-            Require(translate(L"$$OSFModBindings *") == L"Mod Bindings *", "required-row token parsing changed");
+            Require(translate(L"$$OSFModBindings *") == g_labels.at(L"$OSFModBindings") + L" *", "required-row token parsing changed");
             Require(translate(L"$OSFTranslationProbe_Growth0") == L"last", "stock resource reload lost the probe key");
             g_registration["referenceOwnership"] = true;
             g_registration["preservedEntries"] = g_stock.size();

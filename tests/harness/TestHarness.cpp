@@ -3,6 +3,7 @@
 #include "Acceptance.h"
 
 #include "Settings/SettingsService.h"
+#include "Settings/Localization.h"
 #include "Utils/Paths.h"
 #include "RE/B/BSService.h"
 #include "RE/C/ControlMap.h"
@@ -64,7 +65,7 @@ namespace OSFSettings::TestHarness
                     "mouse", "mouseDown", "mouseClick", "sequence", "frame", "target", "buttonDown", "saving",
                     "rootPage", "issueCount", "alternate", "action", "source", "potential", "records", "device", "slot", "modifier", "context",
                     "translations", "heading", "originalContext", "kbm", "gamepad", "unicode", "unknown", "vanilla", "requiredHeading", "conflictText",
-                    "nativeRows", "divider", "presentationContext",
+                    "nativeRows", "divider", "presentationContext", "menuHeading", "sectionHeading", "countText",
                     "bindings", "count", "required", "requiredActions", "selectedKey", "query", "searching", "searchRect", "sourceRect", "clearRect", "primaryRect", "alternateRect",
                     "largeText", "stringEditor", "text", "valid", "feedback", "focused", "maxLength", "issueId", "severity", "impact", "nextSteps", "issueDetails", "extent", "position", "emptyText", "detailHint"}) {
                     Value member;
@@ -195,6 +196,8 @@ namespace OSFSettings::TestHarness
             { std::scoped_lock lock(g_mutex); result = g_state; }
             auto& service = SettingsService::Get();
             result["ready"] = service.IsReady();
+            const auto catalog = Localization::Get();
+            result["localization"] = {{"language", catalog->Language()}, {"errors", catalog->Errors().size()}};
             result["valuesDirectory"] = Paths::ValuesDir().string();
             result["sampledAtMs"] = ::GetTickCount64();
             auto values = Json::object();

@@ -7,6 +7,7 @@
 #include "Core/Runtime.h"
 #include "Diagnostics/DiagnosticsService.h"
 #include "Actions/ActionService.h"
+#include "Settings/Localization.h"
 #include <charconv>
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
@@ -19,7 +20,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, ActionRevision, Launch, LauncherRevision };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, ActionRevision, Launch, LauncherRevision, GetLocalization };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -89,6 +90,7 @@ namespace OSFSettings
 
     void OSFSettingsMenu::MapCodeObjectFunctions()
     {
+        RegisterNativeFunction("getLocalization", static_cast<std::uint64_t>(Function::GetLocalization));
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
         RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
@@ -159,6 +161,14 @@ namespace OSFSettings
             *params.ret = RE::Scaleform::GFx::Value(accepted);
             break;
         }
+        case Function::GetLocalization: {
+            root->CreateObject(params.ret);
+            const auto catalog = Localization::Get();
+            for (const auto& [key, value] : catalog->UI()) {
+                Text(*params.ret, key.c_str(), value);
+            }
+            break;
+        }
         case Function::ActionRevision:
             root->CreateString(params.ret, std::to_string(ActionService::Get().Revision()).c_str());
             break;
@@ -174,7 +184,7 @@ namespace OSFSettings
                 }
             }
             if (result != ActionError::None) {
-                error = result == ActionError::Busy ? "This action is already running." : "This action is currently unavailable.";
+                error = result == ActionError::Busy ? tr("actions.busy") : tr("actions.unavailable");
             }
             root->CreateObject(params.ret);
             params.ret->SetMember("ok", RE::Scaleform::GFx::Value(result == ActionError::None));
@@ -257,7 +267,7 @@ namespace OSFSettings
             else m_capture.RetryConfirmation();
             root->CreateObject(params.ret);
             params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
-            Text(*params.ret, "error", ok ? "" : "Could not save this setting. Your previous value is unchanged.");
+            Text(*params.ret, "error", ok ? "" : tr("errors.save"));
             break;
         }
         case Function::CancelKeyCapture:
@@ -281,6 +291,7 @@ namespace OSFSettings
                 Text(row, "id", issue.id);
                 Text(row, "modTitle", IssueModName(issue, settings));
                 Text(row, "severity", issue.severity == IssueSeverity::Error ? "ERROR" : "WARNING");
+                Text(row, "severityLabel", tr(issue.severity == IssueSeverity::Error ? "issues.error" : "issues.warning"));
                 Text(row, "title", issue.title);
                 Text(row, "impact", issue.impact);
                 Text(row, "nextSteps", issue.nextSteps);
@@ -387,8 +398,8 @@ namespace OSFSettings
                         Text(row, "hint", action.hint);
                         Text(row, "confirmation", action.confirmation);
                         Text(row, "message", state.message);
-                        Text(row, "actionState", state.state == ActionState::Running ? "Working..." : !state.available ? "Unavailable" :
-                            state.state == ActionState::Succeeded ? "Completed" : state.state == ActionState::Failed ? "Failed" : "Run");
+                        Text(row, "actionState", state.state == ActionState::Running ? tr("actions.working") : !state.available ? tr("actions.stateUnavailable") :
+                            state.state == ActionState::Succeeded ? tr("actions.stateCompleted") : state.state == ActionState::Failed ? tr("actions.stateFailed") : tr("actions.stateRun"));
                         row.SetMember("editable", RE::Scaleform::GFx::Value(state.available));
                         params.ret->PushBack(row);
                     }
@@ -406,8 +417,8 @@ namespace OSFSettings
                         row.SetMember("registered", RE::Scaleform::GFx::Value(NativeHotkeys::FindAction(mod.schema.id + "/" + hotkey.id) != nullptr));
                         Text(row, "title", hotkey.label);
                         Text(row, "type", "hotkey");
-                        Text(row, "hint", "Select a binding to change it. Escape cancels.");
-                        Text(row, "defaultName", hotkey.defaultKey.value_or("Unbound"));
+                        Text(row, "hint", tr("bindings.editHint"));
+                        Text(row, "defaultName", hotkey.defaultKey.value_or(tr("values.unboundTitle")));
                         // Current bindings arrive through vanilla ControlBindingsData in the movie.
                         params.ret->PushBack(row);
                     }
@@ -468,7 +479,7 @@ namespace OSFSettings
             const bool ok = result == SettingsError::None;
             params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
             // Detailed file errors go to the log. The player gets an actionable message.
-            Text(*params.ret, "error", ok ? "" : "Could not save this setting. Your previous value is unchanged.");
+            Text(*params.ret, "error", ok ? "" : tr("errors.save"));
             break;
         }
         }

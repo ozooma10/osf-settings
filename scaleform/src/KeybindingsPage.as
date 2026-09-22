@@ -26,7 +26,7 @@ package
         private var changed:Function;
         private var leaveSearch:Function;
         private var definitions:Array = [];
-        private var sources:Array = [{id:"all",title:"All sources"},{id:"game",title:"Game"}];
+        private var sources:Array = [{id:"all",title:tr("bindings.allSources")},{id:"game",title:tr("bindings.game")}];
         private var generation:uint;
         private var revision:uint;
         private var requestedAt:int;
@@ -45,16 +45,16 @@ package
             search.addEventListener(FocusEvent.FOCUS_OUT,focusChanged);
             sourceLabel = field("",740,536,570,38,CONFIG::largeText ? 27 : 24);
             nameField(sourceLabel,"bindingSource").addEventListener(MouseEvent.CLICK,nextSource); sourceLabel.mouseEnabled = true;
-            var clear:TextField = field("CLEAR FILTERS",1480,536,364,38,CONFIG::largeText ? 27 : 24);
+            var clear:TextField = field(tr("bindings.clearFilters"),1480,536,364,38,CONFIG::largeText ? 27 : 24);
             nameField(clear,"clearBindingFilters").addEventListener(MouseEvent.CLICK,clearFilters); clear.mouseEnabled = true;
-            filterLabel = field("Search action, mod or key",MenuStyle.LEFT,580,1000,31,20,MenuStyle.MUTED);
-            legend = field("Game: grey   Mod: orange   Mixed: split   Shared key: diamond",MenuStyle.LEFT,884,1728,28,20,MenuStyle.MUTED);
+            filterLabel = field(tr("bindings.searchHint"),MenuStyle.LEFT,580,1000,31,20,MenuStyle.MUTED);
+            legend = field(tr("bindings.legend"),MenuStyle.LEFT,884,1728,28,20,MenuStyle.MUTED);
             detail = field("",1210,635,634,241,CONFIG::largeText ? 27 : 24);
             detail.multiline = true; detail.wordWrap = true; detail.mouseEnabled = true;
             detail.addEventListener(MouseEvent.MOUSE_WHEEL,function(event:MouseEvent):void { detail.scrollV -= event.delta; event.stopPropagation(); });
-            field("ACTION / SOURCE",MenuStyle.LEFT,604,490,30,20,MenuStyle.MUTED);
-            field("PRIMARY",MenuStyle.LEFT + 566,604,210,30,20,MenuStyle.MUTED);
-            field("ALTERNATE",MenuStyle.LEFT + 804,604,210,30,20,MenuStyle.MUTED);
+            field(tr("bindings.actionSource"),MenuStyle.LEFT,604,490,30,20,MenuStyle.MUTED);
+            field(tr("bindings.primary"),MenuStyle.LEFT + 566,604,210,30,20,MenuStyle.MUTED);
+            field(tr("bindings.alternate"),MenuStyle.LEFT + 804,604,210,30,20,MenuStyle.MUTED);
             graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(MenuStyle.LEFT,532,594,42);
             graphics.drawRect(728,532,680,42);
             visible = false;
@@ -104,7 +104,7 @@ package
         }
         private function updateSources():void
         {
-            sources = [{id:"all",title:"All sources"},{id:"game",title:"Game"}];
+            sources = [{id:"all",title:tr("bindings.allSources")},{id:"game",title:tr("bindings.game")}];
             var seen:Object = {};
             for each (var row:Object in rows) if (row.mod && !seen[row.mod]) {
                 sources.push({id:row.mod,title:row.source}); seen[row.mod] = true;
@@ -114,22 +114,22 @@ package
         public function filtered():Array { return KeybindingsData.filter(rows,search.text,source,selectedKey); }
         public function get emptyText():String
         {
-            return state == "loading" ? "Loading native bindings..." : state == "unavailable" ?
-                "Native binding data unavailable. Reopen Keybindings to retry." : "No actions match these filters.";
+            return state == "loading" ? tr("bindings.loading") : state == "unavailable" ?
+                tr("bindings.retry") : tr("bindings.noMatches");
         }
         public function showSelection(row:Object):void
         {
             keyboard.update(rows,filtered(),row,selectedKey);
-            var title:String = "All sources";
+            var title:String = tr("bindings.allSources");
             for each (var choice:Object in sources) if (choice.id == source) title = choice.title;
-            MenuStyle.fit(sourceLabel,"SOURCE: " + title + "  >");
-            MenuStyle.setText(filterLabel,(search.text ? "Search: " + search.text : "Search action, mod or key") +
-                (selectedKey >= 0 ? "   |   Key: " + KeyboardMap.keyName(selectedKey,0) + " (click again to clear)" : ""));
-            var text:String = row ? row.title + "\n" + row.source + (row.binding.bRequired ? "  |  Required" : "") + (row.binding.bReadOnly ? "  |  Read only" : "") : "Select an action";
-            if (row) text += "\n" + (row.available ? (row.value || "Unbound") + "  /  " + (row.alternate || "Unbound") : "Binding data unavailable");
-            if (row && row.potential) text += "\nPotential conflict: another action has the same device, key and modifier.";
-            else if (row && row.shared) text += "\nShared key: another action also uses part of this binding.";
-            else if (row) text += "\nSelect a slot to rebind. Native validation decides whether a change is allowed.";
+            MenuStyle.fit(sourceLabel,tr("bindings.source", {source:title}));
+            MenuStyle.setText(filterLabel,(search.text ? tr("bindings.search", {query:search.text}) : tr("bindings.searchHint")) +
+                (selectedKey >= 0 ? "   |   " + tr("bindings.keyFilter", {key:KeyboardMap.keyName(selectedKey,0)}) : ""));
+            var text:String = row ? row.title + "\n" + row.source + (row.binding.bRequired ? "  |  " + tr("bindings.required") : "") + (row.binding.bReadOnly ? "  |  " + tr("bindings.readOnly") : "") : tr("bindings.selectAction");
+            if (row) text += "\n" + (row.available ? (row.value || tr("values.unboundTitle")) + "  /  " + (row.alternate || tr("values.unboundTitle")) : tr("bindings.unavailable"));
+            if (row && row.potential) text += "\n" + tr("bindings.conflictHint");
+            else if (row && row.shared) text += "\n" + tr("bindings.sharedHint");
+            else if (row) text += "\n" + tr("bindings.rebindHint");
             MenuStyle.setText(detail,text);
         }
         private function selectKey(key:int):void
@@ -153,7 +153,7 @@ package
         private function focusChanged(event:FocusEvent):void
         {
             if (!bridge.textInput(searching) && searching) {
-                leaveSearch(); MenuStyle.setText(filterLabel,"Native text input is unavailable.");
+                leaveSearch(); MenuStyle.setText(filterLabel,tr("bindings.textUnavailable"));
             }
         }
         public function searchKey(event:KeyboardEvent):Boolean

@@ -13,20 +13,20 @@ package
         public function KeyboardMap(select:Function)
         {
             choose = select;
-            addKey(27, "Esc", 0, 0);
+            addKey(27, tr("keys.esc"), 0, 0);
             for (var i:int = 0; i < 12; ++i) addKey(112 + i, "F" + (i + 1), 2 + i + int(i / 4) * .5, 0);
-            addKey(44,"PrtSc",15.5,0); addKey(145,"Scroll",16.5,0); addKey(19,"Pause",17.5,0);
+            addKey(44,tr("keys.prtsc"),15.5,0); addKey(145,tr("keys.scroll"),16.5,0); addKey(19,tr("keys.pause"),17.5,0);
             row([192,49,50,51,52,53,54,55,56,57,48,189,187], ["`","1","2","3","4","5","6","7","8","9","0","-","="],0,1);
-            addKey(8,"Backspace",13,1,2);
-            addKey(9,"Tab",0,2,1.5); row([81,87,69,82,84,89,85,73,79,80,219,221],["Q","W","E","R","T","Y","U","I","O","P","[","]"],1.5,2); addKey(220,"\\",13.5,2,1.5);
-            addKey(20,"Caps",0,3,1.75); row([65,83,68,70,71,72,74,75,76,186,222],["A","S","D","F","G","H","J","K","L",";","'"],1.75,3); addKey(13,"Enter",12.75,3,2.25);
-            addKey(160,"L Shift",0,4,2.25); row([90,88,67,86,66,78,77,188,190,191],["Z","X","C","V","B","N","M",",",".","/"],2.25,4); addKey(161,"R Shift",12.25,4,2.75);
-            addKey(162,"L Ctrl",0,5,1.25); addKey(91,"Win",1.25,5,1.25); addKey(164,"L Alt",2.5,5,1.25); addKey(32,"Space",3.75,5,6.25); addKey(165,"R Alt",10,5,1.25); addKey(92,"Win",11.25,5,1.25); addKey(93,"Menu",12.5,5,1.25); addKey(163,"R Ctrl",13.75,5,1.25);
-            row([45,36,33],["Ins","Home","PgUp"],15.5,1); row([46,35,34],["Del","End","PgDn"],15.5,2);
-            addKey(38,"Up",16.5,4); row([37,40,39],["Left","Down","Right"],15.5,5);
-            row([144,111,106,109],["Num","/","*","-"],19,1);
+            addKey(8,tr("keys.backspace"),13,1,2);
+            addKey(9,tr("keys.tab"),0,2,1.5); row([81,87,69,82,84,89,85,73,79,80,219,221],["Q","W","E","R","T","Y","U","I","O","P","[","]"],1.5,2); addKey(220,"\\",13.5,2,1.5);
+            addKey(20,tr("keys.caps"),0,3,1.75); row([65,83,68,70,71,72,74,75,76,186,222],["A","S","D","F","G","H","J","K","L",";","'"],1.75,3); addKey(13,tr("keys.enter"),12.75,3,2.25);
+            addKey(160,tr("keys.lshift"),0,4,2.25); row([90,88,67,86,66,78,77,188,190,191],["Z","X","C","V","B","N","M",",",".","/"],2.25,4); addKey(161,tr("keys.rshift"),12.25,4,2.75);
+            addKey(162,tr("keys.lctrl"),0,5,1.25); addKey(91,tr("keys.win"),1.25,5,1.25); addKey(164,tr("keys.lalt"),2.5,5,1.25); addKey(32,tr("keys.space"),3.75,5,6.25); addKey(165,tr("keys.ralt"),10,5,1.25); addKey(92,tr("keys.win"),11.25,5,1.25); addKey(93,tr("keys.menu"),12.5,5,1.25); addKey(163,tr("keys.rctrl"),13.75,5,1.25);
+            row([45,36,33],[tr("keys.ins"),tr("keys.home"),tr("keys.pgup")],15.5,1); row([46,35,34],[tr("keys.del"),tr("keys.end"),tr("keys.pgdn")],15.5,2);
+            addKey(38,tr("keys.up"),16.5,4); row([37,40,39],[tr("keys.left"),tr("keys.down"),tr("keys.right")],15.5,5);
+            row([144,111,106,109],[tr("keys.num"),"/","*","-"],19,1);
             row([103,104,105],["7","8","9"],19,2); addKey(107,"+",22,2,1,2);
-            row([100,101,102],["4","5","6"],19,3); row([97,98,99],["1","2","3"],19,4); addKey(13,"Enter",22,4,1,2);
+            row([100,101,102],["4","5","6"],19,3); row([97,98,99],["1","2","3"],19,4); addKey(13,tr("keys.enter"),22,4,1,2);
             addKey(96,"0",19,5,2); addKey(110,".",21,5);
         }
         private function row(codes:Array, labels:Array, x:Number, y:Number):void
@@ -40,15 +40,15 @@ package
             var label:TextField = MenuStyle.field(text,4,4,width * 75 - 13,29,CONFIG::largeText ? 21 : 19,MenuStyle.WHITE,true);
             key.addChild(label); key.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void { choose(int(code)); });
             keys.push({clip:key,code:code,label:label,width:width * 75 - 6,height:height * 43 - 5}); addChild(key);
-            if (code >= 96 && code <= 111) names[code] = "Numpad " + text;
+            if (code >= 96 && code <= 111) names[code] = tr("keys.numpad", {key:text});
             else names[code] = text;
         }
         public static function keyName(code:uint, device:uint):String
         {
-            if (!KeybindingsData.bound(code)) return "Unbound";
-            if (device == 1) return "Mouse " + (code + 1);
-            if (code == 16) return "Shift"; if (code == 17) return "Ctrl"; if (code == 18) return "Alt";
-            return names[code] || "Key " + code;
+            if (!KeybindingsData.bound(code)) return tr("values.unboundTitle");
+            if (device == 1) return tr("keys.mouse", {number:code + 1});
+            if (code == 16) return tr("keys.shift"); if (code == 17) return tr("keys.ctrl"); if (code == 18) return tr("keys.alt");
+            return names[code] || tr("keys.code", {code:code});
         }
         public function update(rows:Array, visibleRows:Array, selected:Object, filter:int):void
         {

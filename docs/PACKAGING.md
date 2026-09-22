@@ -1,7 +1,7 @@
 # Release packaging
 
 Run from a Windows checkout with its submodules initialized, XMake 3.0.0+,
-MSVC with C++23 support, PowerShell 7.2+, and the Scaleform tools installed by
+MSVC with C++23 support, Python 3, PowerShell 7.2+, and the Scaleform tools installed by
 `tools/setup-scaleform.ps1`. The Papyrus helper also needs the Creation Kit
 compiler and vanilla imports; see `tools/build-papyrus.ps1` for its defaults.
 
@@ -31,6 +31,7 @@ The ZIP root maps directly to `Data`:
 ```text
 SFSE/Plugins/OSFSettings.dll
 SFSE/Plugins/OSF/Settings/schemas/osfsettings.json
+SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json
 Interface/OSFSettingsMenu.swf
 Interface/OSFSettingsMenu_LRG.swf
 Scripts/OSFSettings.pex

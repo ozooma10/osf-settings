@@ -19,4 +19,5 @@ namespace OSFSettings::Paths
 
 	std::filesystem::path SchemasDir() { return g_dataDir / "schemas"; }
 	std::filesystem::path ValuesDir() { return g_valuesDir; }
+	std::filesystem::path LocalizationDir() { return g_dataDir / "translations"; }
 }

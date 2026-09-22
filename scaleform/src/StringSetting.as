@@ -16,7 +16,7 @@ package
         {
             x = 1210; y = 754;
             graphics.lineStyle(1, MenuStyle.LINE); graphics.drawRect(0, 30, 634, 52);
-            var label:TextField = MenuStyle.field("EDIT VALUE", 0, 0, 634, 30, 21, MenuStyle.MUTED, true);
+            var label:TextField = MenuStyle.field(tr("strings.edit"), 0, 0, 634, 30, 21, MenuStyle.MUTED, true);
             addChild(label);
             input = MenuStyle.field("", 8, 34, 618, 44, CONFIG::largeText ? 30 : 27);
             input.name = "stringValue"; input.type = "input";
@@ -59,13 +59,13 @@ package
             if (!row) return;
             var bytes:int = byteLength(input.text);
             feedback.textColor = valid ? MenuStyle.MUTED : MenuStyle.ACCENT;
-            MenuStyle.setText(feedback, bytes < 0 ? "Use single-line text without control characters." :
-                bytes + " / " + row.maxLength + " UTF-8 bytes. Enter saves; Escape cancels.");
+            MenuStyle.setText(feedback, bytes < 0 ? tr("strings.invalid") :
+                tr("strings.bytes", {bytes:bytes, limit:row.maxLength}));
         }
         private function entering(event:TextEvent):void
         {
             if (byteLength(event.text) < 0) {
-                event.preventDefault(); showError("Use single-line text without control characters.");
+                event.preventDefault(); showError(tr("strings.invalid"));
             }
         }
         // Match native IsValidString, decoding AS3 UTF-16 before counting UTF-8.

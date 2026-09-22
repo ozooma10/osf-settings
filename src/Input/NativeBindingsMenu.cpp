@@ -1,6 +1,7 @@
 #include "NativeBindingsMenu.h"
 #include "NativeHotkeys.h"
 #include "Settings/SettingsService.h"
+#include "Settings/Localization.h"
 #include "RE/B/BSScaleformManager.h"
 #include "RE/B/BSScaleformTranslator.h"
 #include "RE/S/SettingsDataModel.h"
@@ -60,7 +61,7 @@ namespace OSFSettings::NativeBindingsMenu
                     const auto event = mod.schema.id + "/" + hotkey.id;
                     if (!NativeHotkeys::FindAction(event)) continue;
                     std::wstring name, label;
-                    if (!REX::UTF8_TO_UTF16(event, name) || !REX::UTF8_TO_UTF16(mod.schema.title + ": " + hotkey.label, label)) continue;
+                    if (!REX::UTF8_TO_UTF16(event, name) || !REX::UTF8_TO_UTF16(tr("bindings.actionLabel", {{"mod", mod.schema.title}, {"action", hotkey.label}}), label)) continue;
                     g_order.emplace(event, g_order.size());
                     // Original context tokens also occur in native conflict text.
                     for (const auto* context : { L"MainGameplay", L"OSFModBindings" }) {
@@ -71,7 +72,9 @@ namespace OSFSettings::NativeBindingsMenu
                     }
                 }
             }
-            g_labels.emplace(L"$OSFModBindings", L"Mod Bindings");
+            std::wstring heading;
+            REX::UTF8_TO_UTF16(tr("bindings.heading"), heading);
+            g_labels.emplace(L"$OSFModBindings", std::move(heading));
             for (const auto& [key, value] : g_labels) {
                 g_translations.push_back({ key.c_str(), value.c_str() });
             }
@@ -86,6 +89,8 @@ namespace OSFSettings::NativeBindingsMenu
         {
             TestHarness::BeforeTranslationLoad(translator);
             (*g_loadTranslationsHook)(translator, parser);
+            Localization::Initialize();
+            BuildLabels(SettingsService::Get().Snapshot());
             TestHarness::BeforeTranslationRegistration(translator, g_labels);
             const bool registered = translator->RegisterTranslations(g_translations);
             if (!registered) REX::ERROR("Mod bindings translation registration failed");
@@ -154,7 +159,6 @@ namespace OSFSettings::NativeBindingsMenu
         }
 
         BuildLabels(SettingsService::Get().Snapshot());
-        if (g_order.empty()) return true;
         if (RE::BSScaleformManager::GetSingleton()) {
             REX::ERROR("Mod bindings presentation must install before Scaleform initialization");
             return false;

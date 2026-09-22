@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "title": "Lokalisierungsbeispiel",
+  "description": "Ein unverändertes Schema mit einer separat installierten Übersetzung.",
+  "groups": { "General": { "label": "Allgemein" } },
+  "settings": {
+    "enabled": { "label": "Funktion aktivieren", "hint": "Diese Funktion einschalten." },
+    "mode": { "label": "Modus", "hint": "Die Menge der angezeigten Informationen auswählen.", "optionLabels": { "quiet": "Leise", "normal": "Normal" } }
+  },
+  "hotkeys": { "open": { "label": "Beispielmenü öffnen" } },
+  "actions": { "reset": { "label": "Zustand zurücksetzen", "hint": "Den Zustand dieses Mods zurücksetzen.", "confirmation": "Den Zustand wirklich zurücksetzen?" } }
+}

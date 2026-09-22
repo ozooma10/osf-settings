@@ -38,13 +38,13 @@ package
                 for (var property:String in entry) native[property] = entry[property];
                 var row:Object = {type:"hotkey", action:entry.sInputName, context:entry.uContextID, identity:id,
                     title:owner ? owner.title : translate(entry), mod:owner ? owner.mod : "", key:owner ? owner.key : entry.sInputName,
-                    source:owner ? owner.modTitle : "Game", binding:native, editable:!entry.bReadOnly,
+                    source:owner ? owner.modTitle : tr("bindings.game"), binding:native, editable:!entry.bReadOnly,
                     value:entry.MainBinding.aPCKeyName.join(" + "), alternate:entry.AltBinding.aPCKeyName.join(" + "),
                     records:mappings[id] || [], potential:false, shared:false, keybindings:true, defaultName:""};
                 // Missing map records are unavailable, never an inferred unbound slot.
                 row.available = mappings[id] != null;
                 row.editable = row.editable && row.available;
-                row.hint = row.available ? "" : "Numeric binding data unavailable.";
+                row.hint = row.available ? "" : tr("bindings.numericUnavailable");
                 result.push(row);
             }
             classify(result);

@@ -2,6 +2,8 @@
 param([switch]$TestHarness, [switch]$Preview)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+& python -B (Join-Path $PSScriptRoot 'generate-localization.py')
+if ($LASTEXITCODE -ne 0) { throw 'Could not generate English localization defaults.' }
 $flex = Join-Path $repo 'external\flex'
 $jdk = Join-Path $repo 'external\temurin8'
 $compiler = Join-Path $flex 'bin\mxmlc.bat'
@@ -149,7 +151,7 @@ foreach ($large in @($false, $true)) {
     $largeDefine = if ($large) { 'true' } else { 'false' }
     $previewDefine = if ($Preview) { 'true' } else { 'false' }
     $harnessDefine = if ($TestHarness) { 'true' } else { 'false' }
-    & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" '-use-network=false' '-debug=false' '-optimize=true' "-define=CONFIG::largeText,$largeDefine" "-define+=CONFIG::testHarness,$harnessDefine" "-define+=CONFIG::preview,$previewDefine" "-output=$raw" (Join-Path $repo 'scaleform\src\OSFSettingsMenu.as')
+    & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" "-source-path+=$repo/build/generated" '-use-network=false' '-debug=false' '-optimize=true' "-define=CONFIG::largeText,$largeDefine" "-define+=CONFIG::testHarness,$harnessDefine" "-define+=CONFIG::preview,$previewDefine" "-output=$raw" (Join-Path $repo 'scaleform\src\OSFSettingsMenu.as')
     if ($LASTEXITCODE -ne 0) { throw "mxmlc failed with exit code $LASTEXITCODE" }
     if (-not (Test-Path $raw)) { throw "mxmlc did not create $raw" }
     Add-GameLibraries $raw $output "SettingsPanel$suffix.swf"

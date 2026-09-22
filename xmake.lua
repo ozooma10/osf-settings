@@ -1,6 +1,16 @@
 -- include subprojects
 includes("lib/commonlibsf")
 
+rule("osf.localization")
+    on_load(function(target)
+        target:add("includedirs", path.join(os.projectdir(), "build", "generated"))
+    end)
+    before_build(function(target)
+        os.execv("python", { "-B", path.join(os.projectdir(), "tools", "generate-localization.py") })
+    end)
+rule_end()
+add_rules("osf.localization")
+
 -- set project constants
 set_project("OSF Settings")
 set_version("1.0.0")
@@ -56,6 +66,7 @@ target("OSF Settings")
         os.execv("pwsh", args)
     end)
     add_installfiles("data/SFSE/Plugins/OSF/Settings/schemas/osfsettings.json", { prefixdir = "SFSE/Plugins/OSF/Settings/schemas" })
+    add_installfiles("data/SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json", { prefixdir = "SFSE/Plugins/OSF/Settings/translations/en" })
     add_installfiles("data/Scripts/Source/OSFSettings.psc", { prefixdir = "Scripts/Source" })
     add_installfiles("build/papyrus/OSFSettings.pex", { prefixdir = "Scripts" })
     add_installfiles("build/scaleform/OSFSettingsMenu.swf", "build/scaleform/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })

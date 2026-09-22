@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "localization-example",
+  "title": "Localization example",
+  "description": "An unchanged schema with a separately installed translation.",
+  "groups": {
+    "General": [
+      { "key": "enabled", "type": "bool", "label": "Enable feature", "hint": "Turn this feature on.", "default": true },
+      { "key": "mode", "type": "enum", "label": "Mode", "hint": "Choose how much information to show.", "default": "quiet", "options": ["quiet", "normal"], "optionLabels": ["Quiet", "Normal"] }
+    ]
+  },
+  "hotkeys": [{ "id": "open", "label": "Open example menu", "menu": "LocalizationExampleMenu" }],
+  "actions": [{ "id": "reset", "label": "Reset state", "hint": "Reset this mod's state.", "confirmation": "Reset the state?" }]
+}

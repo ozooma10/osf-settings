@@ -45,5 +45,9 @@ publishing values. Refresh on notifications; a null key means refresh the whole
 mod. Serialize refreshes, preserve the last good cache on failure, and retry.
 Use IDs as identities, not display labels or array positions.
 
+Display fields use the game's language through [localization catalogs](LOCALIZATION.md).
+Consumers reading before language initialization receive a full-refresh notification
+after translated metadata is published. IDs and current/default values remain unchanged.
+
 The [registry example](../examples/registry/README.md) implements copying,
 subscription cleanup, and serialized refreshes.

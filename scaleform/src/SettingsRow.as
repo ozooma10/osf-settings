@@ -36,7 +36,7 @@ package
             title.y = row.keybindings ? 3 : (MenuStyle.ROW_HEIGHT - MenuStyle.BODY_SIZE) / 2 - 3;
             if (row.keybindings) {
                 source.textColor = selected ? MenuStyle.INK : MenuStyle.MUTED;
-                MenuStyle.fit(source,row.source + (row.potential ? "  |  Potential conflict" : row.shared ? "  |  Shared key" : ""));
+                MenuStyle.fit(source,row.source + (row.potential ? "  |  " + tr("bindings.conflict") : row.shared ? "  |  " + tr("bindings.shared") : ""));
             }
             value.visible = !row.capturing && row.type != "hotkey";
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;

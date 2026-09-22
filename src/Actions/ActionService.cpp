@@ -1,3 +1,4 @@
+#include "Settings/Localization.h"
 #include "ActionService.h"
 #include <algorithm>
 #include <utility>
@@ -74,7 +75,7 @@ namespace OSFSettings
             if (found == m_actions.end() || found->second.submitted) return;
             auto& entry = found->second;
             if (!m_transitions.empty()) {
-                entry.message = "Action interrupted by a game session change.";
+                entry.message = tr("actions.interrupted");
                 entry.state = ActionState::Failed;
                 entry.invocation = 0;
                 m_revision++;
@@ -106,17 +107,17 @@ namespace OSFSettings
     {
         std::lock_guard lock(m_mutex);
         const auto found = m_actions.find({ std::string(mod), std::string(id) });
-        if (found == m_actions.end()) return { false, ActionState::Ready, "Unknown action." };
+        if (found == m_actions.end()) return { false, ActionState::Ready, tr("actions.unknown") };
         const auto& entry = found->second;
-        if (!m_transitions.empty()) return { false, entry.state, "A game session change is in progress." };
-        if (!entry.callback) return { false, entry.state, "This action has no registered handler." };
+        if (!m_transitions.empty()) return { false, entry.state, tr("actions.sessionChanging") };
+        if (!entry.callback) return { false, entry.state, tr("actions.noHandler") };
         auto message = entry.message;
         if (message.empty()) {
             switch (entry.state) {
-            case ActionState::Ready: message = "Ready."; break;
-            case ActionState::Running: message = "Working..."; break;
-            case ActionState::Succeeded: message = "Action completed."; break;
-            case ActionState::Failed: message = "Action failed."; break;
+            case ActionState::Ready: message = tr("actions.ready"); break;
+            case ActionState::Running: message = tr("actions.working"); break;
+            case ActionState::Succeeded: message = tr("actions.completed"); break;
+            case ActionState::Failed: message = tr("actions.failed"); break;
             }
         }
         return { !entry.invocation, entry.state, std::move(message) };

@@ -25,6 +25,8 @@ namespace
     unsigned stockLoads{};
     bool registeredAfterStock{};
     bool stopVisitor{};
+    std::vector<OSFSettings::ModSettings> sourceMods;
+    unsigned localizationInitializations{};
 
     template<class Char>
     void GetString(RE::BSStringPool::Entry*& result, const Char* text, bool)
@@ -101,7 +103,8 @@ namespace
 namespace OSFSettings
 {
     SettingsService& SettingsService::Get() { static SettingsService service; return service; }
-    std::vector<ModSettings> SettingsService::Snapshot() const { return {}; }
+    std::vector<ModSettings> SettingsService::Snapshot() const { return sourceMods; }
+    namespace Localization { void Initialize() { ++localizationInitializations; } }
     namespace NativeHotkeys
     {
         const Action* FindAction(std::string_view event)
@@ -181,6 +184,7 @@ int main()
         mods[1].schema.hotkeys = {{"second", "Declared first", std::nullopt}, {"first", "Declared second", std::nullopt}, {"invalid", "Invalid", std::nullopt}};
         mods[2].schema.id = "empty"; mods[2].schema.title = "Empty";
         registered = {"zeta/open", "alpha/second", "alpha/first"};
+        sourceMods = mods;
         BuildLabels(mods);
         check(g_order.size() == 3 && g_order.at("alpha/second") == 0 && g_order.at("alpha/first") == 1 && g_order.at("zeta/open") == 2,
             "sort mods by title, preserve declaration order, omit unregistered actions");
@@ -190,6 +194,7 @@ int main()
         const auto load = reinterpret_cast<void (*)(Translator*, Translator::StreamParser*)>(manager);
         load(&translator, &parser);
         check(stockLoads == 1 && registeredAfterStock, "stock load precedes registration through the patched constructor call");
+        check(localizationInitializations == 1, "catalog initialization runs at the constructor hook");
         check(loadedLabels.at(L"$OSFModBindings") == L"Mod Bindings", "section title registered");
         check(loadedLabels.at(L"$OSFModBindings_zeta/open_KBM") == L"Zeta: Ouvrir réglages", "UTF-8 labels become wide strings");
         check(loadedLabels.at(L"$MainGameplay_zeta/open") == L"Zeta: Ouvrir réglages", "original-context conflict label registered");
@@ -229,6 +234,11 @@ int main()
         stopVisitor = false;
         registered.clear(); BuildLabels(mods); emitted.clear(); dividers.clear(); previous = Context::kCount;
         check(publish(&state, rows.data()) == 1 && emitted.size() == 1 && dividers == std::vector<std::string>{"MainGameplay"}, "empty registry leaves the native iteration in charge");
+        const auto initialized = localizationInitializations;
+        sourceMods.clear();
+        load(&translator, &parser);
+        check(localizationInitializations == initialized + 1 && g_order.empty() && loadedLabels.at(L"$OSFModBindings") == L"Mod Bindings",
+            "localization initializes without any schema or registered hotkey");
         std::cout << checks << " native bindings presentation checks passed\n";
         return 0;
     } catch (const std::exception& error) {

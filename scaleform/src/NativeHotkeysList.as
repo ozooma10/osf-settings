@@ -83,7 +83,7 @@ package
                 row.editable = Boolean(native && !native.bReadOnly && !native.bGamepadEntry);
                 row.value = native ? native.MainBinding.aPCKeyName.join(" + ") : "";
                 row.alternate = native ? native.AltBinding.aPCKeyName.join(" + ") : "";
-                if (!native) row.hint = "This action is not available in the current native Controls list.";
+                if (!native) row.hint = tr("bindings.unavailableAction");
                 if (native) {
                     // Keep the data model's slot/glyph data intact.
                     var item:Object = {};
@@ -168,10 +168,10 @@ package
         private function begin():Boolean
         {
             if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
-            if (!bridge.beginNativeBinding()) { changed("Could not start key capture.", false); return false; }
+            if (!bridge.beginNativeBinding()) { changed(tr("errors.capture"), false); return false; }
             busy = true; seenRemapping = false; cancelled = false;
             list.disableInput = true; list.disableSelection = true;
-            changed("Press a key. Escape cancels.", false);
+            changed(tr("bindings.capture"), false);
             return true;
         }
 
@@ -219,7 +219,7 @@ package
         {
             if (!canClear) return;
             clearing = true; saving = true;
-            changed("Clearing binding...", false);
+            changed(tr("bindings.clearing"), false);
             // The native operation accepts either priority; the stock row's delete
             // method restricts it to alternate bindings before dispatching this event.
             dataManager.dispatchCustomEvent("SettingsPanel_ClearBinding", {
@@ -234,7 +234,7 @@ package
             cancelled = true;
             bridge.endNativeBinding(true);
             finish();
-            changed("Binding unchanged.", true);
+            changed(tr("bindings.unchanged"), true);
         }
 
         private function finish():void
@@ -256,7 +256,7 @@ package
             if (busy && seenRemapping && !data.bRemappingControl) {
                 finish();
                 if (!cancelled) save();
-                else changed("Binding unchanged.", true);
+                else changed(tr("bindings.unchanged"), true);
             } else if (clearing) {
                 clearing = false; save();
             }
@@ -271,7 +271,7 @@ package
         private function save():void
         {
             saving = true;
-            changed("Saving binding...", false);
+            changed(tr("bindings.saving"), false);
             dataManager.dispatchEvent(new Event("SettingsPanel_ValidateControls", true));
         }
 
@@ -283,9 +283,9 @@ package
                 dataManager.dispatchEvent(new Event("SettingsPanel_SaveControls", true));
             } else if (global.HasFireForgetEvent(data, "SettingsDataModel_MissingRequiredBindingError")) {
                 saving = false;
-                changed("A required game binding is missing. Restore it in Controls before saving.", true);
+                changed(tr("bindings.requiredMissing"), true);
             } else if (global.HasFireForgetEvent(data, "SettingsDataModel_ControlsSaved")) {
-                saving = false; changed("Binding saved.", true);
+                saving = false; changed(tr("bindings.saved"), true);
             }
         }
 

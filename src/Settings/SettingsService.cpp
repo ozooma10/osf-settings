@@ -1,4 +1,5 @@
 #include "SettingsService.h"
+#include "Localization.h"
 #include "REX/LOG.h"
 
 #include <stdexcept>
@@ -41,7 +42,21 @@ namespace OSFSettings
     std::vector<ModSettings> SettingsService::Snapshot() const
     {
         std::lock_guard lock(m_mutex);
-        return m_store.Mods();
+        auto mods = m_store.Mods();
+        const auto catalog = Localization::Get();
+        for (auto& mod : mods) {
+            catalog->Apply(mod.schema);
+        }
+        return mods;
+    }
+
+    void SettingsService::Localize(const std::filesystem::path& directory, std::string_view language)
+    {
+        std::lock_guard lock(m_mutex);
+        Localization::Publish(std::make_shared<Localization::Catalog>(directory, language, m_store.Mods()));
+        for (const auto& mod : m_store.Mods()) {
+            Notify(mod.schema.id, std::nullopt);
+        }
     }
 
     std::vector<SettingsLoadError> SettingsService::LoadErrors() const

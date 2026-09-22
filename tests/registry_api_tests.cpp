@@ -339,6 +339,27 @@ int main()
         check(consumer.LastRefresh() == Status::Ok && std::get<bool>(consumer.Snapshot().at("alpha").at("enabled").value) == false,
             "example converges after concurrent commits and resets");
 
+        const auto localization = root / "translations";
+        std::filesystem::create_directories(localization / "de");
+        Write(localization / "de/alpha.json", {{"version",1},{"title","Übersetzter Titel"},
+            {"groups",{{"First group",{{"label","Allgemein"}}}}},
+            {"settings",{{"enabled",{{"label","Aktivieren"}}},{"mode",{{"optionLabels",{{"quiet","Leise"}}}}}}}});
+        const auto beforeLocalization = notifications.full;
+        backend.Localize(localization, "de");
+        check(backend.HasPendingChanges(), "catalog publication invalidates early registry consumers");
+        backend.DispatchChanges();
+        check(notifications.full == beforeLocalization + 1 && notifications.latest.mods[0]["title"] == "Übersetzter Titel",
+            "full refresh reads translated metadata synchronously");
+        const auto localized = Read(client, "alpha");
+        check(localized.mods[0]["groups"][0]["id"] == "First group" && localized.mods[0]["groups"][0]["label"] == "Allgemein" &&
+            localized.mods[0]["groups"][0]["settings"][0]["label"] == "Aktivieren", "registry shares localized display fields and stable identities");
+        check(localized.mods[0]["groups"][0]["settings"][3]["options"][1]["label"] == "Leise" &&
+            localized.mods[0]["groups"][0]["settings"][3]["value"] == "quiet", "localized registry options retain stored values");
+        check(client.SetEnum("alpha", "mode", "Leise") == Status::InvalidValue, "translated labels are not accepted as enum values");
+        backend.Localize(localization, "en");
+        backend.DispatchChanges();
+        check(Read(client, "alpha").mods[0]["title"] == embedded, "localization always starts from the authored schema");
+
         const auto callsBeforeStop = notifications.calls;
         check(client.Unsubscribe(token) == Status::Ok && client.Unsubscribe(token) == Status::UnknownSubscription, "unsubscribe token contract");
         consumer.Stop();

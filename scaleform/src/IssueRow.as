@@ -30,7 +30,7 @@ package
             mod.textColor = selected ? MenuStyle.LINE : MenuStyle.MUTED;
             severity.textColor = selected ? MenuStyle.INK : MenuStyle.ACCENT;
             MenuStyle.fit(title, row.title); MenuStyle.fit(mod, row.modTitle);
-            MenuStyle.setText(severity, row.severity);
+            MenuStyle.fit(severity, row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning"));
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
             graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.ROW_HEIGHT); graphics.endFill();
             var x:Number = 768; var y:Number = MenuStyle.ROW_HEIGHT / 2;
