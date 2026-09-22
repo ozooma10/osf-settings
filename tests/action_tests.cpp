@@ -29,11 +29,11 @@ int main()
         ++checks;
     };
     try {
-        const auto document = Json::parse(R"({"schemaVersion":1,"id":"actions","groups":{},"actions":[
+        const auto document = Json::parse(R"({"schemaVersion":1,"groups":{},"actions":[
             {"id":"scan","label":"Rescan files","hint":"Reload the index","confirmation":"Rescan now?"},
             {"id":"run","label":"Start scene"}]})");
         std::string error;
-        const auto schema = SettingsJson::ParseSchema(document, error);
+        const auto schema = SettingsJson::ParseSchema(document, "actions", error);
         check(schema && schema->actions.size() == 2 && schema->groups.size() == 1 && schema->actions[0].group == "General", "action-only schema creates a visible group");
         check(schema->groups[0].settings.empty() && !schema->FindSetting("scan"), "actions are not value definitions");
         check(schema->actions[0].confirmation == "Rescan now?" && schema->actions[1].confirmation.empty(), "confirmation is optional and preserved");

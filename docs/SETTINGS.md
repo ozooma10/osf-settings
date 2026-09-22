@@ -10,7 +10,6 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 
 ```json
 {
-  "id": "mymod",
   "title": "My mod",
   "groups": {
     "General": [
@@ -25,6 +24,7 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 }
 ```
 
+The filename without `.json` is your mod ID: `mymod.json` gives `mymod`.
 OSF builds your mods configuration menu from this file. Schemas load at startup; restart Starfield after editing them. 
 
 Player values are saved in `Data/SFSE/Plugins/OSF/Settings/state.json` and shared across save games.
@@ -37,12 +37,16 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 
 ### Schema fields and types
 
-- Required root fields: `id` and `groups`. `title` defaults to the mod ID;
+- The required root field is `groups`. `title` defaults to the mod ID;
   `description` is optional.
+- The mod ID comes from the schema filename without `.json`. A legacy root `id`
+  is optional; if present, it must be a nonempty string matching that ID exactly.
 - `schemaVersion` is optional and defaults to `1` when omitted. If present, it
   must be the integer `1`; other versions and value types are rejected.
 - Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs,
-  `.` and `..` are invalid. Use a unique ID and keep it stable between releases.
+  `.` and `..` are invalid. Use a unique filename and keep it stable between releases.
+  Renaming the file changes the mod ID used by saved settings, translation catalogs,
+  and API calls. Change `title` to rename the displayed mod without changing its ID.
 - Group names become headings. Groups and settings appear in authored order.
 - Every setting needs `key`, `type`, and `default`. Keys must be nonempty and
   unique across the mod. API lookups use exact, case-sensitive keys.

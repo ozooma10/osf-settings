@@ -14,6 +14,9 @@ Install UTF-8 JSON files under:
 Data/SFSE/Plugins/OSF/Settings/translations/<language>/<modId>.json
 ```
 
+`<modId>` is the schema filename without `.json`, so `schemas/mymod.json` uses
+`translations/de/mymod.json` for German.
+
 Use Starfield's language identifiers: `en`, `de`, `es`, `fr`, `it`, `ja`, `pl`,
 `ptbr`, and `zhhans`. The game setting is matched without regard to case. Other
 safe language identifiers also work when supplied by a game language mod.

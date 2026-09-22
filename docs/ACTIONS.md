@@ -1,11 +1,10 @@
 # Action buttons
 
-Declare a top-level `actions` array in your settings schema:
+Declare a top-level `actions` array in your `schemas/mymod.json` settings schema:
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "mymod",
   "title": "My mod",
   "groups": { "Maintenance": [] },
   "actions": [

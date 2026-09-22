@@ -1,6 +1,5 @@
 {
   "schemaVersion": 1,
-  "id": "learning",
   "title": "Test Mod",
   "description": "Sample settings and a native hotkey for testing the settings menu.",
   "hotkeys": [

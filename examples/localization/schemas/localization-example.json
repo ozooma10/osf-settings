@@ -1,6 +1,5 @@
 {
   "schemaVersion": 1,
-  "id": "localization-example",
   "title": "Localization example",
   "description": "An unchanged schema with a separately installed translation.",
   "groups": {

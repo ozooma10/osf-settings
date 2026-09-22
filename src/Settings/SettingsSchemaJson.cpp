@@ -62,7 +62,7 @@ namespace OSFSettings::SettingsJson
         }
     }
 
-    std::optional<ModSchema> ParseSchema(std::istream& input, std::string& error)
+    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error)
     {
         error.clear();
         try {
@@ -80,14 +80,14 @@ namespace OSFSettings::SettingsJson
                     }
                     return true;
                 });
-            return ParseSchema(document, error);
+            return ParseSchema(document, modId, error);
         } catch (const std::exception& exception) {
             error = exception.what();
             return std::nullopt;
         }
     }
 
-    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string& error)
+    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error)
     {
         error.clear();
         try {
@@ -96,8 +96,11 @@ namespace OSFSettings::SettingsJson
             Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
 
             ModSchema mod;
-            mod.id = RequiredText(document, "id");
+            mod.id = modId;
             Require(IsValidModId(mod.id), "mod id must use lowercase ASCII letters, digits, dots, underscores, or hyphens");
+            if (document.contains("id")) {
+                Require(RequiredText(document, "id") == mod.id, "schema id must match the filename stem");
+            }
             mod.title = OptionalText(document, "title", mod.id);
             mod.description = OptionalText(document, "description");
 

@@ -33,12 +33,11 @@ an unwritable history still updates the current session and never blocks opening
 
 ## Registered native menus
 
-Add a top-level `menus` array to `Data/SFSE/Plugins/OSF/Settings/schemas/<modId>.json`:
+Add a top-level `menus` array to `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json`:
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "mymod",
   "title": "My Mod",
   "groups": {},
   "menus": [
@@ -47,12 +46,13 @@ Add a top-level `menus` array to `Data/SFSE/Plugins/OSF/Settings/schemas/<modId>
 }
 ```
 
-`id` is the OSF mod ID. `title` defaults to it. Each menu requires its own stable
+The filename without `.json` is the OSF mod ID (`mymod` here). `title` defaults to it.
+Each menu requires its own stable
 `id`, display `title`, and registered native `menu` name; `description` is optional.
 Native IDs are exact and case-sensitive. `menus` is optional and uses the existing
 schemaVersion 1 loader, validation, and load-error reporting. Keep normal settings
-in `groups`; use `"groups": {}` for a menu-only mod. The filename must match the mod
-ID. No separate menus file or directory is read.
+in `groups`; use `"groups": {}` for a menu-only mod. No separate menus file or
+directory is read.
 
 The owner must register the menu with `RE::UI` and supply its movie/native bridge.
 A SWF path is not a menu name. Missing menu registrations show an unavailable card.

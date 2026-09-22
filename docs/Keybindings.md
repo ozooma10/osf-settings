@@ -1,11 +1,10 @@
 # Hotkeys
 
-Add a top-level `hotkeys` array to your [schema](SETTINGS.md):
+Add a top-level `hotkeys` array to your [schema](SETTINGS.md), `schemas/mymod.json`:
 
 ```json
 {
   "schemaVersion": 1,
-  "id": "mymod",
   "title": "My mod",
   "groups": {},
   "hotkeys": [

@@ -38,13 +38,9 @@ namespace OSFSettings
                     continue;
                 }
                 std::string message;
-                auto schema = SettingsJson::ParseSchema(input, message);
+                auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message);
                 if (!schema) {
                     m_loadErrors.push_back({ path, std::move(message) });
-                    continue;
-                }
-                if (schema->id != path.stem().string()) {
-                    m_loadErrors.push_back({ path, "schema id must match the filename stem" });
                     continue;
                 }
 

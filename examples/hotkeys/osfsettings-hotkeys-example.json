@@ -1,6 +1,5 @@
 {
   "schemaVersion": 1,
-  "id": "osfsettings-hotkeys-example",
   "title": "Hotkey callback example",
   "groups": {},
   "hotkeys": [
