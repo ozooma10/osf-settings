@@ -10,7 +10,7 @@ $repo = Split-Path $PSScriptRoot -Parent
 $output = Join-Path $repo 'build/preview'
 $ruffle = Join-Path $repo 'external/ruffle/ruffle.exe'
 if (-not (Test-Path -LiteralPath $ruffle)) { throw 'Run pwsh tools/setup-ruffle.ps1 first.' }
-& "$PSScriptRoot/preview-menu.ps1" -BuildOnly -Design -LargeText:$LargeText -InterfaceArchive $InterfaceArchive
+& "$PSScriptRoot/preview-menu.ps1" -BuildOnly -Design -Issues -LargeText:$LargeText -InterfaceArchive $InterfaceArchive
 $name = if ($LargeText) { 'large' } else { 'normal' }
 $log = Join-Path $output "test-$name.log"
 $env:RUST_LOG = 'warn,avm_trace=info'

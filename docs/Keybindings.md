@@ -25,7 +25,10 @@ ordinary settings values. Schema changes require restarting the game.
 - Optional `group` names an existing schema group. Otherwise the hotkey follows
   the first group's settings, or appears in General when `groups` is empty.
 
-For a C++ callback, omit `menu` and register once after [client initialization](API.md)
+## C++ callbacks
+
+For a C++ callback, omit `menu` and register once after
+[client initialization](SETTINGS.md#c-integration)
 at SFSE `kPostPostLoad`:
 
 ```cpp
@@ -40,13 +43,40 @@ Each accepted keyboard down submits one SFSE task; holds/releases do not repeat 
 Callbacks have no main-thread or cross-task serialization guarantee. Copy retained
 strings and schedule engine effects appropriately; exceptions must not escape.
 
-[Papyrus](PAPYRUS.md) can register the same declarations through `RegisterHotkey`.
+See the [buildable C++ example](../examples/hotkeys/README.md).
+
+## Papyrus callbacks
+
+For a declaration without `menu`, register a bound quest/reference/alias from
+initialization and after each load, following the
+[Papyrus settings lifecycle](SETTINGS.md#papyrus-integration):
+
+```papyrus
+Bool registered = OSFSettings.RegisterHotkey(Self, "mymod", "toggle")
+
+Function OnOSFHotkey(String modId, String hotkeyId)
+    ; Run your action once per accepted key-down.
+EndFunction
+```
+
+Check the registration result. Registrations are cleared on load or return to
+the main menu; repeating a registration succeeds without adding duplicates.
+Keep the receiving script alive. Global scripts use
+`RegisterHotkeyStatic("MyScript", "mymod", "toggle")` with the same callback
+marked `Global`. An owning quest/alias must register them after each load.
+Papyrus schedules callbacks; delivery is not synchronous.
+
+See the [instance and Global example](../examples/papyrus/README.md).
+
+## Open a native menu
 
 To open a native menu instead, add `"menu": "MyModMenu"` to the declaration.
 Your plugin must register that name with `RE::UI::RegisterMenu` before accepting
 input. OSF requests the menu on key release; it does not toggle it closed.
 Menu hotkeys cannot also register callbacks. Native gameplay input rules apply;
 OSF dispatch currently handles keyboard input.
+
+## Block hotkeys while capturing input
 
 For a custom view that captures input, acquire a block before granting focus:
 
@@ -60,5 +90,3 @@ auto status = settings.AcquireHotkeyBlock(&block);
 Call `ReleaseHotkeyBlock(block)` for every acquired token. All blocks must be
 released before new presses can activate. Blocks suppress OSF-dispatched hotkeys
 only; they do not cancel callbacks already queued or disable other input handlers.
-
-See the [buildable C++ example](../examples/hotkeys/README.md).

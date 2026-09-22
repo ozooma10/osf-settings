@@ -2,7 +2,7 @@
 
 Use the registry to discover mods and build a settings browser or cache.
 Include [OSFSettingsRegistry.h](../sdk/OSFSettingsRegistry.h), which also includes
-the [C++ client](API.md).
+the [C++ client](SETTINGS.md#c-integration).
 
 ```cpp
 #include "OSFSettingsRegistry.h"
