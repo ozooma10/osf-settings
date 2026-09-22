@@ -58,6 +58,7 @@ package
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready at root");
                     require(list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview", "design and binding fixture mods open at All Mods");
                     require(findNamed(menu, "mods") != null && findNamed(menu, "issues") != null, "both root tabs are reachable");
+                    checkLocalization();
                     capture("all-mods");
                     if (bindingsOnly) step = 34;
                     else userEvent("Accept"); break;
@@ -277,12 +278,31 @@ package
                 case 52:
                     require(list.entryCount == 1 && list.selectedEntry.row.records[0].key == 179,"unsupported diagram key remains searchable and editable");
                     capture("keybindings-unsupported");
+                    findNamed(menu,"issues").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 53:
+                    require(list.entryCount == 4, "issues fixture has four reports");
+                    requireGlyphs("Issues: 4");
+                    capture("issues");
                     menu.removeEventListener(Event.ENTER_FRAME, advance);
                     trace("[verify] PASS"); break;
                 }
             } catch (error:Error) {
                 menu.removeEventListener(Event.ENTER_FRAME, advance); trace("[verify] FAIL " + error);
             }
+        }
+        private function checkLocalization():void
+        {
+            var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+            require(localization.text("counts.issues", {count:4}) == "Issues: 4", "issue count substitutes a number");
+            require(localization.text("counts.issues", {count:0}) == "Issues: 0", "zero count is preserved");
+            require(localization.text("counts.issues") == "Issues: {count}", "omitted parameters leave tokens intact");
+            try {
+                localization.initialize({probe:"{name}: {count}/{count}; {missing}; {empty}.", "counts.issues":"報告: {count}"});
+                require(localization.text("counts.issues", {count:4}) == "報告: 4", "translated count substitutes a number");
+                require(localization.text("probe", {name:"$& $1 {count} 日本語", count:0, empty:""}) ==
+                    "$& $1 {count} 日本語: 0/0; {missing}; .", "repeated tokens, literal values, empty values and unknown tokens are preserved");
+                require(localization.text("counts.mods", {count:3}) == "Mods: 3", "missing translation uses English with parameters");
+            } finally { localization.initialize(null); }
         }
         private function requireGlyphs(text:String):void
         {
