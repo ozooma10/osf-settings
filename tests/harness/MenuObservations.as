@@ -68,7 +68,7 @@ private function testClick(event:MouseEvent):void
 private function testRow(row:Object):Object
 {
     if (!row) return null;
-    return {kind:launcherPage() ? "launcher" : bindingsPage() ? "binding" : issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
+    return {kind:row.more ? "launcherMore" : row.type == "launcher" ? "launcher" : bindingsPage() ? "binding" : issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
         issueId:String(row.id || ""), severity:String(row.severity || ""), impact:String(row.impact || ""), nextSteps:String(row.nextSteps || ""),
         key:String(row.key || ""), type:String(row.type || ""), value:row.value,
         action:row.action, source:row.source, potential:Boolean(row.potential), records:row.records,
@@ -81,13 +81,14 @@ private function reportTestState():void
     // heartbeat every frame so stalled rendering remains distinguishable.
     if (frame % 6 != 1) { BGSCodeObj.testSnapshot(frame, null); return; }
     var visibleRows:Array = [];
-    if (launcherPage() && menuStage) {
+    if (launcher && launcher.visible && menuStage) {
         for each (var card:LauncherCard in launcher.visibleCards) {
             var destination:Object = testRow(card.row); destination.index = card.index;
             destination.rect = testRect(card.getBounds(menuStage)); destination.controlRect = destination.rect;
             visibleRows.push(destination);
         }
-    } else if (options && menuStage) {
+    }
+    if (options && MovieClip(options).visible && menuStage) {
         for (var i:int = 0; i < options.totalEntryClips; ++i) {
             var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;
             if (!clip || !clip.visible || Object(clip).itemIndex < 0) continue;
@@ -114,6 +115,7 @@ private function reportTestState():void
         conflictText:nativeHotkeys.popup.active ? String(nativeHotkeys.popup.ControlInfo_mc.Label_mc.Text_tf.text) : "",
         refreshing:refreshing || requestedRefresh, startupPhase:startupPhase,
         mod:modID, group:groupID, rootPage:rootPage, issueCount:issues.length,
+        home:{interfacesVisible:launcher.visible, expanded:launcher.expanded, interfacesFocused:launcher.focused},
         bindings:{state:keybindings.state, count:keybindings.rows.length, requiredActions:requiredActions, selectedKey:keybindings.selectedKey,
             source:keybindings.source, query:keybindings.search.text, searching:searching(), slot:nativeHotkeys.selectedSlot,
             searchRect:testRect(keybindings.search.getBounds(menuStage)),

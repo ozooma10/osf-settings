@@ -3,6 +3,8 @@
 #include "Settings/SettingsSchema.h"
 #include <iostream>
 #include <stdexcept>
+#include <chrono>
+#include <fstream>
 
 namespace OSFSettings
 {
@@ -56,6 +58,34 @@ int main()
         check(service.Snapshot().size() == 2, "schema initialization cannot duplicate entries");
         mod.schema.menus[0].title = "Changed";
         check(service.Find("absolute-control", "panel")->title == "Absolute Control", "schema registrations own their metadata");
+
+        const auto history = std::filesystem::temp_directory_path() /
+            ("osf-launcher-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".json");
+        struct Cleanup {
+            std::filesystem::path path;
+            ~Cleanup() { std::error_code ignored; std::filesystem::remove(path, ignored); path += ".tmp"; std::filesystem::remove(path, ignored); }
+        } cleanup{history};
+        const auto rank = [](const LauncherService& source, std::string_view mod) {
+            for (const auto& entry : source.Snapshot()) if (entry.mod == mod) return entry.recentOrder;
+            return std::uint32_t{};
+        };
+        service.LoadHistory(history);
+        const auto unchanged = service.Revision();
+        check(!service.RecordOpened("demo", "missing") && !service.RecordOpened("demo", "native"), "missing and unavailable destinations cannot enter recent history");
+        check(service.Revision() == unchanged && !std::filesystem::exists(history), "rejected openings do not change or write history");
+        check(service.RecordOpened("absolute-control", "panel") && rank(service, "absolute-control") > rank(service, "demo"), "opened interface ranks before unopened interfaces");
+        service.SetAvailable("demo", "native", true, "");
+        check(service.RecordOpened("demo", "native") && rank(service, "demo") > rank(service, "absolute-control"), "last opening moves the destination to the front");
+        check(service.RecordOpened("absolute-control", "panel") && rank(service, "absolute-control") == 2 && rank(service, "demo") == 1, "repeated openings reorder without duplicate history entries");
+        LauncherService restored;
+        restored.LoadHistory(history); // Providers may register after history is loaded.
+        restored.Register(native); restored.Initialize({mod});
+        check(rank(restored, "absolute-control") == 2 && rank(restored, "demo") == 1, "recent ordering survives a new service and late provider registration");
+        { std::ofstream broken(history); broken << "{broken"; }
+        restored.LoadHistory(history);
+        check(restored.Snapshot().size() == 2 && rank(restored, "demo") == 0, "malformed history preserves registered interfaces with default ordering");
+        restored.LoadHistory(history / "unwritable.json");
+        check(restored.RecordOpened("demo", "native") && rank(restored, "demo") > 0, "history write failure preserves in-memory recency and does not reject opening");
 
         namespace API = OSFSettings::API::Launcher;
         std::uint32_t version = 9;

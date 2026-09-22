@@ -15,7 +15,7 @@ For mod authors, start with [Settings](docs/SETTINGS.md) to define a page and co
 <summary>Optional integrations</summary>
 
 - [Action buttons](docs/ACTIONS.md): run an operation with optional confirmation and report completion.
-- [Menu launchers](docs/LAUNCHERS.md): add native menus or custom interfaces to the Launcher tab.
+- [Menu launchers](docs/LAUNCHERS.md): add native menus or custom interfaces to the launch cards listing.
 
 </details>
 
@@ -41,4 +41,4 @@ xmake test
 pwsh -NoProfile -File packaging/build-archive.ps1
 ```
 
-Builds a production ZIP, checksum and manifest in isolated staging under `build/packages`. 
+Builds a production ZIP, checksum and manifest in isolated staging under `build/packages`.

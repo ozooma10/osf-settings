@@ -50,6 +50,7 @@ namespace OSFSettings
         }
         ActionService::Get().Initialize(mods);
         LauncherService::Get().Initialize(mods);
+        LauncherService::Get().LoadHistory(Paths::ValuesDir().parent_path() / "launcher-history.json");
         settings.Start();
         m_initialized = true;
         return true;

@@ -435,6 +435,7 @@ namespace OSFSettings
                 Text(row, "key", destination.id);
                 Text(row, "title", destination.title);
                 Text(row, "type", "launcher");
+                row.SetMember("recentOrder", RE::Scaleform::GFx::Value(static_cast<double>(destination.recentOrder)));
                 const auto* ui = RE::UI::GetSingleton();
                 const bool registered = destination.menu.empty() || (ui && ui->IsMenuRegistered(RE::BSFixedString(destination.menu)));
                 const bool available = destination.available && registered;
@@ -528,9 +529,11 @@ namespace OSFSettings
         auto* ui = RE::UI::GetSingleton();
         if (!destination || !ui || ui->IsMenuOpen("MainMenu") || ui->IsMenuOpen("LoadingMenu")) return;
         if (destination->open) {
+            LauncherService::Get().RecordOpened(destination->mod, destination->id);
             destination->open(destination->mod, destination->id);
         } else if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
             queue->AddMessage(RE::BSFixedString(destination->menu.c_str()), RE::UI_MESSAGE_TYPE::kShow);
+            LauncherService::Get().RecordOpened(destination->mod, destination->id);
         }
     }
 

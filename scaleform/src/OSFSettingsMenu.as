@@ -59,6 +59,9 @@ package
         private var heading:TextField;
         private var section:TextField;
         private var count:TextField;
+        private var homeMods:TextField;
+        private var homeCount:TextField;
+        private var homeRecent:TextField;
         private var detailTitle:TextField;
         private var detailLabel:TextField;
         private var detailDivider:Sprite = new Sprite();
@@ -160,6 +163,10 @@ package
             tabViewport.scrollRect = new Rectangle(0, 0, 1728, 64); tabViewport.addChild(tabs); addChild(tabViewport);
             section = label("", MenuStyle.LEFT, 305, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
             count = label("", 902, 308, 230, 40, 23, MenuStyle.MUTED, true); alignRight(count);
+            homeMods = label(tr("menu.title"), MenuStyle.LEFT, 0, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
+            homeCount = label("", 902, 0, 230, 40, 23, MenuStyle.MUTED, true); alignRight(homeCount);
+            homeRecent = label(tr("home.recentFirst"), 1250, 308, 594, 40, 23, MenuStyle.MUTED, true); alignRight(homeRecent);
+            homeMods.visible = homeCount.visible = homeRecent.visible = false;
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
             configureList(options, "OptionListEntry");
             options.addEventListener("SettingsOptionEntry_ValueChanged", valueChanged);
@@ -193,15 +200,19 @@ package
             acceptButton = button(tr("buttons.toggle"), "Accept", accept);
             resetButton = button(tr("buttons.reset"), "YButton", reset);
             clearButton = button(tr("buttons.clearBinding"), "XButton", clearBinding);
-            backButton = button(tr("menu.allMods"), "Cancel", back); bar.RefreshButtons();
+            backButton = button(tr("menu.home"), "Cancel", back); bar.RefreshButtons();
             captureBinding = create("Binding") as MovieClip;
             captureBinding.mouseEnabled = false; captureBinding.mouseChildren = false;
             captureBinding.visible = false;
             nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
+            startupPhase = "build keybindings";
             keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
             addChild(keybindings);
-            launcher = new LauncherPage(function():void { if (!refreshing) describe(); }, accept);
+            startupPhase = "build Home launchers";
+            launcher = new LauncherPage(function():void { if (!refreshing) focusLauncher(true); }, accept,
+                function():void { populate(true); focusLauncher(true); });
             launcher.visible = false; addChild(launcher);
+            startupPhase = "build string editor";
             stringEditor = new StringSetting(); addChild(stringEditor);
             options.addEventListener("SettingsControlListEnty_ActiveBindingChanged", selectionChanged);
             var popup:MovieClip = nativeHotkeys.popup as MovieClip;
@@ -209,6 +220,7 @@ package
             var bounds:Rectangle = popup.getBounds(popup);
             popup.x = (1920 - bounds.width) / 2 - bounds.x;
             popup.y = (1080 - bounds.height) / 2 - bounds.y;
+            startupPhase = "build action confirmation";
             actionConfirmation = new ActionConfirmation(finishActionConfirmation); addChild(actionConfirmation);
             menuStage.stageFocusRect = false;
             menuStage.addEventListener(Event.RESIZE, resizeBackground); resizeBackground();
@@ -248,7 +260,19 @@ package
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
-        private function launcherPage():Boolean { return !modID && rootPage == "launcher"; }
+        private function homePage():Boolean { return !modID && rootPage == "mods"; }
+        private function launcherPage():Boolean { return homePage() && launcher && launcher.hasEntries && launcher.focused; }
+        private function expandedLauncher():Boolean { return homePage() && launcher && launcher.expanded; }
+        private function focusLauncher(value:Boolean):void
+        {
+            launcher.focused = value;
+            launcherAcceptHeld = false;
+            options.disableInput = value;
+            options.disableSelection = value;
+            menuStage.focus = value ? launcher : options as MovieClip;
+            if (!value && homePage()) { MenuStyle.setText(status, tr("menu.modsHint")); status.textColor = MenuStyle.MUTED; }
+            describe(); decorate();
+        }
         private function searching():Boolean { return keybindings && keybindings.searching; }
         private function editingString():Boolean { return stringEditor && stringEditor.visible; }
         private function confirmingAction():Boolean { return actionConfirmation && actionConfirmation.visible; }
@@ -261,7 +285,7 @@ package
         private function issuesPage():Boolean { return !modID && rootPage == "issues"; }
         private function pages():Array
         {
-            return modID ? groups : [{id:"mods", title:tr("menu.allMods")}, {id:"launcher", title:"LAUNCHER"}, {id:"bindings", title:tr("menu.keybindings")}, {id:"issues", title:tr("menu.issues") + (issues.length ? " (" + issues.length + ")" : "")}];
+            return modID ? groups : [{id:"mods", title:tr("menu.home")}, {id:"bindings", title:tr("menu.keybindings")}, {id:"issues", title:tr("menu.issues") + (issues.length ? " (" + issues.length + ")" : "")}];
         }
         private function activePage():String { return modID ? groupID : rootPage; }
         private function selectPage(id:String):void
@@ -331,24 +355,19 @@ package
             nativeHotkeys.populate(allRows);
             nativeHotkeys.fullPage = bindingsPage();
             keybindings.visible = bindingsPage();
-            launcher.visible = launcherPage();
-            launcher.mouseEnabled = launcher.mouseChildren = launcherPage();
-            MovieClip(options).visible = !launcherPage();
-            count.x = launcherPage() ? MenuStyle.RIGHT - count.width : 902;
-            if (launcherPage()) {
-                options.disableInput = options.disableSelection = true;
-                launcher.populate(allRows, preserve);
-                section.visible = count.visible = true;
-                empty.y = MenuStyle.LIST_TOP + 22;
-                MenuStyle.setText(empty, launcher.current ? "" : "No interfaces registered.\nInstalled mods can add their menus here.");
-                MenuStyle.setText(heading, "MOD SETTINGS");
-                MenuStyle.setText(section, "INTERFACES");
-                menuStage.focus = launcher;
-                refreshing = false; describe(); return;
-            }
+            if (homePage()) launcher.populate(allRows, preserve);
+            launcher.visible = homePage() && launcher.hasEntries;
+            launcher.mouseEnabled = launcher.mouseChildren = launcher.visible;
+            launcher.y = expandedLauncher() ? MenuStyle.LIST_TOP : 342;
+            MovieClip(options).visible = !expandedLauncher();
+            count.x = 902;
+            homeMods.visible = homeCount.visible = launcher.visible && !expandedLauncher();
+            homeRecent.visible = launcher.visible && !expandedLauncher();
+            homeMods.y = launcher.y + launcher.shelfHeight + 20;
+            homeCount.y = homeMods.y + 3;
             options.disableSelection = bindingBusy();
-            var listHeight:Number = bindingsPage() ? 250 : MenuStyle.LIST_HEIGHT;
-            options.y = bindingsPage() ? 634 : MenuStyle.LIST_TOP;
+            options.y = bindingsPage() ? 634 : homeMods.visible ? homeMods.y + 50 : MenuStyle.LIST_TOP;
+            var listHeight:Number = bindingsPage() ? 250 : homeMods.visible ? 894 - options.y : MenuStyle.LIST_HEIGHT;
             options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
             MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,MenuStyle.LIST_WIDTH,listHeight);
             section.visible = count.visible = !bindingsPage();
@@ -379,15 +398,19 @@ package
             if (hasHotkeys) nativeHotkeys.open();
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
-            options.disableInput = bindingBusy() || searching();
-            if (!searching()) menuStage.focus = options as MovieClip;
+            if (homePage() && launcher.hasEntries && !data.length) launcher.focused = true;
+            options.disableInput = bindingBusy() || searching() || launcherPage();
+            options.disableSelection = bindingBusy() || launcherPage();
+            if (!searching()) menuStage.focus = launcherPage() ? launcher : options as MovieClip;
+            empty.visible = !expandedLauncher();
             MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? tr("menu.noIssues") : tr("menu.noSettings"));
-            var title:String = tr("menu.title"); var group:String = tr("menu.allMods");
+            var title:String = tr("menu.title"); var group:String = tr("menu.title");
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
             MenuStyle.fit(heading, title.toUpperCase());
-            MenuStyle.setText(section, issuesPage() ? tr("menu.reportedIssues") : group.toUpperCase());
-            MenuStyle.setText(count, tr(issuesPage() ? "counts.issues" : modID ? "counts.items" : "counts.mods", {count:data.length}));
+            MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : group.toUpperCase());
+            MenuStyle.setText(count, launcher.visible ? launcher.countText : tr(issuesPage() ? "counts.issues" : modID ? "counts.items" : "counts.mods", {count:data.length}));
+            MenuStyle.setText(homeCount, tr("counts.mods", {count:data.length}));
             if (!modID && (!bindingsPage() || !preserve)) {
                 MenuStyle.setText(status, bindingsPage() ? tr("menu.bindingContext") : issuesPage() ? tr("menu.issuesHint") : tr("menu.modsHint"));
                 status.textColor = MenuStyle.MUTED;
@@ -447,18 +470,21 @@ package
         {
             var row:Object = current();
             var reporting:Boolean = issuesPage();
+            detailLabel.y = homeMods.visible ? options.y : 363;
+            detailTitle.y = detailLabel.y + 46;
             detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage() && !launcherPage();
             MenuStyle.setText(detailLabel, modID ? row && row.type == "action" ? tr("menu.selectedAction") : tr("menu.selectedSetting") : tr("menu.selectedMod"));
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
             MenuStyle.setText(detailTitle, row ? row.title : tr("menu.nothingSelected"));
-            detailHint.y = 409 + Math.max(68, detailTitle.textHeight + 20);
-            detailHint.height = Math.max(64, 630 - detailHint.y);
+            detailHint.y = detailTitle.y + Math.max(68, detailTitle.textHeight + 20);
+            detailHint.height = Math.max(64, (homeMods.visible ? 894 : 630) - detailHint.y);
             var hint:String = row ? String(row.hint || "") : "";
             if (row && row.type == "action" && row.message) hint += (hint ? "\n\n" : "") + row.message;
             MenuStyle.setText(detailHint, (row && row.requiresRestart ? tr("menu.restart") + (hint ? "\n\n" : "") : "") + hint);
             detailHint.scrollV = 1;
             MenuStyle.setText(defaultLabel, modID ? tr("menu.default") : tr("menu.items"));
+            if (homeMods.visible) defaultLabel.visible = defaultValue.visible = detailDivider.visible = false;
             if (row && row.type == "action") { defaultLabel.visible = defaultValue.visible = detailDivider.visible = false; changedLegend.visible = false; }
             defaultValue.x = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 1434 : 1674;
             defaultValue.width = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 410 : 170;
@@ -468,7 +494,7 @@ package
             clearButton.Visible = Boolean(!captureRow && !bindingBusy() && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
             buttonData.Accept.sButtonText = editingString() ? tr("buttons.save") : row && row.type == "action" ? tr("buttons.runAction") : row && row.type == "string" ? tr("buttons.editText") : captureRow ? tr("buttons.confirmBinding") : bindingsPage() ? tr("buttons.changeBinding") : !modID ? tr("buttons.open") : row && (row.type == "key" || row.type == "hotkey") ? tr("buttons.changeBinding") : row && row.type == "enum" ? tr("buttons.nextChoice") : tr("buttons.toggle");
-            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? tr("buttons.cancel") : modID ? tr("menu.allMods") : tr("buttons.back");
+            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? tr("buttons.cancel") : modID || expandedLauncher() ? tr("menu.home") : tr("buttons.back");
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
             acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action"))));
             backButton.Visible = !bindingBusy();
@@ -487,10 +513,11 @@ package
                 clearButton.Visible = clearButton.Visible && !searching();
             }
             if (launcherPage()) {
+                buttonData.Accept.sButtonText = row && row.more ? tr("home.expand") : tr("buttons.open");
+                acceptButton.SetButtonData(buttonData.Accept);
                 acceptButton.Visible = Boolean(row && row.editable);
                 resetButton.Visible = clearButton.Visible = changedLegend.visible = false;
-                MenuStyle.setText(count, launcher.countText);
-                MenuStyle.fit(status, row ? row.message ? row.message : row.hint ? row.hint : "Select an interface to open it." : "Registered interfaces appear here.");
+                MenuStyle.fit(status, row ? row.message ? row.message : row.hint ? row.hint : tr("home.selectInterface") : tr("home.selectInterface"));
                 status.textColor = row && !row.editable ? MenuStyle.ACCENT : MenuStyle.MUTED;
             }
             pageBar.visible = !captureRow && !bindingBusy() && !searching() && pages().length > 1;
@@ -501,7 +528,7 @@ package
         {
             detailHint.scrollV -= event.delta; event.stopPropagation();
         }
-        private function selectionChanged(event:Event):void { if (!refreshing) describe(); }
+        private function selectionChanged(event:Event):void { if (!refreshing) { if (homePage() && !expandedLauncher()) focusLauncher(false); else describe(); } }
         private function focusSound(event:Event):void { Object(definition("Shared.GlobalFunc")).PlayMenuSound("UIMenuGeneralFocus"); }
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
@@ -513,7 +540,7 @@ package
             if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
             var row:Object = current(); if (!row) return;
-            if (launcherPage()) { if (row.editable) launch(row); }
+            if (launcherPage()) { if (row.more) launcher.toggleExpanded(); else if (row.editable) launch(row); }
             else if (!modID && !bindingsPage()) { modID = row.mod; groupID = ""; refresh(false); }
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
@@ -665,6 +692,7 @@ package
             if (captureRow) { finishBinding(true); return; }
             if (frame <= searchExitFrame + 1) return;
             if (closing || dragging() || requestedRefresh) return;
+            if (expandedLauncher()) { launcher.toggleExpanded(); return; }
             if (modID) { modID = ""; groupID = ""; rootPage = "mods"; readIssues(); refresh(false); return; }
             closing = true; options.disableInput = true; BGSCodeObj.close();
         }
@@ -696,6 +724,10 @@ package
             if (frame <= searchExitFrame + 1) return true;
             if (launcherPage() && name == "Accept") { launcherAccept(pressed); return true; }
             if (launcherPage() && navigateLauncher(name, pressed)) return true;
+            if (homePage() && launcher.hasEntries && name == "Up" && options.selectedIndex <= 0) {
+                if (pressed && navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }
+                return true;
+            }
             if (bindingsPage() && navigateBindings(name, pressed)) return true;
             if (bar.ProcessUserEvent(name, pressed)) return true;
             if (name == "LShoulder" || name == "RShoulder") {
@@ -712,8 +744,9 @@ package
             if (captureRow || bindingBusy() || editingString() || confirmingAction()) return;
             if (!initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
-            if (launcherPage()) { if (target && launcher.contains(target)) menuStage.focus = launcher; return; }
+            if (homePage() && target && launcher.contains(target)) { focusLauncher(true); return; }
             if (!target || !MovieClip(options).contains(target)) return;
+            if (homePage()) focusLauncher(false);
             menuStage.focus = options as MovieClip; options.disableInput = false;
             while (target && target != options) {
                 if ("itemIndex" in target) { options.selectedIndex = Object(target).itemIndex; break; }
@@ -735,6 +768,10 @@ package
             if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (keybindings && keybindings.searchKey(event)) return;
             if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
+            if (homePage() && launcher.hasEntries && !launcherPage() && event.keyCode == Keyboard.UP && options.selectedIndex <= 0) {
+                if (navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }
+                event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
             if (launcherPage() && event.keyCode == Keyboard.ENTER) {
                 launcherAccept(true); event.stopImmediatePropagation(); event.preventDefault(); return;
             }
@@ -809,7 +846,9 @@ package
         {
             if (name != "Up" && name != "Down" && name != "Left" && name != "Right" && name != "PageUp" && name != "PageDown") return false;
             if (pressed && !refreshing && !requestedRefresh && navigationFrame != frame) {
-                navigationFrame = frame; launcher.navigate(name);
+                navigationFrame = frame;
+                if (name == "Down" && !launcher.expanded && options.entryCount) { focusLauncher(false); options.selectedIndex = 0; }
+                else launcher.navigate(name);
             }
             return true;
         }
@@ -923,7 +962,7 @@ package
         }
         private function decorate():void
         {
-            if (launcherPage()) return;
+            if (expandedLauncher()) return;
             var needsLayout:Boolean = false;
             for (var i:int = 0; i < options.totalEntryClips; ++i) {
                 var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;
@@ -968,7 +1007,7 @@ package
                 border.x = 0; border.y = 0; border.width = MenuStyle.LIST_WIDTH;
                 if (border.height != MenuStyle.ROW_HEIGHT) { border.height = MenuStyle.ROW_HEIGHT; needsLayout = true; }
                 clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (MenuStyle.ROW_HEIGHT + 4);
-                view.update(item.row, Object(clip).itemIndex == options.selectedIndex, modID == "" && !bindingsPage());
+                view.update(item.row, Object(clip).itemIndex == options.selectedIndex && !launcherPage(), modID == "" && !bindingsPage());
             }
             if (needsLayout && !dragging()) options.UpdateContainerRect();
         }

@@ -206,11 +206,11 @@ package
         {
             // Launcher-only mods also exercise separation from the settings browser.
             var names:Array = ["Absolute Control", "Character Studio", "OSF Animation Browser", "DevilzDad's Shop + Explorer",
-                "Starcade OS", "AISS Companion Log", "Camera Tools", "An interface with a deliberately long display title", "Unavailable Interface"];
+                "Starcade OS", "AISS Companion Log", "Camera Tools", "An interface with a deliberately long display title", "Ship Planner", "Unavailable Interface"];
             var result:Array = [];
             for (var i:int = 0; i < names.length; ++i) result.push({type:"launcher", mod:"launcher-preview-" + i,
                 modTitle:names[i], group:"@launcher", groupTitle:"Launcher", key:"open", title:names[i],
-                hint:"A preview registration for the shared Launcher. This interface owns its own controls and navigation.",
+                hint:"Open this mod's interface.", recentOrder:i < 4 ? 4 - i : 0,
                 editable:i != names.length - 1, message:i == names.length - 1 ? "This interface is unavailable in the current context." : ""});
             return result;
         }

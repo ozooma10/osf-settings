@@ -19,7 +19,8 @@ package
             var label:TextField = MenuStyle.field(tr("strings.edit"), 0, 0, 634, 30, 21, MenuStyle.MUTED, true);
             addChild(label);
             input = MenuStyle.field("", 8, 34, 618, 44, CONFIG::largeText ? 30 : 27);
-            input.name = "stringValue"; input.type = "input";
+            // The shared-font field is timeline-authored, so its name is read-only.
+            input.type = "input";
             input.selectable = true; input.mouseEnabled = true;
             input.multiline = false; input.wordWrap = false;
             // maxChars counts UTF-16 units and truncates pasted text. Validate

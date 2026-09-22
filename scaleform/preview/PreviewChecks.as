@@ -24,6 +24,8 @@ package
         private var step:int = -1;
         private var setter:Function;
         private var bindingsOnly:Boolean;
+        private var launcher:Object;
+        private var originalRows:Function;
 
         public function PreviewChecks(movie:MovieClip, bindings:Boolean = false)
         {
@@ -56,7 +58,7 @@ package
                 switch (step++) {
                 case -1:
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready at root");
-                    require(list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview", "design and binding fixture mods open at All Mods");
+                    require(list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview", "Home opens with the settings list selected");
                     require(findNamed(menu, "mods") != null && findNamed(menu, "issues") != null, "both root tabs are reachable");
                     checkLocalization();
                     capture("all-mods");
@@ -71,17 +73,17 @@ package
                     require(findInput(menu) == null, "menu has no text input");
                     key(Keyboard.F);
                     require(menu.stage.focus == list && !list.disableInput, "F leaves list input active");
-                    playbackTab = findNamed(menu, "playback");
+                    playbackTab = findNamed(menu, "Playback");
                     require(playbackTab != null, "playback tab present");
                     capture("default"); userEvent("Accept"); break;
                 case 1:
                     require(list.selectedEntry.row.value == false, "toggle saved and reread");
-                    require(findNamed(menu, "playback") == playbackTab, "toggle reuses tabs");
+                    require(findNamed(menu, "Playback") == playbackTab, "toggle reuses tabs");
                     capture("changed"); key(Keyboard.B); break;
                 case 2:
                     require(list.selectedEntry.row.value == true, "reset restored schema default");
-                    require(findNamed(menu, "playback") == playbackTab, "reset reuses tabs");
-                    findNamed(menu, "camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    require(findNamed(menu, "Playback") == playbackTab, "reset reuses tabs");
+                    findNamed(menu, "Camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 3:
                     require(list.entryCount == 2 && list.selectedEntry.row.key == "freeCamera", "camera tab filters settings");
                     key(221); break;
@@ -89,13 +91,13 @@ package
                     require(list.entryCount == 3 && list.selectedEntry.row.key == "hotkeys", "keyboard changes group");
                     key(221); break;
                 case 5:
-                    require(list.entryCount == 1 && list.selectedEntry.row.key == "debug", "advanced tab reachable");
+                    require(list.entryCount == 2 && list.selectedEntry.row.key == "debug", "advanced tab reachable");
                     key(221); break;
                 case 6:
                     require(list.entryCount == 6 && list.selectedEntry.row.key == "autoAdvance", "next page wraps to playback");
                     key(219); break;
                 case 7:
-                    require(list.entryCount == 1 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
+                    require(list.entryCount == 2 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
                     userEvent("Cancel"); break;
                 case 8:
                     require(list.entryCount == 3 && list.selectedEntry.row.title == "OSF Director", "back opens mod list");
@@ -114,7 +116,7 @@ package
                 case 11:
                     require(list.selectedEntry.row.value == true, "save failure preserves previous value");
                     Object(menu).BGSCodeObj.setBool = setter;
-                    findNamed(menu, "controls").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    findNamed(menu, "Controls").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 12:
                     list.selectedIndex = 1; userEvent("Accept"); break;
                 case 13:
@@ -124,7 +126,7 @@ package
                 case 14:
                     userEvent("Accept");
                     require(list.selectedEntry.row.value == 115, "held candidate cannot be confirmed");
-                    findNamed(menu, "camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    findNamed(menu, "Camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
                     require(list.selectedEntry.row.key == "toggleKey", "capture blocks tab changes");
                     Object(menu).BGSCodeObj.previewKey(116, false); break;
                 case 15:
@@ -215,6 +217,7 @@ package
                     require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/alternate","search suppresses native and raw shortcuts");
                     var input:TextField = searchField();
                     input.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN,true,true,0,Keyboard.ENTER));
+                    input.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_UP,true,true,0,Keyboard.ENTER));
                     require(menu.stage.focus == list,"Enter returns focus to results"); break;
                 case 40:
                     userEvent("Right");
@@ -225,8 +228,9 @@ package
                     require(list.entryCount == 0,"combined search has explicit empty results");
                     capture("keybindings-empty");
                     var focused:TextField = searchField();
-                    focused.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN,true,true,0,Keyboard.ESCAPE));
-                    require(menu.stage.focus == list && findNamed(menu,"bindings") != null,"Escape leaves search without closing menu");
+                    focused.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN,true,true,0,Keyboard.ENTER));
+                    focused.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_UP,true,true,0,Keyboard.ENTER));
+                    require(menu.stage.focus == list && findNamed(menu,"bindings") != null,"Enter leaves empty search without closing menu");
                     findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 42:
                     findNamed(menu,"bindingSource").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
@@ -283,6 +287,51 @@ package
                     require(list.entryCount == 4, "issues fixture has four reports");
                     requireGlyphs("Issues: 4");
                     capture("issues");
+                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 54:
+                    for (var childIndex:int = 0; childIndex < menu.numChildren; ++childIndex) {
+                        var candidate:Object = menu.getChildAt(childIndex);
+                        if ("shelfHeight" in candidate && "toggleExpanded" in candidate) launcher = candidate;
+                    }
+                    require(launcher && launcher.visible && !launcher.expanded && list.visible, "Home combines interfaces and mod settings");
+                    require(findNamed(menu,"launcher") == null, "separate Launcher tab removed");
+                    require(findNamed(menu,"launcher_" + (launcher.columns - 1)) != null && findNamed(menu,"launcher_" + launcher.columns) == null, "recent shelf reserves the final card for overflow");
+                    require(Object(findNamed(menu,"launcher_0")).row.title == "Absolute Control", "recent order overrides alphabetical order");
+                    require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "Home tab label");
+                    capture("home"); userEvent("Up"); break;
+                case 55:
+                    require(launcher.focused && list.disableInput, "Up from the first mod focuses the interface shelf");
+                    userEvent("Down"); break;
+                case 56:
+                    require(!launcher.focused && !list.disableInput, "Down from the shelf returns to mod settings");
+                    findNamed(menu,"launcher_" + (launcher.columns - 1)).dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 57:
+                    require(launcher.expanded && !list.visible, "Show more expands interfaces inside Home");
+                    require(launcher.current.type == "launcher" && launcher.focused, "expanded grid selects an actual interface");
+                    capture("home-expanded"); userEvent("PageDown"); break;
+                case 58:
+                    if (launcher.columns == 4) require(launcher.scrollPosition == 8, "large-text overflow reaches the remaining interfaces");
+                    userEvent("Cancel"); break;
+                case 59:
+                    require(!launcher.expanded && list.visible, "Back collapses interfaces without leaving Home");
+                    originalRows = Object(menu).BGSCodeObj.getRows;
+                    Object(menu).BGSCodeObj.getRows = function():Array {
+                        var rows:Array = originalRows();
+                        for each (var item:Object in rows) if (item.type == "launcher" && item.mod == "launcher-preview-8") item.recentOrder = 100;
+                        return rows;
+                    };
+                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "promoted"; }; break;
+                case 60: break;
+                case 61:
+                    require(Object(findNamed(menu,"launcher_0")).row.title == "Ship Planner", "new native history moves the last-opened interface first");
+                    Object(menu).BGSCodeObj.getRows = function():Array {
+                        return originalRows().filter(function(row:Object, index:int, source:Array):Boolean { return row.type != "launcher"; });
+                    };
+                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "no-interfaces"; }; break;
+                case 62: break;
+                case 63:
+                    require(!launcher.visible && list.visible && list.y == 362 && !list.disableInput, "no interfaces restores the full settings list");
+                    capture("home-no-interfaces");
                     menu.removeEventListener(Event.ENTER_FRAME, advance);
                     trace("[verify] PASS"); break;
                 }
@@ -317,8 +366,9 @@ package
                 if (font.fontName == field.defaultTextFormat.font) embedded = true;
             }
             require(embedded, "custom text uses an embedded game font: " + text);
-            var first:BitmapData = new BitmapData(96, 96, true, 0);
-            var second:BitmapData = new BitmapData(96, 96, true, 0);
+            // Right-aligned labels can render outside a fixed 96px sample.
+            var first:BitmapData = new BitmapData(Math.ceil(field.width), Math.ceil(field.height), true, 0);
+            var second:BitmapData = new BitmapData(first.width, first.height, true, 0);
             field.text = "M"; first.draw(field);
             field.text = "I"; second.draw(field);
             field.text = text;

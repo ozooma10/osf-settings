@@ -1,22 +1,35 @@
 # Menu launchers
 
-The top-level **Launcher** tab lists all registered native menus and callback-owned
-interfaces together. Declare native menus in the mod's existing settings schema;
+The **Home** tab shows recent native menus and callback-owned interfaces above
+the mod settings list. Declare native menus in the mod's existing settings schema;
 SDK providers can register directly. Launchers have no stored values, are never
-reset, and do not add entries to All Mods or settings groups.
+reset, and do not add entries to the mod settings list or settings groups.
 
 Each destination has a card with a circular vector badge, generated initials,
 a stable accent color derived from its mod/destination ID, a title, a short
-description, and the owning mod's name. This presentation needs no external images.
+description, and an Open footer. This presentation needs no external images.
 The current registration contract does not accept custom icon files.
 
-Cards sort by mod title, then interface title. Normal text shows four tall cards
-per page; large text shows three larger cards per page. Use directional navigation
-on keyboard/controller, click a card, or use the Open prompt. Mouse wheel,
-Page Up/Down, and the visible Prev/Next controls move between card pages; directional
-navigation also reveals the selected page. Shoulder buttons continue to switch
-the top-level tabs. Unavailable destinations remain visible with their reason in
-the footer and cannot be opened.
+Cards sort by last opened, with never-opened destinations ordered by mod title,
+interface title, and stable IDs. Normal text has five shelf slots; large text has
+four. When there are more interfaces than slots, the final card becomes **Show X
+more** (ten interfaces show four recent cards and **Show 6 more** at normal size).
+Selecting it expands the grid on Home. **Show less** or Back restores the shelf
+and settings list. Expanded grids hold ten cards per page, or eight at large text.
+
+Use Up from the first mod to focus the shelf, and Down from the shelf to return
+to mod settings. Cards support directional keyboard/controller navigation, click,
+and the Open prompt. In the expanded grid, mouse wheel, Page Up/Down, and visible
+Prev/Next controls move between pages; directional navigation also reveals the
+selected page. Shoulder buttons switch the top-level tabs. Unavailable destinations
+remain visible with their reason in the footer and cannot be opened. With no
+registered interfaces, Home uses the full-height settings list.
+
+Recency is recorded when Settings hands off an accepted open request, and saved
+to `Data/SFSE/Plugins/OSF/Settings/launcher-history.json`. It survives menu and game
+restarts and is shared across saves. Canceled or rejected requests do not update
+it. Providers own failures after handoff. Invalid history falls back to title order;
+an unwritable history still updates the current session and never blocks opening.
 
 ## Registered native menus
 
@@ -100,10 +113,13 @@ A main-menu/loading screen already open when Settings is removed cancels handoff
 ## Verification
 
 `xmake test osfsettings-launcher-tests/default` checks registry validation,
-copied metadata/callback identity, availability updates, ABI discovery, and
-registration from loaded schemas. `xmake test osfsettings-schema-tests/default`
+copied metadata/callback identity, availability updates, ABI discovery, persisted
+recency, and registration from loaded schemas. `xmake test osfsettings-schema-tests/default`
 covers menu declarations and their separation from saved setting values. Build the production DLL and normal/large
 movies with `xmake build "OSF Settings"`.
+
+`pwsh tools/test-menu-preview.ps1` (also with `-LargeText`) checks the combined
+Home layout, overflow, focus transitions, recency refresh, and empty-launcher fallback.
 
 Fresh-game acceptance remains necessary for native-menu and OSF UI handoffs:
 keyboard, mouse and controller activation; releasing the activation input;
