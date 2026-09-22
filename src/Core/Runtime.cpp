@@ -20,7 +20,9 @@ namespace OSFSettings
         const auto schemaDir = Paths::SchemasDir();
         REX::INFO("Loading schemas from {}", schemaDir.string());
         auto& settings = SettingsService::Get();
-        settings.Load(schemaDir, Paths::ValuesDir());
+        auto state = std::make_shared<StateStore>(Paths::ValuesDir() / "osfsettings.json",
+            Paths::ValuesDir().parent_path() / "launcher-history.json");
+        settings.Load(schemaDir, Paths::ValuesDir(), state);
         const auto errors = settings.LoadErrors();
         const auto mods = settings.Snapshot();
 
@@ -50,7 +52,7 @@ namespace OSFSettings
         }
         ActionService::Get().Initialize(mods);
         LauncherService::Get().Initialize(mods);
-        LauncherService::Get().LoadHistory(Paths::ValuesDir().parent_path() / "launcher-history.json");
+        LauncherService::Get().LoadHistory(std::move(state));
         settings.Start();
         m_initialized = true;
         return true;

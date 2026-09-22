@@ -15,6 +15,7 @@ For mod authors, start with [Settings](docs/SETTINGS.md) to define a page and co
 <summary>Optional integrations</summary>
 
 - [Action buttons](docs/ACTIONS.md): run an operation with optional confirmation and report completion.
+- [Persistence](docs/PERSISTENCE.md): per-mod values, launcher history, and shared per-save native records.
 - [Menu launchers](docs/LAUNCHERS.md): add native menus or custom interfaces to the launch cards listing.
 
 </details>

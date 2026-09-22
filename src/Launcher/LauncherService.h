@@ -4,6 +4,7 @@
 #include <functional>
 #include <filesystem>
 #include <mutex>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -12,6 +13,7 @@
 namespace OSFSettings
 {
     struct ModSettings;
+    class StateStore;
     enum class LauncherError { None, InvalidArgument, AlreadyRegistered, NotFound };
     struct LaunchDestination
     {
@@ -26,7 +28,7 @@ namespace OSFSettings
     public:
         static LauncherService& Get();
         void Initialize(const std::vector<ModSettings>& mods);
-        void LoadHistory(const std::filesystem::path& path);
+        void LoadHistory(std::shared_ptr<StateStore> state);
         bool RecordOpened(std::string_view mod, std::string_view id);
         LauncherError Register(LaunchDestination destination);
         LauncherError SetAvailable(std::string_view mod, std::string_view id, bool available, std::string reason);
@@ -36,9 +38,10 @@ namespace OSFSettings
     private:
         mutable std::mutex m_mutex;
         std::vector<LaunchDestination> m_destinations;
-        std::filesystem::path m_historyPath;
+        std::shared_ptr<StateStore> m_state;
+        bool m_historyDirty{};
         std::vector<std::pair<std::string, std::string>> m_recent;
-        void SaveHistory() const; // Called with m_mutex held; writes cannot overtake one another.
+        void SaveHistory(); // Called with m_mutex held; writes cannot overtake one another.
         std::atomic_uint64_t m_revision{};
     };
 }

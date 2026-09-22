@@ -7,11 +7,15 @@
 
 namespace OSFSettings
 {
-    void SettingsStore::LoadAll(const std::filesystem::path& schemaDir, const std::filesystem::path& valuesDir)
+    void SettingsStore::LoadAll(const std::filesystem::path& schemaDir, const std::filesystem::path& valuesDir,
+        std::shared_ptr<StateStore> state)
     {
         m_mods.clear();
         m_loadErrors.clear();
         m_valuesDir = valuesDir;
+        m_state = state ? std::move(state) : std::make_shared<StateStore>(valuesDir / "osfsettings.json",
+            valuesDir.parent_path() / "launcher-history.json");
+        m_loadErrors = m_state->LoadErrors();
 
         std::error_code error;
         if (!std::filesystem::is_directory(schemaDir, error)) {
@@ -51,7 +55,11 @@ namespace OSFSettings
                         mod.values.emplace(setting.key, setting.DefaultValue());
                     }
                 }
-                SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
+                if (mod.schema.id == "osfsettings") {
+                    SettingsJson::ApplyValues(m_state->Read(), m_state->Path(), mod.schema, mod.values, m_loadErrors);
+                } else {
+                    SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
+                }
                 m_mods.push_back(std::move(mod));
             } catch (const std::exception& exception) {
                 m_loadErrors.push_back({ path, exception.what() });
@@ -80,7 +88,15 @@ namespace OSFSettings
     {
         if (mod.values == proposed) return { true, {} };
         std::string error;
-        if (!SettingsJson::SaveValues(m_valuesDir / (mod.schema.id + ".json"), proposed, error)) {
+        bool saved;
+        if (mod.schema.id == "osfsettings") {
+            auto values = m_state->Read("values");
+            values.update(SettingsJson::EncodeValues(proposed));
+            saved = m_state->Write("values", values, error);
+        } else {
+            saved = SettingsJson::SaveValues(m_valuesDir / (mod.schema.id + ".json"), proposed, error);
+        }
+        if (!saved) {
             return { false, std::move(error), Error::SaveFailed };
         }
         mod.values.swap(proposed);

@@ -22,11 +22,11 @@ namespace OSFSettings
         return *service;
     }
 
-    void SettingsService::Load(const std::filesystem::path& schemas, const std::filesystem::path& values)
+    void SettingsService::Load(const std::filesystem::path& schemas, const std::filesystem::path& values, std::shared_ptr<StateStore> state)
     {
         std::lock_guard lock(m_mutex);
         if (m_loaded) return;
-        m_store.LoadAll(schemas, values);
+        m_store.LoadAll(schemas, values, std::move(state));
         m_loaded = true;
     }
 

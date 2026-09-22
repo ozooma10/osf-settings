@@ -17,5 +17,8 @@ namespace OSFSettings::SettingsJson
     // Parse source directly to preserve group order and reject duplicate group names.
     std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error);
     void LoadValues(const std::filesystem::path& path, const ModSchema& schema, SettingValues& values, std::vector<SettingsLoadError>& errors);
+    void ApplyValues(const nlohmann::json& document, const std::filesystem::path& path, const ModSchema& schema,
+        SettingValues& values, std::vector<SettingsLoadError>& errors);
+    nlohmann::json EncodeValues(const SettingValues& values);
     bool SaveValues(const std::filesystem::path& path, const SettingValues& values, std::string& error);
 }

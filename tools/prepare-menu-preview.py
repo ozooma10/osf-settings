@@ -13,6 +13,18 @@ import zlib
 from preview_abc import adapt_callbacks
 
 
+def load_schema(path):
+    schema = json.loads(path.read_text(encoding="utf-8-sig"))
+    mod_id = path.stem
+    if not re.fullmatch(r"[a-z0-9._-]+", mod_id) or mod_id in (".", ".."):
+        raise ValueError(f"Invalid schema filename mod ID: {path}")
+    if "id" in schema and schema["id"] != mod_id:
+        raise ValueError(f"Schema id must match the filename stem: {path}")
+    schema["id"] = mod_id
+    schema.setdefault("title", mod_id)
+    return schema
+
+
 @cache
 def virtual_key_names():
     # The offline preview reads the same enum used by native magic_enum reflection.
@@ -198,7 +210,7 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
     (output / "menu.swf").write_bytes(pack_swf(source, prefix, tags))
     rows = ET.SubElement(config, "rows")
     for path in schema_paths:
-        schema = json.loads(path.read_text(encoding="utf-8-sig"))
+        schema = load_schema(path)
         for name, settings in schema["groups"].items():
             for setting in settings:
                 if "requires" in setting and setting["requires"] != "restart":
@@ -269,7 +281,7 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
     issues = ET.SubElement(config, "issues")
     if issues_path:
         titles = {schema["id"]: schema.get("title") or schema["id"]
-                  for schema in (json.loads(path.read_text(encoding="utf-8")) for path in schema_paths)}
+                  for schema in (load_schema(path) for path in schema_paths)}
         reports = json.loads(issues_path.read_text(encoding="utf-8"))
         for report in sorted(reports, key=lambda report: report["severity"] != "ERROR"):
             issue = ET.SubElement(issues, "issue", mod=report["modId"], id=report["id"],

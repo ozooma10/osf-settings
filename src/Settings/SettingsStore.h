@@ -2,9 +2,11 @@
 
 #include "SettingsSchema.h"
 #include "SettingsError.h"
+#include "StateStore.h"
 
 #include <filesystem>
 #include <optional>
+#include <memory>
 
 namespace OSFSettings
 {
@@ -21,7 +23,8 @@ namespace OSFSettings
             bool changed{};
         };
 
-        void LoadAll(const std::filesystem::path& schemaDir, const std::filesystem::path& valuesDir);
+        void LoadAll(const std::filesystem::path& schemaDir, const std::filesystem::path& valuesDir,
+            std::shared_ptr<StateStore> state = {});
         std::optional<SettingValue> GetValue(std::string_view mod, std::string_view key) const;
         SetResult Set(std::string_view mod, std::string_view key, SettingValue value);
         SetResult Reset(std::string_view mod, std::string_view key);
@@ -38,5 +41,6 @@ namespace OSFSettings
         std::vector<ModSettings> m_mods;
         std::vector<SettingsLoadError> m_loadErrors;
         std::filesystem::path m_valuesDir;
+        std::shared_ptr<StateStore> m_state;
     };
 }

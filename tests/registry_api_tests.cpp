@@ -154,7 +154,7 @@ int main()
         std::filesystem::create_directories(schemas);
         std::filesystem::create_directories(values);
         auto schema = TestJson::parse(R"({
-            "schemaVersion":1,"id":"alpha","title":"Alpha title","description":"Description",
+            "schemaVersion":1,"title":"Alpha title","description":"Description",
             "groups":{"First group":[
                 {"key":"enabled","type":"bool","label":"Enabled","hint":"A hint","requires":"restart","default":false},
                 {"key":"count","type":"int","default":-9007199254740993,"min":-9223372036854775808,"max":9223372036854775807},
@@ -209,7 +209,8 @@ int main()
 
         const auto all = Read(client);
         check(all.calls == 1 && all.thread == std::this_thread::get_id() && all.mods.size() == 3, "one synchronous whole-registry callback");
-        check(all.mods[0]["id"] == "alpha" && all.mods[1]["id"] == "beta" && all.mods[2]["id"] == "hotkeys", "mod identities");
+        check(all.mods[0]["id"] == "alpha" && all.mods[1]["id"] == "beta" && all.mods[2]["id"] == "hotkeys",
+            "registry identities come from filenames with or without legacy root ids");
         const auto selected = Read(client, "alpha");
         check(selected.mods.size() == 1 && selected.mods[0] == all.mods[0], "exact mod filter");
         check(all.mods[1]["groups"].empty() && all.mods[1]["title"] == "beta", "empty mods and parsed fallback labels");

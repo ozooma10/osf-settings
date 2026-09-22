@@ -26,9 +26,9 @@ remain visible with their reason in the footer and cannot be opened. With no
 registered interfaces, Home uses the full-height settings list.
 
 Recency is recorded when Settings hands off an accepted open request, and saved
-to `Data/SFSE/Plugins/OSF/Settings/launcher-history.json`. It survives menu and game
+to the launcher section of `Data/SFSE/Plugins/OSF/Settings/values/osfsettings.json`. It survives menu and game
 restarts and is shared across saves. Canceled or rejected requests do not update
-it. Providers own failures after handoff. Invalid history falls back to title order;
+it. Older `launcher-history.json` files are imported into OSF Settings' own values file; see [Persistence](PERSISTENCE.md). Providers own failures after handoff. Invalid history falls back to title order;
 an unwritable history still updates the current session and never blocks opening.
 
 ## Registered native menus

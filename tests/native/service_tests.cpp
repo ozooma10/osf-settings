@@ -369,9 +369,9 @@ int TestSettingsService()
     auto invalid = schema;
     invalid["groups"]["main"][0]["key"] = std::string("enabled\0suffix", 14);
     std::string error;
-    check(!SettingsJson::ParseSchema(invalid, error) && error.find("NUL") != std::string::npos, "schema rejects keys truncated by the ABI");
+    check(!SettingsJson::ParseSchema(invalid, "sample", error) && error.find("NUL") != std::string::npos, "schema rejects keys truncated by the ABI");
     invalid = schema;
     invalid["groups"]["main"][3]["options"][1] = std::string("bad\0option", 10);
-    check(!SettingsJson::ParseSchema(invalid, error) && error.find("NUL") != std::string::npos, "schema rejects enum values truncated by the ABI");
+    check(!SettingsJson::ParseSchema(invalid, "sample", error) && error.find("NUL") != std::string::npos, "schema rejects enum values truncated by the ABI");
     return checks;
 }

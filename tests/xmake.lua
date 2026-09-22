@@ -20,12 +20,14 @@ test_target("osfsettings-tests")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-schema-tests")
+    add_files("../src/Settings/StateStore.cpp")
     add_files("hotkey_schema_tests.cpp", "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp",
         "../src/Settings/SettingsJson.cpp", "../src/Settings/SettingsStore.cpp", "../src/Settings/SettingsValuesJson.cpp")
     add_includedirs("../src")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-launcher-tests")
+    add_files("../src/Settings/StateStore.cpp")
     add_deps("commonlibsf")
     add_files("launcher_tests.cpp", "../src/Launcher/LauncherService.cpp",
         "../src/API/LauncherApi.cpp", "../src/Settings/SettingsSchema.cpp")
@@ -127,4 +129,27 @@ test_target("osfsettings-papyrus-tests")
         "../src/Papyrus/Values.cpp", "../src/Papyrus/Subscriptions.cpp", "../src/Input/KeyNames.cpp", "../src/Settings/*.cpp")
     add_includedirs("../src")
     set_pcxxheader("../src/pch.h")
+    add_packages("nlohmann_json")
+
+test_target("osfsettings-persistence-tests")
+    add_files("persistence_tests.cpp", "../src/Persistence/PersistenceBroker.cpp")
+    add_includedirs("../src")
+
+test_target("osfsettings-state-tests")
+    add_deps("commonlibsf")
+    add_files("state_store_tests.cpp", "../src/Settings/StateStore.cpp", "../src/Settings/SettingsStore.cpp",
+        "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp", "../src/Settings/SettingsJson.cpp",
+        "../src/Settings/SettingsValuesJson.cpp", "../src/Launcher/LauncherService.cpp")
+    add_includedirs("../src")
+    set_pcxxheader("../src/pch.h")
+    add_packages("nlohmann_json")
+
+-- The historical aggregate also depends on the removed HotkeyService API.
+-- Run its value/storage coverage independently of those obsolete fixtures.
+test_target("osfsettings-store-tests")
+    add_defines("OSFSETTINGS_STORE_ONLY_TESTS")
+    add_files("native/settings_tests.cpp", "../src/Settings/StateStore.cpp", "../src/Settings/SettingsStore.cpp",
+        "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp", "../src/Settings/SettingsJson.cpp",
+        "../src/Settings/SettingsValuesJson.cpp", "../src/Menu/FloatSlider.cpp")
+    add_includedirs("../src")
     add_packages("nlohmann_json")

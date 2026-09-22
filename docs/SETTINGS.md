@@ -27,9 +27,9 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 The filename without `.json` is your mod ID: `mymod.json` gives `mymod`.
 OSF builds your mods configuration menu from this file. Schemas load at startup; restart Starfield after editing them. 
 
-Player values are saved in `Data/SFSE/Plugins/OSF/Settings/state.json` and shared across save games.
+Player values are saved separately for each mod in `Data/SFSE/Plugins/OSF/Settings/values/<modId>.json` and shared across save games.
 
-Ship just the schema file; OSF Settings manages the shared state file. Existing per-mod values are imported automatically; see [Persistence](PERSISTENCE.md). 
+Ship just the schema file; OSF Settings manages your mod's values file. OSF Settings keeps its own values and launcher history together in `values/osfsettings.json`; see [Persistence](PERSISTENCE.md).
 
 Load failures are reported in `OSFSettings.log` as well as the "Mod Health" Section of OSF Settings menu.
 

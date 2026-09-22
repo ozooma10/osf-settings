@@ -131,7 +131,7 @@ int TestKeySettings()
         {"key":"mode","type":"enum","default":"F4","options":["F4","F5"]}
     ]}})");
     std::string error;
-    const auto schema = SettingsJson::ParseSchema(document, error);
+    const auto schema = SettingsJson::ParseSchema(document, "keys", error);
     check(schema && error.empty() && std::get<KeyBinding>(schema->FindSetting("toggle")->DefaultValue()).keyCode == 0x73, "schema stores virtual-key defaults");
     const std::pair<Json, std::uint32_t> defaults[] = {
         { 115, 0x73 }, { "F4", 0x73 }, { "unbound", 0xFF }, { 255, 0xFF },
@@ -140,7 +140,7 @@ int TestKeySettings()
     for (const auto& [source, expected] : defaults) {
         auto named = document;
         named["groups"]["main"][0]["default"] = source;
-        const auto parsed = SettingsJson::ParseSchema(named, error);
+        const auto parsed = SettingsJson::ParseSchema(named, "keys", error);
         check(parsed && std::get<KeyBinding>(parsed->FindSetting("toggle")->DefaultValue()).keyCode == expected,
             "names and numeric defaults resolve to native virtual-key identity");
     }
@@ -149,17 +149,17 @@ int TestKeySettings()
         Json(nullptr), Json(std::uint64_t{ 0xFFFFFFFFFFFFFFFF }) }) {
         auto bad = document;
         bad["groups"]["main"][0]["default"] = invalid;
-        check(!SettingsJson::ParseSchema(bad, error), "invalid key default rejects schema");
+        check(!SettingsJson::ParseSchema(bad, "keys", error), "invalid key default rejects schema");
     }
     auto bad = document;
     bad["groups"]["main"][1]["default"] = 255;
-    check(!SettingsJson::ParseSchema(bad, error), "unbinding is opt-in");
+    check(!SettingsJson::ParseSchema(bad, "keys", error), "unbinding is opt-in");
     bad["groups"]["main"][1]["default"] = "UNBOUND";
-    check(!SettingsJson::ParseSchema(bad, error), "named unbound defaults also require opt-in");
+    check(!SettingsJson::ParseSchema(bad, "keys", error), "named unbound defaults also require opt-in");
     bad["groups"]["main"][1]["allowUnbound"] = true;
-    check(SettingsJson::ParseSchema(bad, error).has_value(), "unbound default permitted explicitly");
+    check(SettingsJson::ParseSchema(bad, "keys", error).has_value(), "unbound default permitted explicitly");
     bad["groups"]["main"][1]["allowUnbound"] = "true";
-    check(!SettingsJson::ParseSchema(bad, error), "allowUnbound must be boolean");
+    check(!SettingsJson::ParseSchema(bad, "keys", error), "allowUnbound must be boolean");
 
     const auto root = std::filesystem::temp_directory_path() /
         ("osfsettings-keys-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));

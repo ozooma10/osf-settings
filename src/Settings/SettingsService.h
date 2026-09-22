@@ -26,7 +26,7 @@ namespace OSFSettings
 
         static SettingsService& Get();
 
-        void Load(const std::filesystem::path& schemas, const std::filesystem::path& values);
+        void Load(const std::filesystem::path& schemas, const std::filesystem::path& values, std::shared_ptr<StateStore> state = {});
         void Start(); // After the notification dispatcher is installed.
         void Localize(const std::filesystem::path& directory, std::string_view language);
         std::vector<ModSettings> Snapshot() const;

@@ -52,6 +52,8 @@ xmake build 'OSF Settings'
 
 The instrumented plugin requires `Data/SFSE/Plugins/OSFSettingsTestHarness.json`
 with `{"valuesDir":"C:/Modding/Starfield/OSF Test Harness/state/settings-values"}`.
+Each mod saves its own JSON file there; `osfsettings.json` also contains launcher history.
+Keep this directory isolated from live player state.
 The harness prepares this directory and config. The path must be nonempty and
 absolute; missing/invalid config prevents plugin initialization. This keeps tests
 away from MO2's shared overwrite values. Normal builds ignore this configuration.
