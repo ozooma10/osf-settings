@@ -93,7 +93,7 @@ namespace OSFSettings::SettingsJson
         try {
             Require(document.is_object(), "schema must be an object");
             const auto version = document.find("schemaVersion");
-            Require(version != document.end() && version->is_number_integer() && *version == 1,  "schemaVersion must be the integer 1");
+            Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
 
             ModSchema mod;
             mod.id = RequiredText(document, "id");

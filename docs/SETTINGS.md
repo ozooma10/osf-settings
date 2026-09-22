@@ -1,8 +1,8 @@
 # Settings
 
-Ship a JSON schema and connect its values to your mod through
-[C++](#c-integration) or [Papyrus](#papyrus-integration). OSF supplies the menu
-and persistence; your mod reads the values and applies them to gameplay.
+Ship a JSON schema and connect its values to your mod through [C++](#c-integration) or [Papyrus](#papyrus-integration).
+
+OSF Settings provides a centralized interface for users to view and edit those settings.
 
 ## Define your settings
 
@@ -10,7 +10,6 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 
 ```json
 {
-  "schemaVersion": 1,
   "id": "mymod",
   "title": "My mod",
   "groups": {
@@ -26,19 +25,22 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 }
 ```
 
-OSF builds the menu from this file. Schemas load at startup; restart Starfield
-after editing them. Player values are saved in
-`Data/SFSE/Plugins/OSF/Settings/values/<modId>.json` and shared across save games.
-Ship the schema; OSF manages the values file. Load failures are reported in
-`OSFSettings.log`.
+OSF builds your mods configuration menu from this file. Schemas load at startup; restart Starfield after editing them. 
 
-Display text can be translated with separate [localization catalogs](LOCALIZATION.md)
-without modifying this schema. IDs and stored values remain unchanged.
+Player values are saved in `Data/SFSE/Plugins/OSF/Settings/state.json` and shared across save games.
+
+Ship just the schema file; OSF Settings manages the shared state file. Existing per-mod values are imported automatically; see [Persistence](PERSISTENCE.md). 
+
+Load failures are reported in `OSFSettings.log` as well as the "Mod Health" Section of OSF Settings menu.
+
+Display text can be translated with separate [localization catalogs](LOCALIZATION.md) without modifying the schema. IDs and stored values remain unchanged.
 
 ### Schema fields and types
 
-- Required root fields: `schemaVersion: 1`, `id`, and `groups`. `title` defaults
-  to the mod ID; `description` is optional.
+- Required root fields: `id` and `groups`. `title` defaults to the mod ID;
+  `description` is optional.
+- `schemaVersion` is optional and defaults to `1` when omitted. If present, it
+  must be the integer `1`; other versions and value types are rejected.
 - Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs,
   `.` and `..` are invalid. Use a unique ID and keep it stable between releases.
 - Group names become headings. Groups and settings appear in authored order.
