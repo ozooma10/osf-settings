@@ -101,6 +101,7 @@ private function reportTestState():void
         requiredActions.push({action:bindingRow.action,title:bindingRow.title});
     var visible:Rectangle = Object(extensions).visibleRect as Rectangle;
     BGSCodeObj.testSnapshot(frame, {initialized:initialized, closing:closing,
+        menuHeading:heading ? heading.text : "", sectionHeading:section ? section.text : "", countText:count ? count.text : "",
         largeText:CONFIG::largeText, emptyText:empty ? empty.text : "", detailHint:detailHint ? detailHint.text : "",
         stringEditor:stringEditor.testState(), issueDetails:issueDetails.testState(),
         translations:testTranslationState(),

@@ -39,11 +39,11 @@ package
             while (content.numChildren) content.removeChildAt(0);
             content.graphics.clear(); extent = 0;
             if (row) {
-                line("SELECTED ISSUE", 21, MenuStyle.MUTED, true, 16);
-                line(row.modTitle + " / " + row.severity, CONFIG::largeText ? 25 : 23, MenuStyle.MUTED, true, 12);
+                line(Localization.text("issues.selected"), 21, MenuStyle.MUTED, true, 16);
+                line(row.modTitle + " / " + (row.severityLabel || Localization.text(row.severity == "ERROR" ? "issues.error" : "issues.warning")), CONFIG::largeText ? 25 : 23, MenuStyle.MUTED, true, 12);
                 line(row.title, CONFIG::largeText ? 38 : 34, MenuStyle.WHITE, false, 32);
                 if (row.impact) {
-                    line("WHAT THIS AFFECTS", 21, MenuStyle.MUTED, true, 12);
+                    line(Localization.text("issues.impact"), 21, MenuStyle.MUTED, true, 12);
                     line(row.impact, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED, false, 30);
                 }
                 if (row.nextSteps) {
@@ -52,7 +52,7 @@ package
                         content.graphics.moveTo(0, extent); content.graphics.lineTo(WIDTH - 18, extent);
                         content.graphics.lineStyle(); extent += 24;
                     }
-                    line("WHAT YOU CAN DO", 21, MenuStyle.MUTED, true, 12);
+                    line(Localization.text("issues.nextSteps"), 21, MenuStyle.MUTED, true, 12);
                     line(row.nextSteps, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED, false, 8);
                 }
             }

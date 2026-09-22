@@ -114,6 +114,7 @@ package
             if (!bridgeReady || !stage || initialized || starting) return;
             starting = true;
             try {
+                Localization.initialize(BGSCodeObj.getLocalization ? BGSCodeObj.getLocalization() : null);
                 menuStage = stage; buildMenu(); initialized = true;
                 startupPhase = "populate settings"; readIssues(); refresh(false);
                 startupPhase = "ready"; BGSCodeObj.startup(startupPhase);
@@ -149,7 +150,7 @@ package
                 chrome.graphics.lineTo(100, y + 40); chrome.graphics.lineTo(100, y + 62.3);
                 chrome.graphics.lineTo(60, y + 22.3); chrome.graphics.endFill();
             }
-            var rail:TextField = label("MOD SETTINGS", 0, 0, 250, 40, 25, 0xD3DDDF, true);
+            var rail:TextField = label(Localization.text("menu.title"), 0, 0, 250, 40, 25, 0xD3DDDF, true);
             rail.rotation = -90; rail.x = 60; rail.y = 268;
             heading = label("", MenuStyle.LEFT, 98, 1320, 85, CONFIG::largeText ? 60 : 52, MenuStyle.WHITE, true);
             tabViewport.x = MenuStyle.LEFT; tabViewport.y = 196;
@@ -159,7 +160,7 @@ package
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
             configureList(options, "OptionListEntry");
             options.addEventListener("SettingsOptionEntry_ValueChanged", valueChanged);
-            detailLabel = label("SELECTED SETTING", 1210, 363, 630, 36, 21, MenuStyle.MUTED, true);
+            detailLabel = label(Localization.text("menu.selectedSetting"), 1210, 363, 630, 36, 21, MenuStyle.MUTED, true);
             detailTitle = label("", 1210, 409, 634, 102, CONFIG::largeText ? 38 : 34);
             detailTitle.multiline = true; detailTitle.wordWrap = true;
             detailHint = label("", 1210, 486, 634, 160, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED);
@@ -167,11 +168,11 @@ package
             var descriptionFormat:TextFormat = detailHint.defaultTextFormat;
             descriptionFormat.leading = CONFIG::largeText ? 12 : 10; detailHint.defaultTextFormat = descriptionFormat;
             detailHint.addEventListener(MouseEvent.MOUSE_WHEEL, scrollDescription);
-            defaultLabel = label("DEFAULT", 1210, 680, 420, 44, 23, MenuStyle.MUTED, true);
+            defaultLabel = label(Localization.text("menu.default"), 1210, 680, 420, 44, 23, MenuStyle.MUTED, true);
             defaultValue = label("", 1674, 680, 170, 44, 25, MenuStyle.WHITE, true); alignRight(defaultValue);
             issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
-            status = label("Changes are saved automatically.", MenuStyle.LEFT, 938, 1180, 52, 21, MenuStyle.MUTED, true);
-            var legend:TextField = label("Changed from default", 1450, 938, 394, 36, 21, MenuStyle.MUTED, true);
+            status = label(Localization.text("menu.autoSave"), MenuStyle.LEFT, 938, 1180, 52, 21, MenuStyle.MUTED, true);
+            var legend:TextField = label(Localization.text("menu.changed"), 1450, 938, 394, 36, 21, MenuStyle.MUTED, true);
             changedLegend.mouseEnabled = false; changedLegend.mouseChildren = false;
             addChild(changedLegend); changedLegend.addChild(legend);
             alignRight(legend); MenuStyle.diamond(changedLegend.graphics, 1840 - legend.textWidth - 20, 954, MenuStyle.ACCENT);
@@ -180,16 +181,16 @@ package
             pageBar = create("Shared.Components.ButtonControls.ButtonBar.ButtonBar");
             pageBar.x = MenuStyle.LEFT; pageBar.y = 1008; addChild(pageBar as MovieClip); pageBar.Initialize(0, 28);
             pageBar.scaleX = 1.1; pageBar.scaleY = 1.1;
-            button("PREV PAGE", "LShoulder", function():void { changePage(-1); }, pageBar);
-            button("NEXT PAGE", "RShoulder", function():void { changePage(1); }, pageBar);
+            button(Localization.text("buttons.previousPage"), "LShoulder", function():void { changePage(-1); }, pageBar);
+            button(Localization.text("buttons.nextPage"), "RShoulder", function():void { changePage(1); }, pageBar);
             pageBar.RefreshButtons();
             bar = create("Shared.Components.ButtonControls.ButtonBar.ButtonBar");
             bar.x = MenuStyle.RIGHT; bar.y = 1008; addChild(bar as MovieClip); bar.Initialize(1, 38);
             bar.scaleX = 1.25; bar.scaleY = 1.25;
-            acceptButton = button("TOGGLE", "Accept", accept);
-            resetButton = button("RESET SETTING", "YButton", reset);
-            clearButton = button("CLEAR BINDING", "XButton", clearBinding);
-            backButton = button("ALL MODS", "Cancel", back); bar.RefreshButtons();
+            acceptButton = button(Localization.text("buttons.toggle"), "Accept", accept);
+            resetButton = button(Localization.text("buttons.reset"), "YButton", reset);
+            clearButton = button(Localization.text("buttons.clearBinding"), "XButton", clearBinding);
+            backButton = button(Localization.text("menu.allMods"), "Cancel", back); bar.RefreshButtons();
             captureBinding = create("Binding") as MovieClip;
             captureBinding.mouseEnabled = false; captureBinding.mouseChildren = false;
             captureBinding.visible = false;
@@ -254,7 +255,7 @@ package
         private function issuesPage():Boolean { return !modID && rootPage == "issues"; }
         private function pages():Array
         {
-            return modID ? groups : [{id:"mods", title:"ALL MODS"}, {id:"bindings", title:"KEYBINDINGS"}, {id:"issues", title:"MOD ISSUES" + (issues.length ? " (" + issues.length + ")" : "")}];
+            return modID ? groups : [{id:"mods", title:Localization.text("menu.allMods")}, {id:"bindings", title:Localization.text("menu.keybindings")}, {id:"issues", title:Localization.text("menu.issues") + (issues.length ? " (" + issues.length + ")" : "")}];
         }
         private function activePage():String { return modID ? groupID : rootPage; }
         private function selectPage(id:String):void
@@ -284,7 +285,7 @@ package
             var latest:Array = BGSCodeObj.getIssues() as Array || [];
             var changed:Boolean = latest.length != issues.length;
             for (var i:int = 0; !changed && i < latest.length; ++i) {
-                for each (var field:String in ["mod", "id", "modTitle", "title", "severity", "impact", "nextSteps"]) {
+                for each (var field:String in ["mod", "id", "modTitle", "title", "severity", "severityLabel", "impact", "nextSteps"]) {
                     if (latest[i][field] != issues[i][field]) { changed = true; break; }
                 }
             }
@@ -353,17 +354,17 @@ package
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             options.disableInput = bindingBusy() || searching();
             if (!searching()) menuStage.focus = options as MovieClip;
-            MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? "No issues reported." : "No settings to display.");
-            var title:String = "MOD SETTINGS"; var group:String = "ALL MODS";
+            MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? Localization.text("menu.noIssues") : Localization.text("menu.noSettings"));
+            var title:String = Localization.text("menu.title"); var group:String = Localization.text("menu.allMods");
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
             MenuStyle.fit(heading, title.toUpperCase());
-            MenuStyle.setText(section, issuesPage() ? "REPORTED ISSUES" : group.toUpperCase());
-            MenuStyle.setText(count, data.length + (issuesPage() ? data.length == 1 ? " ISSUE" : " ISSUES" : modID ? data.length == 1 ? " ITEM" : " ITEMS" : data.length == 1 ? " MOD" : " MODS"));
+            MenuStyle.setText(section, issuesPage() ? Localization.text("menu.reportedIssues") : group.toUpperCase());
+            MenuStyle.setText(count, Localization.text(issuesPage() ? "counts.issues" : modID ? "counts.items" : "counts.mods", {count:data.length}));
             if (!modID && (!bindingsPage() || !preserve)) {
-                MenuStyle.setText(status, bindingsPage() ? "MainGameplay / PC   |   US ANSI   |   Enter and Num Enter share a native key code." : issuesPage() ? "Issues are reported by mods." : "Select a mod to view its settings.");
+                MenuStyle.setText(status, bindingsPage() ? Localization.text("menu.bindingContext") : issuesPage() ? Localization.text("menu.issuesHint") : Localization.text("menu.modsHint"));
                 status.textColor = MenuStyle.MUTED;
-            } else if (!preserve) MenuStyle.setText(status, "Changes are saved automatically.");
+            } else if (!preserve) MenuStyle.setText(status, Localization.text("menu.autoSave"));
             refreshing = false; describe(); decorate();
         }
         private function drawTabs():void
@@ -420,17 +421,17 @@ package
             var row:Object = current();
             var reporting:Boolean = issuesPage();
             detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage();
-            MenuStyle.setText(detailLabel, modID ? row && row.type == "action" ? "SELECTED ACTION" : "SELECTED SETTING" : "SELECTED MOD");
+            MenuStyle.setText(detailLabel, modID ? row && row.type == "action" ? Localization.text("menu.selectedAction") : Localization.text("menu.selectedSetting") : Localization.text("menu.selectedMod"));
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
-            MenuStyle.setText(detailTitle, row ? row.title : "Nothing selected");
+            MenuStyle.setText(detailTitle, row ? row.title : Localization.text("menu.nothingSelected"));
             detailHint.y = 409 + Math.max(68, detailTitle.textHeight + 20);
             detailHint.height = Math.max(64, 630 - detailHint.y);
             var hint:String = row ? String(row.hint || "") : "";
             if (row && row.type == "action") hint += (hint ? "\n\n" : "") + row.message;
-            MenuStyle.setText(detailHint, (row && row.requiresRestart ? "Changes take effect after restarting Starfield." + (hint ? "\n\n" : "") : "") + hint);
+            MenuStyle.setText(detailHint, (row && row.requiresRestart ? Localization.text("menu.restart") + (hint ? "\n\n" : "") : "") + hint);
             detailHint.scrollV = 1;
-            MenuStyle.setText(defaultLabel, modID ? "DEFAULT" : "ITEMS");
+            MenuStyle.setText(defaultLabel, modID ? Localization.text("menu.default") : Localization.text("menu.items"));
             if (row && row.type == "action") { defaultLabel.visible = defaultValue.visible = detailDivider.visible = false; changedLegend.visible = false; }
             defaultValue.x = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 1434 : 1674;
             defaultValue.width = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 410 : 170;
@@ -439,13 +440,13 @@ package
             resetButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row && row.editable && row.type != "hotkey" && row.type != "action");
             clearButton.Visible = Boolean(!captureRow && !bindingBusy() && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
-            buttonData.Accept.sButtonText = editingString() ? "SAVE" : row && row.type == "action" ? "RUN ACTION" : row && row.type == "string" ? "EDIT TEXT" : captureRow ? "CONFIRM BINDING" : bindingsPage() ? "CHANGE BINDING" : !modID ? "OPEN" : row && (row.type == "key" || row.type == "hotkey") ? "CHANGE BINDING" : row && row.type == "enum" ? "NEXT CHOICE" : "TOGGLE";
-            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? "CANCEL" : modID ? "ALL MODS" : "BACK";
+            buttonData.Accept.sButtonText = editingString() ? Localization.text("buttons.save") : row && row.type == "action" ? Localization.text("buttons.runAction") : row && row.type == "string" ? Localization.text("buttons.editText") : captureRow ? Localization.text("buttons.confirmBinding") : bindingsPage() ? Localization.text("buttons.changeBinding") : !modID ? Localization.text("buttons.open") : row && (row.type == "key" || row.type == "hotkey") ? Localization.text("buttons.changeBinding") : row && row.type == "enum" ? Localization.text("buttons.nextChoice") : Localization.text("buttons.toggle");
+            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? Localization.text("buttons.cancel") : modID ? Localization.text("menu.allMods") : Localization.text("buttons.back");
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
             acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action"))));
             backButton.Visible = !bindingBusy();
-            buttonData.YButton.sButtonText = reporting ? "SCROLL UP" : "RESET SETTING";
-            buttonData.XButton.sButtonText = reporting ? "SCROLL DOWN" : "CLEAR BINDING";
+            buttonData.YButton.sButtonText = reporting ? Localization.text("buttons.scrollUp") : Localization.text("buttons.reset");
+            buttonData.XButton.sButtonText = reporting ? Localization.text("buttons.scrollDown") : Localization.text("buttons.clearBinding");
             resetButton.SetButtonData(buttonData.YButton); clearButton.SetButtonData(buttonData.XButton);
             if (reporting) {
                 acceptButton.Visible = false;
@@ -534,7 +535,7 @@ package
                 if (row.type == "key") row.valueName = NumericSetting.text(row, value);
                 row.value = value; describe();
             }
-            MenuStyle.setText(status, result && result.ok ? "Changes are saved automatically." : result ? result.error : "Could not save this setting. Your previous value is unchanged.");
+            MenuStyle.setText(status, result && result.ok ? Localization.text("menu.autoSave") : result ? result.error : Localization.text("errors.save"));
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
             requestedRefresh = true;
         }
@@ -554,14 +555,14 @@ package
             tabs.mouseChildren = true; MovieClip(bar).visible = true;
             searchExitFrame = activationFrame = frame;
             if (run) invokeAction(row);
-            else { refresh(); MenuStyle.setText(status, "Action cancelled."); status.textColor = MenuStyle.MUTED; }
+            else { refresh(); MenuStyle.setText(status, Localization.text("actions.cancelled")); status.textColor = MenuStyle.MUTED; }
         }
         private function invokeAction(row:Object):void
         {
             var result:Object = BGSCodeObj.invokeAction(row.mod, row.key);
             // Refresh from the service, including handlers which completed immediately.
             refresh();
-            MenuStyle.setText(status, result && result.ok ? "Action submitted. You can keep using or close Settings." : result && result.error ? result.error : "Could not submit the action.");
+            MenuStyle.setText(status, result && result.ok ? Localization.text("actions.submitted") : result && result.error ? result.error : Localization.text("errors.submitAction"));
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
         }
         private function beginString(row:Object):void
@@ -572,21 +573,21 @@ package
             MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = false;
             tabs.mouseChildren = false;
             stringEditor.open(row); describe();
-            MenuStyle.setText(status, "Edit the value, then save or cancel.");
+            MenuStyle.setText(status, Localization.text("strings.hint"));
             status.textColor = MenuStyle.MUTED;
         }
         private function saveString():void
         {
             if (!editingString() || frame <= activationFrame + 1) return;
             if (!stringEditor.valid) {
-                stringEditor.showError("Use valid single-line text within " + stringEditor.row.maxLength + " UTF-8 bytes.");
+                stringEditor.showError(Localization.text("strings.limit", {limit:stringEditor.row.maxLength}));
                 menuStage.focus = stringEditor.input; return;
             }
             var row:Object = stringEditor.row;
             var value:String = stringEditor.input.text;
             var result:Object = BGSCodeObj.setString(row.mod, row.key, value, Number(StringSetting.byteLength(value)));
             if (!result || !result.ok) {
-                stringEditor.showError(result ? result.error : "Could not save. Your previous value is unchanged.");
+                stringEditor.showError(result ? result.error : Localization.text("errors.saveText"));
                 menuStage.focus = stringEditor.input; return;
             }
             finishString(false);
@@ -600,7 +601,7 @@ package
             tabs.mouseChildren = true;
             searchExitFrame = activationFrame = frame;
             refresh();
-            MenuStyle.setText(status, cancel ? "Text unchanged." : "Changes are saved automatically.");
+            MenuStyle.setText(status, cancel ? Localization.text("strings.unchanged") : Localization.text("menu.autoSave"));
             status.textColor = MenuStyle.MUTED;
         }
         private function back():void
@@ -781,7 +782,7 @@ package
         private function beginBinding(row:Object):void
         {
             var result:Object = BGSCodeObj.beginKeyCapture(row.mod, row.key);
-            if (!result || !result.ok) { MenuStyle.setText(status, "Could not start key capture."); return; }
+            if (!result || !result.ok) { MenuStyle.setText(status, Localization.text("errors.capture")); return; }
             captureRow = row; captureRow.capturing = true; captureReady = false;
             CONFIG::testHarness { testCaptureState = "waiting"; }
             options.disableInput = true;
@@ -794,7 +795,7 @@ package
             Object(captureBinding).SetBinding({aButtonName:[], aPCKeyName:[]});
             Object(captureBinding).SetState("listening"); captureBinding.visible = true;
             pageBar.visible = false;
-            MenuStyle.setText(status, "Press a key. Escape cancels.");
+            MenuStyle.setText(status, Localization.text("bindings.capture"));
             status.textColor = MenuStyle.MUTED;
             describe();
         }
@@ -815,7 +816,7 @@ package
             if (!captureRow || !captureReady) return;
             var result:Object = BGSCodeObj.commitKeyCapture();
             if (result && result.ok) { finishBinding(false); return; }
-            MenuStyle.setText(status, result && result.error ? result.error : "Could not save this setting. Your previous value is unchanged.");
+            MenuStyle.setText(status, result && result.error ? result.error : Localization.text("errors.save"));
             status.textColor = MenuStyle.ACCENT;
         }
         private function focusLost(event:Event):void
@@ -841,7 +842,7 @@ package
             MovieClip(bar).visible = true;
             MovieClip(options).mouseEnabled = true; MovieClip(options).mouseChildren = true;
             activationFrame = frame;
-            MenuStyle.setText(status, cancel ? "Binding unchanged." : "Changes are saved automatically.");
+            MenuStyle.setText(status, cancel ? Localization.text("bindings.unchanged") : Localization.text("menu.autoSave"));
             status.textColor = MenuStyle.MUTED;
             refresh();
         }

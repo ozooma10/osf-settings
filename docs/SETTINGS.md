@@ -23,6 +23,9 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 OSF builds the menu from this file. Your mod reads the values and applies them
 through [C++](API.md) or [Papyrus](PAPYRUS.md).
 
+Display text can be translated with separate [localization catalogs](LOCALIZATION.md)
+without modifying this schema. IDs and stored values remain unchanged.
+
 - Required root fields: `schemaVersion: 1`, `id`, and `groups`. `title` defaults
   to the mod ID; `description` is optional.
 - Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs,

@@ -1,5 +1,6 @@
 #include "Input/PauseMenu.h"
 #include "Menu/OSFSettingsMenu.h"
+#include "Settings/Localization.h"
 
 
 #include "RE/B/BSFixedString.h"
@@ -28,7 +29,7 @@ namespace OSFSettings
 			if (!g_registered.load(std::memory_order_acquire)) {return;}
 
 			// leaked: the engine can touch these strings after static teardown
-			static const auto* label = new RE::BSFixedStringCS{ "MOD SETTINGS" };
+			static const auto* label = new RE::BSFixedStringCS{ Localization::Text("menu.title").c_str() };
 			static const auto* confirm = new RE::BSFixedStringCS{ "" };
 			(*g_queueActionHook)(a_model, label, kActionID, confirm, false);
 		}

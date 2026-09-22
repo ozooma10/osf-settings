@@ -46,7 +46,10 @@ package
             setText(field, text);
             if (field.textWidth <= field.width - 6) return;
             while (text.length && field.textWidth > field.width - 6) {
-                text = text.substr(0, text.length - 1); setText(field, text + "...");
+                text = text.substr(0, text.length - 1);
+                if (text.length && text.charCodeAt(text.length - 1) >= 0xD800 && text.charCodeAt(text.length - 1) <= 0xDBFF)
+                    text = text.substr(0, text.length - 1);
+                setText(field, text + "...");
             }
         }
         public static function diamond(graphics:Graphics, x:Number, y:Number, color:uint):void

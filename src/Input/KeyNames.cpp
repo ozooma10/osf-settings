@@ -1,4 +1,5 @@
 #include "KeyNames.h"
+#include "Settings/Localization.h"
 #include "Settings/SettingValue.h"
 #include "SFSE/Impl/PCH.h"
 #include "RE/B/BSInputDeviceManager.h"
@@ -93,7 +94,7 @@ namespace OSFSettings
 
     std::string KeyName(std::uint32_t keyCode)
     {
-        if (keyCode == KeyBinding::Unbound) return "UNBOUND";
+        if (keyCode == KeyBinding::Unbound) return Localization::Text("values.unbound");
         if (keyCode > 0 && keyCode < KeyBinding::Unbound) {
             const auto* manager = RE::BSInputDeviceManager::GetSingleton();
             const auto* keyboard = manager ? manager->GetKeyboard() : nullptr;
@@ -102,6 +103,6 @@ namespace OSFSettings
                 if (keyboard->GetKeyNameFromCode(keyCode, name) && !name.empty()) return name.c_str();
             }
         }
-        return std::format("Key 0x{:02X}", keyCode);
+        return Localization::Text("keys.hex", {{"code", std::format("{:02X}", keyCode)}});
     }
 }

@@ -27,11 +27,11 @@ package
             addChild(heading);
             message = MenuStyle.field("", 450, 390, 1020, 280, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED);
             message.multiline = message.wordWrap = true; addChild(message);
-            addChild(MenuStyle.field("Left / Right: choose     Enter / Accept: select     Escape / Back: cancel", 450, 795, 1020, 32, 20, MenuStyle.MUTED));
+            addChild(MenuStyle.field(Localization.text("actions.confirmControls"), 450, 795, 1020, 32, 20, MenuStyle.MUTED));
             for (var i:int = 0; i < 2; ++i) {
                 var choice:Sprite = new Sprite(); choice.x = 450 + i * 530; choice.y = 708;
                 choice.name = String(i); choice.buttonMode = true; choice.mouseChildren = false;
-                var text:TextField = MenuStyle.field(i == 0 ? "CANCEL" : "RUN ACTION", 20, 12, 450, 44, CONFIG::largeText ? 30 : 27);
+                var text:TextField = MenuStyle.field(i == 0 ? Localization.text("buttons.cancel") : Localization.text("buttons.runAction"), 20, 12, 450, 44, CONFIG::largeText ? 30 : 27);
                 choice.addChild(text); choices.push(choice); addChild(choice);
                 choice.addEventListener(MouseEvent.MOUSE_DOWN, mousePress);
                 choice.addEventListener(MouseEvent.CLICK, mouseClick);
