@@ -42,7 +42,7 @@ int main()
         schema["groups"]["General"].push_back({{"key", "wideFloat"}, {"type", "float"}, {"default", 1e100}});
         schema["groups"]["General"].push_back({{"key", "CaseKey"}, {"type", "bool"}, {"default", false}});
         schema["groups"]["General"].push_back({{"key", "casekey"}, {"type", "bool"}, {"default", false}});
-        schema["hotkeys"].push_back({{"id", "menu"}, {"label", "Menu"}, {"menu", "ExampleMenu"}});
+        schema["hotkeys"]["menu"] = {{"label", "Menu"}, {"menu", "ExampleMenu"}};
         { std::ofstream file(schemas / "papyrusexample.json"); file << schema; }
 
         SettingsService settings;

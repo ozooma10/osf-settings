@@ -29,7 +29,7 @@ function Get-ReleasePayloadPaths {
         'Docs/OSFSettings/CommonLibSF-COPYING', 'Docs/OSFSettings/CommonLibSF-EXCEPTIONS',
         'Docs/OSFSettings/CommonLibShared-EXCEPTIONS', 'Docs/OSFSettings/CommonLibShared-LICENSE',
         'Docs/OSFSettings/EXCEPTIONS', 'Docs/OSFSettings/LICENSE', 'Docs/OSFSettings/README.txt',
-        'Docs/OSFSettings/THIRD_PARTY_NOTICES.txt', 'Interface/OSFSettingsMenu.swf',
+        'Interface/OSFSettingsMenu.swf',
         'Interface/OSFSettingsMenu_LRG.swf', 'Scripts/OSFSettings.pex', 'Scripts/Source/OSFSettings.psc',
         'SFSE/Plugins/OSF/Settings/schemas/osfsettings.json',
         'SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json',

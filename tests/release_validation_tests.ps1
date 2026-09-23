@@ -50,7 +50,7 @@ function New-Candidate([string]$Name, [string]$Fault = '') {
 }
 $good = New-Candidate 'valid'
 $candidate = Test-ReleaseArchive $good
-Check ($candidate.files -eq 16) 'Valid archive has all expected payloads'
+Check ($candidate.files -eq 15) 'Valid archive has all expected payloads'
 $preserved = Test-ReleaseReinstall $candidate.archive (Join-Path $scratch 'reinstall')
 Check ($preserved.Count -eq 3) 'Reinstall preserves all player-state sentinels'
 foreach ($fault in @(

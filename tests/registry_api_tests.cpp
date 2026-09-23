@@ -181,7 +181,7 @@ int main()
             {unicode, TestJson::array()}, {"extra", schema["groups"]["extra"]}};
         Write(schemas / "alpha.json", schema);
         Write(schemas / "beta.json", TestJson::parse(R"({"schemaVersion":1,"id":"beta","groups":{}})"));
-        Write(schemas / "hotkeys.json", TestJson::parse(R"({"schemaVersion":1,"id":"hotkeys","groups":{},"hotkeys":[{"id":"open","label":"Open","default":"F10"}]})"));
+        Write(schemas / "hotkeys.json", TestJson::parse(R"({"schemaVersion":1,"id":"hotkeys","groups":{},"hotkeys":{"open":{"label":"Open","default":"F10"}}})"));
         Write(values / "alpha.json", {{"formatVersion",1},{"values",{{"enabled",true},{"count",9007199254740993LL},{"scale",1.75},{"mode","verbose"},{"key",65},{"text",unicode}}}});
 
         OSFSettings::SettingsService backend;

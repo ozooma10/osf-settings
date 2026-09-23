@@ -50,5 +50,4 @@ Source, author guide and release status:
 https://github.com/ozooma10/osf-settings-slim
 
 This archive contains a production build. Acceptance fixtures, sample mods,
-debug symbols and personal settings are excluded. See LICENSE, EXCEPTIONS and
-THIRD_PARTY_NOTICES.txt.
+debug symbols and personal settings are excluded. See LICENSE and EXCEPTIONS.

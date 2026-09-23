@@ -2,11 +2,10 @@
   "schemaVersion": 1,
   "title": "Hotkey callback example",
   "groups": {},
-  "hotkeys": [
-    {
-      "id": "toggleFeature",
+  "hotkeys": {
+    "toggleFeature": {
       "label": "Toggle example feature",
       "default": "F6"
     }
-  ]
+  }
 }

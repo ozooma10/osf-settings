@@ -138,10 +138,10 @@ int main()
         fs::create_directories(root / "schemas");
         {
             std::ofstream file(root / "schemas/sample.json");
-            file << R"({"schemaVersion":1,"id":"sample","groups":{},"hotkeys":[
-                {"id":"toggleFeature","label":"Toggle feature","default":"F6"},
-                {"id":"openMenu","label":"Open menu","menu":"SampleMenu"},
-                {"id":"invalid","label":"Invalid key","default":"Unknown"}]})";
+            file << R"({"schemaVersion":1,"id":"sample","groups":{},"hotkeys":{
+                "toggleFeature":{"label":"Toggle feature","default":"F6"},
+                "openMenu":{"label":"Open menu","menu":"SampleMenu"},
+                "invalid":{"label":"Invalid key","default":"Unknown"}}})";
         }
         settings.Load(root / "schemas", root / "values");
         check(settings.LoadErrors().empty(), "load callback API fixture schema");

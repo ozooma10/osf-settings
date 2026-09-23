@@ -40,7 +40,6 @@ Scripts/Source/OSFSettings.psc
 Docs/OSFSettings/README.txt
 Docs/OSFSettings/LICENSE
 Docs/OSFSettings/EXCEPTIONS
-Docs/OSFSettings/THIRD_PARTY_NOTICES.txt
 Docs/OSFSettings/CommonLibSF-COPYING
 Docs/OSFSettings/CommonLibSF-EXCEPTIONS
 Docs/OSFSettings/CommonLibShared-LICENSE

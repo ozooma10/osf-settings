@@ -9,8 +9,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'ReleaseValidation.ps1')
-foreach ($file in @('README.txt', 'THIRD_PARTY_NOTICES.txt')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file))) { throw "Missing packaging input: $file" }
+if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'README.txt'))) {
+    throw 'Missing packaging input: README.txt'
 }
 $sourceIdentity = Get-ReleaseSourceIdentity $repo
 $project = Get-Content -LiteralPath (Join-Path $repo 'xmake.lua') -Raw
@@ -54,7 +54,6 @@ try {
 $documents = Join-Path $stage 'Docs/OSFSettings'
 New-Item -ItemType Directory -Path $documents -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.txt') -Destination $documents
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'THIRD_PARTY_NOTICES.txt') -Destination $documents
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'EXCEPTIONS') -Destination $documents
 Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/COPYING') -Destination (Join-Path $documents 'CommonLibSF-COPYING')
 Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/EXCEPTIONS') -Destination (Join-Path $documents 'CommonLibSF-EXCEPTIONS')

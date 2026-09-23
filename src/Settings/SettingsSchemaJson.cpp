@@ -67,17 +67,23 @@ namespace OSFSettings::SettingsJson
         error.clear();
         try {
             std::set<std::string> groupNames;
+            std::set<std::string> hotkeyIds;
             std::set<std::string> optionValues;
             bool inGroups{};
+            bool inHotkeys{};
             bool inOptions{};
             const auto document = nlohmann::ordered_json::parse(input,
                 [&](int depth, nlohmann::ordered_json::parse_event_t event, nlohmann::ordered_json& value) {
                     if (event == nlohmann::ordered_json::parse_event_t::key) {
                         if (depth == 1) {
                             inGroups = value == "groups";
+                            inHotkeys = value == "hotkeys";
                         } else if (depth == 2 && inGroups) {
                             const auto& name = value.get_ref<const std::string&>();
                             Require(groupNames.insert(name).second, "duplicate group name: " + name);
+                        } else if (depth == 2 && inHotkeys) {
+                            const auto& id = value.get_ref<const std::string&>();
+                            Require(hotkeyIds.insert(id).second, "duplicate hotkey id: " + id);
                         } else if (depth == 4 && inGroups) {
                             inOptions = value == "options";
                             if (inOptions) {
@@ -208,12 +214,14 @@ namespace OSFSettings::SettingsJson
                 mod.groups.push_back(std::move(group));
             }
             if (const auto hotkeys = document.find("hotkeys"); hotkeys != document.end()) {
-                Require(hotkeys->is_array(), "hotkeys must be an array");
+                Require(hotkeys->is_object(), "hotkeys must be an object keyed by id");
                 std::set<std::string> ids;
-                for (const auto& source : *hotkeys) {
+                for (const auto& [id, source] : hotkeys->items()) {
                     Require(source.is_object(), "each hotkey must be an object");
+                    Require(!source.contains("id"), "hotkey id must be the object key: " + id);
                     HotkeyDefinition hotkey;
-                    hotkey.id = RequiredText(source, "id");
+                    hotkey.id = id;
+                    Require(!hotkey.id.empty(), "hotkey id must not be empty");
                     Require(hotkey.id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos, "hotkey id must use ASCII letters, digits, underscores, or hyphens");
                     auto folded = hotkey.id;
                     for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';

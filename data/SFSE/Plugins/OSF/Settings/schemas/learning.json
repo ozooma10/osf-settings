@@ -2,12 +2,11 @@
   "schemaVersion": 1,
   "title": "Test Mod",
   "description": "Sample settings and a native hotkey for testing the settings menu.",
-  "hotkeys": [
-    {
-      "id": "testHotkey",
+  "hotkeys": {
+    "testHotkey": {
       "label": "Test hotkey"
     }
-  ],
+  },
   "groups": {
     "General": [
       {

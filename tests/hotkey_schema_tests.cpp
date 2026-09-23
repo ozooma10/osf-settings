@@ -68,16 +68,16 @@ int main()
         }
 
         auto changed = document;
-        changed["hotkeys"][0].erase("menu");
+        changed["hotkeys"]["openMenu"].erase("menu");
         auto result = SettingsJson::ParseSchema(changed, "osfsettings", error);
         check(result && !result->hotkeys[0].menu, "omitting menu declares a callback hotkey without additional schema fields");
         changed = document;
-        changed["hotkeys"][0].erase("default");
+        changed["hotkeys"]["openMenu"].erase("default");
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
         check(result && !result->hotkeys[0].defaultKey, "omitting the default declares an unbound action");
-        changed["hotkeys"] = Json::array();
+        changed["hotkeys"] = Json::object();
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
-        check(result && result->hotkeys.empty() && result->groups.empty(), "an empty hotkey list adds no implicit group");
+        check(result && result->hotkeys.empty() && result->groups.empty(), "an empty hotkey object adds no implicit group");
         changed.erase("hotkeys");
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
         check(result && result->hotkeys.empty(), "existing schemas need no hotkeys field");
@@ -85,29 +85,48 @@ int main()
         const auto reject = [&](const Json& bad) {
             check(!SettingsJson::ParseSchema(bad, "osfsettings", error) && !error.empty(), "malformed declaration must report a schema error");
         };
-        changed = document; changed["hotkeys"] = Json::object(); reject(changed);
-        changed = document; changed["hotkeys"][0] = Json(nullptr); reject(changed);
-        for (const auto* field : {"id", "label"}) {
-            changed = document; changed["hotkeys"][0].erase(field); reject(changed);
+        for (const auto& value : {Json(nullptr), Json(true), Json(1), Json("hotkey"), Json::array(),
+                Json::array({{{"id", "openMenu"}, {"label", "Open"}}})}) {
+            changed = document; changed["hotkeys"] = value; reject(changed);
+            check(error == "hotkeys must be an object keyed by id", "hotkeys require an object, including when empty");
         }
-        changed = document; changed["hotkeys"][0]["id"] = "open menu"; reject(changed);
-        changed = document; changed["hotkeys"][0]["default"] = std::string("F10\0hidden", 10); reject(changed);
-        for (const auto* id : {"openMenu", "OPENMENU"}) {
+        for (const auto& value : {Json(nullptr), Json(true), Json(1), Json("hotkey"), Json::array()}) {
+            changed = document; changed["hotkeys"]["openMenu"] = value; reject(changed);
+            check(error == "each hotkey must be an object", "hotkey values must be declarations");
+        }
+        changed = document; changed["hotkeys"]["openMenu"].erase("label"); reject(changed);
+        for (const auto& value : {Json(nullptr), Json(true), Json(1), Json(""), Json::array(), Json::object()}) {
+            changed = document; changed["hotkeys"]["openMenu"]["label"] = value; reject(changed);
+        }
+        for (const auto& id : {std::string{}, std::string("open menu"), std::string("bad/id"),
+                std::string("日本語"), std::string("open\0Menu", 9)}) {
             changed = document;
-            changed["hotkeys"].push_back({{"id", id}, {"label", "Duplicate"}});
+            changed["hotkeys"] = Json::object({{id, {{"label", "Invalid ID"}}}});
             reject(changed);
         }
+        for (const auto* id : {"openMenu", "OPENMENU"}) {
+            changed = document;
+            changed["hotkeys"]["openMenu"]["id"] = id;
+            reject(changed);
+            check(error == "hotkey id must be the object key: openMenu", "nested IDs cannot repeat or override the object key");
+        }
+        changed = document; changed["hotkeys"]["openMenu"]["default"] = std::string("F10\0hidden", 10); reject(changed);
         changed = document;
-        changed["hotkeys"].push_back({{"id", "second_action-2"}, {"label", "Second action"}});
+        changed["hotkeys"]["OPENMENU"] = {{"label", "Duplicate"}};
+        reject(changed);
+        check(error == "duplicate hotkey id: OPENMENU", "object keys must remain unique ignoring ASCII case");
+        changed = document;
+        changed["hotkeys"]["second_action-2"] = {{"label", "Second action"}};
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
-        check(result && result->hotkeys.size() == 2 && !result->hotkeys[1].defaultKey && error.empty(),
+        check(result && result->hotkeys.size() == 2 && result->hotkeys[0].id == "openMenu" &&
+            result->hotkeys[1].id == "second_action-2" && !result->hotkeys[1].defaultKey && error.empty(),
             "distinct actions retain order and clear a previous parse error");
 
         changed["groups"] = Json::object({
             {"Z first page / détails", Json::array()},
             {"A second page", Json::array()}
         });
-        changed["hotkeys"][1]["group"] = "A second page";
+        changed["hotkeys"]["second_action-2"]["group"] = "A second page";
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
         check(result && result->groups.size() == 2 && result->groups[0].id == "Z first page / détails" && result->groups[0].label == "Z first page / détails" &&
             result->hotkeys[0].group == "Z first page / détails" && result->hotkeys[1].group == "A second page",
@@ -125,13 +144,13 @@ int main()
             invalid["groups"]["Z first page / détails"][0]["requires"] = value;
             reject(invalid);
         }
-        changed["hotkeys"][1]["group"] = "missing";
+        changed["hotkeys"]["second_action-2"]["group"] = "missing";
         reject(changed);
         check(error == "unknown hotkey group: missing", "unknown group names report the invalid reference");
-        changed["hotkeys"][1]["group"] = "a second page";
+        changed["hotkeys"]["second_action-2"]["group"] = "a second page";
         reject(changed);
         changed = document;
-        changed["hotkeys"][0]["group"] = "general";
+        changed["hotkeys"]["openMenu"]["group"] = "general";
         reject(changed);
         check(error == "unknown hotkey group: general", "explicit groups must reference a declared group");
 
@@ -165,11 +184,33 @@ int main()
             result->hotkeys[0].menu == action.menu,
             "source parsing defaults an omitted schemaVersion to version 1 and clears errors");
         result = parseText(R"({"schemaVersion":1,"groups":{"Z page / 日本語":[],"A page":[]},
-            "hotkeys":[{"id":"default","label":"Default"},{"id":"explicit","label":"Explicit","group":"A page"}]})");
+            "hotkeys":{"zDefault":{"label":"Default"},"aExplicit":{"label":"Explicit","group":"A page"}}})");
         check(result && error.empty() && result->groups.size() == 2 &&
             result->groups[0].id == "Z page / 日本語" && result->groups[0].label == result->groups[0].id &&
-            result->groups[1].id == "A page" && result->hotkeys[0].group == result->groups[0].id &&
-            result->hotkeys[1].group == "A page", "source parsing preserves authored order and Unicode names");
+            result->groups[1].id == "A page" && result->hotkeys.size() == 2 &&
+            result->hotkeys[0].id == "zDefault" && result->hotkeys[0].group == result->groups[0].id &&
+            result->hotkeys[1].id == "aExplicit" && result->hotkeys[1].group == "A page",
+            "source parsing preserves authored order and Unicode names");
+        for (const auto* source : {
+            R"({"groups":{},"hotkeys":{"openMenu":{"label":"First"},"openMenu":{"label":"Second"}}})",
+            R"({"groups":{},"hotkeys":{"openMenu":{"label":"First"},"open\u004denu":{"label":"Second"}}})",
+            R"({"hotkeys":{"OPENMENU":{"label":"First"},"openMenu":{"label":"Second"}},"groups":{}})"
+        }) {
+            check(!parseText(source) && error == "duplicate hotkey id: openMenu",
+                "duplicate source IDs cannot overwrite hotkeys, including escaped and case-folded keys");
+        }
+        result = parseText(R"({"hotkeys":{"same":{"label":"same","group":"same"},"other":{"label":"Other","group":"same"}},
+            "groups":{"same":[]},"menus":[{"id":"same","title":"same","menu":"SameMenu"}]})");
+        check(result && error.empty() && result->hotkeys.size() == 2 && result->hotkeys[0].id == "same" &&
+            result->hotkeys[1].id == "other" && result->groups[0].id == "same" && result->menus[0].id == "same",
+            "duplicate detection is scoped to hotkey keys and ignores declaration fields and other sections");
+        for (const auto* path : {"examples/hotkeys/osfsettings-hotkeys-example.json", "examples/papyrus/papyrusexample.json",
+                "examples/localization/schemas/localization-example.json"}) {
+            std::ifstream input(path);
+            result = SettingsJson::ParseSchema(input, fs::path(path).stem().string(), error);
+            check(result && error.empty() && result->hotkeys.size() == 1,
+                "shipped hotkey examples load through the source parser");
+        }
         for (const auto* source : {
             R"({"schemaVersion":1,"groups":{"Panel":[],"Panel":[]}})",
             R"({"schemaVersion":1,"groups":{"Panel":[],"\u0050anel":[]}})"
