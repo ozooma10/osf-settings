@@ -37,33 +37,27 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 
 ### Schema fields and types
 
-- The required root field is `groups`. `title` defaults to the mod ID;
-  `description` is optional.
-- The mod ID comes from the schema filename without `.json`. A legacy root `id`
-  is optional; if present, it must be a nonempty string matching that ID exactly.
-- `schemaVersion` is optional and defaults to `1` when omitted. If present, it
-  must be the integer `1`; other versions and value types are rejected.
-- Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs,
-  `.` and `..` are invalid. Use a unique filename and keep it stable between releases.
-  Renaming the file changes the mod ID used by saved settings, translation catalogs,
-  and API calls. Change `title` to rename the displayed mod without changing its ID.
+- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional.
+- The mod ID comes from the schema filename without `.json`.
+- Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs, `.` and `..` are invalid.
 - Group names become headings. Groups and settings appear in authored order.
-- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and
-  unique across the mod. API lookups use exact, case-sensitive keys.
+- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod. API lookups use exact, case-sensitive keys.
 - Optional `label` defaults to the key. `hint` adds help text.
 
 | Type | Default example | Additional fields |
 | --- | --- | --- |
 | `bool` | `true` | None |
-| `int` | `3` | Optional inclusive `min` / `max`; signed 64-bit |
+| `int` | `3` | Optional inclusive `min` / `max` |
 | `float` | `0.75` | Optional inclusive `min` / `max`; positive `step` defaults to `0.1` |
 | `enum` | `"normal"` | Required `options` array; optional matching `optionLabels` array |
 | `string` | `"auto"` | `maxLength`: 1–4096 UTF-8 bytes; defaults to 256 |
 | `key` | `"F4"` | `allowUnbound` defaults to false; C++ reads/writes keyboard VK codes |
 
-Defaults must satisfy the setting's type and limits. Float `step` controls the
-editor increment; writes need not be multiples of it. Enum options are unique,
-nonempty strings; the default and API values must match an option exactly.
+Defaults must satisfy the setting's type and limits. 
+
+Float `step` controls the editor increment; writes need not be multiples of it.
+
+Enum options are unique, nonempty strings; the default and API values must match an option exactly.
 
 ```json
 {
@@ -75,16 +69,11 @@ nonempty strings; the default and API values must match an option exactly.
 }
 ```
 
-Strings are single-line UTF-8. Empty text is allowed; NUL, control characters,
-and line/paragraph separators are rejected. Limits count bytes, not characters.
-Values are preserved without trimming or truncation.
+Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, and line/paragraph separators are rejected.  Limits count bytes, not characters. Values are preserved without trimming or truncation.
 
-A `key` setting stores a value for your own input handler. Use [hotkeys](Keybindings.md)
-for OSF-dispatched actions. Key defaults accept recognized names or bindable VK
-integers; `"UNBOUND"` / `255` requires `allowUnbound: true`.
+A `key` setting stores a value for your own input handler. Use [hotkeys](Keybindings.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers; `"UNBOUND"` / `255` requires `allowUnbound: true`.
 
-Add `"requires": "restart"` to show a restart notice. This is only a notice:
-values still save immediately, and your mod decides when to apply them.
+Add `"requires": "restart"` to show a restart notice. This is only a notice: values still save immediately, and your mod decides when to apply them.
 
 ## C++ integration
 
