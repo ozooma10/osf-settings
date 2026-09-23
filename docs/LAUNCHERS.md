@@ -1,6 +1,6 @@
 # Menu launchers
 
-Add launch cards for your menus to the **Home** tab, above the mod settings list. Declare native menus in your schema, or register a callback in C++ for supporting imgui/webviews.
+Add launch cards for your menus to the **Home** tab, above the mod settings list. Declare native menus in your schema, or register a C++ callback to open custom interfaces such as ImGui or WebView overlays.
 
 ## Schema
 
@@ -8,7 +8,6 @@ Add a `menus` object keyed by ID to `Data/SFSE/Plugins/OSF/Settings/schemas/mymo
 
 ```json
 {
-  "schemaVersion": 1,
   "title": "My Mod",
   "groups": {},
   "menus": {
@@ -19,7 +18,7 @@ Add a `menus` object keyed by ID to `Data/SFSE/Plugins/OSF/Settings/schemas/mymo
 
 - Each key is the card's `id`: nonempty, single-line, case-sensitive and unique within the mod.
 - `title` and `menu` are required. `description` is optional.
-- `menu` is the exact, case-sensitive name your mod registers with `RE::UI`.  If the menu isn't registered, the card shows as unavailable.
+- `menu` is the exact, case-sensitive name your mod registers with `RE::UI`. If the menu isn't registered, the card shows as unavailable.
 
 [`examples/launchers/absolute-control.json`](../examples/launchers/absolute-control.json) adds Absolute Control's `AbsoluteControlPanelMenu`.
 
@@ -52,11 +51,11 @@ launcher.SetAvailable("mymod", "editor", false, "Requires My Mod Assets.");
 ```
 
 - Set exactly one of `menu` (a native menu name) or `open` (a callback). `modTitle` defaults to `modId`. `description` is optional.
-- `modId` follows the [schema ID rules](SETTINGS.md) and is limited to 128 bytes. `id` must be nonempty, single-line UTF-8, up to 256 bytes. Titles and menu names are limited to 256 bytes; descriptions and reasons to 4096.
+- `modId` follows the [schema ID rules](SETTINGS.md#schema-fields-and-types) and is limited to 128 bytes. `id` must be nonempty, single-line UTF-8, up to 256 bytes. Titles and menu names are limited to 256 bytes; descriptions and reasons to 4096.
 
 ## Opening
 
-- Your `open` callback must return promptly and queue the open on your usual UI or runtime thread. 
+- Your `open` callback must return promptly and queue the open on your usual UI or runtime thread.
 - A rejected request leaves Settings open. You handle and report any failure after handoff (see [Issue reporting](DIAGNOSTICS.md)).
 - Handoff is canceled if a main menu or loading screen is already open when Settings closes.
 

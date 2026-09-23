@@ -4,7 +4,6 @@ Add a top-level `hotkeys` object keyed by hotkey ID to your [schema](SETTINGS.md
 
 ```json
 {
-  "schemaVersion": 1,
   "title": "My mod",
   "groups": {},
   "hotkeys": {
@@ -31,7 +30,7 @@ void OnHotkey(const char* mod, const char* id, void* context) noexcept;
 auto status = settings.RegisterHotkey("mymod", "toggle", OnHotkey, nullptr);
 ```
 
-See the [buildable C++ example](../examples/hotkeys/README.md).
+See the [C++ example](../examples/hotkeys/main.cpp) and its [schema](../examples/hotkeys/osfsettings-hotkeys-example.json).
 
 ## Papyrus callbacks
 
@@ -45,9 +44,9 @@ Function OnOSFHotkey(String modId, String hotkeyId)
 EndFunction
 ```
 
-Global scripts use `RegisterHotkeyStatic("MyScript", "mymod", "toggle")` with the same callback marked `Global`. 
+Global scripts use `RegisterHotkeyStatic("MyScript", "mymod", "toggle")` with the same callback marked `Global`.
 
-See the [instance and Global example](../examples/papyrus/README.md).
+See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../examples/papyrus/OSFSettingsExampleGlobal.psc) examples.
 
 ## Open a native menu
 
@@ -64,4 +63,4 @@ auto status = settings.AcquireHotkeyBlock(&block);
 // settings.ReleaseHotkeyBlock(block);
 ```
 
-Call `ReleaseHotkeyBlock(block)` for every acquired token. All blocks must be released before new presses can activate. 
+Call `ReleaseHotkeyBlock(block)` for every acquired token. All blocks must be released before new presses can activate.

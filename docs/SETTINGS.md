@@ -25,19 +25,19 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 ```
 
 The filename without `.json` is your mod ID: `mymod.json` gives `mymod`.
-OSF builds your mods configuration menu from this file. Schemas load at startup; restart Starfield after editing them. 
+OSF builds your mod's configuration menu from this file. Schemas load at startup; restart Starfield after editing them.
 
 Player values are saved separately for each mod in `Data/SFSE/Plugins/OSF/Settings/values/<modId>.json` and shared across save games.
 
 Ship just the schema file; OSF Settings manages your mod's values file.
 
-Load failures are reported in `OSFSettings.log` as well as the "Mod Health" Section of OSF Settings menu.
+Load failures are reported in `OSF Settings.log` under `Documents/My Games/Starfield/SFSE/Logs`.
 
 Display text can be translated with separate [localization catalogs](LOCALIZATION.md) without modifying the schema. IDs and stored values remain unchanged.
 
 ### Schema fields and types
 
-- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional.
+- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present.
 - The mod ID comes from the schema filename without `.json`.
 - Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs, `.` and `..` are invalid.
 - Group names become headings. Groups and their controls appear in authored order.
@@ -53,7 +53,7 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 | `string` | `"auto"` | `maxLength`: 1–4096 UTF-8 bytes; defaults to 256 |
 | `key` | `"F4"` | `allowUnbound` defaults to true; C++ reads/writes keyboard VK codes |
 
-Defaults must satisfy the setting's type and limits. 
+Defaults must satisfy the setting's type and limits.
 
 Float `step` controls the editor increment; writes need not be multiples of it.
 
@@ -80,9 +80,9 @@ When the labels are also the values, use a string array:
 
 Object labels must be strings; an empty label falls back to its value. Labels may repeat. Only values are saved, so changing labels or order preserves existing selections.
 
-Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, and line/paragraph separators are rejected.  Limits count bytes, not characters. Values are preserved without trimming or truncation.
+Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, and line/paragraph separators are rejected. Limits count bytes, not characters. Values are preserved without trimming or truncation.
 
-A `key` setting stores a value for your own input handler. Use [hotkeys](Keybindings.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers. Unbinding and `"UNBOUND"` / `255` defaults are allowed unless `allowUnbound` is explicitly `false`.
+A `key` setting stores a value for your own input handler. Use [hotkeys](KEYBINDINGS.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers. Unbinding and `"UNBOUND"` / `255` defaults are allowed unless `allowUnbound` is explicitly `false`.
 
 Add `"requires": "restart"` to show a restart notice. This is only a notice: values still save immediately, and your mod decides when to apply them.
 
@@ -139,10 +139,10 @@ auto status = settings.Subscribe("mymod", OnChanged, nullptr, &token);
 // On success, read your initial values. Keep token for Unsubscribe(token).
 ```
 
-- Implement `OnChanged` to reread current values. `key == nullptr` means refresh the whole mod (usually settings reset)
-- Callbacks run serially on an SFSE task, without a main-thread guarantee. Schedule engine/UI work in its required context;
+- Implement `OnChanged` to reread current values. `key == nullptr` means refresh the whole mod (usually a settings reset).
+- Callbacks run serially on an SFSE task, without a main-thread guarantee. Schedule engine/UI work in its required context.
 
-The [registry example](../examples/registry/README.md) demonstrates complete subscription, refresh, and cleanup ownership.
+The registry example's [RegistryConsumer.h](../examples/registry/RegistryConsumer.h) demonstrates complete subscription, refresh, and cleanup ownership.
 
 ## Papyrus integration
 
@@ -183,11 +183,11 @@ Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 
 - Reads: `GetBool`, `GetInt`, `GetFloat`, `GetEnum`, `GetString`. Each takes `(modId, key, fallback)` and returns the fallback on failure.
 - Writes: matching `Set*` functions take `(modId, key, value)`. `Reset(modId, key)` and `ResetMod(modId)` restore defaults.
-- Writes/resets return `true` when saved; failure leaves the old value unchanged. Check the result; failures are logged in `OSFSettings.log`.
+- Writes/resets return `true` when saved; failure leaves the old value unchanged. Check the result; failures are logged in `OSF Settings.log`.
 - IDs, keys, and enum options use the schema's exact spelling. Enums and strings are distinct types. There are no Papyrus `GetKey` / `SetKey` functions.
 - Papyrus integers are 32-bit and floats are single precision. Reads that overflow return the fallback; float precision may be reduced.
 
-See the [instance and Global example](../examples/papyrus/README.md) for all value types, hotkeys, and action callbacks.
+See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../examples/papyrus/OSFSettingsExampleGlobal.psc) examples, with their [schema](../examples/papyrus/papyrusexample.json), for all value types, hotkeys, and action callbacks.
 
 ## Action buttons
 
@@ -195,7 +195,6 @@ Declare a `type: "action"` control inside a group in your `schemas/mymod.json` s
 
 ```json
 {
-  "schemaVersion": 1,
   "title": "My mod",
   "groups": {
     "Maintenance": [
@@ -232,14 +231,14 @@ if (actions.Init()) {
 }
 ```
 
-Exactly one native **or** Papyrus handler owns each declaration. Native registration is process lifetime; another registration returns `AlreadyRegistered`. 
+Exactly one native **or** Papyrus handler owns each declaration. Native registration is process lifetime; another registration returns `AlreadyRegistered`.
 
-Callbacks run on SFSE tasks with no main-thread guarantee. The menu pauses the game; your handler may queue work that will run after it closes. 
+Callbacks run on SFSE tasks with no main-thread guarantee. The menu pauses the game; your handler may queue work that will run after it closes.
 OSF does not close menus, wait for gameplay, create worker threads, or cancel the mod's work.
 
-Complete immediately inside the callback or retain the token and complete later. 
+Complete immediately inside the callback or retain the token and complete later.
 
-See the [buildable native example](../examples/actions/README.md).
+See the [native example](../examples/actions/main.cpp) and its [schema](../examples/actions/osfsettings-actions-example.json).
 
 ### Papyrus action handlers
 
@@ -254,14 +253,14 @@ Function OnOSFAction(String modId, String actionId, String invocation)
 EndFunction
 ```
 
-Global scripts use `RegisterActionStatic("MyScript", "mymod", "rescan")` and the same callback marked `Global`. 
+Global scripts use `RegisterActionStatic("MyScript", "mymod", "rescan")` and the same callback marked `Global`.
 Repeating the same receiver registration succeeds without adding another handler; a different owner is rejected.
 
-The [Papyrus example](../examples/papyrus/README.md) includes an immediate reset and a Global action that completes after `Utility.WaitMenuPause`.
+The [instance example](../examples/papyrus/OSFSettingsExample.psc) includes an immediate reset, and the [Global example](../examples/papyrus/OSFSettingsExampleGlobal.psc) has an action that completes after `Utility.WaitMenuPause`.
 Gameplay-dependent script work may remain pending until gameplay resumes.
 
 ## Related features
 
-- [Hotkeys](Keybindings.md): declare rebindable actions and handle them in C++ or Papyrus, or open a registered native menu.
-- [Menu launchers](LAUNCHERS.md): add a top-level `menus` object keyed by ID for native menus in the Launcher tab, or use the separate C++ launcher service for custom interfaces. Each schema entry has a `title` and a registered `menu` name; `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not create stored values and use the same schema version.
+- [Hotkeys](KEYBINDINGS.md): declare rebindable actions and handle them in C++ or Papyrus, or open a registered native menu.
+- [Menu launchers](LAUNCHERS.md): add a top-level `menus` object keyed by ID for native menus on the Home tab, or use the separate C++ launcher service for custom interfaces. Each schema entry has a `title` and a registered `menu` name; `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not create stored values.
 - [Issue reporting](DIAGNOSTICS.md): report and clear problems in Mod Issues from C++ or Papyrus.

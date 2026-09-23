@@ -39,4 +39,4 @@ An invalid entry falls back on its own. Invalid JSON or duplicate keys reject th
 
 Translated text also appears in the registry API and vanilla Controls. IDs and stored values never change.
 
-See [the complete example](../examples/localization/README.md).
+See the complete example: a [schema](../examples/localization/schemas/localization-example.json) and its [German catalog](../examples/localization/translations/de/localization-example.json).
