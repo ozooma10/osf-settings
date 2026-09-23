@@ -179,6 +179,9 @@ int main()
         schema["groups"]["First group"][3]["options"]["quiet"] = embedded;
         schema["groups"] = {{"First group", schema["groups"]["First group"]},
             {unicode, TestJson::array()}, {"extra", schema["groups"]["extra"]}};
+        auto& mixedControls = schema["groups"]["First group"];
+        mixedControls.insert(mixedControls.begin() + 1, {{"type", "action"}, {"id", "rescan"}, {"label", "Rescan"}});
+        schema["groups"][unicode].push_back({{"type", "action"}, {"id", "run"}, {"label", "Run"}});
         Write(schemas / "alpha.json", schema);
         Write(schemas / "beta.json", TestJson::parse(R"({"schemaVersion":1,"id":"beta","groups":{}})"));
         Write(schemas / "hotkeys.json", TestJson::parse(R"({"schemaVersion":1,"id":"hotkeys","groups":{},"hotkeys":{"open":{"label":"Open","default":"F10"}}})"));
@@ -221,7 +224,7 @@ int main()
         const auto& settings = groups[0]["settings"];
         check(mod["title"] == embedded && mod["description"] == unicode && groups[1]["id"] == unicode && groups[1]["label"] == unicode,
             "length-aware mod and group text");
-        check(groups[0]["id"] == "First group" && groups[0]["label"] == "First group" && groups[2]["id"] == "extra" && groups[1]["settings"].empty(), "group order and empty groups");
+        check(groups[0]["id"] == "First group" && groups[0]["label"] == "First group" && groups[2]["id"] == "extra" && groups[1]["settings"].empty(), "group order and action-only groups expose no value records");
         const std::array types{API::SettingType::Bool, API::SettingType::Int, API::SettingType::Float, API::SettingType::Enum, API::SettingType::Key, API::SettingType::String};
         const std::array keys{"enabled", "count", "scale", "mode", "key", "text"};
         for (std::size_t i = 0; i < types.size(); ++i) check(settings[i]["type"] == types[i] && settings[i]["key"] == keys[i], "setting identity, type and authored order");

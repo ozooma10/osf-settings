@@ -47,7 +47,10 @@ namespace OSFSettings
                 ModSettings mod;
                 mod.schema = std::move(*schema);
                 for (const auto& group : mod.schema.groups) {
-                    for (const auto& setting : group.settings) {
+                    for (const auto& control : group.controls) {
+                        const auto* valueSetting = std::get_if<SettingDefinition>(&control);
+                        if (!valueSetting) continue;
+                        const auto& setting = *valueSetting;
                         mod.values.emplace(setting.key, setting.DefaultValue());
                     }
                 }
@@ -129,7 +132,10 @@ namespace OSFSettings
             if (stored.schema.id != mod) continue;
             SettingValues proposed;
             for (const auto& group : stored.schema.groups) {
-                for (const auto& setting : group.settings) {
+                for (const auto& control : group.controls) {
+                    const auto* valueSetting = std::get_if<SettingDefinition>(&control);
+                    if (!valueSetting) continue;
+                    const auto& setting = *valueSetting;
                     proposed.emplace(setting.key, setting.DefaultValue());
                 }
             }

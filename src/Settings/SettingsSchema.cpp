@@ -75,13 +75,35 @@ namespace OSFSettings
     {
         for(const auto& group : groups)
         {
-            for(const auto& setting : group.settings)
+            for(const auto& control : group.controls)
             {
-                if (setting.key == key) {
-                    return &setting;
+                if (const auto* setting = std::get_if<SettingDefinition>(&control); setting && setting->key == key) {
+                    return setting;
                 }
             }
         }
         return nullptr;
+    }
+
+    SettingDefinition* ModSchema::FindSetting(std::string_view key)
+    {
+        return const_cast<SettingDefinition*>(static_cast<const ModSchema&>(*this).FindSetting(key));
+    }
+
+    const ActionDefinition* ModSchema::FindAction(std::string_view actionId) const
+    {
+        for (const auto& group : groups) {
+            for (const auto& control : group.controls) {
+                if (const auto* action = std::get_if<ActionDefinition>(&control); action && action->id == actionId) {
+                    return action;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    ActionDefinition* ModSchema::FindAction(std::string_view actionId)
+    {
+        return const_cast<ActionDefinition*>(static_cast<const ModSchema&>(*this).FindAction(actionId));
     }
 }

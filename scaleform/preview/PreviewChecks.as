@@ -106,13 +106,13 @@ package
                     require(list.entryCount == 3 && list.selectedEntry.row.key == "hotkeys", "keyboard changes group");
                     key(221); break;
                 case 5:
-                    require(list.entryCount == 2 && list.selectedEntry.row.key == "debug", "advanced tab reachable");
+                    require(list.entryCount == 4 && list.selectedEntry.row.key == "debug", "advanced tab with mixed controls reachable");
                     key(221); break;
                 case 6:
                     require(list.entryCount == 6 && list.selectedEntry.row.key == "autoAdvance", "next page wraps to playback");
                     key(219); break;
                 case 7:
-                    require(list.entryCount == 2 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
+                    require(list.entryCount == 4 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
                     userEvent("Cancel"); break;
                 case 8:
                     require(list.entryCount == 3 && list.selectedEntry.row.title == "OSF Director", "back opens mod list");
@@ -347,6 +347,32 @@ package
                 case 63:
                     require(!launcher.visible && list.visible && list.y == 362 && !list.disableInput, "no interfaces restores the full settings list");
                     capture("home-no-interfaces");
+                    userEvent("Accept"); break;
+                case 64:
+                    findNamed(menu,"Advanced").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 65:
+                    require(list.entryCount == 4 && list.GetDataForEntry(0).row.key == "debug" &&
+                        list.GetDataForEntry(1).row.key == "rescan" && list.GetDataForEntry(2).row.key == "resetIndex" &&
+                        list.GetDataForEntry(3).row.key == "language", "settings and actions preserve declaration order");
+                    list.selectedIndex = 1; userEvent("YButton");
+                    require(list.selectedEntry.row.actionState == "Run", "reset leaves action controls unchanged");
+                    userEvent("Accept"); break;
+                case 66:
+                    require(list.selectedEntry.row.key == "rescan" && list.selectedEntry.row.actionState == "Completed", "inline action completes and preserves selection");
+                    list.selectedIndex = 2; userEvent("Accept"); break;
+                case 67:
+                    require(list.disableInput, "inline confirmation blocks the underlying list");
+                    userEvent("Accept"); break;
+                case 68:
+                    require(!list.disableInput && list.selectedEntry.row.actionState == "Run", "confirmation defaults to Cancel without invoking");
+                    userEvent("Accept"); break;
+                case 69:
+                    userEvent("Right"); userEvent("Accept"); break;
+                case 70:
+                    require(!list.disableInput && list.selectedEntry.row.key == "resetIndex" && list.selectedEntry.row.actionState == "Completed", "confirmed inline action completes");
+                    list.selectedIndex = 3;
+                    require(list.selectedEntry.row.type == "string", "setting after actions remains reachable");
+                    capture("mixed-controls");
                     menu.removeEventListener(Event.ENTER_FRAME, advance);
                     trace("[verify] PASS"); break;
                 }

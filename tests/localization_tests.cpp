@@ -35,7 +35,8 @@ int main()
             .definition = EnumDefinition{ { "fast" }, {{ "slow", "Slow" }, { "fast", "Fast" }} } };
         mod.schema.groups = {{ "General / group", "General / group", {setting} }};
         mod.schema.hotkeys = {{ "open", "Open", "F10", "Menu", "General / group" }};
-        mod.schema.actions = {{ "run", "Run", "Hint", "General / group", "Really run?" }, { "quick", "Quick", "", "General / group", "" }};
+        mod.schema.groups[0].controls.emplace_back(ActionDefinition{ "run", "Run", "Hint", "Really run?" });
+        mod.schema.groups[0].controls.emplace_back(ActionDefinition{ "quick", "Quick", "", "" });
         mod.values.emplace(setting.key, EnumValue{ "slow" });
         std::vector mods{mod};
         check(Localization::NormalizeLanguage("PTBR") == "ptbr", "game language codes normalize");
@@ -57,13 +58,13 @@ int main()
         check(german.Errors().empty() && german.Language() == "de", "valid catalogs load cleanly");
         check(translated.title == "Deutsch" && translated.description == "Authored description", "selected and authored fallbacks");
         check(translated.groups[0].label == "Allgemein" && translated.groups[0].id == "General / group", "group identities stay authored");
-        const auto& current = translated.groups[0].settings[0];
+        const auto& current = std::get<SettingDefinition>(translated.groups[0].controls[0]);
         check(current.key == setting.key && current.label == "Modus" && current.hint == "English hint" && current.requiresRestart, "exact setting keys and English field fallback");
         const auto& enumeration = std::get<EnumDefinition>(current.definition);
         check(enumeration.defaultValue.value == "fast" && enumeration.options[0].value == "slow" && enumeration.options[0].label == "Langsam", "enum labels do not replace values or order");
         check(IsValidValue(current, EnumValue{"slow"}) && !IsValidValue(current, EnumValue{"Langsam"}), "setters still validate stored enum values");
         check(translated.hotkeys[0].label == "Öffnen" && translated.hotkeys[0].defaultKey == "F10" && translated.hotkeys[0].menu == "Menu", "hotkey localization does not change registration");
-        check(translated.actions[0].confirmation == "Wirklich ausführen?" && translated.actions[1].confirmation.empty(), "confirmation translation preserves enabled state");
+        check(translated.FindAction("run")->confirmation == "Wirklich ausführen?" && translated.FindAction("quick")->confirmation.empty(), "confirmation translation preserves enabled state");
         Localization::Catalog english(root, "fr", mods);
         english.Apply(translated);
         check(translated.title == "English title", "missing selected language uses English catalog");
@@ -75,8 +76,8 @@ int main()
         invalid.Apply(translated);
         check(invalid.Errors().size() == 6, "bad entries and unknown fields report diagnostics");
         check(translated.title == "English title" && translated.description.empty(), "bad title falls back and optional text can be cleared");
-        check(translated.groups[0].settings[0].label == "Mode" && translated.groups[0].settings[0].hint == "Mehrere\nZeilen", "invalid NUL rejected and valid multiline sibling retained");
-        check(translated.actions[0].confirmation == "Really run?" && translated.actions[1].confirmation.empty(), "catalog cannot remove or add confirmation requirement");
+        check(std::get<SettingDefinition>(translated.groups[0].controls[0]).label == "Mode" && std::get<SettingDefinition>(translated.groups[0].controls[0]).hint == "Mehrere\nZeilen", "invalid NUL rejected and valid multiline sibling retained");
+        check(translated.FindAction("run")->confirmation == "Really run?" && translated.FindAction("quick")->confirmation.empty(), "catalog cannot remove or add confirmation requirement");
         std::ofstream(root / "de/example.json") << R"({"version":1,"title":"first","title":"second"})";
         Localization::Catalog duplicate(root, "de", mods);
         duplicate.Apply(translated);

@@ -70,7 +70,6 @@ namespace OSFSettings
         std::string id;
         std::string label;
         std::string hint;
-        std::string group;
         std::string confirmation; // Empty means invoke without a confirmation dialog.
     };
 
@@ -101,7 +100,7 @@ namespace OSFSettings
     {
         std::string id;
         std::string label;
-        std::vector<SettingDefinition> settings;
+        std::vector<std::variant<SettingDefinition, ActionDefinition>> controls;
     };
 
     struct ModSchema
@@ -111,9 +110,11 @@ namespace OSFSettings
         std::string description;
         std::vector<SettingsGroup> groups;
         std::vector<HotkeyDefinition> hotkeys;
-        std::vector<ActionDefinition> actions;
         std::vector<MenuDefinition> menus;
+        SettingDefinition* FindSetting(std::string_view key);
         const SettingDefinition* FindSetting(std::string_view key) const;
+        ActionDefinition* FindAction(std::string_view actionId);
+        const ActionDefinition* FindAction(std::string_view actionId) const;
     };
 
     struct ModSettings

@@ -122,10 +122,13 @@ namespace OSFSettings::API
                     backing.views.reserve(groupCount);
                     for (const auto& group : schema.groups) {
                         auto& data = backing.groups[backing.views.size()];
-                        const auto settingCount = Count(group.settings.size());
+                        const auto settingCount = Count(std::ranges::count_if(group.controls, [](const auto& control) { return std::holds_alternative<SettingDefinition>(control); }));
                         data.settings.reserve(settingCount);
                         data.options.resize(settingCount);
-                        for (const auto& setting : group.settings) {
+                        for (const auto& control : group.controls) {
+                            const auto* valueSetting = std::get_if<SettingDefinition>(&control);
+                            if (!valueSetting) continue;
+                            const auto& setting = *valueSetting;
                             data.settings.push_back(Describe(setting, mod.values.at(setting.key), data.options[data.settings.size()]));
                         }
                         backing.views.push_back({ Text(group.id), Text(group.label), Elements(data.settings), settingCount });

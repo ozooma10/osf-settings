@@ -97,27 +97,24 @@ namespace OSFSettings::Localization
                     return true;
                 });
                 Entries(document, "settings", "", [&](const auto& id, const auto& entry, const auto& field) {
-                    for (auto& group : mod.groups) {
-                        auto setting = std::ranges::find(group.settings, id, &SettingDefinition::key);
-                        if (setting == group.settings.end()) continue;
-                        Fields(entry, { "label", "hint", "optionLabels" }, field);
-                        Text(entry, "label", setting->label, field);
-                        Text(entry, "hint", setting->hint, field, true, true);
-                        if (auto options = entry.find("optionLabels"); options != entry.end()) {
-                            auto* definition = std::get_if<EnumDefinition>(&setting->definition);
-                            if (!definition || !options->is_object()) Error(field + "optionLabels");
-                            else for (const auto& [value, label] : options->items()) {
-                                auto option = std::ranges::find(definition->options, value, &EnumOption::value);
-                                if (option == definition->options.end() || !ValidText(label, false, false)) {
-                                    Error(field + "optionLabels/" + value);
-                                } else {
-                                    option->label = label.template get<std::string>();
-                                }
+                    auto* setting = mod.FindSetting(id);
+                    if (!setting) return false;
+                    Fields(entry, { "label", "hint", "optionLabels" }, field);
+                    Text(entry, "label", setting->label, field);
+                    Text(entry, "hint", setting->hint, field, true, true);
+                    if (auto options = entry.find("optionLabels"); options != entry.end()) {
+                        auto* definition = std::get_if<EnumDefinition>(&setting->definition);
+                        if (!definition || !options->is_object()) Error(field + "optionLabels");
+                        else for (const auto& [value, label] : options->items()) {
+                            auto option = std::ranges::find(definition->options, value, &EnumOption::value);
+                            if (option == definition->options.end() || !ValidText(label, false, false)) {
+                                Error(field + "optionLabels/" + value);
+                            } else {
+                                option->label = label.template get<std::string>();
                             }
                         }
-                        return true;
                     }
-                    return false;
+                    return true;
                 });
                 Entries(document, "hotkeys", "", [&](const auto& id, const auto& entry, const auto& field) {
                     auto hotkey = std::ranges::find(mod.hotkeys, id, &HotkeyDefinition::id);
@@ -127,8 +124,8 @@ namespace OSFSettings::Localization
                     return true;
                 });
                 Entries(document, "actions", "", [&](const auto& id, const auto& entry, const auto& field) {
-                    auto action = std::ranges::find(mod.actions, id, &ActionDefinition::id);
-                    if (action == mod.actions.end()) return false;
+                    auto* action = mod.FindAction(id);
+                    if (!action) return false;
                     Fields(entry, { "label", "hint", "confirmation" }, field);
                     Text(entry, "label", action->label, field);
                     Text(entry, "hint", action->hint, field, true, true);

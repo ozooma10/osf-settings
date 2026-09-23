@@ -23,7 +23,10 @@ namespace OSFSettings::Papyrus
             if (item.schema.id != modId) continue;
             const SettingDefinition* found{};
             for (const auto& group : item.schema.groups) {
-                for (const auto& setting : group.settings) {
+                for (const auto& control : group.controls) {
+                    const auto* valueSetting = std::get_if<SettingDefinition>(&control);
+                    if (!valueSetting) continue;
+                    const auto& setting = *valueSetting;
                     if (FoldIdentifier(setting.key) != keyId) continue;
                     if (found) return std::unexpected(SettingsError::InvalidArgument);
                     found = &setting;

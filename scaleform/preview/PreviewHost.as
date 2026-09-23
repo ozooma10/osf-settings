@@ -83,6 +83,14 @@ package
             for each (var library:XML in config.libraries.library) libraries.push(String(library.@url));
             for each (var font:XML in config.fonts.font) fontNames.push(String(font.@name));
             for each (var row:XML in config.rows.row) {
+                if (String(row.@type) == "action") {
+                    rows.push({modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
+                        group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
+                        mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint), type:"action",
+                        editable:true, confirmation:String(row.@confirmation), actionState:String(row.@actionState),
+                        message:String(row.@message)});
+                    continue;
+                }
                 var value:*;
                 if (String(row.@type) == "float" || String(row.@type) == "key") value = Number(row.@value);
                 else if (String(row.@type) == "int" || String(row.@type) == "enum" || String(row.@type) == "string") value = String(row.@value);
@@ -155,7 +163,7 @@ package
         {
             menu = event.target.content;
             menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
-                actionRevision:function():String { return "0"; }, launcherRevision:function():String { return "0"; },
+                actionRevision:function():String { return "0"; }, invokeAction:invokeAction, launcherRevision:function():String { return "0"; },
                 launch:function(mod:String, id:String):Boolean {
                     trace("[preview] launch " + mod + "/" + id);
                     return false; // The preview cannot open engine/provider menus.
@@ -239,6 +247,18 @@ package
                 result.push(copy);
             }
             return result;
+        }
+
+        private function invokeAction(mod:String, key:String):Object
+        {
+            for each (var row:Object in rows) {
+                if (row.mod == mod && row.key == key && row.type == "action") {
+                    row.actionState = "Completed";
+                    row.message = "Preview action completed.";
+                    return {ok:true};
+                }
+            }
+            return {ok:false, error:"Unknown preview action."};
         }
 
         private function setBool(mod:String, key:String, value:Boolean):Object

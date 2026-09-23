@@ -29,50 +29,84 @@ int main()
         ++checks;
     };
     try {
-        const auto document = Json::parse(R"({"schemaVersion":1,"groups":{},"actions":[
-            {"id":"scan","label":"Rescan files","hint":"Reload the index","confirmation":"Rescan now?"},
-            {"id":"run","label":"Start scene"}]})");
+        const auto document = Json::parse(R"({"schemaVersion":1,"groups":{"Maintenance":[
+            {"type":"action","id":"scan","label":"Rescan files","hint":"Reload the index","confirmation":"Rescan now?"},
+            {"type":"action","id":"run","label":"Start scene"}]}})");
         std::string error;
         const auto schema = SettingsJson::ParseSchema(document, "actions", error);
-        check(schema && schema->actions.size() == 2 && schema->groups.size() == 1 && schema->actions[0].group == "General", "action-only schema creates a visible group");
-        check(schema->groups[0].settings.empty() && !schema->FindSetting("scan"), "actions are not value definitions");
-        check(schema->actions[0].confirmation == "Rescan now?" && schema->actions[1].confirmation.empty(), "confirmation is optional and preserved");
-        for (const auto* field : {"id", "label", "hint", "confirmation", "group"}) {
-            auto bad = document; bad["actions"][0][field] = 42;
+        check(schema && schema->groups.size() == 1 && schema->groups[0].controls.size() == 2, "action-only group is retained");
+        check(!schema->FindSetting("scan") && schema->FindAction("scan") && schema->FindAction("run"), "actions are not value definitions");
+        check(schema->FindAction("scan")->confirmation == "Rescan now?" && schema->FindAction("run")->confirmation.empty(), "confirmation is optional and preserved");
+        for (const auto* field : {"type", "id", "label", "hint", "confirmation"}) {
+            auto bad = document; bad["groups"]["Maintenance"][0][field] = 42;
             check(!SettingsJson::ParseSchema(bad, "actions", error), "nontext action metadata rejected");
         }
-        auto bad = document; bad["actions"][1]["id"] = "SCAN";
+        for (const auto* field : {"type", "id", "label"}) {
+            auto bad = document; bad["groups"]["Maintenance"][0].erase(field);
+            check(!SettingsJson::ParseSchema(bad, "actions", error), "required action fields cannot be omitted");
+        }
+        auto bad = document; bad["groups"]["Maintenance"][1]["id"] = "SCAN";
         check(!SettingsJson::ParseSchema(bad, "actions", error), "case-ambiguous action ids rejected");
-        bad = document; bad["actions"][0]["confirmation"] = "";
+        bad = document; bad["groups"]["Maintenance"][0]["confirmation"] = "";
         check(!SettingsJson::ParseSchema(bad, "actions", error), "explicit empty confirmation rejected");
-        bad = document; bad["actions"][0]["confirmation"] = std::string("no\0yes", 6);
+        bad = document; bad["groups"]["Maintenance"][0]["confirmation"] = std::string("no\0yes", 6);
         check(!SettingsJson::ParseSchema(bad, "actions", error), "confirmation cannot hide text after a NUL");
-        bad = document; bad["actions"][0]["default"] = true;
-        check(!SettingsJson::ParseSchema(bad, "actions", error), "actions cannot have defaults");
-        bad = document; bad["actions"][0]["group"] = "Missing";
-        check(!SettingsJson::ParseSchema(bad, "actions", error), "explicit unknown group rejected");
-        bad = document; bad["actions"][0]["id"] = "../scan";
+        for (const auto* field : {"default", "value", "key", "requires", "group"}) {
+            bad = document; bad["groups"]["Maintenance"][0][field] = "unused";
+            check(!SettingsJson::ParseSchema(bad, "actions", error), "actions reject value metadata and redundant group placement");
+        }
+        bad = document; bad["groups"]["Maintenance"][0]["id"] = "../scan";
         check(!SettingsJson::ParseSchema(bad, "actions", error), "invalid identity rejected");
-        bad = document; bad["actions"] = Json::object();
-        check(!SettingsJson::ParseSchema(bad, "actions", error), "actions must be an array");
+        bad = document; bad["groups"]["Maintenance"] = Json::object();
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "group controls must be an array");
+        bad = document; bad["groups"]["Maintenance"][0] = 42;
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "group controls must be objects");
+        bad = document; bad["actions"] = Json::array();
+        check(!SettingsJson::ParseSchema(bad, "actions", error) && error.find("move each action into a group") != std::string::npos,
+            "legacy top-level actions produce a migration error");
         auto grouped = document;
-        grouped["groups"] = {{"Maintenance", Json::array()}, {"Gameplay", Json::array()}};
-        grouped["actions"][1]["group"] = "Gameplay";
+        grouped["groups"]["Gameplay"] = Json::array({grouped["groups"]["Maintenance"][1]});
+        grouped["groups"]["Maintenance"].erase(1);
         const auto groups = SettingsJson::ParseSchema(grouped, "actions", error);
-        check(groups && groups->actions[0].group == "Maintenance" && groups->actions[1].group == "Gameplay", "default and explicit group placement");
+        check(groups && std::get<ActionDefinition>(groups->groups[0].controls[0]).id == "scan" &&
+            std::get<ActionDefinition>(groups->groups[1].controls[0]).id == "run", "actions belong to their containing group");
+        bad = grouped; bad["groups"]["Gameplay"][0]["id"] = "SCAN";
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "action ids are unique across groups ignoring case");
 
-        // Exercise the real value writer: an action must never leak into a persisted value map.
+        auto mixed = grouped;
+        mixed["groups"]["Maintenance"] = Json::array({
+            {{"key", "enabled"}, {"type", "bool"}, {"default", true}},
+            document["groups"]["Maintenance"][0],
+            {{"key", "count"}, {"type", "int"}, {"default", 3}}
+        });
+        const auto ordered = SettingsJson::ParseSchema(mixed, "actions", error);
+        check(ordered && ordered->groups[0].controls.size() == 3 &&
+            std::get<SettingDefinition>(ordered->groups[0].controls[0]).key == "enabled" &&
+            std::get<ActionDefinition>(ordered->groups[0].controls[1]).id == "scan" &&
+            std::get<SettingDefinition>(ordered->groups[0].controls[2]).key == "count", "mixed controls preserve authored order");
+        check(ordered->FindSetting("count") && ordered->FindAction("run") && !ordered->FindAction("enabled"), "typed lookups skip the other control kind");
+        for (const auto* example : {"examples/actions/osfsettings-actions-example.json", "examples/papyrus/papyrusexample.json", "examples/localization/schemas/localization-example.json"}) {
+            std::ifstream input(example);
+            const auto parsed = SettingsJson::ParseSchema(input, std::filesystem::path(example).stem().string(), error);
+            check(parsed && (parsed->FindAction("run") || parsed->FindAction("reset")), "shipped examples parse with grouped actions");
+        }
+
+        // Exercise the real value writer and resets with an action between settings.
         const auto root = std::filesystem::temp_directory_path() / ("osfsettings-actions-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         struct Cleanup { std::filesystem::path path; ~Cleanup() { std::error_code ignored; std::filesystem::remove_all(path, ignored); } } cleanup{root};
         std::filesystem::create_directories(root / "schemas");
-        auto stored = grouped;
-        stored["groups"]["Maintenance"].push_back({{"key", "enabled"}, {"type", "bool"}, {"default", true}});
-        { std::ofstream file(root / "schemas/actions.json"); file << stored; }
+        { std::ofstream file(root / "schemas/actions.json"); file << mixed; }
         SettingsStore store;
         store.LoadAll(root / "schemas", root / "values");
         check(store.LoadErrors().empty() && store.Set("actions", "enabled", false).ok, "ordinary setting remains writable with actions present");
-        const auto values = Json::parse(std::ifstream(root / "values/actions.json"));
-        check(values["values"] == Json{{"enabled", false}}, "only the ordinary setting is persisted");
+        auto values = Json::parse(std::ifstream(root / "values/actions.json"));
+        check(values["values"] == Json{{"enabled", false}, {"count", 3}}, "only ordinary settings are persisted");
+        check(!store.Set("actions", "scan", true).ok && !store.Reset("actions", "scan").ok, "actions cannot be written or reset as settings");
+        check(store.ResetMod("actions").ok, "mixed group resets its settings");
+        values = Json::parse(std::ifstream(root / "values/actions.json"));
+        check(values["values"] == Json{{"enabled", true}, {"count", 3}}, "mod reset preserves value-only persistence");
+        store.LoadAll(root / "schemas", root / "values");
+        check(store.LoadErrors().empty() && store.Mods()[0].schema.FindAction("scan"), "actions survive value reloads");
 
         ActionService service;
         const std::vector<ModSettings> mods{{*schema, {}}};

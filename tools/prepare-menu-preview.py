@@ -15,6 +15,8 @@ from preview_abc import adapt_callbacks
 
 def load_schema(path):
     schema = json.loads(path.read_text(encoding="utf-8-sig"))
+    if "actions" in schema:
+        raise ValueError(f"Move top-level actions into groups with type: action: {path}")
     mod_id = path.stem
     if not re.fullmatch(r"[a-z0-9._-]+", mod_id) or mod_id in (".", ".."):
         raise ValueError(f"Invalid schema filename mod ID: {path}")
@@ -213,6 +215,13 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
         schema = load_schema(path)
         for name, settings in schema["groups"].items():
             for setting in settings:
+                if setting["type"] == "action":
+                    ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
+                                  modDescription=schema.get("description", ""), group=name, groupTitle=name,
+                                  key=setting["id"], title=setting["label"], type="action", editable="true",
+                                  hint=setting.get("hint", ""), confirmation=setting.get("confirmation", ""),
+                                  actionState="Run", message="Ready.")
+                    continue
                 if "requires" in setting and setting["requires"] != "restart":
                     raise ValueError(f'Preview requires must be "restart" when present: {path} / {setting["key"]}')
                 kind, default = setting["type"], setting["default"]

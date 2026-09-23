@@ -108,6 +108,7 @@ namespace OSFSettings::SettingsJson
         error.clear();
         try {
             Require(document.is_object(), "schema must be an object");
+            Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
             const auto version = document.find("schemaVersion");
             Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
 
@@ -123,6 +124,7 @@ namespace OSFSettings::SettingsJson
             const auto groups = document.find("groups");
             Require(groups != document.end() && groups->is_object(), "groups must be an object");
             std::set<std::string> settingKeys;
+            std::set<std::string> actionIds;
             for (const auto& [name, settings] : groups->items()) {
                 Require(!name.empty(), "group name must not be empty");
                 Require(name.find('\0') == std::string::npos, "group name must not contain NUL");
@@ -130,14 +132,35 @@ namespace OSFSettings::SettingsJson
                 group.id = name;
                 group.label = name;
 
-                Require(settings.is_array(), "group settings must be an array: " + name);
+                Require(settings.is_array(), "group controls must be an array: " + name);
                 for (const auto& sourceSetting : settings) {
-                    Require(sourceSetting.is_object(), "each setting must be an object");
+                    Require(sourceSetting.is_object(), "each control must be an object");
+                    const auto type = RequiredText(sourceSetting, "type");
+                    if (type == "action") {
+                        ActionDefinition action;
+                        action.id = RequiredText(sourceSetting, "id");
+                        Require(action.id.size() <= 128 && action.id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos,
+                            "action id must use 1-128 ASCII letters, digits, underscores, or hyphens");
+                        auto folded = action.id;
+                        for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';
+                        Require(actionIds.insert(folded).second, "duplicate action id: " + action.id);
+                        action.label = RequiredText(sourceSetting, "label");
+                        action.hint = OptionalText(sourceSetting, "hint");
+                        action.confirmation = OptionalText(sourceSetting, "confirmation");
+                        Require(IsValidString(action.label, 256) && IsValidString(action.hint, 4096) && IsValidString(action.confirmation, 4096),
+                            "action text must be single-line UTF-8 (label: 256 bytes; hint/confirmation: 4096 bytes)");
+                        if (sourceSetting.contains("confirmation")) Require(!action.confirmation.empty(), "confirmation must not be empty when present");
+                        Require(!sourceSetting.contains("group"), "actions use their containing group; remove the group field");
+                        Require(!sourceSetting.contains("key"), "actions use id, not a setting key");
+                        Require(!sourceSetting.contains("default") && !sourceSetting.contains("value"), "actions do not have a default or value");
+                        Require(!sourceSetting.contains("requires"), "actions do not have a restart requirement");
+                        group.controls.emplace_back(std::move(action));
+                        continue;
+                    }
                     SettingDefinition setting;
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(setting.key.find('\0') == std::string::npos, "setting key must not contain NUL");
                     Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
-                    const auto type = RequiredText(sourceSetting, "type");
                     Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key" || type == "string", "only types bool, int, float, enum, key, and string are supported: " + setting.key);
                     std::string defaultError = "default must be a boolean: ";
                     if (type == "string") {
@@ -209,7 +232,7 @@ namespace OSFSettings::SettingsJson
                         Require(requirement->is_string() && *requirement == "restart", "requires must be \"restart\" when present: " + setting.key);
                         setting.requiresRestart = true;
                     }
-                    group.settings.push_back(std::move(setting));
+                    group.controls.emplace_back(std::move(setting));
                 }
                 mod.groups.push_back(std::move(group));
             }
@@ -245,34 +268,6 @@ namespace OSFSettings::SettingsJson
                     mod.hotkeys.push_back(std::move(hotkey));
                 }
             }
-            if (const auto actions = document.find("actions"); actions != document.end()) {
-                Require(actions->is_array(), "actions must be an array");
-                std::set<std::string> ids;
-                for (const auto& source : *actions) {
-                    Require(source.is_object(), "each action must be an object");
-                    ActionDefinition action;
-                    action.id = RequiredText(source, "id");
-                    Require(action.id.size() <= 128 && action.id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos,
-                        "action id must use 1-128 ASCII letters, digits, underscores, or hyphens");
-                    auto folded = action.id;
-                    for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';
-                    Require(ids.insert(folded).second, "duplicate action id: " + action.id);
-                    action.label = RequiredText(source, "label");
-                    action.hint = OptionalText(source, "hint");
-                    action.confirmation = OptionalText(source, "confirmation");
-                    Require(IsValidString(action.label, 256) && IsValidString(action.hint, 4096) && IsValidString(action.confirmation, 4096),
-                        "action text must be single-line UTF-8 (label: 256 bytes; hint/confirmation: 4096 bytes)");
-                    if (source.contains("confirmation")) Require(!action.confirmation.empty(), "confirmation must not be empty when present");
-                    if (source.contains("group")) {
-                        action.group = RequiredText(source, "group");
-                        Require(groups->contains(action.group), "unknown action group: " + action.group);
-                    } else {
-                        action.group = mod.groups.empty() ? "General" : mod.groups.front().id;
-                    }
-                    Require(!source.contains("default"), "actions do not have a default value");
-                    mod.actions.push_back(std::move(action));
-                }
-            }
             if (const auto menus = document.find("menus"); menus != document.end()) {
                 Require(menus->is_array(), "menus must be an array");
                 if (!menus->empty()) Require(mod.id.size() <= 128 && IsValidString(mod.title, 256),
@@ -293,7 +288,7 @@ namespace OSFSettings::SettingsJson
                     mod.menus.push_back(std::move(menu));
                 }
             }
-            if (mod.groups.empty() && (!mod.hotkeys.empty() || !mod.actions.empty())) {
+            if (mod.groups.empty() && !mod.hotkeys.empty()) {
                 mod.groups.push_back({ "General", "General", {} });
             }
             return mod;

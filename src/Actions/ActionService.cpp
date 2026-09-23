@@ -17,8 +17,12 @@ namespace OSFSettings
         std::lock_guard lock(m_mutex);
         if (m_ready) return;
         for (const auto& mod : mods) {
-            for (const auto& action : mod.schema.actions) {
-                m_actions.try_emplace(Key{ mod.schema.id, action.id });
+            for (const auto& group : mod.schema.groups) {
+                for (const auto& control : group.controls) {
+                    if (const auto* action = std::get_if<ActionDefinition>(&control)) {
+                        m_actions.try_emplace(Key{ mod.schema.id, action->id });
+                    }
+                }
             }
         }
         m_ready = true;

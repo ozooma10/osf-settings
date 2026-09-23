@@ -44,7 +44,7 @@ int main()
             "identity, label, default name and registered menu target are preserved");
         check(!parsed->FindSetting("openMenu"), "hotkeys are separate from ordinary setting definitions");
         check(parsed->groups.size() == 1 && parsed->groups[0].id == "General" &&
-            parsed->groups[0].label == "General" && parsed->groups[0].settings.empty() && action.group == "General",
+            parsed->groups[0].label == "General" && parsed->groups[0].controls.empty() && action.group == "General",
             "hotkey-only schemas use an implicit General group");
 
         const Json minimal = {{"groups", Json::object()}};
@@ -133,12 +133,12 @@ int main()
             "omitted groups use the first declared group, while explicit groups retain their target");
         changed["groups"]["Z first page / détails"] = Json::array({{{"key", "enabled"}, {"type", "bool"}, {"default", true}}});
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
-        check(result && result->hotkeys[0].group == "Z first page / détails" && result->groups[0].settings.size() == 1,
+        check(result && result->hotkeys[0].group == "Z first page / détails" && result->groups[0].controls.size() == 1,
             "ordinary settings and hotkeys share a group");
-        check(!result->groups[0].settings[0].requiresRestart, "settings omit the restart notice by default");
+        check(!std::get<SettingDefinition>(result->groups[0].controls[0]).requiresRestart, "settings omit the restart notice by default");
         changed["groups"]["Z first page / détails"][0]["requires"] = "restart";
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
-        check(result && result->groups[0].settings[0].requiresRestart, "restart metadata is retained on an ordinary setting");
+        check(result && std::get<SettingDefinition>(result->groups[0].controls[0]).requiresRestart, "restart metadata is retained on an ordinary setting");
         for (const auto& value : {Json(nullptr), Json(false), Json(1), Json(""), Json("reload"), Json("Restart"), Json::array()}) {
             auto invalid = changed;
             invalid["groups"]["Z first page / détails"][0]["requires"] = value;

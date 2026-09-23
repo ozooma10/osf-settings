@@ -303,7 +303,29 @@ namespace OSFSettings
             root->CreateArray(params.ret);
             for (const auto& mod : runtime.Settings()) {
                 for (const auto& group : mod.schema.groups) {
-                    for (const auto& setting : group.settings) {
+                    for (const auto& control : group.controls) {
+                        if (const auto* action = std::get_if<ActionDefinition>(&control)) {
+                            const auto state = ActionService::Get().Status(mod.schema.id, action->id);
+                            RE::Scaleform::GFx::Value row;
+                            root->CreateObject(&row);
+                            Text(row, "mod", mod.schema.id);
+                            Text(row, "modTitle", mod.schema.title);
+                            Text(row, "modDescription", mod.schema.description);
+                            Text(row, "group", group.id);
+                            Text(row, "groupTitle", group.label);
+                            Text(row, "key", action->id);
+                            Text(row, "title", action->label);
+                            Text(row, "type", "action");
+                            Text(row, "hint", action->hint);
+                            Text(row, "confirmation", action->confirmation);
+                            Text(row, "message", state.message);
+                            Text(row, "actionState", state.state == ActionState::Running ? tr("actions.working") : !state.available ? tr("actions.stateUnavailable") :
+                                state.state == ActionState::Succeeded ? tr("actions.stateCompleted") : state.state == ActionState::Failed ? tr("actions.stateFailed") : tr("actions.stateRun"));
+                            row.SetMember("editable", RE::Scaleform::GFx::Value(state.available));
+                            params.ret->PushBack(row);
+                            continue;
+                        }
+                        const auto& setting = std::get<SettingDefinition>(control);
                         const auto value = mod.values.find(setting.key);
                         if (value == mod.values.end()) continue;
                         RE::Scaleform::GFx::Value row;
@@ -380,27 +402,6 @@ namespace OSFSettings
                             }
                             row.SetMember("options", options);
                         }
-                        params.ret->PushBack(row);
-                    }
-                    for (const auto& action : mod.schema.actions) {
-                        if (action.group != group.id) continue;
-                        const auto state = ActionService::Get().Status(mod.schema.id, action.id);
-                        RE::Scaleform::GFx::Value row;
-                        root->CreateObject(&row);
-                        Text(row, "mod", mod.schema.id);
-                        Text(row, "modTitle", mod.schema.title);
-                        Text(row, "modDescription", mod.schema.description);
-                        Text(row, "group", group.id);
-                        Text(row, "groupTitle", group.label);
-                        Text(row, "key", action.id);
-                        Text(row, "title", action.label);
-                        Text(row, "type", "action");
-                        Text(row, "hint", action.hint);
-                        Text(row, "confirmation", action.confirmation);
-                        Text(row, "message", state.message);
-                        Text(row, "actionState", state.state == ActionState::Running ? tr("actions.working") : !state.available ? tr("actions.stateUnavailable") :
-                            state.state == ActionState::Succeeded ? tr("actions.stateCompleted") : state.state == ActionState::Failed ? tr("actions.stateFailed") : tr("actions.stateRun"));
-                        row.SetMember("editable", RE::Scaleform::GFx::Value(state.available));
                         params.ret->PushBack(row);
                     }
                     for (const auto& hotkey : mod.schema.hotkeys) {
