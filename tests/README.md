@@ -36,10 +36,9 @@ Each fixture remains a separate executable with its own stubs and process state.
 Sources included directly in fixtures, the lifecycle harness definition, and the
 callback suite's SFSE stub retain their separate compilation contexts.
 
-`osfsettings-localization` validates referenced keys and generates the native/AS
-defaults once when its generator, English catalog, or scanned sources change.
-Adding/removing scanned files also invalidates it; missing generated outputs are
-recreated. Keep its input list aligned with `tools/generate-localization.py`.
+The `osfsettings.localization` rule runs `tools/generate-localization.py` before
+building the plugin and the test core library. It validates referenced keys and
+writes `build/generated/English.{h,as}`, rewriting only outputs whose content changed.
 
 The historical `osfsettings-tests` aggregate used the removed `HotkeyService` API.
 Its still-supported SDK, service and key checks now have standalone targets.

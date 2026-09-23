@@ -21,31 +21,19 @@ option("test_harness")
     set_description("Expose passive local testing observations; normal input remains active")
 option_end()
 
--- One generation job shared by all consumers, including validation of new keys.
-target("osfsettings-localization")
-    set_kind("phony")
-    set_default(false)
-    add_includedirs("build/generated", { public = true })
-    on_build(function(target)
-        import("core.project.depend")
-        local inputs = table.join({"tools/generate-localization.py",
-            "data/SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json"},
-            os.files("src/**.cpp"), os.files("scaleform/src/*.as"))
-        table.sort(inputs)
-        depend.on_changed(function()
-            os.execv("python", { "-B", "tools/generate-localization.py" })
-        end, { dependfile = path.join(target:autogendir(), "localization.d"),
-            files = inputs, values = inputs,
-            changed = not os.isfile("build/generated/English.h") or not os.isfile("build/generated/English.as") })
+-- Generate build/generated/English.{h,as} from the shipped catalog and fail on string keys missing from it. The script only rewrites outputs that changed.
+rule("osfsettings.localization")
+    before_build(function(target)
+        os.execv("python", { "-B", path.join(os.projectdir(), "tools", "generate-localization.py") })
     end)
-target_end()
+rule_end()
 
 includes("tests", "examples")
 
 -- define targets
 target("OSF Settings")
     set_basename("OSFSettings")
-    add_deps("osfsettings-localization")
+    add_rules("osfsettings.localization")
     add_rules("commonlibsf.plugin", {
         name = "OSF Settings",
         author = "ozooma10",
@@ -56,7 +44,7 @@ target("OSF Settings")
     -- add src files
     add_files("src/**.cpp")
     add_headerfiles("src/**.h")
-    add_includedirs("src", "tests")
+    add_includedirs("src", "tests", "build/generated")
     set_pcxxheader("src/pch.h")
     add_packages("nlohmann_json")
     if has_config("test_harness") then
