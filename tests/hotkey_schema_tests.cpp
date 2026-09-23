@@ -161,7 +161,7 @@ int main()
         changed = document; changed.erase("groups"); reject(changed);
         for (const auto& value : {Json(nullptr), Json(true), Json(1), Json("setting"), Json::object()}) {
             changed = document; changed["groups"] = {{"Panel", value}}; reject(changed);
-            check(error == "group settings must be an array: Panel", "each group contains a settings array");
+            check(error == "group controls must be an array: Panel", "each group contains a controls array");
         }
         for (const auto& name : {std::string{}, std::string("Panel\0suffix", 12)}) {
             changed = document; changed["groups"] = {{name, Json::array()}}; reject(changed);

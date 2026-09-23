@@ -100,11 +100,11 @@ int main()
         store.LoadAll(root / "schemas", root / "values");
         check(store.LoadErrors().empty() && store.Set("actions", "enabled", false).ok, "ordinary setting remains writable with actions present");
         auto values = Json::parse(std::ifstream(root / "values/actions.json"));
-        check(values["values"] == Json{{"enabled", false}, {"count", 3}}, "only ordinary settings are persisted");
+        check(values["values"] == Json{{"count", 3}, {"enabled", false}}, "only ordinary settings are persisted");
         check(!store.Set("actions", "scan", true).ok && !store.Reset("actions", "scan").ok, "actions cannot be written or reset as settings");
         check(store.ResetMod("actions").ok, "mixed group resets its settings");
         values = Json::parse(std::ifstream(root / "values/actions.json"));
-        check(values["values"] == Json{{"enabled", true}, {"count", 3}}, "mod reset preserves value-only persistence");
+        check(values["values"] == Json{{"count", 3}, {"enabled", true}}, "mod reset preserves value-only persistence");
         store.LoadAll(root / "schemas", root / "values");
         check(store.LoadErrors().empty() && store.Mods()[0].schema.FindAction("scan"), "actions survive value reloads");
 

@@ -55,6 +55,8 @@ selected language, then an optional `en` catalog, then the original schema.
 Setting keys, group IDs, action/hotkey IDs, and enum option values are exact and
 case-sensitive, including punctuation. Enum labels are keyed by stored value,
 not option position. An automatically created group has the ID `General`.
+Action translations remain in the catalog's `actions` map, keyed by action ID,
+regardless of where the action control appears inside the schema's groups.
 
 Labels must be nonempty single-line text. Descriptions and hints may be empty
 and may contain JSON `\n` line breaks. Confirmation text may contain line breaks

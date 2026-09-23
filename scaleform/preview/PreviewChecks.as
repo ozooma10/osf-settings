@@ -313,6 +313,8 @@ package
                     require(findNamed(menu,"launcher_" + (launcher.columns - 1)) != null && findNamed(menu,"launcher_" + launcher.columns) == null, "recent shelf reserves the final card for overflow");
                     require(Object(findNamed(menu,"launcher_0")).row.title == "Absolute Control", "recent order overrides alphabetical order");
                     require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "Home tab label");
+                    list.selectedIndex = 0;
+                    require(list.selectedEntry.row.mod == "design-preview", "select the first mod before navigating to the shelf");
                     capture("home"); userEvent("Up"); break;
                 case 55:
                     require(launcher.focused && list.disableInput, "Up from the first mod focuses the interface shelf");

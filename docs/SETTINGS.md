@@ -1,6 +1,6 @@
 # Settings
 
-Ship a JSON schema and connect its values to your mod through [C++](#c-integration) or [Papyrus](#papyrus-integration).
+Define settings and [action buttons](#action-buttons) in one JSON schema, then connect them to your mod through [C++](#c-integration) or [Papyrus](#papyrus-integration).
 
 OSF Settings provides a centralized interface for users to view and edit those settings.
 
@@ -40,7 +40,7 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 - The required root field is `groups`. `title` defaults to the mod ID; `description` is optional.
 - The mod ID comes from the schema filename without `.json`.
 - Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs, `.` and `..` are invalid.
-- Group names become headings. Groups and settings appear in authored order.
+- Group names become headings. Groups and their controls appear in authored order.
 - Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod. API lookups use exact, case-sensitive keys.
 - Optional `label` defaults to the key. `hint` adds help text.
 
@@ -189,9 +189,79 @@ Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 
 See the [instance and Global example](../examples/papyrus/README.md) for all value types, hotkeys, and action callbacks.
 
+## Action buttons
+
+Declare a `type: "action"` control inside a group in your `schemas/mymod.json` settings schema:
+
+```json
+{
+  "schemaVersion": 1,
+  "title": "My mod",
+  "groups": {
+    "Maintenance": [
+      {
+        "type": "action",
+        "id": "rescan",
+        "label": "Rescan animation files",
+        "hint": "Reload the available animation list.",
+        "confirmation": "Rescan animation files now?"
+      }
+    ]
+  }
+}
+```
+
+`type: "action"`, `id` and `label` are required. API calls use exact spelling. `hint` and `confirmation` are optional.
+
+### C++ action handlers
+
+```cpp
+OSFSettings::API::Client actions; // Process lifetime.
+
+void OnRescan(std::uint64_t invocation, const char* mod, const char* id, void* context) noexcept
+{
+    auto& api = *static_cast<OSFSettings::API::Client*>(context);
+    // Perform a short operation, or hand invocation to your existing work queue.
+    // Call CompleteAction when the operation finishes, from any thread.
+    api.CompleteAction(invocation, true, "Animation index reloaded.");
+}
+
+// In the kPostPostLoad listener:
+if (actions.Init()) {
+    auto result = actions.RegisterAction("mymod", "rescan", OnRescan, &actions);
+}
+```
+
+Exactly one native **or** Papyrus handler owns each declaration. Native registration is process lifetime; another registration returns `AlreadyRegistered`. 
+
+Callbacks run on SFSE tasks with no main-thread guarantee. The menu pauses the game; your handler may queue work that will run after it closes. 
+OSF does not close menus, wait for gameplay, create worker threads, or cancel the mod's work.
+
+Complete immediately inside the callback or retain the token and complete later. 
+
+See the [buildable native example](../examples/actions/README.md).
+
+### Papyrus action handlers
+
+Register a bound quest/reference/alias from initialization and after each load:
+
+```papyrus
+Bool registered = OSFSettings.RegisterAction(Self, "mymod", "rescan")
+
+Function OnOSFAction(String modId, String actionId, String invocation)
+    ; Perform or queue the operation. Keep invocation as an opaque String.
+    Bool completed = OSFSettings.CompleteAction(invocation, true, "Rescan finished.")
+EndFunction
+```
+
+Global scripts use `RegisterActionStatic("MyScript", "mymod", "rescan")` and the same callback marked `Global`. 
+Repeating the same receiver registration succeeds without adding another handler; a different owner is rejected.
+
+The [Papyrus example](../examples/papyrus/README.md) includes an immediate reset and a Global action that completes after `Utility.WaitMenuPause`.
+Gameplay-dependent script work may remain pending until gameplay resumes.
+
 ## Related features
 
 - [Hotkeys](Keybindings.md): declare rebindable actions and handle them in C++ or Papyrus, or open a registered native menu.
-- [Action buttons](ACTIONS.md): add a top-level `actions` array for buttons with optional confirmation and asynchronous completion. Use `RegisterAction` and `CompleteAction` in C++ or Papyrus. Actions have no stored value/default.
 - [Menu launchers](LAUNCHERS.md): add a top-level `menus` array for native menus in the Launcher tab, or use the separate C++ launcher service for custom interfaces. Each schema entry has `id`, `title`, and a registered `menu` name; `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not create stored values and use the same schema version.
 - [Issue reporting](DIAGNOSTICS.md): report and clear problems in Mod Issues from C++ or Papyrus.

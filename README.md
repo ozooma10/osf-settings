@@ -6,14 +6,13 @@ For mod authors, start with [Settings](docs/SETTINGS.md) to define a page and co
 
 | Guide | Use it to |
 | --- | --- |
-| [Settings](docs/SETTINGS.md) | Define settings, read and write values, and respond to changes |
+| [Settings](docs/SETTINGS.md) | Define settings and action buttons, read and write values, and respond to changes |
 | [Hotkeys](docs/Keybindings.md) | Register rebindable actions or open a menu |
 | [Issue reporting](docs/DIAGNOSTICS.md) | Report and clear problems shown in Mod Issues |
 
 <details>
 <summary>additional integrations</summary>
 
-- [Action buttons](docs/ACTIONS.md): run an operation with optional confirmation and report completion.
 - [Persistence](docs/PERSISTENCE.md): per-mod values and launcher history.
 - [Menu launchers](docs/LAUNCHERS.md): add native menus or custom interfaces to the launch cards listing.
 - [Localization](docs/LOCALIZATION.md): Translate an existing mod with drop-in catalogs

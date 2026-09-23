@@ -180,7 +180,7 @@ int main()
         schema["groups"] = {{"First group", schema["groups"]["First group"]},
             {unicode, TestJson::array()}, {"extra", schema["groups"]["extra"]}};
         auto& mixedControls = schema["groups"]["First group"];
-        mixedControls.insert(mixedControls.begin() + 1, {{"type", "action"}, {"id", "rescan"}, {"label", "Rescan"}});
+        mixedControls.insert(mixedControls.begin() + 1, TestJson{{"type", "action"}, {"id", "rescan"}, {"label", "Rescan"}});
         schema["groups"][unicode].push_back({{"type", "action"}, {"id", "run"}, {"label", "Run"}});
         Write(schemas / "alpha.json", schema);
         Write(schemas / "beta.json", TestJson::parse(R"({"schemaVersion":1,"id":"beta","groups":{}})"));
