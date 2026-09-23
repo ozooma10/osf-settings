@@ -86,6 +86,14 @@ int main()
         Localization::Catalog broken(root, "de", mods);
         broken.Apply(translated);
         check(broken.Errors().size() == 1 && translated.title == "English title", "malformed JSON falls back");
+        write("de", "example", {{"version",2},{"title","Zwei"}});
+        Localization::Catalog unsupported(root, "de", mods);
+        unsupported.Apply(translated);
+        check(unsupported.Errors().size() == 1 && translated.title == "English title", "unsupported version rejects the file");
+        write("de", "example", {{"title","Ohne Version"}});
+        Localization::Catalog unversioned(root, "de", mods);
+        unversioned.Apply(translated);
+        check(unversioned.Errors().empty() && translated.title == "Ohne Version", "missing version defaults to 1");
 
         write("en", "osfsettings", {{"version",1},{"hotkeys",{{"openMenu",{{"label","Open mod settings"}}}}}});
         Localization::Catalog interfaceOnly(root, "en", mods);

@@ -222,7 +222,8 @@ namespace OSFSettings::Localization
                         }
                         return true;
                     });
-                    if (!document.is_object() || !document.contains("version") || !document["version"].is_number_integer() || document["version"] != 1) {
+                    if (!document.is_object()) { m_errors.push_back({ file, "translation catalog must be an object" }); continue; }
+                    if (document.contains("version") && (!document["version"].is_number_integer() || document["version"] != 1)) {
                         m_errors.push_back({ file, "translation version must be integer 1" }); continue;
                     }
                     if (interfaceOnly && id == "osfsettings") {
