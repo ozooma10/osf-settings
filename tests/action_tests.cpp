@@ -39,26 +39,26 @@ int main()
         check(schema->actions[0].confirmation == "Rescan now?" && schema->actions[1].confirmation.empty(), "confirmation is optional and preserved");
         for (const auto* field : {"id", "label", "hint", "confirmation", "group"}) {
             auto bad = document; bad["actions"][0][field] = 42;
-            check(!SettingsJson::ParseSchema(bad, error), "nontext action metadata rejected");
+            check(!SettingsJson::ParseSchema(bad, "actions", error), "nontext action metadata rejected");
         }
         auto bad = document; bad["actions"][1]["id"] = "SCAN";
-        check(!SettingsJson::ParseSchema(bad, error), "case-ambiguous action ids rejected");
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "case-ambiguous action ids rejected");
         bad = document; bad["actions"][0]["confirmation"] = "";
-        check(!SettingsJson::ParseSchema(bad, error), "explicit empty confirmation rejected");
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "explicit empty confirmation rejected");
         bad = document; bad["actions"][0]["confirmation"] = std::string("no\0yes", 6);
-        check(!SettingsJson::ParseSchema(bad, error), "confirmation cannot hide text after a NUL");
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "confirmation cannot hide text after a NUL");
         bad = document; bad["actions"][0]["default"] = true;
-        check(!SettingsJson::ParseSchema(bad, error), "actions cannot have defaults");
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "actions cannot have defaults");
         bad = document; bad["actions"][0]["group"] = "Missing";
-        check(!SettingsJson::ParseSchema(bad, error), "explicit unknown group rejected");
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "explicit unknown group rejected");
         bad = document; bad["actions"][0]["id"] = "../scan";
-        check(!SettingsJson::ParseSchema(bad, error), "invalid identity rejected");
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "invalid identity rejected");
         bad = document; bad["actions"] = Json::object();
-        check(!SettingsJson::ParseSchema(bad, error), "actions must be an array");
+        check(!SettingsJson::ParseSchema(bad, "actions", error), "actions must be an array");
         auto grouped = document;
         grouped["groups"] = {{"Maintenance", Json::array()}, {"Gameplay", Json::array()}};
         grouped["actions"][1]["group"] = "Gameplay";
-        const auto groups = SettingsJson::ParseSchema(grouped, error);
+        const auto groups = SettingsJson::ParseSchema(grouped, "actions", error);
         check(groups && groups->actions[0].group == "Maintenance" && groups->actions[1].group == "Gameplay", "default and explicit group placement");
 
         // Exercise the real value writer: an action must never leak into a persisted value map.

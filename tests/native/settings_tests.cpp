@@ -158,7 +158,7 @@ namespace
     void Reject(const Json& document, std::string_view expectedError)
     {
         std::string error;
-        const auto schema = OSFSettings::SettingsJson::ParseSchema(document, error);
+        const auto schema = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
         ++checks;
         if (schema || error.find(expectedError) == std::string::npos) {
             ++failures;
@@ -184,7 +184,7 @@ namespace
     void TestSchema(const Json& example)
     {
         std::string error = "old error";
-        const auto schema = OSFSettings::SettingsJson::ParseSchema(example, error);
+        const auto schema = OSFSettings::SettingsJson::ParseSchema(example, "learning", error);
         Check(schema.has_value() && error.empty(), "the shipped example parses and clears the error");
         if (!schema) return;
         Check(schema->id == "learning" && schema->groups.size() == 1, "mod and group are loaded");
@@ -196,7 +196,7 @@ namespace
 
         auto document = example;
         document["groups"]["General"][0]["default"] = false;
-        auto parsed = OSFSettings::SettingsJson::ParseSchema(document, error);
+        auto parsed = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
         Check(parsed && !std::get<OSFSettings::BoolDefinition>(parsed->groups[0].settings[0].definition).defaultValue, "false is a valid default");
 
         document = example;
@@ -204,7 +204,7 @@ namespace
         document.erase("description");
         document["groups"]["General"][0].erase("label");
         document["groups"]["General"][0].erase("hint");
-        parsed = OSFSettings::SettingsJson::ParseSchema(document, error);
+        parsed = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
         Check(parsed && parsed->title == "learning" && parsed->description.empty() &&
             parsed->groups[0].label == "General" && parsed->groups[0].settings[0].label == "notifications" &&
             parsed->groups[0].settings[0].hint.empty(), "optional display text uses readable defaults");
@@ -217,10 +217,14 @@ namespace
         }
         document = example;
         document.erase("schemaVersion");
-        Reject(document, "schemaVersion");
+        parsed = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
+        Check(parsed && error.empty() && parsed->id == schema->id &&
+            parsed->FindSetting("notifications") &&
+            parsed->FindSetting("notifications")->DefaultValue() == setting->DefaultValue(),
+            "omitting schemaVersion loads version 1 definitions and defaults");
         document = example;
         document["id"] = "../learning";
-        Reject(document, "mod id");
+        Reject(document, "schema id must match the filename stem");
         document = example;
         document["groups"] = Json::array();
         Reject(document, "groups must be an object");
@@ -256,7 +260,7 @@ namespace
 
         schema["groups"]["General"].push_back({ { "key", "counter" }, { "type", "int" }, { "default", 0 } });
         std::string error;
-        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
+        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, "learning", error);
         Check(parsed.has_value() && error.empty(), "a schema can mix booleans and integers");
         if (!parsed) return;
         const auto* limit = parsed->FindSetting("notificationLimit");
@@ -290,19 +294,19 @@ namespace
             document = schema;
             auto& setting = document["groups"]["General"][1];
             setting.erase("min"); setting.erase("max"); setting["default"] = value;
-            const auto unbounded = OSFSettings::SettingsJson::ParseSchema(Json::parse(document.dump()), error);
+            const auto unbounded = OSFSettings::SettingsJson::ParseSchema(Json::parse(document.dump()), "learning", error);
             Check(unbounded && unbounded->FindSetting("notificationLimit")->DefaultValue() == SettingValue{ value },
                 "unbounded defaults preserve signed 64-bit integers, including values beyond double precision");
         }
         for (const auto* absent : { "min", "max" }) {
             document = schema;
             document["groups"]["General"][1].erase(absent);
-            Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "each integer bound is optional");
+            Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "each integer bound is optional");
         }
         document = schema;
         document["groups"]["General"][1]["min"] = 3;
         document["groups"]["General"][1]["max"] = 3;
-        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "equal bounds allow their one valid integer");
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "equal bounds allow their one valid integer");
 
         const auto run = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
         const auto root = fs::current_path() / "build" / "tests" / "integers" / run;
@@ -379,7 +383,7 @@ namespace
     void TestFloatSlider(const Json& example)
     {
         std::string error;
-        const auto schema = OSFSettings::SettingsJson::ParseSchema(example, error);
+        const auto schema = OSFSettings::SettingsJson::ParseSchema(example, "learning", error);
         const auto* setting = schema ? schema->FindSetting("notificationVolume") : nullptr;
         const auto* definition = setting ? std::get_if<OSFSettings::FloatDefinition>(&setting->definition) : nullptr;
         Check(definition && definition->defaultValue == 0.75 && definition->step == 0.05, "the shipped float has its declared default and step");
@@ -427,7 +431,7 @@ namespace
             { "default", 0.75 }, { "min", 0 }, { "max", 1.0 } });
         schema["groups"]["General"].push_back({ { "key", "scale" }, { "type", "float" }, { "default", 0.0 } });
         std::string error;
-        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
+        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, "learning", error);
         Check(parsed.has_value() && error.empty(), "a schema can mix booleans, integers, and floats");
         if (!parsed) return;
         const auto* gain = parsed->FindSetting("gain");
@@ -463,27 +467,27 @@ namespace
             }
             document = schema;
             document["groups"]["General"][gainIndex].erase(bound);
-            Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "each float bound is optional");
+            Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "each float bound is optional");
         }
         document = schema;
         auto& fixed = document["groups"]["General"][gainIndex];
         fixed["min"] = 0.75; fixed["max"] = 0.75;
-        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "equal bounds allow their one valid float");
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "equal bounds allow their one valid float");
         document = schema;
         auto& negative = document["groups"]["General"][gainIndex];
         negative["default"] = -0.75; negative["min"] = -1; negative["max"] = -0.5;
-        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "float ranges and defaults can be negative");
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "float ranges and defaults can be negative");
         for (const auto* literal : { "0", "1", "1.0", "1e0", "0.1" }) {
             document = schema;
             const auto value = Json::parse(literal);
             document["groups"]["General"][gainIndex]["default"] = value;
-            const auto decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
+            const auto decoded = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
             Check(decoded && decoded->FindSetting("gain")->DefaultValue() == SettingValue{ value.get<double>() },
                 "integer, decimal, and exponent JSON defaults become doubles for float definitions");
         }
         document = schema;
         document["groups"]["General"][gainIndex + 1]["default"] = std::numeric_limits<std::uint64_t>::max();
-        const auto wide = OSFSettings::SettingsJson::ParseSchema(document, error);
+        const auto wide = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
         Check(wide && wide->FindSetting("scale")->DefaultValue() == SettingValue{ static_cast<double>(std::numeric_limits<std::uint64_t>::max()) },
             "float JSON decoding is not limited by signed integer storage");
 
@@ -587,7 +591,7 @@ namespace
         const auto modeEntry = std::ranges::find_if(settings, [](const Json& setting) { return setting["key"] == "notificationMode"; });
         const auto modeIndex = static_cast<std::size_t>(std::distance(settings.begin(), modeEntry));
         std::string error;
-        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, error);
+        const auto parsed = OSFSettings::SettingsJson::ParseSchema(schema, "learning", error);
         Check(parsed.has_value() && error.empty(), "a schema can mix enums with booleans, integers, and floats");
         if (!parsed) return;
         const auto* mode = parsed->FindSetting("notificationMode");
@@ -603,20 +607,20 @@ namespace
 
         auto document = schema;
         document["groups"]["General"][modeIndex].erase("optionLabels");
-        auto decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
+        auto decoded = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
         Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
             "omitted option labels use the option values");
         document = schema;
         document["groups"]["General"][modeIndex]["optionLabels"] = { "", "Same label", "Same label" };
-        decoded = OSFSettings::SettingsJson::ParseSchema(document, error);
+        decoded = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
         Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
             "empty labels use the option value and display labels need not be unique");
         document = schema;
         auto& single = document["groups"]["General"][modeIndex];
         single.erase("optionLabels"); single["options"] = { "normal" };
-        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "an enum can have a single option");
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "an enum can have a single option");
         single["options"] = { "normal", "Normal" };
-        Check(OSFSettings::SettingsJson::ParseSchema(document, error).has_value(), "enum option identities are case-sensitive");
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "enum option identities are case-sensitive");
 
         document = schema;
         document["groups"]["General"][modeIndex].erase("options");
@@ -759,7 +763,9 @@ namespace
         document["id"] = "unsupported";
         document["schemaVersion"] = 2;
         Write(schemas / "unsupported.json", document.dump());
-        Write(schemas / "mismatch.json", example.dump());
+        document = example;
+        document["id"] = "learning";
+        Write(schemas / "mismatch.json", document.dump());
 
         store.LoadAll(schemas, values);
         Check(store.Mods().size() == 1 && store.LoadErrors().size() == 3,

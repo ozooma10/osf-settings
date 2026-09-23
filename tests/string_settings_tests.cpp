@@ -64,31 +64,31 @@ int main()
         schema["groups"]["Interface"].push_back({{"key", "enabled"}, {"type", "bool"}, {"default", false}});
         schema["groups"]["Interface"].push_back({{"key", "text"}, {"type", "string"}, {"default", ""}, {"maxLength", 4096}});
         std::string error;
-        const auto parsed = SettingsJson::ParseSchema(schema, error);
+        const auto parsed = SettingsJson::ParseSchema(schema, "osfui", error);
         check(parsed && error.empty(), "OSF UI language declaration parses in a Slim schema");
         const auto& definition = std::get<StringDefinition>(parsed->FindSetting("language")->definition);
         check(definition.maxLength == 32 && definition.defaultValue == "auto", "language stays free-form with authored default and limit");
 
         auto changed = schema;
         changed["groups"]["Interface"][0].erase("maxLength");
-        check(std::get<StringDefinition>(SettingsJson::ParseSchema(changed, error)->FindSetting("language")->definition).maxLength == 256,
+        check(std::get<StringDefinition>(SettingsJson::ParseSchema(changed, "osfui", error)->FindSetting("language")->definition).maxLength == 256,
             "omitted maxLength is 256 UTF-8 bytes");
         for (const TestJson& limit : {TestJson(0), TestJson(-1), TestJson(4097), TestJson(32.0), TestJson(true), TestJson(nullptr), TestJson("32"), TestJson(UINT64_MAX)}) {
             changed = schema; changed["groups"]["Interface"][0]["maxLength"] = limit;
-            check(!SettingsJson::ParseSchema(changed, error), "invalid maxLength is a schema error");
+            check(!SettingsJson::ParseSchema(changed, "osfui", error), "invalid maxLength is a schema error");
         }
         for (const auto limit : {1, 4096}) {
             changed = schema;
             changed["groups"]["Interface"][0]["maxLength"] = limit;
             changed["groups"]["Interface"][0]["default"] = std::string(limit, 'x');
-            check(SettingsJson::ParseSchema(changed, error).has_value(), "inclusive schema byte boundaries");
+            check(SettingsJson::ParseSchema(changed, "osfui", error).has_value(), "inclusive schema byte boundaries");
         }
         changed = schema; changed["groups"]["Interface"][0].erase("default");
-        check(!SettingsJson::ParseSchema(changed, error), "string default is required");
+        check(!SettingsJson::ParseSchema(changed, "osfui", error), "string default is required");
         changed["groups"]["Interface"][0]["default"] = "";
-        check(SettingsJson::ParseSchema(changed, error).has_value(), "empty default is valid");
+        check(SettingsJson::ParseSchema(changed, "osfui", error).has_value(), "empty default is valid");
         changed["groups"]["Interface"][0]["default"] = true;
-        check(!SettingsJson::ParseSchema(changed, error), "default is not coerced to text");
+        check(!SettingsJson::ParseSchema(changed, "osfui", error), "default is not coerced to text");
 
         const std::vector<std::string> invalid{
             std::string(33, 'x'), std::string("a\0b", 3), "a\tb", "a\nb", "a\rb", "\x7F", "\xC2\x80", "\xC2\x9F",
@@ -97,7 +97,7 @@ int main()
         };
         for (const auto& text : invalid) {
             changed = schema; changed["groups"]["Interface"][0]["default"] = text;
-            check(!IsValidString(text, 32) && !SettingsJson::ParseSchema(changed, error), "schema and value validation reject the same text");
+            check(!IsValidString(text, 32) && !SettingsJson::ParseSchema(changed, "osfui", error), "schema and value validation reject the same text");
         }
         const std::string unicode = "\xC3\xA9\xE4\xB8\xAD\xF0\x9F\x98\x80"; // 9 bytes, 3 scalars.
         check(IsValidString(unicode, 9) && !IsValidString(unicode, 8), "length counts UTF-8 bytes rather than characters or UTF-16 units");

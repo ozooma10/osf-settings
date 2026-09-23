@@ -232,7 +232,7 @@ int main()
             {
                 std::error_code ignored;
                 for (const auto* path : {"schemas/osfsettings.json", "schemas/renamed.mod_2.json", "schemas/Invalid ID.json",
-                        "state.json.tmp", "state.json", "schemas", "values", ""})
+                        "values/osfsettings.json.tmp", "values/osfsettings.json", "schemas", "values", ""})
                     fs::remove(root / path, ignored);
             }
         } cleanup{root};
@@ -261,8 +261,8 @@ int main()
         check(store.Mods()[0].schema.FindSetting("enabled")->requiresRestart &&
             store.Set("osfsettings", "enabled", false).ok && store.GetValue("osfsettings", "enabled") == SettingValue{false},
             "restart-required settings still save and publish the new value immediately");
-        std::ifstream saved(root / "state.json");
-        check(Json::parse(saved)["settings"]["osfsettings"]["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey and menu declarations");
+        std::ifstream saved(root / "values/osfsettings.json");
+        check(Json::parse(saved)["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey and menu declarations");
         changed["groups"] = {{"Renamed page", changed["groups"]["Z first page / détails"]}};
         { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
         store.LoadAll(root / "schemas", root / "values");
