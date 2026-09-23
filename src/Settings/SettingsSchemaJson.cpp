@@ -158,11 +158,13 @@ namespace OSFSettings::SettingsJson
                         Require(!definition.minimum || !definition.maximum || *definition.minimum <= *definition.maximum, "min must not exceed max: " + setting.key);
                         setting.definition = definition;
                     } else if (type == "key") {
-                        defaultError = "default must be a keyboard virtual-key integer or recognized key name (255/UNBOUND only with allowUnbound): ";
+                        defaultError = "default must be a keyboard virtual-key integer or recognized key name (255/UNBOUND disallowed when allowUnbound is false): ";
                         KeyDefinition definition;
                         const auto unbound = sourceSetting.find("allowUnbound");
                         Require(unbound == sourceSetting.end() || unbound->is_boolean(), "allowUnbound must be a boolean: " + setting.key);
-                        definition.allowUnbound = unbound != sourceSetting.end() && unbound->get<bool>();
+                        if (unbound != sourceSetting.end()) {
+                            definition.allowUnbound = unbound->get<bool>();
+                        }
                         setting.definition = definition;
                     } else if (type == "enum") {
                         defaultError = "default must be a string matching an option: ";

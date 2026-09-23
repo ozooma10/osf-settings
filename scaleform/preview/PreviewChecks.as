@@ -12,6 +12,7 @@ package
     import flash.text.TextField;
     import flash.ui.Keyboard;
     import flash.utils.ByteArray;
+    import flash.utils.getTimer;
 
     // Opt-in checks against the real movie and vanilla list, using -Pverify=true
     // with the design fixture. No operating-system input or game files are used.
@@ -24,12 +25,17 @@ package
         private var step:int = -1;
         private var setter:Function;
         private var bindingsOnly:Boolean;
+        private var captures:Boolean;
+        private var waitingSince:int;
+        private var readyFrames:int = 0;
         private var launcher:Object;
         private var originalRows:Function;
 
-        public function PreviewChecks(movie:MovieClip, bindings:Boolean = false)
+        public function PreviewChecks(movie:MovieClip, bindings:Boolean = false, screenshots:Boolean = false)
         {
             bindingsOnly = bindings;
+            captures = screenshots;
+            waitingSince = getTimer();
             menu = movie;
             for (var i:int = 0; i < menu.numChildren; ++i) {
                 var child:Object = menu.getChildAt(i);
@@ -53,8 +59,17 @@ package
         }
         private function advance(event:Event):void
         {
-            if (++tick % 12) return;
+            // Capture mode keeps the original visual settling interval. Routine
+            // assertions advance on rendered frames and observable async results.
+            if (captures && ++tick % 12) return;
             try {
+                if (getTimer() - waitingSince > 2000) throw new Error("step " + step + " did not become ready");
+                if (!readyForStep()) { readyFrames = 0; return; }
+                // Allow the menu's activation-frame guard and list rendering to
+                // finish before the next synthetic input event.
+                if (!captures && ++readyFrames < 2) return;
+                readyFrames = 0;
+                waitingSince = getTimer();
                 switch (step++) {
                 case -1:
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready at root");
@@ -339,6 +354,17 @@ package
                 menu.removeEventListener(Event.ENTER_FRAME, advance); trace("[verify] FAIL " + error);
             }
         }
+        private function readyForStep():Boolean
+        {
+            if (step == -1) return Object(menu).startupPhase == "ready" && list != null;
+            if (step == 35 || step == 48) return list.entryCount == 40;
+            if (step == 61) {
+                var first:Object = findNamed(menu,"launcher_0");
+                return first && first.row.title == "Ship Planner";
+            }
+            if (step == 63) return !launcher.visible;
+            return true;
+        }
         private function checkLocalization():void
         {
             var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
@@ -424,6 +450,7 @@ package
         }
         private function capture(name:String):void
         {
+            if (!captures) return;
             var bitmap:BitmapData = new BitmapData(1280, 720, false, 0x08151C);
             bitmap.draw(menu, new Matrix(2 / 3, 0, 0, 2 / 3));
             var pixels:ByteArray = new ByteArray();

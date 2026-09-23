@@ -45,7 +45,7 @@ namespace OSFSettings
     struct KeyDefinition
     {
         KeyBinding defaultValue;
-        bool allowUnbound{};
+        bool allowUnbound{ true };
     };
 
     struct StringDefinition

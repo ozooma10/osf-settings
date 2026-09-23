@@ -186,7 +186,8 @@ package
             // Keep ordinary design pages unchanged until Keybindings is selected.
             setChildIndex(message, numChildren - 1);
             setChildIndex(caption, numChildren - 1);
-            if (loaderInfo.parameters.verify == "true") new PreviewChecks(menu as MovieClip,loaderInfo.parameters.verifyBindings == "true");
+            if (loaderInfo.parameters.verify == "true") new PreviewChecks(menu as MovieClip,
+                loaderInfo.parameters.verifyBindings == "true", loaderInfo.parameters.verifyCaptures == "true");
         }
 
         private function getRows():Array
