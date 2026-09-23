@@ -51,7 +51,7 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 | `float` | `0.75` | Optional inclusive `min` / `max`; positive `step` defaults to `0.1` |
 | `enum` | `"normal"` | Required `options`: value-to-label object or string array |
 | `string` | `"auto"` | `maxLength`: 1–4096 UTF-8 bytes; defaults to 256 |
-| `key` | `"F4"` | `allowUnbound` defaults to false; C++ reads/writes keyboard VK codes |
+| `key` | `"F4"` | `allowUnbound` defaults to true; C++ reads/writes keyboard VK codes |
 
 Defaults must satisfy the setting's type and limits. 
 
@@ -82,14 +82,13 @@ Object labels must be strings; an empty label falls back to its value. Labels ma
 
 Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, and line/paragraph separators are rejected.  Limits count bytes, not characters. Values are preserved without trimming or truncation.
 
-A `key` setting stores a value for your own input handler. Use [hotkeys](Keybindings.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers; `"UNBOUND"` / `255` requires `allowUnbound: true`.
+A `key` setting stores a value for your own input handler. Use [hotkeys](Keybindings.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers. Unbinding and `"UNBOUND"` / `255` defaults are allowed unless `allowUnbound` is explicitly `false`.
 
 Add `"requires": "restart"` to show a restart notice. This is only a notice: values still save immediately, and your mod decides when to apply them.
 
 ## C++ integration
 
-Add [OSFSettings.h](../sdk/OSFSettings.h) to your plugin's includes. It requires
-CommonLibSF. Initialize the client at SFSE `kPostPostLoad`:
+Add [OSFSettings.h](../sdk/OSFSettings.h) to your plugin's includes. Initialize the client at SFSE `kPostPostLoad`:
 
 ```cpp
 #include "OSFSettings.h"
