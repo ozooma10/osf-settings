@@ -1,21 +1,10 @@
 #include "SettingsJson.h"
+#include "Persistence/AtomicFile.h"
 
 #include <cmath>
 #include <fstream>
 #include <stdexcept>
-#include <system_error>
 #include <nlohmann/json.hpp>
-
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <Windows.h>
-#undef ERROR
-#endif
 
 namespace OSFSettings::SettingsJson
 {
@@ -59,25 +48,7 @@ namespace OSFSettings::SettingsJson
 
     bool SaveValues(const std::filesystem::path& path, const SettingValues& values, std::string& error)
     {
-        error.clear();
-        auto temporary = path;
-        temporary += ".tmp";
-
         try {
-            // Clean up before entering the handler, even if formatting the error fails.
-            struct Cleanup
-            {
-                const std::filesystem::path& path;
-                bool owned{};
-                ~Cleanup()
-                {
-                    if (owned) {
-                        std::error_code ignored;
-                        std::filesystem::remove(path, ignored);
-                    }
-                }
-            } cleanup{ temporary };
-
             auto saved = nlohmann::json::object();
             for (const auto& [key, value] : values) {
                 if (const auto* number = std::get_if<double>(&value); number && !std::isfinite(*number)) {
@@ -93,29 +64,8 @@ namespace OSFSettings::SettingsJson
                     }
                 }, value);
             }
-            const nlohmann::json document = { { "formatVersion", 1 }, { "values", saved } };
-            const auto text = document.dump(2) + '\n';
-            if (!path.parent_path().empty()) std::filesystem::create_directories(path.parent_path());
-
-            {
-                std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-                if (!output) throw std::runtime_error("cannot open temporary values file");
-                cleanup.owned = true;
-                output << text;
-                output.close();
-                if (!output) throw std::runtime_error("cannot finish writing temporary values file");
-            }
-
-            // A sibling temporary file lets the filesystem replace the old file in one step.
-            if (!::MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-                const auto code = static_cast<int>(::GetLastError());
-                throw std::runtime_error("cannot replace values file: " + std::system_category().message(code));
-            }
-            cleanup.owned = false;
-            return true;
-        } catch (const std::exception& exception) {
-            error = path.string() + ": " + exception.what();
-            return false;
-        }
+            const nlohmann::json document = {{"formatVersion", 1}, {"values", saved}};
+            return Persistence::WriteAtomic(path, document.dump(2) + '\n', error);
+        } catch (const std::exception& exception) { error = path.string() + ": " + exception.what(); return false; }
     }
 }

@@ -1,17 +1,10 @@
 #include "LauncherService.h"
+#include "Persistence/AtomicFile.h"
 #include "Settings/SettingsSchema.h"
 #include <utility>
 #include <algorithm>
 #include <fstream>
 #include <nlohmann/json.hpp>
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <Windows.h>
-#undef ERROR
 
 namespace OSFSettings
 {
@@ -65,25 +58,24 @@ namespace OSFSettings
         }
         return LauncherError::NotFound;
     }
-    void LauncherService::LoadHistory(const std::filesystem::path& path)
+    void LauncherService::LoadHistory(const std::filesystem::path& directory)
     {
         std::lock_guard lock(m_mutex);
-        m_historyPath = path;
+        m_dataPath = directory / "internal.json";
+        m_historyDirty = false;
         m_recent.clear();
         m_revision++;
-        if (path.empty()) return;
         try {
-            if (!std::filesystem::exists(path)) return;
-            if (std::filesystem::file_size(path) > 256 * 1024) {
-                throw std::runtime_error("history is too large");
-            }
-            std::ifstream input(path);
+            if (!std::filesystem::exists(m_dataPath)) return;
+            std::ifstream input(m_dataPath);
+            if (!input) throw std::runtime_error("cannot open internal data file");
             const auto document = nlohmann::json::parse(input);
-            if (document.at("formatVersion") != 1 || !document.at("recent").is_array() || document.at("recent").size() > 256){
+            const auto& history = document.at("recentLaunchers");
+            if (!history.is_array() || history.size() > 256) {
                 throw std::runtime_error("invalid history format");
             }
             std::vector<std::pair<std::string, std::string>> recent;
-            for (const auto& item : document.at("recent")) {
+            for (const auto& item : history) {
                 auto identity = std::pair{ item.at("mod").get<std::string>(), item.at("id").get<std::string>() };
                 if (!IsValidModId(identity.first) || identity.first.size() > 128 || !ValidID(identity.second)) {
                     throw std::runtime_error("invalid destination identity");
@@ -94,38 +86,27 @@ namespace OSFSettings
             }
             m_recent = std::move(recent);
         } catch (const std::exception& error) {
-            REX::WARN("Launcher history {}: {}", path.string(), error.what());
+            REX::WARN("Launcher history {}: {}", m_dataPath.string(), error.what());
         }
     }
 
-    void LauncherService::SaveHistory() const
+    void LauncherService::SaveHistory()
     {
-        if (m_historyPath.empty()) return;
-        auto temporary = m_historyPath;
-        temporary += ".tmp";
+        if (m_dataPath.empty() || !m_historyDirty) return;
         try {
             auto recent = nlohmann::json::array();
             for (const auto& [mod, id] : m_recent) {
-                recent.push_back({ { "mod", mod }, { "id", id } });
+                recent.push_back({{"mod", mod}, {"id", id}});
             }
-            const nlohmann::json document = { { "formatVersion", 1 }, { "recent", recent } };
-            if (!m_historyPath.parent_path().empty()) {
-                std::filesystem::create_directories(m_historyPath.parent_path());
+            const nlohmann::json document = {{"recentLaunchers", recent}};
+            std::string error;
+            if (!Persistence::WriteAtomic(m_dataPath, document.dump(2) + '\n', error)) {
+                REX::WARN("Launcher history {}: {}", m_dataPath.string(), error);
+                return;
             }
-            std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-            output << document.dump(2) << '\n';
-            output.close();
-            if (!output) {
-                throw std::runtime_error("could not write history");
-            }
-            if (!::MoveFileExW(temporary.c_str(), m_historyPath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-                throw std::runtime_error("could not replace history");
-            }
+            m_historyDirty = false;
         } catch (const std::exception& error) {
-            std::error_code ignored;
-            std::filesystem::remove(temporary, ignored);
-            // An unwritable history must not prevent opening an interface.
-            REX::WARN("Launcher history {}: {}", m_historyPath.string(), error.what());
+            REX::WARN("Launcher history {}: {}", m_dataPath.string(), error.what());
         }
     }
 
@@ -135,12 +116,17 @@ namespace OSFSettings
         const auto entry = std::ranges::find_if(m_destinations, [&](const auto& value) { return value.mod == mod && value.id == id; });
         if (entry == m_destinations.end() || !entry->available) return false;
         const auto identity = std::pair{ std::string(mod), std::string(id) };
+        if (!m_recent.empty() && m_recent.front() == identity) {
+            SaveHistory(); // Retry a failed write even when recency did not change.
+            return true;
+        }
         std::erase(m_recent, identity);
         m_recent.insert(m_recent.begin(), identity);
         if (m_recent.size() > 256) {
             m_recent.resize(256);
         }
         m_revision++;
+        m_historyDirty = true;
         SaveHistory();
         return true;
     }

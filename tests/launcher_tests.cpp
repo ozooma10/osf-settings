@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <chrono>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace OSFSettings
 {
@@ -59,17 +60,23 @@ int main()
         mod.schema.menus[0].title = "Changed";
         check(service.Find("absolute-control", "panel")->title == "Absolute Control", "schema registrations own their metadata");
 
-        const auto history = std::filesystem::temp_directory_path() /
-            ("osf-launcher-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".json");
+        const auto directory = std::filesystem::temp_directory_path() /
+            ("osf-launcher-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        const auto history = directory / "internal.json";
         struct Cleanup {
             std::filesystem::path path;
-            ~Cleanup() { std::error_code ignored; std::filesystem::remove(path, ignored); path += ".tmp"; std::filesystem::remove(path, ignored); }
-        } cleanup{history};
+            ~Cleanup() { std::error_code ignored; std::filesystem::remove_all(path, ignored); }
+        } cleanup{directory};
+        const auto read = [](const std::filesystem::path& path) { std::ifstream input(path); return nlohmann::json::parse(input); };
+        const auto values = directory / "values" / "osfsettings.json";
+        std::filesystem::create_directories(values.parent_path());
+        const nlohmann::json settings = {{"formatVersion", 1}, {"values", {{"enabled", false}}}};
+        { std::ofstream output(values); output << settings; }
         const auto rank = [](const LauncherService& source, std::string_view mod) {
             for (const auto& entry : source.Snapshot()) if (entry.mod == mod) return entry.recentOrder;
             return std::uint32_t{};
         };
-        service.LoadHistory(history);
+        service.LoadHistory(directory);
         const auto unchanged = service.Revision();
         check(!service.RecordOpened("demo", "missing") && !service.RecordOpened("demo", "native"), "missing and unavailable destinations cannot enter recent history");
         check(service.Revision() == unchanged && !std::filesystem::exists(history), "rejected openings do not change or write history");
@@ -77,14 +84,26 @@ int main()
         service.SetAvailable("demo", "native", true, "");
         check(service.RecordOpened("demo", "native") && rank(service, "demo") > rank(service, "absolute-control"), "last opening moves the destination to the front");
         check(service.RecordOpened("absolute-control", "panel") && rank(service, "absolute-control") == 2 && rank(service, "demo") == 1, "repeated openings reorder without duplicate history entries");
+        check(read(history).size() == 1 && read(history)["recentLaunchers"][0]["mod"] == "absolute-control" &&
+            read(values) == settings, "internal data uses its fixed field and preserves mod settings files");
         LauncherService restored;
-        restored.LoadHistory(history); // Providers may register after history is loaded.
+        restored.LoadHistory(directory); // Providers may register after history is loaded.
         restored.Register(native); restored.Initialize({mod});
         check(rank(restored, "absolute-control") == 2 && rank(restored, "demo") == 1, "recent ordering survives a new service and late provider registration");
+        std::filesystem::create_directory(directory / "internal.json.tmp");
+        const auto restoredRevision = restored.Revision();
+        check(restored.RecordOpened("absolute-control", "panel") && restored.Revision() == restoredRevision,
+            "opening the front destination leaves unchanged history alone");
+        check(restored.RecordOpened("demo", "native") && rank(restored, "demo") == 2 &&
+            read(history)["recentLaunchers"][0]["mod"] == "absolute-control",
+            "failed save preserves disk history and updates session recency");
+        std::filesystem::remove(directory / "internal.json.tmp");
+        check(restored.RecordOpened("demo", "native") && read(history)["recentLaunchers"][0]["mod"] == "demo",
+            "reopening the front destination retries a failed save");
         { std::ofstream broken(history); broken << "{broken"; }
-        restored.LoadHistory(history);
+        restored.LoadHistory(directory);
         check(restored.Snapshot().size() == 2 && rank(restored, "demo") == 0, "malformed history preserves registered interfaces with default ordering");
-        restored.LoadHistory(history / "unwritable.json");
+        restored.LoadHistory(history);
         check(restored.RecordOpened("demo", "native") && rank(restored, "demo") > 0, "history write failure preserves in-memory recency and does not reject opening");
 
         namespace API = OSFSettings::API::Launcher;

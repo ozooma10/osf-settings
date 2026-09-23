@@ -13,6 +13,7 @@ test_target("osfsettings-localization-tests")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_deps("commonlibsf")
     add_files("native/*.cpp", "../src/Settings/*.cpp", "../src/API/*.cpp", "../src/Actions/*.cpp", "../src/Diagnostics/*.cpp", "../src/Input/KeyNames.cpp", "../src/Input/KeyCapture.cpp", "../src/Input/HotkeyService.cpp", "../src/Menu/FloatSlider.cpp")
     add_files("../src/Launcher/LauncherService.cpp")
@@ -20,12 +21,14 @@ test_target("osfsettings-tests")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-schema-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_files("hotkey_schema_tests.cpp", "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp",
         "../src/Settings/SettingsJson.cpp", "../src/Settings/SettingsStore.cpp", "../src/Settings/SettingsValuesJson.cpp")
     add_includedirs("../src")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-launcher-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_deps("commonlibsf")
     add_files("launcher_tests.cpp", "../src/Launcher/LauncherService.cpp",
         "../src/API/LauncherApi.cpp", "../src/Settings/SettingsSchema.cpp")
@@ -34,6 +37,7 @@ test_target("osfsettings-launcher-tests")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-action-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_deps("commonlibsf")
     add_files("action_tests.cpp", "../src/Actions/ActionService.cpp", "../src/API/ActionsApi.cpp", "../src/Papyrus/Actions.cpp",
         "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp",
@@ -94,6 +98,7 @@ test_target("osfsettings-diagnostics-api-tests")
     add_includedirs("../src")
 
 test_target("osfsettings-hotkey-block-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_deps("commonlibsf")
     add_files("hotkey_block_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyNames.cpp",
         "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp", "../src/API/ActionsApi.cpp", "../src/Actions/ActionService.cpp", "../src/Settings/*.cpp")
@@ -106,6 +111,7 @@ test_target("osfsettings-hotkey-callback-tests")
     add_includedirs("stubs", "../src")
 
 test_target("osfsettings-string-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_deps("commonlibsf")
     add_files("string_settings_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyNames.cpp",
         "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp", "../src/API/ActionsApi.cpp", "../src/Actions/ActionService.cpp", "../src/Settings/*.cpp")
@@ -114,6 +120,7 @@ test_target("osfsettings-string-tests")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-registry-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_deps("commonlibsf")
     add_files("registry_api_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyNames.cpp",
         "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp", "../src/API/ActionsApi.cpp", "../src/Actions/ActionService.cpp", "../src/Settings/*.cpp")
@@ -122,9 +129,21 @@ test_target("osfsettings-registry-tests")
     add_packages("nlohmann_json")
 
 test_target("osfsettings-papyrus-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
     add_deps("commonlibsf")
     add_files("papyrus_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp",
         "../src/Papyrus/Values.cpp", "../src/Papyrus/Subscriptions.cpp", "../src/Input/KeyNames.cpp", "../src/Settings/*.cpp")
     add_includedirs("../src")
     set_pcxxheader("../src/pch.h")
+    add_packages("nlohmann_json")
+
+-- The historical aggregate also depends on the removed HotkeyService API.
+-- Run its value/storage coverage independently of those obsolete fixtures.
+test_target("osfsettings-store-tests")
+    add_files("../src/Persistence/AtomicFile.cpp")
+    add_defines("OSFSETTINGS_STORE_ONLY_TESTS")
+    add_files("native/settings_tests.cpp", "../src/Settings/SettingsStore.cpp",
+        "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp", "../src/Settings/SettingsJson.cpp",
+        "../src/Settings/SettingsValuesJson.cpp", "../src/Menu/FloatSlider.cpp")
+    add_includedirs("../src")
     add_packages("nlohmann_json")

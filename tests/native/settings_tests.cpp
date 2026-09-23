@@ -1,4 +1,6 @@
+#ifndef OSFSETTINGS_STORE_ONLY_TESTS
 #include "../../sdk/OSFSettings.h"
+#endif
 #include "Settings/SettingsJson.h"
 #include "Menu/FloatSlider.h"
 #include "Settings/SettingsStore.h"
@@ -24,6 +26,20 @@ int TestSettingsService();
 int TestKeySettings();
 int TestHotkeys();
 
+#ifdef OSFSETTINGS_STORE_ONLY_TESTS
+// This suite tests persistence, not the game's keyboard-name table. The authored
+// learning fixture has one F4 key default; fail on unexpected engine lookups.
+namespace OSFSettings
+{
+    std::optional<std::uint32_t> KeyCodeFromName(std::string_view name)
+    {
+        if (name == "F4") return 0x73;
+        throw std::runtime_error("unexpected key-name lookup in storage fixture");
+    }
+    bool IsBindableKey(std::uint32_t code) { return code == 0x73; }
+}
+#endif
+
 namespace
 {
     namespace fs = std::filesystem;
@@ -41,6 +57,7 @@ namespace
         }
     }
 
+#ifndef OSFSETTINGS_STORE_ONLY_TESTS
     void TestSDK()
     {
         using namespace OSFSettings::API;
@@ -154,6 +171,8 @@ namespace
         Check(!client.Init() && !client && !client.Raw() && client.Version() == 0,
             "failed SDK discovery clears an existing attachment");
     }
+
+#endif
 
     void Reject(const Json& document, std::string_view expectedError)
     {
@@ -573,9 +592,9 @@ namespace
         }
         for (const auto* literal : { "NaN", "Infinity", "1e400" }) {
             const auto saved = std::string("{\"formatVersion\":1,\"values\":{\"gain\":") + literal + "}}";
-            Write(valuesFile, saved);
+            Write(valuesFile, "{\"formatVersion\":1,\"settings\":{\"learning\":" + saved + "}}");
             restarted.LoadAll(schemas, values);
-            Check(restarted.GetValue("learning", "gain") == SettingValue{0.75} && restarted.LoadErrors().size() == 1 && Read(valuesFile) == saved,
+            Check(restarted.GetValue("learning", "gain") == SettingValue{0.75} && restarted.LoadErrors().size() == 1 && Read(valuesFile) == "{\"formatVersion\":1,\"settings\":{\"learning\":" + saved + "}}",
                 "malformed or overflowing JSON numbers are rejected without rewriting the file");
         }
         Write(valuesFile, Json{ { "formatVersion", 1 }, { "values", { { "notifications", false } } } }.dump());
@@ -948,12 +967,16 @@ int main(int argc, char** argv)
         std::ifstream input(examplePath);
         if (!input) throw std::runtime_error("cannot open example schema: " + examplePath.string());
         const auto example = nlohmann::ordered_json::parse(input);
+#ifndef OSFSETTINGS_STORE_ONLY_TESTS
         TestSDK();
         checks += TestSettingsService();
         checks += TestKeySettings();
         checks += TestHotkeys();
+#endif
+#ifndef OSFSETTINGS_STORE_ONLY_TESTS
         TestSchema(example);
         TestStore(example, examplePath);
+#endif
         TestPersistence(example);
         TestIntegers(example);
         TestFloats(example);
