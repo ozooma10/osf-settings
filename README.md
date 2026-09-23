@@ -23,7 +23,7 @@ For mod authors, start with [Settings](docs/SETTINGS.md) to define a page and co
 Use XMake 3.0.0+, Python 3.9+, and an MSVC compiler with C++23 support. Run from this repository:
 
 ```powershell
-pwsh tools/setup-scaleform.ps1
+pwsh tools/setup.ps1
 xmake f -y -m releasedbg --test_harness=n
 xmake build
 ```
