@@ -88,7 +88,7 @@
     "issues.error": "エラー",
     "issues.warning": "警告",
     "issues.schemaFailed": "設定ファイル {file} を読み込めませんでした",
-    "issues.schemaFailedImpact": "このファイルを提供するMODの設定ページ、ホットキー、メニューカードはOSF Settingsに表示されません。理由: {reason}",
+    "issues.schemaFailedImpact": "このファイルを提供するMODの設定ページ・ホットキー・メニューはOSF Settingsに表示されません。理由：{reason}",
     "issues.schemaFailedNextSteps": "このファイルを提供するMODを更新または再インストールしてから、Starfieldを再起動してください。ファイルのフルパスはOSF Settings.logに記録されています。",
     "bindings.heading": "MOD キー割り当て",
     "bindings.unavailableAction": "このアクションは現在のゲーム内操作設定にありません。",

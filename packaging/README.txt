@@ -46,7 +46,7 @@ or menu SWFs. Mod pages require schemas and an integration supplied by the mod.
 For a report, include the game/SFSE/mod versions, reproduction steps and the
 OSF Settings/SFSE logs under Documents/My Games/Starfield/SFSE/Logs.
 
-Source, author guide and release status:
+Source and mod author guide:
 https://github.com/ozooma10/osf-settings-slim
 
 This archive contains a production build. Acceptance fixtures, sample mods,
