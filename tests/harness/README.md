@@ -107,6 +107,13 @@ restart persistence and Pause entry. Physical controller input remains separate.
 
 ## Release acceptance fixtures
 
+`SettingsSmoke -Acceptance -AcceptancePhase Features` adds real-input checks
+for actions, Papyrus issues and Home launchers. The fixture includes native
+success/failure/deferred handlers, instance/Global action callbacks, an unavailable
+action, a callback launcher, an unavailable launcher and native/missing menu targets.
+Observers expose confirmation visibility, action status and fixture recency;
+they do not invoke menu actions for the test. Production builds omit these helpers.
+
 The harness's `SettingsSmoke -Acceptance` mode uses `Acceptance.cpp` and the
 scripts under `papyrus/`. A generated, test-only ESM defines one start-enabled
 quest with an optional player alias. The bootstrap fills it through `ForceRefTo`

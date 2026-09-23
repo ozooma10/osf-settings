@@ -67,7 +67,8 @@ namespace OSFSettings::TestHarness
                     "translations", "heading", "originalContext", "kbm", "gamepad", "unicode", "unknown", "vanilla", "requiredHeading", "conflictText",
                     "nativeRows", "divider", "presentationContext", "menuHeading", "sectionHeading", "countText",
                     "bindings", "count", "required", "requiredActions", "selectedKey", "query", "searching", "searchRect", "sourceRect", "clearRect", "primaryRect", "alternateRect",
-                    "largeText", "stringEditor", "text", "valid", "feedback", "focused", "maxLength", "issueId", "severity", "impact", "nextSteps", "issueDetails", "extent", "position", "emptyText", "detailHint"}) {
+                    "largeText", "stringEditor", "text", "valid", "feedback", "focused", "maxLength", "issueId", "severity", "impact", "nextSteps", "issueDetails", "extent", "position", "emptyText", "detailHint",
+                    "home", "interfacesVisible", "expanded", "interfacesFocused", "actionConfirmation", "message"}) {
                     Value member;
                     if (value.GetMember(field, &member) && !member.IsUndefined()) result[field] = CopyValue(member, depth + 1);
                 }

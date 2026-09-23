@@ -2,11 +2,17 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]*$')]
-    [string]$Label = 'rc1'
+    [string]$Label = 'rc1',
+    [string]$ResultPath = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'ReleaseValidation.ps1')
+foreach ($file in @('README.txt', 'THIRD_PARTY_NOTICES.txt')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file))) { throw "Missing packaging input: $file" }
+}
+$sourceIdentity = Get-ReleaseSourceIdentity $repo
 $project = Get-Content -LiteralPath (Join-Path $repo 'xmake.lua') -Raw
 $versionMatch = [regex]::Match($project, 'set_version\("([0-9]+\.[0-9]+\.[0-9]+)"\)')
 if (-not $versionMatch.Success) { throw 'Cannot read the project version from xmake.lua.' }
@@ -31,7 +37,7 @@ try {
     $env:XSE_SF_MODS_PATH = $mods
     $env:XSE_SF_GAME_PATH = $null
     Invoke-XMake @('f', "--project=$repo", '-y', '-p', 'windows', '-a', 'x64', '-m', 'releasedbg', '-o', 'build', '--test_harness=n')
-    Invoke-XMake @('build', "--project=$repo", '-y', '-r', '-j1', 'OSF Settings')
+    Invoke-XMake @('build', "--project=$repo", '-y', '-j4', 'OSF Settings')
     Invoke-XMake @('install', "--project=$repo", '-y', 'OSF Settings')
     $revision = & git rev-parse HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Cannot record source revision.' }
@@ -55,24 +61,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/EXCEPTIONS') -Destinati
 Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/LICENSE') -Destination (Join-Path $documents 'CommonLibShared-LICENSE')
 Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/EXCEPTIONS') -Destination (Join-Path $documents 'CommonLibShared-EXCEPTIONS')
 
-$files = @(
-    'Docs/OSFSettings/CommonLibSF-COPYING'
-    'Docs/OSFSettings/CommonLibSF-EXCEPTIONS'
-    'Docs/OSFSettings/CommonLibShared-EXCEPTIONS'
-    'Docs/OSFSettings/CommonLibShared-LICENSE'
-    'Docs/OSFSettings/EXCEPTIONS'
-    'Docs/OSFSettings/LICENSE'
-    'Docs/OSFSettings/README.txt'
-    'Docs/OSFSettings/THIRD_PARTY_NOTICES.txt'
-    'Interface/OSFSettingsMenu.swf'
-    'Interface/OSFSettingsMenu_LRG.swf'
-    'Scripts/OSFSettings.pex'
-    'Scripts/Source/OSFSettings.psc'
-    'SFSE/Plugins/OSF/Settings/schemas/osfsettings.json'
-    'SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json'
-    'SFSE/Plugins/OSF/Settings/translations/ja/osfsettings.json'
-    'SFSE/Plugins/OSFSettings.dll'
-)
+$files = @(Get-ReleasePayloadPaths)
 $allowedStageFiles = $files + 'SFSE/Plugins/OSFSettings.pdb'
 foreach ($file in Get-ChildItem -LiteralPath $stage -File -Recurse) {
     $relative = [IO.Path]::GetRelativePath($stage, $file.FullName).Replace('\', '/')
@@ -129,6 +118,8 @@ try {
 Move-Item -LiteralPath $partial -Destination $archive
 $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 "$archiveHash  $name.zip" | Set-Content -LiteralPath "$archive.sha256" -Encoding utf8NoBOM
+if ((Get-ReleaseSourceIdentity $repo).sha256 -cne $sourceIdentity.sha256) { throw 'Source changed during packaging; candidate cannot be accepted.' }
+$manifestPath = Join-Path $run "$name.manifest.json"
 [ordered]@{
     version = $version
     label = $Label
@@ -137,10 +128,13 @@ $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
     dirty = $sourceStatus.Count -ne 0
     sourceStatus = $sourceStatus
     submodules = $submodules
+    sourceIdentity = $sourceIdentity
     configuration = 'windows/x64/releasedbg; test_harness=n'
     archive = "$name.zip"
     sha256 = $archiveHash
     files = @($manifestFiles)
-} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $run "$name.manifest.json") -Encoding utf8NoBOM
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
+$null = Test-ReleaseArchive $manifestPath
+if ($ResultPath) { [IO.File]::WriteAllText([IO.Path]::GetFullPath($ResultPath), $manifestPath, [Text.UTF8Encoding]::new($false)) }
 Write-Host "Verified archive: $archive"
 Write-Host "SHA-256: $archiveHash"

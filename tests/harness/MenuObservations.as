@@ -70,7 +70,7 @@ private function testRow(row:Object):Object
     if (!row) return null;
     return {kind:row.more ? "launcherMore" : row.type == "launcher" ? "launcher" : bindingsPage() ? "binding" : issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
         issueId:String(row.id || ""), severity:String(row.severity || ""), impact:String(row.impact || ""), nextSteps:String(row.nextSteps || ""),
-        key:String(row.key || ""), type:String(row.type || ""), value:row.value,
+        key:String(row.key || ""), type:String(row.type || ""), value:row.value, message:String(row.message || ""),
         action:row.action, source:row.source, potential:Boolean(row.potential), records:row.records,
         alternate:row.alternate, required:Boolean(row.binding && row.binding.bRequired), title:row.title, editable:Boolean(row.editable), minimum:row.minimum, maximum:row.maximum};
 }
@@ -116,6 +116,7 @@ private function reportTestState():void
         refreshing:refreshing || requestedRefresh, startupPhase:startupPhase,
         mod:modID, group:groupID, rootPage:rootPage, issueCount:issues.length,
         home:{interfacesVisible:launcher.visible, expanded:launcher.expanded, interfacesFocused:launcher.focused},
+        actionConfirmation:{active:confirmingAction()},
         bindings:{state:keybindings.state, count:keybindings.rows.length, requiredActions:requiredActions, selectedKey:keybindings.selectedKey,
             source:keybindings.source, query:keybindings.search.text, searching:searching(), slot:nativeHotkeys.selectedSlot,
             searchRect:testRect(keybindings.search.getBounds(menuStage)),

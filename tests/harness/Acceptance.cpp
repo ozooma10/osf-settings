@@ -2,6 +2,9 @@
 #include "TestHarness.h"
 #include "../../sdk/OSFSettingsRegistry.h"
 #include "../../sdk/OSFSettings_Diagnostics.h"
+#include "../../sdk/OSFSettings_Launcher.h"
+#include "Actions/ActionService.h"
+#include "Launcher/LauncherService.h"
 #include "Settings/SettingsService.h"
 #include "RE/B/BSScriptUtil.h"
 #include "RE/V/VirtualMachine.h"
@@ -27,6 +30,8 @@ namespace OSFSettings::TestHarness
         std::uint64_t sequence{};
         API::HotkeyBlock block{};
         bool nativeRegistered{};
+        bool featuresRegistered{};
+        std::atomic<std::uint64_t> pendingAction{};
 
         void Record(std::string source, std::string event, std::string key, std::string value, bool ok)
         {
@@ -70,6 +75,26 @@ namespace OSFSettings::TestHarness
         void Require(API::Status status)
         {
             if (status != API::Status::Ok) throw std::runtime_error("public API status " + std::to_string(static_cast<unsigned>(status)));
+        }
+
+        void OnAction(std::uint64_t invocation, const char*, const char* id, void*) noexcept
+        {
+            try {
+                Record("native", "action", id, std::to_string(invocation), true);
+                if (std::string_view(id) == "deferred") { pendingAction.store(invocation); return; }
+                API::Client client;
+                if (!client.Init()) { Record("native", "completed", id, "provider unavailable", false); return; }
+                const bool succeeded = std::string_view(id) != "failure";
+                const auto result = client.CompleteAction(invocation, succeeded, succeeded ? "Native completed" : "Expected fixture failure");
+                Record("native", "completed", id, "", result == API::Status::Ok);
+            } catch (...) {}
+        }
+
+        void OnLauncher(const char*, const char* id, void*) noexcept
+        {
+            // Snapshot is a cached observation; no engine access on provider callbacks.
+            // The menu event is recorded independently to prove removal precedes handoff.
+            try { Record("launcher", "callback", id, "", true); } catch (...) {}
         }
 
         Json Execute(const Json& args)
@@ -125,9 +150,31 @@ namespace OSFSettings::TestHarness
                     Require(diagnostics.Report({Mod, "long", API::Diagnostics::Severity::Error, "Acceptance issue with long details", detail.c_str(), "Disable the test fixture after completing acceptance."}));
                     Require(diagnostics.Report({"osfacceptance-no-schema", "warning", API::Diagnostics::Severity::Warning, "A mod without a settings schema can report issues"}));
                 }
+            } else if (operation == "features") {
+                if (!featuresRegistered) {
+                    for (const auto* id : {"native", "failure", "deferred"}) Require(settings.RegisterAction(Mod, id, OnAction, nullptr));
+                    API::Launcher::Client launcher;
+                    if (!launcher.Init()) throw std::runtime_error("launcher-unavailable");
+                    for (const auto* id : {"callback", "unavailable"}) {
+                        const auto result = launcher.Register({.modId = Mod, .id = id, .modTitle = "Settings Acceptance",
+                            .title = id, .open = OnLauncher});
+                        if (result != API::Launcher::Status::Ok) throw std::runtime_error("launcher-registration-failed");
+                    }
+                    if (launcher.SetAvailable(Mod, "unavailable", false, "Unavailable fixture") != API::Launcher::Status::Ok)
+                        throw std::runtime_error("launcher-availability-failed");
+                    featuresRegistered = true;
+                }
+            } else if (operation == "completeDeferred") {
+                const auto token = pendingAction.exchange(0);
+                if (!token) throw std::runtime_error("no-deferred-action");
+                Require(settings.CompleteAction(token, true, "Deferred completed after menu close"));
+                if (settings.CompleteAction(token, true, "duplicate") == API::Status::Ok)
+                    throw std::runtime_error("duplicate-completion-accepted");
+                Record("native", "completed", "deferred", "", true);
             } else if (operation == "papyrus") {
                 const auto function = args.at("function").get<std::string>();
-                if (function != "InitializeSettings" && function != "WriteValues" && function != "ReadValues" && function != "InspectFixture")
+                if (function != "InitializeSettings" && function != "WriteValues" && function != "ReadValues" && function != "InspectFixture" &&
+                    function != "InitializeFeatures" && function != "ReportIssues" && function != "ReplaceIssues" && function != "ClearIssues")
                     throw std::runtime_error("unknown-papyrus-test-function");
                 auto* game = RE::GameVM::GetSingleton();
                 auto* vm = game ? game->GetVM() : nullptr;
@@ -187,6 +234,17 @@ namespace OSFSettings::TestHarness
             }
         }
         result["values"] = std::move(values);
+        auto actions = Json::object();
+        for (const auto* id : {"native", "failure", "deferred", "papyrusInstance", "papyrusStatic", "unhandled"}) {
+            const auto status = ActionService::Get().Status(Mod, id);
+            actions[id] = {{"available", status.available}, {"state", static_cast<int>(status.state)}, {"message", status.message}};
+        }
+        result["actions"] = std::move(actions);
+        result["pendingAction"] = pendingAction.load();
+        auto launchers = Json::array();
+        for (const auto& entry : LauncherService::Get().Snapshot()) if (entry.mod == Mod)
+            launchers.push_back({{"id", entry.id}, {"available", entry.available}, {"recentOrder", entry.recentOrder}});
+        result["launchers"] = std::move(launchers);
         auto controllers = Json::array();
         using GetState = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
         static const auto module = ::LoadLibraryW(L"XInput1_4.dll");

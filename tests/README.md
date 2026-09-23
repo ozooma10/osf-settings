@@ -86,6 +86,13 @@ Preview, large-text and harness flags participate in movie fingerprints.
 
 ## Game acceptance
 
+The [final validation runner](../docs/FINAL_VALIDATION.md) combines native and
+preview checks, production archive verification, disposable reinstall checks,
+and the source-matched runtime suite. `tools/test-release.ps1 -RunGame` explicitly
+enables game launches; omitting that switch runs only the offline stages.
+`pwsh -NoProfile -File tests/release_validation_tests.ps1` checks the runner's
+failure handling with fake game results and malformed archives, without launching.
+
 Native assertions and Ruffle previews do not replace input, controller, lifecycle
 or menu-handoff acceptance in Starfield. When requested, use the sibling
 `OSF Test Harness/Test-SettingsRelease.ps1 -Cases ...` runner. It already builds

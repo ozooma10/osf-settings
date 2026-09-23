@@ -31,3 +31,32 @@ Function ReadValues()
 EndFunction
 Function InspectFixture()
 EndFunction
+
+Function InitializeFeatures()
+    Bool ok = OSFSettings.RegisterAction(Self, "osfacceptance", "papyrusInstance")
+    ok = OSFSettings.RegisterAction(Self, "osfacceptance", "papyrusInstance") && ok
+    OSFSettingsAcceptanceProbe.Record("instance", "features", "", "", ok)
+EndFunction
+
+Function OnOSFAction(String modId, String actionId, String invocation)
+    Bool ok = modId == "osfacceptance" && actionId == "papyrusInstance"
+    ok = OSFSettings.CompleteAction(invocation, true, "Instance completed") && ok
+    ok = !OSFSettings.CompleteAction(invocation, true, "Duplicate") && ok
+    OSFSettingsAcceptanceProbe.Record("instance", "action", actionId, invocation, ok)
+EndFunction
+
+Function ReportIssues()
+    Bool ok = OSFSettings.ReportIssue("osfacceptance", "instanceIssue", "Instance warning", false, "Instance impact", "Instance next steps")
+    OSFSettingsAcceptanceProbe.Record("instance", "issuesReported", "", "", ok)
+EndFunction
+
+Function ReplaceIssues()
+    Bool ok = OSFSettings.ReportIssue("osfacceptance", "instanceIssue", "Instance replacement", true)
+    OSFSettingsAcceptanceProbe.Record("instance", "issuesReplaced", "", "", ok)
+EndFunction
+
+Function ClearIssues()
+    Bool ok = OSFSettings.ClearIssue("osfacceptance", "instanceIssue")
+    ok = OSFSettings.ClearIssue("osfacceptance", "instanceIssue") && ok
+    OSFSettingsAcceptanceProbe.Record("instance", "issuesCleared", "", "", ok)
+EndFunction
