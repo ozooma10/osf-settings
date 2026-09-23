@@ -1,7 +1,13 @@
 [CmdletBinding()]
-param([switch]$TestHarness, [switch]$Preview)
+param(
+    [switch]$TestHarness,
+    [switch]$Preview,
+    [ValidateSet('Both', 'Normal', 'Large')][string]$Variant = 'Both',
+    [switch]$Force
+)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+. "$PSScriptRoot/BuildCache.ps1"
 & python -B (Join-Path $PSScriptRoot 'generate-localization.py')
 if ($LASTEXITCODE -ne 0) { throw 'Could not generate English localization defaults.' }
 $flex = Join-Path $repo 'external\flex'
@@ -142,17 +148,30 @@ function Add-GameLibraries([string]$InputPath, [string]$OutputPath, [string]$Set
 }
 
 $outputDirectory = Join-Path $repo 'build\scaleform'
+if ($Preview) { $outputDirectory = Join-Path $outputDirectory 'preview' }
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 $env:JAVA_HOME = $jdk
+$sources = @($PSCommandPath, "$PSScriptRoot/BuildCache.ps1", "$repo/build/generated/English.as")
+$sources += Get-ChildItem -LiteralPath "$repo/scaleform/src" -Recurse -File | Select-Object -ExpandProperty FullName
+$toolchain = @($compiler, $java, $player)
+$toolchain += Get-ChildItem -LiteralPath "$flex/lib" -Filter '*.jar' -File | Select-Object -ExpandProperty FullName
 foreach ($large in @($false, $true)) {
+    if (($Variant -eq 'Normal' -and $large) -or ($Variant -eq 'Large' -and -not $large)) { continue }
     $suffix = if ($large) { '_LRG' } else { '' }
     $raw = Join-Path $outputDirectory "OSFSettingsMenu$suffix.raw.swf"
     $output = Join-Path $outputDirectory "OSFSettingsMenu$suffix.swf"
     $largeDefine = if ($large) { 'true' } else { 'false' }
     $previewDefine = if ($Preview) { 'true' } else { 'false' }
     $harnessDefine = if ($TestHarness) { 'true' } else { 'false' }
+    $stamp = Join-Path $outputDirectory "OSFSettingsMenu$suffix.stamp"
+    $fingerprint = Get-BuildFingerprint -Files $sources -MetadataFiles $toolchain -Values @($largeDefine, $previewDefine, $harnessDefine)
+    if (-not $Force -and (Test-BuildCache $stamp $fingerprint @($raw, $output))) {
+        Write-Host "Up to date: $output"
+        continue
+    }
     & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" "-source-path+=$repo/build/generated" '-use-network=false' '-debug=false' '-optimize=true' "-define=CONFIG::largeText,$largeDefine" "-define+=CONFIG::testHarness,$harnessDefine" "-define+=CONFIG::preview,$previewDefine" "-output=$raw" (Join-Path $repo 'scaleform\src\OSFSettingsMenu.as')
     if ($LASTEXITCODE -ne 0) { throw "mxmlc failed with exit code $LASTEXITCODE" }
     if (-not (Test-Path $raw)) { throw "mxmlc did not create $raw" }
     Add-GameLibraries $raw $output "SettingsPanel$suffix.swf"
+    Save-BuildCache $stamp $fingerprint @($raw, $output)
 }

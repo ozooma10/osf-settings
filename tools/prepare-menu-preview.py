@@ -44,7 +44,7 @@ def virtual_key_names():
     return names
 
 
-def key_default(value, allow_unbound=False):
+def key_default(value, allow_unbound=True):
     # Match KeyCodeFromName's stable schema aliases; runtime and preview rows stay numeric.
     if isinstance(value, str):
         name = value.upper() if value.isascii() else ""
@@ -262,7 +262,7 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
                         raise ValueError(f"Invalid preview enum labels: {path}")
                     attributes.update(value=default, editable=str(len(options) > 1).lower())
                 elif kind == "key":
-                    allow_unbound = setting.get("allowUnbound", False)
+                    allow_unbound = setting.get("allowUnbound", True)
                     try:
                         default = key_default(default, allow_unbound)
                     except ValueError as error:

@@ -160,14 +160,14 @@ int main()
                 {"key":"count","type":"int","default":-9007199254740993,"min":-9223372036854775808,"max":9223372036854775807},
                 {"key":"scale","type":"float","default":0.15,"min":-1.25,"max":2.5,"step":0.125},
                 {"key":"mode","type":"enum","default":"quiet","options":{"verbose":"Verbose label","quiet":"Quiet label"}},
-                {"key":"key","type":"key","default":"UNBOUND","allowUnbound":true},
+                {"key":"key","type":"key","default":"UNBOUND"},
                 {"key":"text","type":"string","default":"Original text","maxLength":32}
             ],"first":[],"extra":[
                 {"key":"unbounded","type":"int","default":0},
                 {"key":"lower","type":"float","default":0,"min":-1},
                 {"key":"upper","type":"int","default":0,"max":1},
                 {"key":"empty","type":"string","default":""},
-                {"key":"bound","type":"key","default":115}
+                {"key":"bound","type":"key","default":115,"allowUnbound":false}
             ]}
         })");
         const std::string embedded("prefix\0suffix", 13);

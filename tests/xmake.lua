@@ -1,149 +1,123 @@
--- Separate executables isolate each fixture's engine stand-ins and global state.
-local function test_target(name)
+-- Shared production objects; separate executables preserve fixture isolation.
+target("osfsettings-test-core")
+    set_kind("static")
+    set_default(false)
+    set_group("tests/support")
+    add_deps("osfsettings-localization")
+    add_includedirs("../src", { public = true })
+    add_packages("nlohmann_json", { public = true })
+    add_files("../src/Settings/*.cpp|SettingsService.cpp", "../src/Persistence/AtomicFile.cpp",
+        "../src/Menu/FloatSlider.cpp", "../src/Diagnostics/*.cpp")
+target_end()
+
+target("osfsettings-test-services")
+    set_kind("static")
+    set_default(false)
+    set_group("tests/support")
+    add_deps("osfsettings-test-core", "commonlibsf", { public = true })
+    add_files("../src/Settings/SettingsService.cpp", "../src/API/*.cpp", "../src/Actions/*.cpp",
+        "../src/Launcher/LauncherService.cpp", "../src/Input/KeyNames.cpp", "../src/Input/KeyCapture.cpp",
+        "../src/Input/HotkeyInputState.cpp", "../src/Input/BSInputEventUserStandalone.cpp",
+        "../src/Papyrus/Actions.cpp", "../src/Papyrus/Values.cpp", "../src/Papyrus/Subscriptions.cpp")
+    -- Use CommonLib's foundation once, instead of RE/Starfield.h per fixture.
+    set_pcxxheader("../lib/commonlibsf/include/SFSE/Impl/PCH.h")
+target_end()
+
+target("osfsettings-test-tasks")
+    set_kind("static")
+    set_default(false)
+    set_group("tests/support")
+    add_deps("commonlibsf", { public = true })
+    add_files("HotkeyTasks.cpp")
+target_end()
+
+local function test_target(name, group, engine)
     target(name)
     set_kind("binary")
     set_default(false)
+    set_group("tests/" .. group)
     set_rundir(os.projectdir())
     add_tests("default")
+    if engine then
+        add_deps("osfsettings-test-services", "osfsettings-test-tasks")
+        add_forceincludes("SFSE/Impl/PCH.h")
+    else
+        add_deps("osfsettings-test-core")
+    end
 end
 
-test_target("osfsettings-localization-tests")
-    add_files("localization_tests.cpp", "../src/Settings/Localization.cpp", "../src/Settings/SettingsSchema.cpp")
-    add_includedirs("../src")
-    add_packages("nlohmann_json")
+test_target("osfsettings-localization-tests", "settings")
+    add_files("localization_tests.cpp")
 
-test_target("osfsettings-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_deps("commonlibsf")
-    add_files("native/*.cpp", "../src/Settings/*.cpp", "../src/API/*.cpp", "../src/Actions/*.cpp", "../src/Diagnostics/*.cpp", "../src/Input/KeyNames.cpp", "../src/Input/KeyCapture.cpp", "../src/Input/HotkeyService.cpp", "../src/Menu/FloatSlider.cpp")
-    add_files("../src/Launcher/LauncherService.cpp")
-    add_includedirs("../src")
-    add_packages("nlohmann_json")
+test_target("osfsettings-schema-tests", "settings")
+    add_files("hotkey_schema_tests.cpp")
 
-test_target("osfsettings-schema-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_files("hotkey_schema_tests.cpp", "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp",
-        "../src/Settings/SettingsJson.cpp", "../src/Settings/SettingsStore.cpp", "../src/Settings/SettingsValuesJson.cpp")
-    add_includedirs("../src")
-    add_packages("nlohmann_json")
+test_target("osfsettings-store-tests", "settings")
+    add_files("native/settings_tests.cpp")
 
-test_target("osfsettings-launcher-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_deps("commonlibsf")
-    add_files("launcher_tests.cpp", "../src/Launcher/LauncherService.cpp",
-        "../src/API/LauncherApi.cpp", "../src/Settings/SettingsSchema.cpp")
-    add_includedirs("../src", "../sdk")
-    set_pcxxheader("../src/pch.h")
-    add_packages("nlohmann_json")
+test_target("osfsettings-service-tests", "settings", true)
+    add_files("native/service_tests.cpp")
 
-test_target("osfsettings-action-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_deps("commonlibsf")
-    add_files("action_tests.cpp", "../src/Actions/ActionService.cpp", "../src/API/ActionsApi.cpp", "../src/Papyrus/Actions.cpp",
-        "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp",
-        "../src/Settings/*.cpp")
-    add_includedirs("../src", "../sdk")
-    set_pcxxheader("../src/pch.h")
-    add_packages("nlohmann_json")
+test_target("osfsettings-key-tests", "input", true)
+    add_files("native/key_tests.cpp", "native/engine_string_stubs.cpp")
 
-test_target("osfsettings-issues-tests")
-    add_files("mod_issue_tests.cpp", "diagnostics_service_tests.cpp", "../src/Diagnostics/*.cpp", "../src/Settings/SettingsSchema.cpp")
-    add_includedirs("../src")
+test_target("osfsettings-sdk-tests", "settings", true)
+    add_files("native/sdk_tests.cpp")
 
-test_target("osfsettings-registration-tests")
-    add_deps("commonlibsf")
-    add_files("hotkey_registration_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyNames.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
-    add_files("../src/Settings/Localization.cpp")
-    add_packages("nlohmann_json")
+test_target("osfsettings-launcher-tests", "launcher", true)
+    add_files("launcher_tests.cpp")
+    add_includedirs("../sdk")
 
-test_target("osfsettings-input-tests")
-    add_deps("commonlibsf")
-    add_files("native_input_user_tests.cpp", "../src/Input/BSInputEventUserStandalone.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
+test_target("osfsettings-action-tests", "actions", true)
+    add_files("action_tests.cpp")
+    add_includedirs("../sdk")
 
-test_target("osfsettings-lifecycle-tests")
-    add_deps("commonlibsf")
-    add_files("hotkey_lifecycle_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/BSInputEventUserStandalone.cpp")
-    add_includedirs("../src", ".")
+test_target("osfsettings-issues-tests", "diagnostics")
+    add_files("mod_issue_tests.cpp", "diagnostics_service_tests.cpp")
+
+test_target("osfsettings-registration-tests", "input", true)
+    add_files("hotkey_registration_tests.cpp")
+
+test_target("osfsettings-input-tests", "input", true)
+    add_files("native_input_user_tests.cpp")
+
+test_target("osfsettings-lifecycle-tests", "input", true)
+    add_files("hotkey_lifecycle_tests.cpp")
+    add_includedirs(".")
     add_defines("OSFSETTINGS_TEST_HARNESS")
-    set_pcxxheader("../src/pch.h")
 
-test_target("osfsettings-binding-tests")
-    add_deps("commonlibsf")
-    add_files("native_binding_editor_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
+test_target("osfsettings-binding-tests", "input", true)
+    add_files("native_binding_editor_tests.cpp")
 
-test_target("osfsettings-bindings-menu-tests")
-    add_deps("commonlibsf")
+test_target("osfsettings-bindings-menu-tests", "input", true)
     add_files("native_bindings_menu_tests.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
-    add_files("../src/Settings/Localization.cpp")
-    add_packages("nlohmann_json")
 
-test_target("osfsettings-binding-snapshot-tests")
-    add_deps("commonlibsf")
+test_target("osfsettings-binding-snapshot-tests", "input", true)
     add_files("binding_snapshot_tests.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
 
-test_target("osfsettings-diagnostics-api-tests")
-    add_deps("commonlibsf")
-    add_files("diagnostics_api_tests.cpp", "../src/API/DiagnosticsApi.cpp", "../src/API/DiagnosticsExports.cpp",
-        "../src/Diagnostics/*.cpp", "../src/Settings/SettingsSchema.cpp")
-    add_includedirs("../src")
+test_target("osfsettings-diagnostics-api-tests", "diagnostics", true)
+    add_files("diagnostics_api_tests.cpp")
 
-test_target("osfsettings-hotkey-block-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_deps("commonlibsf")
-    add_files("hotkey_block_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyNames.cpp",
-        "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp", "../src/API/ActionsApi.cpp", "../src/Actions/ActionService.cpp", "../src/Settings/*.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
-    add_packages("nlohmann_json")
+test_target("osfsettings-hotkey-block-tests", "input", true)
+    add_files("hotkey_block_tests.cpp")
 
-test_target("osfsettings-hotkey-callback-tests")
+-- This fixture intentionally uses its own SFSE stub, not the real task wrapper.
+target("osfsettings-hotkey-callback-tests")
+    set_kind("binary")
+    set_default(false)
+    set_group("tests/input")
+    set_rundir(os.projectdir())
+    add_tests("default")
     add_files("hotkey_callback_tests.cpp", "../src/Input/HotkeyInputState.cpp")
     add_includedirs("stubs", "../src")
 
-test_target("osfsettings-string-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_deps("commonlibsf")
-    add_files("string_settings_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyNames.cpp",
-        "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp", "../src/API/ActionsApi.cpp", "../src/Actions/ActionService.cpp", "../src/Settings/*.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
-    add_packages("nlohmann_json")
+test_target("osfsettings-string-tests", "settings", true)
+    add_files("string_settings_tests.cpp")
 
-test_target("osfsettings-registry-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_deps("commonlibsf")
-    add_files("registry_api_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyNames.cpp",
-        "../src/API/SettingsApi.cpp", "../src/API/Exports.cpp", "../src/API/ActionsApi.cpp", "../src/Actions/ActionService.cpp", "../src/Settings/*.cpp")
-    add_includedirs("../src", "../sdk", "../examples/registry")
-    set_pcxxheader("../src/pch.h")
-    add_packages("nlohmann_json")
+test_target("osfsettings-registry-tests", "settings", true)
+    add_files("registry_api_tests.cpp")
+    add_includedirs("../sdk", "../examples/registry")
 
-test_target("osfsettings-papyrus-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_deps("commonlibsf")
-    add_files("papyrus_tests.cpp", "HotkeyTasks.cpp", "../src/Input/HotkeyInputState.cpp",
-        "../src/Papyrus/Values.cpp", "../src/Papyrus/Subscriptions.cpp", "../src/Input/KeyNames.cpp", "../src/Settings/*.cpp")
-    add_includedirs("../src")
-    set_pcxxheader("../src/pch.h")
-    add_packages("nlohmann_json")
-
--- The historical aggregate also depends on the removed HotkeyService API.
--- Run its value/storage coverage independently of those obsolete fixtures.
-test_target("osfsettings-store-tests")
-    add_files("../src/Persistence/AtomicFile.cpp")
-    add_defines("OSFSETTINGS_STORE_ONLY_TESTS")
-    add_files("native/settings_tests.cpp", "../src/Settings/SettingsStore.cpp",
-        "../src/Settings/SettingsSchema.cpp", "../src/Settings/SettingsSchemaJson.cpp", "../src/Settings/SettingsJson.cpp",
-        "../src/Settings/SettingsValuesJson.cpp", "../src/Menu/FloatSlider.cpp")
-    add_includedirs("../src")
-    add_packages("nlohmann_json")
+test_target("osfsettings-papyrus-tests", "papyrus", true)
+    add_files("papyrus_tests.cpp")
+target_end()

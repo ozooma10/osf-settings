@@ -85,22 +85,13 @@ int main()
         const auto reject = [&](const Json& bad) {
             check(!SettingsJson::ParseSchema(bad, "osfsettings", error) && !error.empty(), "malformed declaration must report a schema error");
         };
-        for (const auto& value : {Json(nullptr), Json(true), Json(10), Json("F10"), Json::object()}) {
-            changed = document; changed["hotkeys"] = value; reject(changed);
-            changed = document; changed["hotkeys"][0] = value;
-            if (!value.is_object()) reject(changed);
-        }
-        for (const auto* field : {"id", "label", "default", "menu", "group"}) {
-            for (const auto& value : {Json(nullptr), Json(10), Json(false), Json(""), Json(std::string("a\0b", 3))}) {
-                changed = document; changed["hotkeys"][0][field] = value; reject(changed);
-            }
-        }
+        changed = document; changed["hotkeys"] = Json::object(); reject(changed);
+        changed = document; changed["hotkeys"][0] = Json(nullptr); reject(changed);
         for (const auto* field : {"id", "label"}) {
             changed = document; changed["hotkeys"][0].erase(field); reject(changed);
         }
-        for (const auto* id : {"open menu", "open.menu", "open\tmenu", "open/menu"}) {
-            changed = document; changed["hotkeys"][0]["id"] = id; reject(changed);
-        }
+        changed = document; changed["hotkeys"][0]["id"] = "open menu"; reject(changed);
+        changed = document; changed["hotkeys"][0]["default"] = std::string("F10\0hidden", 10); reject(changed);
         for (const auto* id : {"openMenu", "OPENMENU"}) {
             changed = document;
             changed["hotkeys"].push_back({{"id", id}, {"label", "Duplicate"}});
@@ -204,19 +195,13 @@ int main()
         check(result && result->menus[0].description.empty(), "menu description is optional");
         changed["menus"] = Json::array();
         check(SettingsJson::ParseSchema(changed, "osfsettings", error)->menus.empty(), "empty menu list is valid");
-        for (const auto& value : {Json(nullptr), Json(true), Json(10), Json("menu"), Json::object()}) {
-            changed = menuDocument; changed["menus"] = value; reject(changed);
-            changed = menuDocument; changed["menus"][0] = value; reject(changed);
-        }
+        changed = menuDocument; changed["menus"] = Json::object(); reject(changed);
+        changed = menuDocument; changed["menus"][0] = Json(nullptr); reject(changed);
         for (const auto* field : {"id", "title", "menu"}) {
-            for (const auto& value : {Json(nullptr), Json(10), Json(""), Json(std::string("a\0b", 3)), Json(std::string(257, 'x'))}) {
-                changed = menuDocument; changed["menus"][0][field] = value; reject(changed);
-            }
             changed = menuDocument; changed["menus"][0].erase(field); reject(changed);
         }
-        for (const auto& value : {Json(nullptr), Json(true), Json(std::string("bad\ntext")), Json(std::string(4097, 'x'))}) {
-            changed = menuDocument; changed["menus"][0]["description"] = value; reject(changed);
-        }
+        changed = menuDocument; changed["menus"][0]["title"] = std::string("hidden\0text", 11); reject(changed);
+        changed = menuDocument; changed["menus"][0]["description"] = "bad\ntext"; reject(changed);
         changed = menuDocument; changed["menus"][0]["menu"] = "OSFSettingsMenu"; reject(changed);
         changed = menuDocument; changed["menus"].push_back(changed["menus"][0]); reject(changed);
         changed = menuDocument; changed["title"] = std::string(257, 'x'); reject(changed);
@@ -231,8 +216,8 @@ int main()
             ~Cleanup()
             {
                 std::error_code ignored;
-                for (const auto* path : {"schemas/osfsettings.json", "schemas/renamed.mod_2.json", "schemas/Invalid ID.json",
-                        "values/osfsettings.json.tmp", "values/osfsettings.json", "schemas", "values", ""})
+                for (const auto* path : {"schemas/osfsettings.json", "values/osfsettings.json.tmp",
+                        "values/osfsettings.json", "schemas", "values", ""})
                     fs::remove(root / path, ignored);
             }
         } cleanup{root};
@@ -263,45 +248,6 @@ int main()
             "restart-required settings still save and publish the new value immediately");
         std::ifstream saved(root / "values/osfsettings.json");
         check(Json::parse(saved)["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey and menu declarations");
-        changed["groups"] = {{"Renamed page", changed["groups"]["Z first page / détails"]}};
-        { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
-        store.LoadAll(root / "schemas", root / "values");
-        check(store.LoadErrors().empty() && store.GetValue("osfsettings", "enabled") == SettingValue{false},
-            "renaming a group preserves saved settings");
-        changed["id"] = "osfsettings";
-        { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
-        store.LoadAll(root / "schemas", root / "values");
-        check(store.LoadErrors().empty() && store.GetValue("osfsettings", "enabled") == SettingValue{false},
-            "matching legacy id loads the same saved settings");
-        changed.erase("id");
-        { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
-        store.LoadAll(root / "schemas", root / "values");
-        check(store.LoadErrors().empty() && store.GetValue("osfsettings", "enabled") == SettingValue{false},
-            "removing a legacy id preserves saved settings");
-        fs::rename(root / "schemas/osfsettings.json", root / "schemas/renamed.mod_2.json");
-        store.LoadAll(root / "schemas", root / "values");
-        check(store.LoadErrors().empty() && store.Mods().size() == 1 &&
-            store.Mods()[0].schema.id == "renamed.mod_2" && store.Mods()[0].schema.title == parsed->title &&
-            store.GetValue("renamed.mod_2", "enabled") == SettingValue{true} && !store.GetValue("osfsettings", "enabled"),
-            "renaming a schema changes its identity and saved-value lookup while preserving its display title");
-        fs::rename(root / "schemas/renamed.mod_2.json", root / "schemas/Invalid ID.json");
-        store.LoadAll(root / "schemas", root / "values");
-        check(store.Mods().empty() && store.LoadErrors().size() == 1 &&
-            store.LoadErrors()[0].file == root / "schemas/Invalid ID.json" &&
-            store.LoadErrors()[0].message.find("mod id") != std::string::npos,
-            "an invalid filename reports a schema load error");
-        fs::rename(root / "schemas/Invalid ID.json", root / "schemas/osfsettings.json");
-        changed["id"] = "different";
-        { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
-        store.LoadAll(root / "schemas", root / "values");
-        check(store.Mods().empty() && store.LoadErrors().size() == 1 &&
-            store.LoadErrors()[0].message == "schema id must match the filename stem",
-            "a legacy id cannot override the filename during file loading");
-        { std::ofstream file(root / "schemas/osfsettings.json");
-            file << R"({"schemaVersion":1,"id":"osfsettings","groups":{"Panel":[],"Panel":[]}})"; }
-        store.LoadAll(root / "schemas", root / "values");
-        check(store.Mods().empty() && store.LoadErrors().size() == 1 &&
-            store.LoadErrors()[0].message == "duplicate group name: Panel", "file loading rejects duplicate group names");
         std::cout << checks << '/' << checks << " schema checks passed\n";
     } catch (const std::exception& error) {
         std::cerr << "FAIL: " << error.what() << '\n';

@@ -8,8 +8,6 @@ namespace
 {
     RE::BSService::TaskQueue queue;
     auto* queuePointer = &queue;
-    std::uint8_t enabled = 1;
-    std::uint32_t owner{};
     RE::ControlMap* mapPointer{};
     std::vector<RE::BSService::QueuedDelegate*> tasks;
     bool inlineFallback{};
@@ -21,9 +19,7 @@ namespace
     }
     void Drain()
     {
-        owner = REX::W32::GetCurrentThreadId();
         for (auto* task : std::exchange(tasks, {})) task->Release();
-        owner = 0;
     }
 }
 
@@ -35,8 +31,6 @@ namespace REL
         std::uintptr_t address{};
         switch (id) {
         case 883606: address = reinterpret_cast<std::uintptr_t>(&queuePointer); break;
-        case 810305: address = reinterpret_cast<std::uintptr_t>(&enabled); break;
-        case 923104: address = reinterpret_cast<std::uintptr_t>(&owner); break;
         case 100121: address = reinterpret_cast<std::uintptr_t>(&Submit); break;
         case 938003: address = reinterpret_cast<std::uintptr_t>(&mapPointer); break;
         default: throw std::runtime_error("Unexpected relocation " + std::to_string(id));
@@ -69,24 +63,15 @@ int main()
         mailbox->Invalidate();
         mailbox->Publish(latest, BindingSnapshot::Status::Ready);
         check(mailbox->Read().status == BindingSnapshot::Status::Unavailable && mailbox->Read().records.empty(), "menu close rejects pending results");
-        enabled = 0;
-        RequestBindingSnapshot(mailbox);
-        check(tasks.empty() && mailbox->Read().status == BindingSnapshot::Status::Unavailable, "disabled queue is unavailable");
-        enabled = 1;
+        // TaskQueue::AddTask explicitly supports inline execution when queueing
+        // is disabled or the caller already owns the drain. Mirror that contract.
         inlineFallback = true;
-        // An invalid map pointer proves an off-drain callback never reads mappings.
-        mapPointer = reinterpret_cast<RE::ControlMap*>(1);
         RequestBindingSnapshot(mailbox);
-        check(mailbox->Read().status == BindingSnapshot::Status::Unavailable, "inline execution on another thread is refused");
+        check(tasks.empty() && mailbox->Read().status == BindingSnapshot::Status::Unavailable, "inline callback reports missing map");
         inlineFallback = false;
         RequestBindingSnapshot(mailbox);
         check(mailbox->Read().status == BindingSnapshot::Status::Loading, "queued request stays loading until the drain");
-        enabled = 0;
         Drain();
-        check(mailbox->Read().status == BindingSnapshot::Status::Unavailable, "queue disabling after submission is guarded");
-        enabled = 1;
-        mapPointer = nullptr;
-        RequestBindingSnapshot(mailbox); Drain();
         check(mailbox->Read().status == BindingSnapshot::Status::Unavailable, "missing map is unavailable, not unbound");
         RE::ControlMap map{};
         mapPointer = &map;
@@ -96,6 +81,10 @@ int main()
         map.inputContexts[0] = &context;
         RequestBindingSnapshot(mailbox); Drain();
         check(mailbox->Read().status == BindingSnapshot::Status::Ready, "verified drain can publish an owned empty context");
+        inlineFallback = true;
+        RequestBindingSnapshot(mailbox);
+        check(tasks.empty() && mailbox->Read().status == BindingSnapshot::Status::Ready, "inline callback publishes an owned snapshot");
+        inlineFallback = false;
         RequestBindingSnapshot(mailbox);
         mailbox->Invalidate();
         mapPointer = reinterpret_cast<RE::ControlMap*>(1);

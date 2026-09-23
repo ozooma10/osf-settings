@@ -1,16 +1,6 @@
 -- include subprojects
 includes("lib/commonlibsf")
 
-rule("osf.localization")
-    on_load(function(target)
-        target:add("includedirs", path.join(os.projectdir(), "build", "generated"))
-    end)
-    before_build(function(target)
-        os.execv("python", { "-B", path.join(os.projectdir(), "tools", "generate-localization.py") })
-    end)
-rule_end()
-add_rules("osf.localization")
-
 -- set project constants
 set_project("OSF Settings")
 set_version("1.0.0")
@@ -31,11 +21,31 @@ option("test_harness")
     set_description("Expose passive local testing observations; normal input remains active")
 option_end()
 
+-- One generation job shared by all consumers, including validation of new keys.
+target("osfsettings-localization")
+    set_kind("phony")
+    set_default(false)
+    add_includedirs("build/generated", { public = true })
+    on_build(function(target)
+        import("core.project.depend")
+        local inputs = table.join({"tools/generate-localization.py",
+            "data/SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json"},
+            os.files("src/**.cpp"), os.files("scaleform/src/*.as"))
+        table.sort(inputs)
+        depend.on_changed(function()
+            os.execv("python", { "-B", "tools/generate-localization.py" })
+        end, { dependfile = path.join(target:autogendir(), "localization.d"),
+            files = inputs, values = inputs,
+            changed = not os.isfile("build/generated/English.h") or not os.isfile("build/generated/English.as") })
+    end)
+target_end()
+
 includes("tests")
 
 -- define targets
 target("OSF Settings")
     set_basename("OSFSettings")
+    add_deps("osfsettings-localization")
     add_rules("commonlibsf.plugin", {
         name = "OSF Settings",
         author = "ozooma10",

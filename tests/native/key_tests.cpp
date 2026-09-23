@@ -1,5 +1,5 @@
 #include "API/SettingsApi.h"
-#include "Input/HotkeyService.h"
+#include "Input/HotkeyInputState.h"
 #include "Input/KeyCapture.h"
 #include "Input/KeyNames.h"
 #include "Settings/SettingsJson.h"
@@ -7,6 +7,7 @@
 #include "SFSE/Impl/PCH.h"
 #include "RE/B/BSInputDeviceManager.h"
 
+#include <iostream>
 #include <chrono>
 #include <fstream>
 #include <stdexcept>
@@ -77,13 +78,13 @@ int TestKeySettings()
     };
     static_assert(API::kVersion == 0x00010000u);
     static_assert(API::kUnboundKey == KeyBinding::Unbound);
-    check(!KeyCodeFromName("F4") && KeyCodeFromName("unbound") == KeyBinding::Unbound,
-        "missing input manager is safe and unbound needs no engine lookup");
+    check(KeyCodeFromName("F4") == 0x73 && !KeyCodeFromName("unknown") && KeyCodeFromName("unbound") == KeyBinding::Unbound,
+        "missing input manager uses the fallback table and preserves unknown names");
     check(KeyName(0x73) == "Key 0x73", "missing input manager uses the numeric display fallback");
-    // Keep the F4 stand-in available for the shared schema/store tests that follow.
+    // The remaining schema/store checks use the live-device stand-in.
     static RE::BSInputDeviceManager manager{};
     inputManager = &manager;
-    check(!KeyCodeFromName("F4"), "missing keyboard is safe");
+    check(KeyCodeFromName("f4") == 0x73, "missing keyboard uses case-insensitive fallback lookup");
     check(KeyName(0x73) == "Key 0x73", "missing keyboard uses the numeric display fallback");
     static TestKeyboard keyboard;
     manager.devices[0] = &keyboard;
@@ -126,8 +127,8 @@ int TestKeySettings()
         "display names have unbound and numeric fallbacks");
 
     auto document = Json::parse(R"({"schemaVersion":1,"id":"keys","groups":{"main":[
-        {"key":"toggle","type":"key","default":"F4","allowUnbound":true},
-        {"key":"required","type":"key","default":163},
+        {"key":"toggle","type":"key","default":"F4"},
+        {"key":"required","type":"key","default":163,"allowUnbound":false},
         {"key":"mode","type":"enum","default":"F4","options":["F4","F5"]}
     ]}})");
     std::string error;
@@ -153,9 +154,9 @@ int TestKeySettings()
     }
     auto bad = document;
     bad["groups"]["main"][1]["default"] = 255;
-    check(!SettingsJson::ParseSchema(bad, "keys", error), "unbinding is opt-in");
+    check(!SettingsJson::ParseSchema(bad, "keys", error), "explicit false rejects unbound defaults");
     bad["groups"]["main"][1]["default"] = "UNBOUND";
-    check(!SettingsJson::ParseSchema(bad, "keys", error), "named unbound defaults also require opt-in");
+    check(!SettingsJson::ParseSchema(bad, "keys", error), "explicit false also rejects named unbound defaults");
     bad["groups"]["main"][1]["allowUnbound"] = true;
     check(SettingsJson::ParseSchema(bad, "keys", error).has_value(), "unbound default permitted explicitly");
     bad["groups"]["main"][1]["allowUnbound"] = "true";
@@ -169,7 +170,7 @@ int TestKeySettings()
     std::filesystem::create_directories(schemas);
     { std::ofstream file(schemas / "keys.json"); file << document; }
     SettingsService backend;
-    HotkeyService hotkeys{ backend };
+    HotkeyInputState hotkeys;
     API::SettingsApi api{ backend, hotkeys };
     API::Client client;
     std::uint32_t keyCode = 999;
@@ -284,4 +285,16 @@ int TestKeySettings()
     check(capture.GetSnapshot().state == State::WaitingForKey, "invalid native codes are rejected without narrowing");
     capture.ResetForMenuClose();
     return checks;
+}
+
+int main()
+{
+    try {
+        const auto checks = TestKeySettings();
+        std::cout << checks << " key checks passed\n";
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 }

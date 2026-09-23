@@ -7,17 +7,20 @@ param(
     [switch]$Design,
     [switch]$Issues,
     [switch]$BuildOnly,
+    [switch]$Force,
     [switch]$Watch,
     [ValidateRange(640, 7680)][int]$Width = 1280,
     [ValidateRange(360, 4320)][int]$Height = 720
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+. "$PSScriptRoot/BuildCache.ps1"
 $output = Join-Path $repo 'build/preview'
 $ruffle = Join-Path $repo 'external/ruffle/ruffle.exe'
 $flex = Join-Path $repo 'external/flex'
 $compiler = Join-Path $flex 'bin/mxmlc.bat'
 $player = Join-Path $flex 'frameworks/libs/player/10.3/playerglobal.swc'
+$keyNames = Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/include/REX/W32/USER32.h'
 $schemas = @((Join-Path $repo 'data/SFSE/Plugins/OSF/Settings/schemas/learning.json'))
 if ($Design) { $schemas = @((Join-Path $repo 'tests/menu/design-preview.json')) }
 if ($Scrolling) { $schemas += Join-Path $repo 'tests/menu/scrolling.json' }
@@ -29,16 +32,43 @@ if (-not $BuildOnly -and -not (Test-Path -LiteralPath $ruffle)) { & "$PSScriptRo
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 
 function Build-Preview {
-    & "$PSScriptRoot/build-scaleform.ps1" -Preview
+    $variant = if ($LargeText) { 'Large' } else { 'Normal' }
+    & "$PSScriptRoot/build-scaleform.ps1" -Preview -Variant $variant -Force:$Force
     $suffix = if ($LargeText) { '_LRG' } else { '' }
-    $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output, '--menu', "$repo/build/scaleform/OSFSettingsMenu$suffix.raw.swf")
+    $movie = "$repo/build/scaleform/preview/OSFSettingsMenu$suffix.raw.swf"
+    $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output, '--menu', $movie)
     if ($LargeText) { $prepareArgs += '--large' }
     if ($Issues) { $prepareArgs += @('--issues', (Join-Path $repo 'tests/menu/issues.json')) }
-    & python -B "$PSScriptRoot/prepare-menu-preview.py" @prepareArgs @schemas
-    if ($LASTEXITCODE -ne 0) { throw 'Could not prepare preview assets.' }
+    $inputs = @($movie, $PSCommandPath, "$PSScriptRoot/BuildCache.ps1", "$PSScriptRoot/prepare-menu-preview.py", "$PSScriptRoot/preview_abc.py", $keyNames) + $schemas
+    if ($Issues) { $inputs += Join-Path $repo 'tests/menu/issues.json' }
+    $fingerprint = Get-BuildFingerprint -Files $inputs -MetadataFiles @($InterfaceArchive) -Values @($variant, [string]$Issues)
+    $stamp = Join-Path $output 'assets.stamp'
+    $outputs = @("$output/menu.swf", "$output/preview.xml")
+    if (Test-Path -LiteralPath "$output/preview.xml") {
+        try {
+            [xml]$config = Get-Content -LiteralPath "$output/preview.xml" -Raw
+            $outputs += @($config.preview.libraries.library | ForEach-Object { Join-Path $output $_.url })
+        } catch { # A corrupt generated config must rebuild, not prevent recovery.
+            $outputs += "$output/invalid-config"
+        }
+    }
+    if ($Force -or -not (Test-BuildCache $stamp $fingerprint $outputs)) {
+        & python -B "$PSScriptRoot/prepare-menu-preview.py" @prepareArgs @schemas
+        if ($LASTEXITCODE -ne 0) { throw 'Could not prepare preview assets.' }
+        [xml]$config = Get-Content -LiteralPath "$output/preview.xml" -Raw
+        $outputs = @("$output/menu.swf", "$output/preview.xml") + @($config.preview.libraries.library | ForEach-Object { Join-Path $output $_.url })
+        Save-BuildCache $stamp $fingerprint $outputs
+    }
     $env:JAVA_HOME = Join-Path $repo 'external/temurin8'
-    & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" '-use-network=false' '-debug=true' "-output=$output/PreviewHost.swf" "$repo/scaleform/preview/PreviewHost.as"
-    if ($LASTEXITCODE -ne 0) { throw 'Could not compile the preview host.' }
+    $hostSources = @($PSCommandPath, "$PSScriptRoot/BuildCache.ps1") + @(Get-ChildItem -LiteralPath "$repo/scaleform/preview" -Recurse -File | Select-Object -ExpandProperty FullName)
+    $toolchain = @($compiler, $player, "$env:JAVA_HOME/bin/java.exe") + @(Get-ChildItem -LiteralPath "$flex/lib" -Filter '*.jar' -File | Select-Object -ExpandProperty FullName)
+    $fingerprint = Get-BuildFingerprint -Files $hostSources -MetadataFiles $toolchain
+    $stamp = Join-Path $output 'host.stamp'
+    if ($Force -or -not (Test-BuildCache $stamp $fingerprint @("$output/PreviewHost.swf"))) {
+        & $compiler '-load-config=' '-target-player=10.3' '-swf-version=12' "-external-library-path+=$player" '-use-network=false' '-debug=true' "-output=$output/PreviewHost.swf" "$repo/scaleform/preview/PreviewHost.as"
+        if ($LASTEXITCODE -ne 0) { throw 'Could not compile the preview host.' }
+        Save-BuildCache $stamp $fingerprint @("$output/PreviewHost.swf")
+    }
 }
 
 function Start-Preview {
@@ -56,6 +86,7 @@ function Source-Stamp {
     $files = @(Get-ChildItem -LiteralPath "$repo/scaleform" -Recurse -File)
     $files += Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object { $_.Extension -in '.py', '.ps1' }
     $files += Get-Item -LiteralPath $schemas
+    $files += Get-Item -LiteralPath $keyNames, "$repo/data/SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json"
     if ($Issues) { $files += Get-Item -LiteralPath (Join-Path $repo 'tests/menu/issues.json') }
     ($files | Sort-Object FullName | ForEach-Object { "$($_.FullName):$($_.LastWriteTimeUtc.Ticks):$($_.Length)" }) -join '|'
 }

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <mutex>
 
+namespace RE { class InputEvent; class BSInputEventSingleUser; }
+
 namespace OSFSettings
 {
     // Menu-owned input handoff. The native Settings data model owns the binding transaction.

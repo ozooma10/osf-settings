@@ -4,8 +4,8 @@
 #include <cstring>
 #include <stdexcept>
 
-// The native tests run outside Starfield. Supply only the two string-pool
-// relocations needed by BSFixedStringCS; unexpected engine calls fail the test.
+// Supply the string-pool calls and fallback keyboard table used by the key
+// fixture. Unexpected engine calls still fail the test.
 namespace
 {
     void GetStringEntry(RE::BSStringPool::Entry*& result, const char* text, bool)
@@ -39,6 +39,8 @@ namespace REL
             address = reinterpret_cast<std::uintptr_t>(&GetStringEntry);
         } else if (id == RE::ID::BSStringPool::Entry::Release.id()) {
             address = reinterpret_cast<std::uintptr_t>(&ReleaseStringEntry);
+        } else if (id == RE::ID::BSWin32KeyboardDevice::KeyNameTable.id()) {
+            address = reinterpret_cast<std::uintptr_t>(L"F4\t73\nSpace\t20\n");
         } else {
             throw std::runtime_error("Unexpected engine relocation in native tests: " + std::to_string(id));
         }

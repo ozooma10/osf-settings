@@ -1,8 +1,9 @@
 #include "API/SettingsApi.h"
-#include "Input/HotkeyService.h"
+#include "Input/HotkeyInputState.h"
 #include "Settings/SettingsService.h"
 #include "Settings/SettingsJson.h"
 
+#include <iostream>
 #include <chrono>
 #include <future>
 #include <fstream>
@@ -81,7 +82,7 @@ int TestSettingsService()
         OSFSettings_RequestAPI(API::kBaseVersion, nullptr) == exported, "export returns the same interface before readiness");
 
     SettingsService backend;
-    HotkeyService hotkeys{ backend };
+    HotkeyInputState hotkeys;
     API::SettingsApi service{ backend, hotkeys };
     Events events{ &service };
     API::Subscription token{};
@@ -374,4 +375,16 @@ int TestSettingsService()
     invalid["groups"]["main"][3]["options"][1] = std::string("bad\0option", 10);
     check(!SettingsJson::ParseSchema(invalid, "sample", error) && error.find("NUL") != std::string::npos, "schema rejects enum values truncated by the ABI");
     return checks;
+}
+
+int main()
+{
+    try {
+        const auto checks = TestSettingsService();
+        std::cout << checks << " service checks passed\n";
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
 }
