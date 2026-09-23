@@ -4,78 +4,58 @@ package
     import flash.text.TextField;
     import flash.text.TextFormat;
 
+    // Cards show only what identifies an interface; Home's detail card describes the selection.
     public final class LauncherCard extends Sprite
     {
         public var row:Object;
         public var index:int;
         private var cardWidth:Number;
         private var cardHeight:Number;
+        private var badge:Badge;
+        private var tint:uint;
+        private var title:TextField;
+        private var tag:TextField;
 
         public function LauncherCard(data:Object, position:int, width:Number, height:Number)
         {
             row = data; index = position; cardWidth = width; cardHeight = height;
             name = "launcher_" + position; mouseChildren = false; buttonMode = Boolean(row.editable);
             var large:Boolean = CONFIG::largeText;
-            var badge:Sprite = makeBadge(large ? 74 : 64);
-            badge.x = (width - badge.width) / 2; badge.y = 12;
-            if (!row.editable) badge.alpha = 0.5;
-            addChild(badge);
-            var titleTop:Number = large ? 94 : 86;
-            var titleHeight:Number = large ? 68 : 56;
-            field(String(row.title).toUpperCase(), titleTop, titleHeight, large ? 30 : 26, MenuStyle.WHITE, true);
-            field(String(row.hint || ""), titleTop + titleHeight + 2, Math.max(28, height - titleTop - titleHeight - 43), large ? 25 : 22, MenuStyle.MUTED);
-            field(row.more ? tr("home.expand") + "  >" : row.editable ? tr("buttons.open") + "  >" : tr("home.unavailable"), height - 33, 30,
-                large ? 25 : 23, row.editable ? 0x9DC4D6 : MenuStyle.MUTED, true);
+            var compact:Boolean = height < 150;
+            var diameter:Number = compact ? 48 : large ? 64 : 56;
+            var top:Number = compact ? 12 : 18;
+            tint = row.more ? Badge.MORE : Badge.color(row.mod + "/" + row.key);
+            badge = new Badge(row.more ? String(row.badge) : Badge.initials(String(row.title)), diameter);
+            badge.x = (width - diameter) / 2; badge.y = top; addChild(badge);
+            var size:Number = compact ? (large ? 25 : 21) : (large ? 28 : 24);
+            var titleTop:Number = top + diameter + (compact ? 6 : 12);
+            var tagHeight:Number = row.editable ? 0 : size;
+            title = field(String(row.title).toUpperCase(), titleTop, height - titleTop - tagHeight - 8, size);
+            if (!row.editable) tag = field(tr("home.unavailable"), height - tagHeight - 8, tagHeight + 4, size - 5);
             select(false);
         }
-        private function makeBadge(diameter:Number):Sprite
+        private function field(value:String, y:Number, height:Number, size:Number):TextField
         {
-            var badge:Sprite = new Sprite();
-            var colors:Array = [0xB39BCF, 0x8DB8CD, 0xA1BD7D, 0xCE99B2, 0xD4AB72, 0xA3A8DC];
-            var identity:String = row.mod + "/" + row.key; var hash:uint = 5381;
-            for (var i:int = 0; i < identity.length; ++i) hash = uint(hash * 33 + identity.charCodeAt(i));
-            var color:uint = row.more ? 0x9DC4D6 : colors[hash % colors.length]; var radius:Number = diameter / 2;
-            badge.graphics.lineStyle(1, color, 0.8); badge.graphics.drawCircle(radius, radius, radius - 1);
-            badge.graphics.lineStyle(1, color, 0.25); badge.graphics.drawCircle(radius, radius, radius - 5);
-            badge.graphics.lineStyle(); badge.graphics.beginFill(color, 0.7);
-            for each (var x:Number in [8, diameter - 8]) {
-                badge.graphics.moveTo(x, radius - 2); badge.graphics.lineTo(x + 2, radius);
-                badge.graphics.lineTo(x, radius + 2); badge.graphics.lineTo(x - 2, radius); badge.graphics.lineTo(x, radius - 2);
-            }
-            badge.graphics.endFill();
-            var words:Array = String(row.title).replace(/^[\s\-_.]+|[\s\-_.]+$/g, "").split(/[\s\-_.]+/);
-            var first:String = character(String(words[0] || "?"));
-            var initials:String = first + character(words.length > 1 ? String(words[1]) : String(words[0]).substr(first.length));
-            var text:TextField = MenuStyle.field(row.more ? String(row.badge) : initials.toUpperCase(), 9, 0, diameter - 18, diameter, diameter * 0.32, color, true);
-            var format:TextFormat = text.defaultTextFormat; format.align = "center";
-            text.defaultTextFormat = format; text.setTextFormat(format);
-            text.y = (diameter - text.textHeight) / 2 - 2; badge.addChild(text);
-            return badge;
-        }
-        private static function character(text:String):String
-        {
-            var code:Number = text.charCodeAt(0);
-            return text.substr(0, code >= 0xD800 && code <= 0xDBFF ? 2 : 1);
-        }
-        private function field(value:String, y:Number, height:Number, size:Number, color:uint, condensed:Boolean = false):void
-        {
-            var text:TextField = MenuStyle.field(value, 18, y, cardWidth - 36, height, size, color, condensed);
+            var text:TextField = MenuStyle.field(value, 14, y, cardWidth - 28, height, size, MenuStyle.WHITE, true);
             var format:TextFormat = text.defaultTextFormat; format.align = "center";
             text.defaultTextFormat = format; text.setTextFormat(format);
             text.wordWrap = text.multiline = true;
-            // Truncate at a fixed readable size. The footer also describes the selected card.
+            // Truncate at a fixed readable size; the detail card shows the full title.
             while (value.length && text.textHeight > height - 4) {
                 value = value.substr(0, value.length - 1);
                 MenuStyle.setText(text, value + "...");
             }
-            addChild(text);
+            addChild(text); return text;
         }
         public function select(selected:Boolean):void
         {
             graphics.clear();
-            graphics.lineStyle(1, selected ? 0xB7C4CC : 0x34424B);
-            graphics.beginFill(selected ? 0x1B252D : 0x0E1B23);
+            graphics.lineStyle(1, selected ? MenuStyle.WHITE : 0x34424B);
+            graphics.beginFill(selected ? MenuStyle.WHITE : 0x0E1B23);
             graphics.drawRect(0, 0, cardWidth, cardHeight); graphics.endFill();
+            badge.paint(selected ? MenuStyle.INK : row.editable ? tint : MenuStyle.LINE);
+            title.textColor = selected ? MenuStyle.INK : row.editable ? MenuStyle.WHITE : MenuStyle.MUTED;
+            if (tag) tag.textColor = selected ? 0x3D4F58 : MenuStyle.MUTED;
         }
     }
 }

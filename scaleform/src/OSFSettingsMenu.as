@@ -61,7 +61,9 @@ package
         private var count:TextField;
         private var homeMods:TextField;
         private var homeCount:TextField;
-        private var homeRecent:TextField;
+        private var headerCount:TextField;
+        private var homeDetails:HomeDetails;
+        private var homeEmpty:HomeEmpty;
         private var detailTitle:TextField;
         private var detailLabel:TextField;
         private var detailDivider:Sprite = new Sprite();
@@ -163,10 +165,11 @@ package
             tabViewport.scrollRect = new Rectangle(0, 0, 1728, 64); tabViewport.addChild(tabs); addChild(tabViewport);
             section = label("", MenuStyle.LEFT, 305, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
             count = label("", 902, 308, 230, 40, 23, MenuStyle.MUTED, true); alignRight(count);
-            homeMods = label(tr("menu.title"), MenuStyle.LEFT, 0, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
-            homeCount = label("", 902, 0, 230, 40, 23, MenuStyle.MUTED, true); alignRight(homeCount);
-            homeRecent = label(tr("home.recentFirst"), 1250, 308, 594, 40, 23, MenuStyle.MUTED, true); alignRight(homeRecent);
-            homeMods.visible = homeCount.visible = homeRecent.visible = false;
+            // Home headings carry their count right after the title: INTERFACES 10, MODS 3.
+            headerCount = label("", MenuStyle.LEFT, 308, 200, 40, 23, MenuStyle.MUTED, true);
+            homeMods = label(tr("home.mods"), MenuStyle.LEFT, 0, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
+            homeCount = label("", MenuStyle.LEFT, 0, 200, 40, 23, MenuStyle.MUTED, true);
+            homeMods.visible = homeCount.visible = headerCount.visible = false;
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
             configureList(options, "OptionListEntry");
             options.addEventListener("SettingsOptionEntry_ValueChanged", valueChanged);
@@ -181,6 +184,11 @@ package
             defaultLabel = label(tr("menu.default"), 1210, 680, 420, 44, 23, MenuStyle.MUTED, true);
             defaultValue = label("", 1674, 680, 170, 44, 25, MenuStyle.WHITE, true); alignRight(defaultValue);
             issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
+            homeDetails = new HomeDetails(); homeDetails.visible = false; addChild(homeDetails);
+            homeEmpty = new HomeEmpty(function():void {
+                if (!captureRow && !bindingBusy() && !requestedRefresh) selectPage("bindings");
+            });
+            addChild(homeEmpty);
             status = label(tr("menu.autoSave"), MenuStyle.LEFT, 938, 1180, 52, 21, MenuStyle.MUTED, true);
             var legend:TextField = label(tr("menu.changed"), 1450, 938, 394, 36, 21, MenuStyle.MUTED, true);
             changedLegend.mouseEnabled = false; changedLegend.mouseChildren = false;
@@ -262,6 +270,7 @@ package
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
         private function homePage():Boolean { return !modID && rootPage == "mods"; }
         private function launcherPage():Boolean { return homePage() && launcher && launcher.hasEntries && launcher.focused; }
+        private function homeEmptyState():Boolean { return homePage() && !mods.length && launcher && !launcher.hasEntries; }
         private function expandedLauncher():Boolean { return homePage() && launcher && launcher.expanded; }
         private function focusLauncher(value:Boolean):void
         {
@@ -270,7 +279,7 @@ package
             options.disableInput = value;
             options.disableSelection = value;
             menuStage.focus = value ? launcher : options as MovieClip;
-            if (!value && homePage()) { MenuStyle.setText(status, tr("menu.modsHint")); status.textColor = MenuStyle.MUTED; }
+            if (homePage()) { MenuStyle.setText(status, ""); status.textColor = MenuStyle.MUTED; }
             describe(); decorate();
         }
         private function searching():Boolean { return keybindings && keybindings.searching; }
@@ -333,11 +342,20 @@ package
             for each (var row:Object in allRows) {
                 if (row.type == "launcher") continue;
                 if (!seen[row.mod]) {
-                    var mod:Object = {mod:row.mod, title:row.modTitle, hint:row.modDescription, count:0};
+                    var mod:Object = {mod:row.mod, title:row.modTitle, hint:row.modDescription, count:0, settings:0, actions:0, interfaces:0, hotkeys:[]};
                     seen[row.mod] = mod; mods.push(mod);
                 }
-                seen[row.mod].count++;
+                mod = seen[row.mod]; mod.count++;
+                if (row.type == "hotkey") mod.hotkeys.push(row);
+                else if (row.type == "action") mod.actions++;
+                else mod.settings++;
             }
+            for each (row in allRows) if (row.type == "launcher" && seen[row.mod]) seen[row.mod].interfaces++;
+            // OSF Settings' only entry is the key that opens this menu, which Keybindings already lists.
+            mods = mods.filter(function(item:Object, index:int, source:Array):Boolean {
+                return item.mod != "osfsettings" || item.settings > 0 || item.actions > 0;
+            });
+            for each (mod in mods) { mod.parts = summaryParts(mod); mod.summary = mod.parts.join("  |  "); mod.chips = summaryParts(mod, false); }
             if (!seen[modID]) modID = "";
             groups = []; seen = new Dictionary();
             for each (row in allRows) {
@@ -349,20 +367,31 @@ package
             if (!seen[groupID]) groupID = groups.length ? groups[0].id : "";
             populate(preserve); drawTabs();
         }
+        // The detail card lists hotkeys themselves, so its chips leave out their count.
+        private function summaryParts(mod:Object, hotkeys:Boolean = true):Array
+        {
+            var parts:Array = [];
+            if (mod.settings) parts.push(mod.settings == 1 ? tr("summary.setting") : tr("summary.settings", {count:mod.settings}));
+            if (hotkeys && mod.hotkeys.length) parts.push(mod.hotkeys.length == 1 ? tr("summary.hotkey") : tr("summary.hotkeys", {count:mod.hotkeys.length}));
+            if (mod.actions) parts.push(mod.actions == 1 ? tr("summary.action") : tr("summary.actions", {count:mod.actions}));
+            if (mod.interfaces) parts.push(mod.interfaces == 1 ? tr("summary.interface") : tr("summary.interfaces", {count:mod.interfaces}));
+            return parts;
+        }
         private function populate(preserve:Boolean = false):void
         {
             refreshing = true; requestedRefresh = false;
             nativeHotkeys.populate(allRows);
             nativeHotkeys.fullPage = bindingsPage();
             keybindings.visible = bindingsPage();
-            if (homePage()) launcher.populate(allRows, preserve);
+            // With no mod settings, interfaces fill Home as a grid that cannot collapse.
+            if (homePage()) launcher.populate(allRows, preserve, !mods.length);
             launcher.visible = homePage() && launcher.hasEntries;
             launcher.mouseEnabled = launcher.mouseChildren = launcher.visible;
-            launcher.y = expandedLauncher() ? MenuStyle.LIST_TOP : 342;
-            MovieClip(options).visible = !expandedLauncher();
+            launcher.y = expandedLauncher() ? LauncherPage.GRID_TOP : 342;
+            MovieClip(options).visible = !expandedLauncher() && !homeEmptyState();
+            homeEmpty.visible = homeEmptyState();
             count.x = 902;
             homeMods.visible = homeCount.visible = launcher.visible && !expandedLauncher();
-            homeRecent.visible = launcher.visible && !expandedLauncher();
             homeMods.y = launcher.y + launcher.shelfHeight + 20;
             homeCount.y = homeMods.y + 3;
             options.disableSelection = bindingBusy();
@@ -371,7 +400,9 @@ package
             var listHeight:Number = bindingsPage() ? 342 : homeMods.visible ? 894 - options.y : MenuStyle.LIST_HEIGHT;
             options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
             MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,MenuStyle.LIST_WIDTH,listHeight);
-            section.visible = count.visible = !bindingsPage();
+            section.visible = !bindingsPage() && !homeEmptyState();
+            count.visible = !bindingsPage() && !homePage();
+            headerCount.visible = section.visible && homePage();
             empty.y = options.y + 22;
             var hasHotkeys:Boolean = false;
             var selected:int = preserve ? options.selectedIndex : 0;
@@ -396,24 +427,33 @@ package
                 }
             }
             options.InitializeEntries(data);
-            if (hasHotkeys) nativeHotkeys.open();
+            // Home's detail card and empty state show current keys, which come from vanilla Controls.
+            var homeKeys:Boolean = homeEmptyState();
+            for each (mod in mods) if (homePage() && mod.hotkeys.length) homeKeys = true;
+            if (hasHotkeys || homeKeys) nativeHotkeys.open();
+            var openKey:String = "";
+            for each (row in allRows) if (row.mod == "osfsettings" && row.key == "openMenu" && row.type == "hotkey") openKey = String(row.value || "");
+            homeEmpty.show(openKey);
             options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             if (homePage() && launcher.hasEntries && !data.length) launcher.focused = true;
             options.disableInput = bindingBusy() || searching() || launcherPage();
             options.disableSelection = bindingBusy() || launcherPage();
             if (!searching()) menuStage.focus = launcherPage() ? launcher : options as MovieClip;
-            empty.visible = !expandedLauncher();
+            empty.visible = !expandedLauncher() && !homeEmptyState();
             MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? tr("menu.noIssues") : tr("menu.noSettings"));
             var title:String = tr("menu.title"); var group:String = tr("menu.title");
             for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
             for each (var page:Object in groups) if (page.id == groupID) group = page.title;
             MenuStyle.fit(heading, title.toUpperCase());
-            MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : group.toUpperCase());
-            MenuStyle.setText(count, launcher.visible ? launcher.countText : tr(issuesPage() ? "counts.issues" : modID ? "counts.items" : "counts.mods", {count:data.length}));
-            MenuStyle.setText(homeCount, tr("counts.mods", {count:data.length}));
+            MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : homePage() ? tr("home.mods") : group.toUpperCase());
+            MenuStyle.setText(count, tr(issuesPage() ? "counts.issues" : "counts.items", {count:data.length}));
+            MenuStyle.setText(headerCount, String(launcher.visible ? launcher.count : data.length));
+            headerCount.x = section.x + section.textWidth + 18;
+            MenuStyle.setText(homeCount, String(data.length));
+            homeCount.x = homeMods.x + homeMods.textWidth + 18;
             if (!modID && (!bindingsPage() || !preserve)) {
-                MenuStyle.setText(status, bindingsPage() ? "" : issuesPage() ? tr("menu.issuesHint") : tr("menu.modsHint"));
+                MenuStyle.setText(status, issuesPage() ? tr("menu.issuesHint") : "");
                 status.textColor = MenuStyle.MUTED;
             } else if (!preserve) MenuStyle.setText(status, tr("menu.autoSave"));
             refreshing = false; describe(); decorate();
@@ -471,21 +511,22 @@ package
         {
             var row:Object = current();
             var reporting:Boolean = issuesPage();
-            detailLabel.y = homeMods.visible ? options.y : 363;
+            detailLabel.y = 363;
             detailTitle.y = detailLabel.y + 46;
-            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage() && !launcherPage();
-            MenuStyle.setText(detailLabel, modID ? row && row.type == "action" ? tr("menu.selectedAction") : tr("menu.selectedSetting") : tr("menu.selectedMod"));
+            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage() && !homePage();
+            MenuStyle.setText(detailLabel, row && row.type == "action" ? tr("menu.selectedAction") : tr("menu.selectedSetting"));
+            homeDetails.visible = homePage() && !homeEmptyState();
+            if (homeDetails.visible) homeDetails.show(homeDetail(row), launcher.visible && !expandedLauncher() ? homeMods.y : 305);
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
             MenuStyle.setText(detailTitle, row ? row.title : tr("menu.nothingSelected"));
             detailHint.y = detailTitle.y + Math.max(68, detailTitle.textHeight + 20);
-            detailHint.height = Math.max(64, (homeMods.visible ? 894 : 630) - detailHint.y);
+            detailHint.height = Math.max(64, 630 - detailHint.y);
             var hint:String = row ? String(row.hint || "") : "";
             if (row && row.type == "action" && row.message) hint += (hint ? "\n\n" : "") + row.message;
             MenuStyle.setText(detailHint, (row && row.requiresRestart ? tr("menu.restart") + (hint ? "\n\n" : "") : "") + hint);
             detailHint.scrollV = 1;
-            MenuStyle.setText(defaultLabel, modID ? tr("menu.default") : tr("menu.items"));
-            if (homeMods.visible) defaultLabel.visible = defaultValue.visible = detailDivider.visible = false;
+            MenuStyle.setText(defaultLabel, tr("menu.default"));
             if (row && row.type == "action") { defaultLabel.visible = defaultValue.visible = detailDivider.visible = false; changedLegend.visible = false; }
             defaultValue.x = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 1434 : 1674;
             defaultValue.width = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 410 : 170;
@@ -497,8 +538,8 @@ package
             resetButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row && row.editable && row.type != "hotkey" && row.type != "action");
             clearButton.Visible = Boolean(!captureRow && !bindingBusy() && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
-            buttonData.Accept.sButtonText = editingString() ? tr("buttons.save") : row && row.type == "action" ? tr("buttons.runAction") : row && row.type == "string" ? tr("buttons.editText") : captureRow ? tr("buttons.confirmBinding") : bindingsPage() ? tr("buttons.changeBinding") : !modID ? tr("buttons.open") : row && (row.type == "key" || row.type == "hotkey") ? tr("buttons.changeBinding") : row && row.type == "enum" ? tr("buttons.nextChoice") : tr("buttons.toggle");
-            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? tr("buttons.cancel") : modID || expandedLauncher() ? tr("menu.home") : tr("buttons.back");
+            buttonData.Accept.sButtonText = editingString() ? tr("buttons.save") : row && row.type == "action" ? tr("buttons.runAction") : row && row.type == "string" ? tr("buttons.editText") : captureRow ? tr("buttons.confirmBinding") : bindingsPage() ? tr("buttons.changeBinding") : homeEmptyState() ? tr("menu.keybindings") : !modID ? tr("buttons.open") : row && (row.type == "key" || row.type == "hotkey") ? tr("buttons.changeBinding") : row && row.type == "enum" ? tr("buttons.nextChoice") : tr("buttons.toggle");
+            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? tr("buttons.cancel") : modID ? tr("menu.home") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
             acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action"))));
             backButton.Visible = !bindingBusy();
@@ -518,12 +559,27 @@ package
                 acceptButton.SetButtonData(buttonData.Accept);
                 acceptButton.Visible = Boolean(row && row.editable);
                 resetButton.Visible = clearButton.Visible = changedLegend.visible = false;
-                MenuStyle.fit(status, row ? row.message ? row.message : row.hint ? row.hint : tr("home.selectInterface") : tr("home.selectInterface"));
-                status.textColor = row && !row.editable ? MenuStyle.ACCENT : MenuStyle.MUTED;
             }
+            if (homeEmptyState()) acceptButton.Visible = !bindingBusy();
             pageBar.visible = !captureRow && !bindingBusy() && !searching() && pages().length > 1;
             if (editingString()) { resetButton.Visible = clearButton.Visible = false; pageBar.visible = false; }
             bar.RefreshButtons();
+        }
+        // The card describes whichever Home item is selected: a mod, an interface or SHOW ALL.
+        private function homeDetail(row:Object):Object
+        {
+            if (!row) return null;
+            if (row.more) return {title:row.title, badge:row.badge, tint:Badge.MORE, subtitle:"", description:row.hint,
+                warning:"", chips:[], hotkeys:[]};
+            if (row.type == "launcher") return {title:row.title, badge:Badge.initials(String(row.title)),
+                tint:row.editable ? Badge.color(row.mod + "/" + row.key) : MenuStyle.LINE,
+                subtitle:row.modTitle && row.modTitle != row.title ? row.modTitle : "", description:row.hint,
+                warning:row.editable ? "" : String(row.message || tr("home.unavailable")),
+                chips:row.editable ? [tr("home.interface")] : [tr("home.interface"), tr("home.unavailable")], hotkeys:[]};
+            var hotkeys:Array = [];
+            for each (var hotkey:Object in row.hotkeys) hotkeys.push({title:hotkey.title, key:hotkey.value || tr("values.unboundTitle")});
+            return {title:row.title, badge:Badge.initials(String(row.title)), tint:Badge.color(String(row.mod)), subtitle:"",
+                description:row.hint, warning:"", chips:row.chips, hotkeys:hotkeys};
         }
         private function scrollDescription(event:MouseEvent):void
         {
@@ -540,6 +596,7 @@ package
             if (captureRow) { confirmBinding(); return; }
             if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
+            if (homeEmptyState()) { selectPage("bindings"); return; }
             var row:Object = current(); if (!row) return;
             if (launcherPage()) { if (row.more) launcher.toggleExpanded(); else if (row.editable) launch(row); }
             else if (!modID && !bindingsPage()) { modID = row.mod; groupID = ""; refresh(false); }
@@ -693,7 +750,7 @@ package
             if (captureRow) { finishBinding(true); return; }
             if (frame <= searchExitFrame + 1) return;
             if (closing || dragging() || requestedRefresh) return;
-            if (expandedLauncher()) { launcher.toggleExpanded(); return; }
+            if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             if (modID) { modID = ""; groupID = ""; rootPage = "mods"; readIssues(); refresh(false); return; }
             closing = true; options.disableInput = true; BGSCodeObj.close();
         }

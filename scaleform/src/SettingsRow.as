@@ -28,7 +28,7 @@ package
             var changed:Boolean = !modList && row.type != "hotkey" && row.type != "action" && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
             var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action");
-            var displayValue:String = modList ? String(row.count) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
+            var displayValue:String = modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
             var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.mod].join("|");
             if (signature == previous) return;
             previous = signature;
@@ -43,10 +43,14 @@ package
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
             graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.ROW_HEIGHT); graphics.endFill();
-            title.textColor = color; value.textColor = color;
-            title.width = slider || choice ? 470 : 650;
-            value.x = choice ? 580 : slider ? 888 : NumericSetting.isNumeric(row) ? 694 : 776;
-            value.width = choice ? 370 : slider ? 100 : NumericSetting.isNumeric(row) ? 300 : 150;
+            title.textColor = color; value.textColor = modList ? (selected ? 0x3D4F58 : MenuStyle.MUTED) : color;
+            title.width = modList ? 440 : slider || choice ? 470 : 650;
+            // Mod rows summarize what each mod adds, right-aligned before the chevron.
+            var format:TextFormat = value.defaultTextFormat; format.align = modList ? "right" : "center";
+            format.size = modList ? (CONFIG::largeText ? 24 : 21) : (CONFIG::largeText ? 28 : 25); value.defaultTextFormat = format;
+            value.x = modList ? 470 : choice ? 580 : slider ? 888 : NumericSetting.isNumeric(row) ? 694 : 776;
+            value.y = (MenuStyle.ROW_HEIGHT - MenuStyle.BODY_SIZE) / 2 - (modList ? 0 : 3);
+            value.width = modList ? 500 : choice ? 370 : slider ? 100 : NumericSetting.isNumeric(row) ? 300 : 150;
             MenuStyle.fit(title, String(row.title));
             MenuStyle.fit(value, displayValue);
             var center:Number = MenuStyle.ROW_HEIGHT / 2;

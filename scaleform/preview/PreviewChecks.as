@@ -52,6 +52,7 @@ package
         {
             Object(menu).ProcessUserEvent(name, true); Object(menu).ProcessUserEvent(name, false);
         }
+        private function homeDetail():Object { return Object(findNamed(menu,"homeDetails")).detail; }
         private function searchField():TextField { return DisplayObjectContainer(findNamed(menu,"bindingSearch")).getChildAt(0) as TextField; }
         private function key(code:uint):void
         {
@@ -115,7 +116,7 @@ package
                     require(list.entryCount == 4 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
                     userEvent("Cancel"); break;
                 case 8:
-                    require(list.entryCount == 3 && list.selectedEntry.row.title == "OSF Director", "back opens mod list");
+                    require(list.entryCount == 3 && list.selectedEntry.row.title == "OSF Animation", "back opens mod list");
                     userEvent("Accept"); break;
                 case 9:
                     require(list.entryCount == 6, "opening a mod returns to playback");
@@ -315,11 +316,17 @@ package
                     require(findNamed(menu,"launcher_" + (launcher.columns - 1)) != null && findNamed(menu,"launcher_" + launcher.columns) == null, "recent shelf reserves the final card for overflow");
                     require(Object(findNamed(menu,"launcher_0")).row.title == "Absolute Control", "recent order overrides alphabetical order");
                     require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "Home tab label");
+                    requireGlyphs("INTERFACES"); requireGlyphs("MODS");
                     list.selectedIndex = 0;
                     require(list.selectedEntry.row.mod == "design-preview", "select the first mod before navigating to the shelf");
+                    require(list.selectedEntry.row.summary == "13 SETTINGS  |  2 ACTIONS" && list.GetDataForEntry(1).row.summary == "4 HOTKEYS",
+                        "mod rows summarize settings, actions and hotkeys");
+                    require(homeDetail().title == "OSF Animation" && homeDetail().chips.join() == "13 SETTINGS,2 ACTIONS", "detail card describes the selected mod");
                     capture("home"); userEvent("Up"); break;
                 case 55:
                     require(launcher.focused && list.disableInput, "Up from the first mod focuses the interface shelf");
+                    require(launcher.current.title == "Absolute Control" && homeDetail().title == "Absolute Control", "detail card follows the focused interface");
+                    capture("home-interface");
                     userEvent("Down"); break;
                 case 56:
                     require(!launcher.focused && !list.disableInput, "Down from the shelf returns to mod settings");
@@ -327,9 +334,14 @@ package
                 case 57:
                     require(launcher.expanded && !list.visible, "Show more expands interfaces inside Home");
                     require(launcher.current.type == "launcher" && launcher.focused, "expanded grid selects an actual interface");
+                    require(findNamed(menu,"launcher_3").y > findNamed(menu,"launcher_0").y && findNamed(menu,"launcher_2").y == findNamed(menu,"launcher_0").y,
+                        "expanded grid is three across");
                     capture("home-expanded"); userEvent("PageDown"); break;
                 case 58:
-                    if (launcher.columns == 4) require(launcher.scrollPosition == 8, "large-text overflow reaches the remaining interfaces");
+                    require(launcher.scrollPosition == (launcher.capacity < 10 ? launcher.capacity : 0), "Page Down reaches the remaining interfaces");
+                    require(launcher.current.title == "Unavailable Interface" && homeDetail().warning == "This interface is unavailable in the current context.",
+                        "unavailable interfaces explain why");
+                    capture("home-unavailable");
                     userEvent("Cancel"); break;
                 case 59:
                     require(!launcher.expanded && list.visible, "Back collapses interfaces without leaving Home");
@@ -351,28 +363,60 @@ package
                 case 63:
                     require(!launcher.visible && list.visible && list.y == 362 && !list.disableInput, "no interfaces restores the full settings list");
                     capture("home-no-interfaces");
-                    userEvent("Accept"); break;
-                case 64:
-                    findNamed(menu,"Advanced").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    Object(menu).BGSCodeObj.getRows = function():Array {
+                        // OSF Settings' own hotkey alone leaves Home with nothing to list.
+                        return [{type:"hotkey", mod:"osfsettings", modTitle:"OSF Settings", modDescription:"", group:"general", groupTitle:"General",
+                            key:"openMenu", action:"osfsettings/openMenu", registered:true, title:"Open mod settings", hint:"", defaultName:"F10"}];
+                    };
+                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "empty"; }; break;
+                case 64: break;
                 case 65:
+                    require(findNamed(menu,"homeEmpty").visible && !list.visible && !launcher.visible, "OSF Settings alone shows the empty state");
+                    capture("home-empty");
+                    findNamed(menu,"homeKeybindings").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 66:
+                    require(findNamed(menu,"bindingSearch").parent.visible, "empty state links to Keybindings");
+                    Object(menu).BGSCodeObj.getRows = function():Array {
+                        return originalRows().filter(function(row:Object, index:int, source:Array):Boolean { return row.type == "launcher"; });
+                    };
+                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "interfaces-only"; };
+                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 67: break;
+                case 68:
+                    require(launcher.visible && launcher.expanded && launcher.locked && launcher.focused && !list.visible && !findNamed(menu,"homeEmpty").visible,
+                        "interfaces without mod settings fill Home");
+                    require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "interfaces-only Home keeps its tab");
+                    capture("home-interfaces-only");
+                    Object(menu).BGSCodeObj.getRows = originalRows;
+                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "restored"; }; break;
+                case 69: break;
+                case 70:
+                    require(launcher.visible && !launcher.expanded && list.visible && list.entryCount == 3, "mod settings bring back the shelf and list");
+                    list.selectedIndex = 1;
+                    require(homeDetail().hotkeys.length == 4 && homeDetail().chips.length == 0, "hotkey-only mods list their keys instead of a count");
+                    capture("home-hotkeys");
+                    list.selectedIndex = 0; userEvent("Accept"); break;
+                case 71:
+                    findNamed(menu,"Advanced").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 72:
                     require(list.entryCount == 4 && list.GetDataForEntry(0).row.key == "debug" &&
                         list.GetDataForEntry(1).row.key == "rescan" && list.GetDataForEntry(2).row.key == "resetIndex" &&
                         list.GetDataForEntry(3).row.key == "language", "settings and actions preserve declaration order");
                     list.selectedIndex = 1; userEvent("YButton");
                     require(list.selectedEntry.row.actionState == "Run", "reset leaves action controls unchanged");
                     userEvent("Accept"); break;
-                case 66:
+                case 73:
                     require(list.selectedEntry.row.key == "rescan" && list.selectedEntry.row.actionState == "Completed", "inline action completes and preserves selection");
                     list.selectedIndex = 2; userEvent("Accept"); break;
-                case 67:
+                case 74:
                     require(list.disableInput, "inline confirmation blocks the underlying list");
                     userEvent("Accept"); break;
-                case 68:
+                case 75:
                     require(!list.disableInput && list.selectedEntry.row.actionState == "Run", "confirmation defaults to Cancel without invoking");
                     userEvent("Accept"); break;
-                case 69:
+                case 76:
                     userEvent("Right"); userEvent("Accept"); break;
-                case 70:
+                case 77:
                     require(!list.disableInput && list.selectedEntry.row.key == "resetIndex" && list.selectedEntry.row.actionState == "Completed", "confirmed inline action completes");
                     list.selectedIndex = 3;
                     require(list.selectedEntry.row.type == "string", "setting after actions remains reachable");
@@ -393,6 +437,9 @@ package
                 return first && first.row.title == "Ship Planner";
             }
             if (step == 63) return !launcher.visible;
+            if (step == 65) return findNamed(menu,"homeEmpty").visible;
+            if (step == 68) return launcher.locked;
+            if (step == 70) return launcher.visible && !launcher.locked;
             return true;
         }
         private function checkLocalization():void
