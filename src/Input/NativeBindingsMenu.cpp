@@ -7,7 +7,7 @@
 #include "RE/S/SettingsDataModel.h"
 #include "REL/THook.h"
 #include "REX/CONVERT.h"
-#include "harness/TranslationRegistration.h"
+#include "Harness/TranslationRegistration.h"
 
 #include <algorithm>
 #include <cctype>

@@ -1,5 +1,5 @@
-#include "TestHarness.h"
-#include "TranslationRegistration.h"
+#include "Harness/TestHarness.h"
+#include "Harness/TranslationRegistration.h"
 #include "Acceptance.h"
 
 #include "Settings/SettingsService.h"

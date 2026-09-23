@@ -8,7 +8,7 @@
 #include "RE/E/Events.h"
 #include "REL/THook.h"
 #include "REX/FModule.h"
-#include "harness/TestHarness.h"
+#include "Harness/TestHarness.h"
 
 namespace OSFSettings::Papyrus
 {

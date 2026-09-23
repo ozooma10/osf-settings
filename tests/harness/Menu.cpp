@@ -1,4 +1,4 @@
-#include "TestHarness.h"
+#include "Harness/TestHarness.h"
 #include "Acceptance.h"
 #include "Menu/OSFSettingsMenu.h"
 #include "RE/E/Events.h"

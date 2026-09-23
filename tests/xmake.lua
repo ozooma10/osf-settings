@@ -84,7 +84,6 @@ test_target("osfsettings-input-tests", "input", true)
 
 test_target("osfsettings-lifecycle-tests", "input", true)
     add_files("hotkey_lifecycle_tests.cpp")
-    add_includedirs(".")
     add_defines("OSFSETTINGS_TEST_HARNESS")
 
 test_target("osfsettings-binding-tests", "input", true)

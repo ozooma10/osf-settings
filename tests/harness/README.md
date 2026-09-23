@@ -3,7 +3,8 @@
 This folder contains the Settings-side instrumentation used by the sibling
 `OSF Test Harness` project's `SettingsSmoke` scenario.
 
-- `TestHarness.h`: the small integration interface, with no-op functions for normal builds.
+- `src/Harness/TestHarness.h` and `src/Harness/TranslationRegistration.h`: the small
+  integration interfaces production code includes; they compile to no-ops in normal builds.
 - `TestHarness.cpp`: cached input/UI observations and the snapshot export.
 - `Paths.cpp`: configuration parsing and isolated test values storage.
 - `Menu.cpp`: menu event observation and the test-only Scaleform callback.
@@ -12,8 +13,8 @@ This folder contains the Settings-side instrumentation used by the sibling
 
 XMake adds this folder's C++ implementations only with `--test_harness=y`.
 The movie includes its observation fragment only with `CONFIG::testHarness` enabled.
-Production files retain small calls at the existing observation points; the header
-makes those calls no-ops in normal builds. Keep test logic in this folder.
+Production files retain small calls at the existing observation points; the headers in
+`src/Harness/` make those calls no-ops in normal builds. Keep test logic in this folder.
 
 ## Translation registration checks
 

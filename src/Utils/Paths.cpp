@@ -1,5 +1,5 @@
 #include "Paths.h"
-#include "harness/TestHarness.h"
+#include "Harness/TestHarness.h"
 
 namespace OSFSettings::Paths
 {

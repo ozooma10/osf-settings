@@ -44,17 +44,17 @@ target("OSF Settings")
     -- add src files
     add_files("src/**.cpp")
     add_headerfiles("src/**.h")
-    add_includedirs("src", "tests", "build/generated")
+    add_includedirs("src", "build/generated")
     set_pcxxheader("src/pch.h")
     add_packages("nlohmann_json")
     if has_config("test_harness") then
         add_defines("OSFSETTINGS_TEST_HARNESS")
         add_files("tests/harness/*.cpp")
+        add_headerfiles("tests/harness/*.h")
         add_installfiles("build/papyrus/harness/*.pex", { prefixdir = "Scripts" })
         add_installfiles("build/papyrus/harness/OSFSettingsAcceptance.esm")
         add_installfiles("data/SFSE/Plugins/OSF/Settings/schemas/learning.json", { prefixdir = "SFSE/Plugins/OSF/Settings/schemas" })
     end
-    add_headerfiles("tests/harness/*.h")
     before_build(function(target)
         local papyrusArgs = { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-papyrus.ps1") }
         if has_config("test_harness") then table.insert(papyrusArgs, "-TestHarness") end

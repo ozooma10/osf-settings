@@ -1,6 +1,6 @@
 #include "SettingsDispatcher.h"
 #include "Settings/SettingsService.h"
-#include "harness/TestHarness.h"
+#include "Harness/TestHarness.h"
 #include "SFSE/SFSE.h"
 
 namespace OSFSettings::SettingsDispatcher

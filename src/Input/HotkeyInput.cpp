@@ -2,7 +2,7 @@
 #include "HotkeyInputState.h"
 #include "NativeHotkeys.h"
 #include "NativeBindingEditor.h"
-#include "harness/TestHarness.h"
+#include "Harness/TestHarness.h"
 #include "BSInputEventUserStandalone.h"
 #include "RE/M/MenuControls.h"
 #include "RE/U/UIMessageQueue.h"

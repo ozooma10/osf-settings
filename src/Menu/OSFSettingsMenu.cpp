@@ -1,5 +1,5 @@
 #include "OSFSettingsMenu.h"
-#include "harness/TestHarness.h"
+#include "Harness/TestHarness.h"
 #include "FloatSlider.h"
 #include "Input/KeyNames.h"
 #include "Input/NativeHotkeys.h"

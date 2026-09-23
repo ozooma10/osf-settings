@@ -1,5 +1,5 @@
 #include "Acceptance.h"
-#include "TestHarness.h"
+#include "Harness/TestHarness.h"
 #include "../../sdk/OSFSettingsRegistry.h"
 #include "../../sdk/OSFSettings_Diagnostics.h"
 #include "../../sdk/OSFSettings_Launcher.h"

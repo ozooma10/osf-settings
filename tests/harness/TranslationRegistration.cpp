@@ -1,4 +1,4 @@
-#include "TranslationRegistration.h"
+#include "Harness/TranslationRegistration.h"
 #include "RE/B/BSScaleformManager.h"
 #include "RE/B/BSScaleformTranslator.h"
 #include "REX/CONVERT.h"
