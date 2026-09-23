@@ -7,7 +7,7 @@ For mod authors, start with [Settings](docs/SETTINGS.md) to define a page and co
 | Guide | Use it to |
 | --- | --- |
 | [Settings](docs/SETTINGS.md) | Define settings and action buttons, read and write values, and respond to changes |
-| [Hotkeys](docs/Keybindings.md) | Register rebindable actions or open a menu |
+| [Hotkeys](docs/KEYBINDINGS.md) | Register rebindable actions or open a menu |
 | [Issue reporting](docs/DIAGNOSTICS.md) | Report and clear problems shown in Mod Issues |
 
 <details>
