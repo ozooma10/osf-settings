@@ -40,7 +40,7 @@ target("osfsettings-localization")
     end)
 target_end()
 
-includes("tests")
+includes("tests", "examples")
 
 -- define targets
 target("OSF Settings")
@@ -81,68 +81,3 @@ target("OSF Settings")
     add_installfiles("data/Scripts/Source/OSFSettings.psc", { prefixdir = "Scripts/Source" })
     add_installfiles("build/papyrus/OSFSettings.pex", { prefixdir = "Scripts" })
     add_installfiles("build/scaleform/OSFSettingsMenu.swf", "build/scaleform/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })
-
-target("osfsettings-diagnostics-example")
-    set_default(false)
-    set_basename("OSFSettingsDiagnosticsExample")
-    add_rules("commonlibsf.plugin", {
-        name = "OSFSettingsDiagnosticsExample",
-        author = "ozooma10",
-        description = "Development-only Mod Issues SDK example",
-        options = { address_library = false, no_struct_use = true }
-    })
-    add_files("examples/diagnostics/main.cpp")
-    add_includedirs("sdk")
-    set_values("commonlib.plugin.install", false)
-    on_config(function(target)
-        -- Keep the example out of installs and packages, including --all.
-        target:set("installfiles", {})
-    end)
-
-target("osfsettings-hotkeys-example")
-    set_default(false)
-    set_basename("OSFSettingsHotkeysExample")
-    add_rules("commonlibsf.plugin", {
-        name = "OSFSettingsHotkeysExample",
-        author = "ozooma10",
-        description = "Development-only native hotkey SDK example",
-        options = { address_library = false, no_struct_use = true }
-    })
-    add_files("examples/hotkeys/main.cpp")
-    add_includedirs("sdk")
-    set_values("commonlib.plugin.install", false)
-    on_config(function(target)
-        target:set("installfiles", {})
-    end)
-
-target("osfsettings-registry-example")
-    set_default(false)
-    set_basename("OSFSettingsRegistryExample")
-    add_rules("commonlibsf.plugin", {
-        name = "OSFSettingsRegistryExample",
-        author = "ozooma10",
-        description = "Development-only settings registry SDK example",
-        options = { address_library = false, no_struct_use = true }
-    })
-    add_files("examples/registry/main.cpp")
-    add_includedirs("sdk")
-    set_values("commonlib.plugin.install", false)
-    on_config(function(target)
-        target:set("installfiles", {})
-    end)
-
-target("osfsettings-actions-example")
-    set_default(false)
-    set_basename("OSFSettingsActionsExample")
-    add_rules("commonlibsf.plugin", {
-        name = "OSFSettingsActionsExample",
-        author = "ozooma10",
-        description = "Development-only action buttons SDK example",
-        options = { address_library = false, no_struct_use = true }
-    })
-    add_files("examples/actions/main.cpp")
-    add_includedirs("sdk")
-    set_values("commonlib.plugin.install", false)
-    on_config(function(target)
-        target:set("installfiles", {})
-    end)
