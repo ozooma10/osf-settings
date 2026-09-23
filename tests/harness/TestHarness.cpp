@@ -63,7 +63,7 @@ namespace OSFSettings::TestHarness
                     "rect", "controlRect", "x", "y", "width", "height", "visibleRect", "active", "ready",
                     "editable", "minimum", "maximum", "status", "scrollPosition", "startupPhase", "state", "diagnosticError",
                     "mouse", "mouseDown", "mouseClick", "sequence", "frame", "target", "buttonDown", "saving",
-                    "rootPage", "issueCount", "alternate", "action", "source", "potential", "records", "device", "slot", "modifier", "context",
+                    "rootPage", "issueCount", "alternate", "action", "source", "records", "device", "slot", "modifier", "context",
                     "translations", "heading", "originalContext", "kbm", "gamepad", "unicode", "unknown", "vanilla", "requiredHeading", "conflictText",
                     "nativeRows", "divider", "presentationContext", "menuHeading", "sectionHeading", "countText",
                     "bindings", "count", "required", "requiredActions", "selectedKey", "query", "searching", "searchRect", "sourceRect", "clearRect", "primaryRect", "alternateRect",

@@ -22,7 +22,7 @@ cancelled. A setting marked as requiring a restart takes effect when its owning
 mod applies it after restarting Starfield.
 
 KEYBINDINGS searches native MainGameplay keyboard/mouse actions and registered
-mod hotkeys, with primary/alternate slots and potential-conflict indicators.
+mod hotkeys, with primary/alternate slots.
 It cannot discover every mod's privately implemented hotkeys. MOD ISSUES shows
 reports supplied by supporting mods; an empty page is not a health check of
 every installed mod. Physical controller operation remains unverified, and

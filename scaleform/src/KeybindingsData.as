@@ -40,44 +40,14 @@ package
                     title:owner ? owner.title : translate(entry), mod:owner ? owner.mod : "", key:owner ? owner.key : entry.sInputName,
                     source:owner ? owner.modTitle : tr("bindings.game"), binding:native, editable:!entry.bReadOnly,
                     value:entry.MainBinding.aPCKeyName.join(" + "), alternate:entry.AltBinding.aPCKeyName.join(" + "),
-                    records:mappings[id] || [], potential:false, shared:false, keybindings:true, defaultName:""};
+                    records:mappings[id] || [], keybindings:true, defaultName:""};
                 // Missing map records are unavailable, never an inferred unbound slot.
                 row.available = mappings[id] != null;
                 row.editable = row.editable && row.available;
                 row.hint = row.available ? "" : tr("bindings.numericUnavailable");
                 result.push(row);
             }
-            classify(result);
             return result;
-        }
-        public static function classify(rows:Array):void
-        {
-            var assignments:Object = {}, keys:Object = {};
-            for each (var row:Object in rows) {
-                row.potential = false; row.shared = false;
-                for each (var record:Object in row.records) {
-                    if (!bound(record.key)) continue;
-                    var assignment:String = record.device + ":" + record.key + ":" + (modified(record.modifier) ? record.modifier : 255);
-                    if (!assignments[assignment]) assignments[assignment] = {};
-                    assignments[assignment][row.identity] = row;
-                    var key:String = record.device + ":" + record.key;
-                    if (!keys[key]) keys[key] = {};
-                    keys[key][row.identity] = row;
-                    if (modified(record.modifier)) {
-                        key = "0:" + record.modifier;
-                        if (!keys[key]) keys[key] = {};
-                        keys[key][row.identity] = row;
-                    }
-                }
-            }
-            for each (var owners:Object in assignments) mark(owners, "potential");
-            for each (owners in keys) mark(owners, "shared");
-        }
-        private static function mark(owners:Object, property:String):void
-        {
-            var count:int = 0;
-            for each (var row:Object in owners) ++count;
-            if (count > 1) for each (row in owners) row[property] = true;
         }
         public static function filter(rows:Array, query:String, source:String, key:int):Array
         {

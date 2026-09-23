@@ -208,25 +208,27 @@ package
                     findNamed(menu,"bindings").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 35:
                     require(list.entryCount == 40,"MainGameplay native rows include both sources and unbound actions");
-                    require(list.selectedEntry.row.action == "Jump" && list.selectedEntry.row.potential,"mixed ownership potential conflict computed");
+                    require(list.selectedEntry.row.action == "Jump","binding results start at the first native action");
+                    require(!findNamed(menu,"clearBindingFilters").visible && !findNamed(menu,"bindingKeyFilter").visible,"filter controls stay hidden without a filter");
                     capture("keybindings");
                     findNamed(menu,"key_77").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 36:
                     require(list.entryCount == 3,"key filter includes plain and chord bindings");
-                    require(list.selectedEntry.row.potential,"filter preserves other ownership");
+                    require(findNamed(menu,"bindingKeyFilter").visible && findNamed(menu,"clearBindingFilters").visible,"key filter shows its chip and clear control");
                     findNamed(menu,"key_77").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 37:
-                    require(list.entryCount == 40,"clicking selected key clears the filter");
+                    require(list.entryCount == 40 && !findNamed(menu,"clearBindingFilters").visible,"clicking selected key clears the filter");
                     findNamed(menu,"key_162").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 38:
                     require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/chord","modifier filter finds chord");
                     capture("keybindings-chord");
-                    findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    findNamed(menu,"bindingKeyFilter").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    require(list.entryCount == 40 && !findNamed(menu,"bindingKeyFilter").visible,"key chip clears the key filter");
                     var search:TextField = searchField();
                     menu.stage.focus = search;
                     search.text = "alternate"; search.dispatchEvent(new Event(Event.CHANGE)); break;
                 case 39:
-                    require(list.entryCount == 1 && !list.selectedEntry.row.potential,"two slots of one action do not conflict");
+                    require(list.entryCount == 1,"two slots of one action appear once");
                     require(menu.stage.focus == searchField(),"filter refresh preserves search focus");
                     key(221); key(Keyboard.B); key(Keyboard.X); userEvent("Accept"); userEvent("RShoulder");
                     require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/alternate","search suppresses native and raw shortcuts");
@@ -448,10 +450,6 @@ package
             require(policy.filter(joined,"", "all",162).length == 1 && policy.filter(joined,"", "all",77).length == 0,"modifier identity is numeric, never inferred from localized strings");
             joined = policy.join([native],[],[],function(row:Object):String { return "Missing"; });
             require(!joined[0].available && !joined[0].editable,"missing numeric data is unavailable, not editable unbound");
-            var chords:Array = [{identity:"0:one",records:[{device:0,key:77,modifier:162}]},
-                {identity:"0:two",records:[{device:0,key:78,modifier:162}]}];
-            policy.classify(chords);
-            require(chords[0].shared && chords[1].shared && !chords[0].potential,"shared modifiers are distinct from exact assignment conflicts");
         }
         private function findInput(container:DisplayObjectContainer):TextField
         {

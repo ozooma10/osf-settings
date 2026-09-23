@@ -28,6 +28,14 @@ package
             row([103,104,105],["7","8","9"],19,2); addKey(107,"+",22,2,1,2);
             row([100,101,102],["4","5","6"],19,3); row([97,98,99],["1","2","3"],19,4); addKey(13,tr("keys.enter"),22,4,1,2);
             addKey(96,"0",19,5,2); addKey(110,".",21,5);
+            // The navigation cluster's empty row holds the legend.
+            legendItem(tr("bindings.game"),MenuStyle.MUTED,15.5,3); legendItem(tr("bindings.mod"),MenuStyle.ACCENT,17,3);
+        }
+        private function legendItem(text:String, color:uint, column:Number, row:Number):void
+        {
+            graphics.beginFill(color); graphics.drawRect(column * 75 + 6,row * 43 + 18,22,3); graphics.endFill();
+            var label:TextField = MenuStyle.field("",column * 75 + 32,row * 43 + 4,column == 17 ? 80 : 74,29,CONFIG::largeText ? 19 : 17,MenuStyle.MUTED,true);
+            addChild(label); MenuStyle.fit(label,text);
         }
         private function row(codes:Array, labels:Array, x:Number, y:Number):void
         {
@@ -59,26 +67,28 @@ package
             if (signature == previous) return;
             previous = signature;
             for each (var key:Object in keys) {
-                var owners:Object = {}, game:Boolean = false, mod:Boolean = false, shown:Boolean = false, active:Boolean = false, total:int = 0;
+                var owned:Boolean = false, mod:Boolean = false, shown:Boolean = false, active:Boolean = false;
                 for each (row in rows) {
                     for each (record in row.records) if (KeybindingsData.includes(record,key.code)) {
-                        owners[row.identity] = true;
-                        if (row.mod) mod = true; else game = true;
+                        owned = true;
+                        if (row.mod) mod = true;
                         if (selected && row.identity == selected.identity) active = true;
                         if (visibleRows.indexOf(row) >= 0) shown = true;
                     }
                 }
-                for (var id:String in owners) ++total;
+                var filtered:Boolean = filter == key.code;
                 var clip:Sprite = key.clip;
-                clip.alpha = total == 0 || shown ? 1 : .45;
-                clip.graphics.clear(); clip.graphics.lineStyle(active || filter == key.code ? 3 : 1, filter == key.code ? MenuStyle.ACCENT : active ? MenuStyle.WHITE : MenuStyle.LINE);
+                // Keys used by the visible results stay bright; free and filtered-out keys recede.
+                clip.alpha = shown || active || filtered ? 1 : .45;
+                clip.graphics.clear();
+                // The ring sits in the gap between keys so it still shows on a selected white key.
+                if (filtered) { clip.graphics.lineStyle(2,MenuStyle.WHITE); clip.graphics.drawRect(-3,-3,key.width + 6,key.height + 6); }
+                clip.graphics.lineStyle(1,active ? MenuStyle.WHITE : MenuStyle.LINE);
                 clip.graphics.beginFill(active ? MenuStyle.WHITE : MenuStyle.ROW); clip.graphics.drawRect(0,0,key.width,key.height); clip.graphics.endFill();
                 key.label.textColor = active ? MenuStyle.INK : MenuStyle.WHITE;
-                if (total) {
+                if (owned) {
                     clip.graphics.lineStyle(); clip.graphics.beginFill(mod ? MenuStyle.ACCENT : MenuStyle.MUTED);
-                    clip.graphics.drawRect(4,key.height - 5,game && mod ? (key.width - 8) / 2 : key.width - 8,3); clip.graphics.endFill();
-                    if (game && mod) { clip.graphics.beginFill(MenuStyle.MUTED); clip.graphics.drawRect(key.width / 2,key.height - 5,key.width / 2 - 4,3); clip.graphics.endFill(); }
-                    if (total > 1) MenuStyle.diamond(clip.graphics,key.width - 7,7,active ? MenuStyle.INK : MenuStyle.ACCENT);
+                    clip.graphics.drawRect(4,key.height - 5,key.width - 8,3); clip.graphics.endFill();
                 }
             }
         }

@@ -29,14 +29,15 @@ package
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
             var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action");
             var displayValue:String = modList ? String(row.count) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
-            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.potential, row.shared].join("|");
+            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.mod].join("|");
             if (signature == previous) return;
             previous = signature;
             source.visible = Boolean(row.keybindings);
             title.y = row.keybindings ? 3 : (MenuStyle.ROW_HEIGHT - MenuStyle.BODY_SIZE) / 2 - 3;
             if (row.keybindings) {
-                source.textColor = selected ? MenuStyle.INK : MenuStyle.MUTED;
-                MenuStyle.fit(source,row.source + (row.potential ? "  |  " + tr("bindings.conflict") : row.shared ? "  |  " + tr("bindings.shared") : ""));
+                // Orange matches the keyboard's mod-owned key marker.
+                source.textColor = selected ? MenuStyle.INK : row.mod ? MenuStyle.ACCENT : MenuStyle.MUTED;
+                MenuStyle.fit(source,row.source);
             }
             value.visible = !row.capturing && row.type != "hotkey";
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;

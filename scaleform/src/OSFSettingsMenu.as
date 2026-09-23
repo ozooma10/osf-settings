@@ -366,8 +366,9 @@ package
             homeMods.y = launcher.y + launcher.shelfHeight + 20;
             homeCount.y = homeMods.y + 3;
             options.disableSelection = bindingBusy();
-            options.y = bindingsPage() ? 634 : homeMods.visible ? homeMods.y + 50 : MenuStyle.LIST_TOP;
-            var listHeight:Number = bindingsPage() ? 250 : homeMods.visible ? 894 - options.y : MenuStyle.LIST_HEIGHT;
+            // Keybindings results run from under the column labels to the footer divider.
+            options.y = bindingsPage() ? 570 : homeMods.visible ? homeMods.y + 50 : MenuStyle.LIST_TOP;
+            var listHeight:Number = bindingsPage() ? 342 : homeMods.visible ? 894 - options.y : MenuStyle.LIST_HEIGHT;
             options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
             MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,MenuStyle.LIST_WIDTH,listHeight);
             section.visible = count.visible = !bindingsPage();
@@ -412,7 +413,7 @@ package
             MenuStyle.setText(count, launcher.visible ? launcher.countText : tr(issuesPage() ? "counts.issues" : modID ? "counts.items" : "counts.mods", {count:data.length}));
             MenuStyle.setText(homeCount, tr("counts.mods", {count:data.length}));
             if (!modID && (!bindingsPage() || !preserve)) {
-                MenuStyle.setText(status, bindingsPage() ? tr("menu.bindingContext") : issuesPage() ? tr("menu.issuesHint") : tr("menu.modsHint"));
+                MenuStyle.setText(status, bindingsPage() ? "" : issuesPage() ? tr("menu.issuesHint") : tr("menu.modsHint"));
                 status.textColor = MenuStyle.MUTED;
             } else if (!preserve) MenuStyle.setText(status, tr("menu.autoSave"));
             refreshing = false; describe(); decorate();

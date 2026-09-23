@@ -18,9 +18,14 @@ package
         public var search:TextField;
         private var keyboard:KeyboardMap;
         private var sourceLabel:TextField;
-        private var filterLabel:TextField;
-        private var detail:TextField;
-        private var legend:TextField;
+        private var placeholder:TextField;
+        private var keyChip:Sprite;
+        private var keyLabel:TextField;
+        private var clear:Sprite;
+        private var clearLabel:TextField;
+        private var notice:TextField;
+        private var textUnavailable:Boolean;
+        private var selection:Object;
         private var bridge:Object;
         private var editor:NativeHotkeysList;
         private var changed:Function;
@@ -37,26 +42,29 @@ package
         {
             bridge = code; editor = nativeEditor; changed = notify; leaveSearch = resultsFocus;
             keyboard = new KeyboardMap(selectKey); keyboard.x = MenuStyle.LEFT; keyboard.y = 270; addChild(keyboard);
-            search = field("",MenuStyle.LEFT + 12,536,560,38,CONFIG::largeText ? 28 : 25);
+            // Filters share the right column so the results list can start under the keyboard.
+            placeholder = field(tr("bindings.searchHint"),1222,545,610,38,CONFIG::largeText ? 28 : 25,MenuStyle.MUTED);
+            search = field("",1222,545,610,38,CONFIG::largeText ? 28 : 25);
             nameField(search,"bindingSearch"); search.type = "input"; search.selectable = true; search.mouseEnabled = true;
             search.maxChars = 128;
             search.addEventListener(Event.CHANGE,filtersChanged);
             search.addEventListener(FocusEvent.FOCUS_IN,focusChanged);
             search.addEventListener(FocusEvent.FOCUS_OUT,focusChanged);
-            sourceLabel = field("",740,536,570,38,CONFIG::largeText ? 27 : 24);
+            sourceLabel = field("",1222,605,610,38,CONFIG::largeText ? 27 : 24);
             nameField(sourceLabel,"bindingSource").addEventListener(MouseEvent.CLICK,nextSource); sourceLabel.mouseEnabled = true;
-            var clear:TextField = field(tr("bindings.clearFilters"),1480,536,364,38,CONFIG::largeText ? 27 : 24);
-            nameField(clear,"clearBindingFilters").addEventListener(MouseEvent.CLICK,clearFilters); clear.mouseEnabled = true;
-            filterLabel = field(tr("bindings.searchHint"),MenuStyle.LEFT,580,1000,31,20,MenuStyle.MUTED);
-            legend = field(tr("bindings.legend"),MenuStyle.LEFT,884,1728,28,20,MenuStyle.MUTED);
-            detail = field("",1210,635,634,241,CONFIG::largeText ? 27 : 24);
-            detail.multiline = true; detail.wordWrap = true; detail.mouseEnabled = true;
-            detail.addEventListener(MouseEvent.MOUSE_WHEEL,function(event:MouseEvent):void { detail.scrollV -= event.delta; event.stopPropagation(); });
-            field(tr("bindings.actionSource"),MenuStyle.LEFT,604,490,30,20,MenuStyle.MUTED);
-            field(tr("bindings.primary"),MenuStyle.LEFT + 566,604,210,30,20,MenuStyle.MUTED);
-            field(tr("bindings.alternate"),MenuStyle.LEFT + 804,604,210,30,20,MenuStyle.MUTED);
-            graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(MenuStyle.LEFT,532,594,42);
-            graphics.drawRect(728,532,680,42);
+            keyLabel = field("",1222,665,400,38,CONFIG::largeText ? 27 : 24);
+            keyChip = nameField(keyLabel,"bindingKeyFilter"); keyChip.addEventListener(MouseEvent.CLICK,clearKey);
+            keyLabel.mouseEnabled = true;
+            clearLabel = field(tr("bindings.clearFilters"),1480,665,364,38,CONFIG::largeText ? 27 : 24,MenuStyle.MUTED);
+            clearLabel.width = Math.min(364,clearLabel.textWidth + 8); clearLabel.x = MenuStyle.RIGHT - clearLabel.width;
+            clear = nameField(clearLabel,"clearBindingFilters"); clear.addEventListener(MouseEvent.CLICK,clearFilters);
+            clearLabel.mouseEnabled = true;
+            notice = field("",1210,728,634,150,CONFIG::largeText ? 24 : 21,MenuStyle.MUTED);
+            notice.multiline = true; notice.wordWrap = true;
+            field(tr("bindings.primary"),MenuStyle.LEFT + 566,538,210,30,20,MenuStyle.MUTED);
+            field(tr("bindings.alternate"),MenuStyle.LEFT + 804,538,210,30,20,MenuStyle.MUTED);
+            graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(1210,540,634,48);
+            graphics.drawRect(1210,600,634,48);
             visible = false;
         }
         private function field(text:String,x:Number,y:Number,w:Number,h:Number,size:Number,color:uint = 0xF1F2EC):TextField
@@ -71,7 +79,7 @@ package
         public function get searching():Boolean { return visible && stage && stage.focus == search; }
         public function open(metadata:Array):void
         {
-            definitions = metadata; visible = true; editor.open(); request();
+            definitions = metadata; visible = true; textUnavailable = false; editor.open(); request();
         }
         public function close():void
         {
@@ -119,23 +127,43 @@ package
         }
         public function showSelection(row:Object):void
         {
+            selection = row;
             keyboard.update(rows,filtered(),row,selectedKey);
             var title:String = tr("bindings.allSources");
             for each (var choice:Object in sources) if (choice.id == source) title = choice.title;
             MenuStyle.fit(sourceLabel,tr("bindings.source", {source:title}));
-            MenuStyle.setText(filterLabel,(search.text ? tr("bindings.search", {query:search.text}) : tr("bindings.searchHint")) +
-                (selectedKey >= 0 ? "   |   " + tr("bindings.keyFilter", {key:KeyboardMap.keyName(selectedKey,0)}) : ""));
-            var text:String = row ? row.title + "\n" + row.source + (row.binding.bRequired ? "  |  " + tr("bindings.required") : "") + (row.binding.bReadOnly ? "  |  " + tr("bindings.readOnly") : "") : tr("bindings.selectAction");
-            if (row) text += "\n" + (row.available ? (row.value || tr("values.unboundTitle")) + "  /  " + (row.alternate || tr("values.unboundTitle")) : tr("bindings.unavailable"));
-            if (row && row.potential) text += "\n" + tr("bindings.conflictHint");
-            else if (row && row.shared) text += "\n" + tr("bindings.sharedHint");
-            else if (row) text += "\n" + tr("bindings.rebindHint");
-            MenuStyle.setText(detail,text);
+            placeholder.visible = !search.text && !searching;
+            keyChip.visible = selectedKey >= 0;
+            if (keyChip.visible) {
+                keyLabel.width = 400; MenuStyle.fit(keyLabel,tr("bindings.keyFilter", {key:KeyboardMap.keyName(selectedKey,0)}));
+                keyLabel.width = Math.min(400,keyLabel.textWidth + 8);
+                keyChip.graphics.clear(); keyChip.graphics.lineStyle(2,MenuStyle.WHITE); keyChip.graphics.beginFill(MenuStyle.INK,0);
+                keyChip.graphics.drawRect(1210,660,keyLabel.width + 24,48); keyChip.graphics.endFill();
+            }
+            clear.visible = Boolean(search.text) || source != "all" || selectedKey >= 0;
+            notice.y = keyChip.visible || clear.visible ? 728 : 668;
+            showNotice();
+        }
+        private function showNotice():void
+        {
+            // Only flags the list row cannot show; everything else is already on the row.
+            var flags:Array = [];
+            if (selection && !selection.available) flags.push(tr("bindings.unavailable"));
+            if (selection && selection.binding.bRequired) flags.push(tr("bindings.required"));
+            if (selection && selection.binding.bReadOnly) flags.push(tr("bindings.readOnly"));
+            var text:String = flags.length ? selection.title + "  |  " + flags.join("  |  ") : "";
+            if (textUnavailable) text = tr("bindings.textUnavailable") + (text ? "\n" + text : "");
+            MenuStyle.setText(notice,text);
         }
         private function selectKey(key:int):void
         {
             if (frozen || editor.busy || editor.saving) return;
             selectedKey = selectedKey == key ? -1 : key; changed();
+        }
+        private function clearKey(event:MouseEvent):void
+        {
+            if (frozen || editor.busy || editor.saving) return;
+            selectedKey = -1; changed();
         }
         private function nextSource(event:MouseEvent):void
         {
@@ -152,9 +180,11 @@ package
         private function filtersChanged(event:Event):void { if (!frozen && !editor.busy && !editor.saving) changed(); }
         private function focusChanged(event:FocusEvent):void
         {
-            if (!bridge.textInput(searching) && searching) {
-                leaveSearch(); MenuStyle.setText(filterLabel,tr("bindings.textUnavailable"));
-            }
+            var active:Boolean = searching;
+            if (!bridge.textInput(active) && active) { textUnavailable = true; leaveSearch(); }
+            else if (active) textUnavailable = false;
+            placeholder.visible = !search.text && !searching;
+            showNotice();
         }
         public function searchKey(event:KeyboardEvent):Boolean
         {
