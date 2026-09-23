@@ -13,3 +13,7 @@ vs*/
 # files
 *.zip
 compile_commands.json
+
+# Python bytecode
+__pycache__/
+*.py[cod]

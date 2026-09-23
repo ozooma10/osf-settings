@@ -73,18 +73,6 @@ $manifestFiles = foreach ($relative in $files) {
     [ordered]@{ path = $relative; bytes = $file.Length; sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
 }
 
-$dllText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes((Join-Path $stage 'SFSE/Plugins/OSFSettings.dll')))
-foreach ($export in @('OSFSettings_TestSnapshot', 'OSFSettings_TestCommand')) {
-    if ($dllText.Contains($export)) { throw "Test export present in production DLL: $export" }
-}
-foreach ($relative in @('Interface/OSFSettingsMenu.swf', 'Interface/OSFSettingsMenu_LRG.swf')) {
-    $movie = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes((Join-Path $stage $relative)))
-    if (-not $movie.StartsWith('FWS')) { throw "Expected an uncompressed production movie: $relative" }
-    foreach ($marker in @('reportTestState', 'previewConstruct')) {
-        if ($movie.Contains($marker)) { throw "Development movie marker $marker in $relative" }
-    }
-}
-
 $archive = Join-Path $run "$name.zip"
 $partial = "$archive.partial"
 $zip = [IO.Compression.ZipFile]::Open($partial, [IO.Compression.ZipArchiveMode]::Create)
@@ -100,20 +88,6 @@ try {
     }
 } finally { $zip.Dispose() }
 
-# Reopen the archive and check every entry against the staged payload.
-$zip = [IO.Compression.ZipFile]::OpenRead($partial)
-try {
-    if ($zip.Entries.Count -ne $files.Count) { throw 'Archive entry count mismatch.' }
-    for ($i = 0; $i -lt $files.Count; ++$i) {
-        $entry = $zip.Entries[$i]
-        if ($entry.FullName -cne $files[$i] -or $entry.Length -ne $manifestFiles[$i].bytes) { throw 'Archive entry mismatch.' }
-        $stream = $entry.Open()
-        $sha = [Security.Cryptography.SHA256]::Create()
-        try { $hash = [Convert]::ToHexString($sha.ComputeHash($stream)) }
-        finally { $sha.Dispose(); $stream.Dispose() }
-        if ($hash -cne $manifestFiles[$i].sha256) { throw "Archive hash mismatch: $($entry.FullName)" }
-    }
-} finally { $zip.Dispose() }
 Move-Item -LiteralPath $partial -Destination $archive
 $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 "$archiveHash  $name.zip" | Set-Content -LiteralPath "$archive.sha256" -Encoding utf8NoBOM
@@ -133,6 +107,8 @@ $manifestPath = Join-Path $run "$name.manifest.json"
     sha256 = $archiveHash
     files = @($manifestFiles)
 } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
+# The shared validator checks the ZIP against the staged hashes, required payloads
+# and production markers. Keep these checks in one place for builds and retests.
 $null = Test-ReleaseArchive $manifestPath
 if ($ResultPath) { [IO.File]::WriteAllText([IO.Path]::GetFullPath($ResultPath), $manifestPath, [Text.UTF8Encoding]::new($false)) }
 Write-Host "Verified archive: $archive"

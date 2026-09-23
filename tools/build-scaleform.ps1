@@ -16,7 +16,7 @@ $compiler = Join-Path $flex 'bin\mxmlc.bat'
 $java = Join-Path $jdk 'bin\java.exe'
 $player = Join-Path $flex 'frameworks\libs\player\10.3\playerglobal.swc'
 if (-not (Test-Path $compiler) -or -not (Test-Path $java) -or -not (Test-Path $player)) {
-    throw 'Scaleform toolchain missing. Run pwsh tools/setup-scaleform.ps1.'
+    throw 'Scaleform toolchain missing. Run pwsh tools/setup.ps1.'
 }
 function New-SwfData([scriptblock]$Content) {
     $dataStream = [IO.MemoryStream]::new()
@@ -153,6 +153,7 @@ New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 $env:JAVA_HOME = $jdk
 $sources = @($PSCommandPath, "$PSScriptRoot/BuildCache.ps1", "$repo/build/generated/English.as")
 $sources += Get-ChildItem -LiteralPath "$repo/scaleform/src" -Recurse -File | Select-Object -ExpandProperty FullName
+if ($TestHarness) { $sources += "$repo/tests/harness/MenuObservations.as" }
 $toolchain = @($compiler, $java, $player)
 $toolchain += Get-ChildItem -LiteralPath "$flex/lib" -Filter '*.jar' -File | Select-Object -ExpandProperty FullName
 foreach ($large in @($false, $true)) {

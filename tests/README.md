@@ -37,8 +37,10 @@ Sources included directly in fixtures, the lifecycle harness definition, and the
 callback suite's SFSE stub retain their separate compilation contexts.
 
 The `osfsettings.localization` rule runs `tools/generate-localization.py` before
-building the plugin and the test core library. It validates referenced keys and
-writes `build/generated/English.{h,as}`, rewriting only outputs whose content changed.
+building the test core library. Plugin builds generate the same files through
+`tools/build-scaleform.ps1`, so they need no second generator invocation. The generator
+validates referenced keys and writes `build/generated/English.{h,as}`, rewriting
+only outputs whose content changed.
 
 The historical `osfsettings-tests` aggregate used the removed `HotkeyService` API.
 Its still-supported SDK, service and key checks now have standalone targets.
@@ -54,6 +56,9 @@ CommonLib's current task contract; they do not establish in-game threading safet
 Preview fixtures explicitly mark required keys with `allowUnbound: false`.
 
 ## Menu previews
+
+Install the optional preview dependency once with
+`pwsh -NoProfile -File tools/setup.ps1 -Preview`.
 
 ```powershell
 pwsh -NoProfile -File tools/test-menu-preview.ps1
@@ -85,19 +90,19 @@ Preview, large-text and harness flags participate in movie fingerprints.
 
 ## Game acceptance
 
-The [final validation runner](../docs/FINAL_VALIDATION.md) combines native and
-preview checks, production archive verification, disposable reinstall checks,
-and the source-matched runtime suite. `tools/test-release.ps1 -RunGame` explicitly
-enables game launches; omitting that switch runs only the offline stages.
-`pwsh -NoProfile -File tests/release_validation_tests.ps1` checks the runner's
-failure handling with fake game results and malformed archives, without launching.
+The [offline release runner](../tools/test-release.ps1) combines native and preview
+checks, production archive verification, disposable reinstall checks, and a
+source identity check. Run `pwsh -NoProfile -File tools/test-release.ps1` for the
+full offline pass, or add `-Plan` to list its stages. Reports and screenshots go
+under `build/release-validation`; exit code 0 means the offline checks passed.
+`pwsh -NoProfile -File tests/release_validation_tests.ps1` independently checks
+malformed-archive rejection and player-state preservation with synthetic fixtures.
+Neither command needs the sibling harness checkout or launches the game.
 
 Native assertions and Ruffle previews do not replace input, controller, lifecycle
 or menu-handoff acceptance in Starfield. When requested, use the sibling
 `OSF Test Harness/Test-SettingsRelease.ps1 -Cases ...` runner. It already builds
 once and reuses that build across selected cases. `-SkipBuild` requires current
-harness artifacts; retain fresh sessions for lifecycle scenarios. Game waits were
-not shortened as part of the native/preview optimizations.
-
-See [performance measurements](../docs/TEST_PERFORMANCE.md) for the baseline and
-verified results.
+harness artifacts; retain fresh sessions for lifecycle scenarios. Game orchestration
+and its results are owned by that project. This repo's obsolete `-RunGame` wrapper
+and mock tests for the old harness interface have been removed.

@@ -1,11 +1,11 @@
-# Shared by packaging and the final-release runner. No deployment or game actions.
+# Shared by packaging and the offline release runner. No deployment or game actions.
 Set-StrictMode -Version Latest
 
 function Get-ReleaseSourceIdentity([string]$Repository) {
     $repository = [IO.Path]::GetFullPath($Repository)
     $lines = [Collections.Generic.List[string]]::new()
     # Include working files, not just HEAD: a dirty candidate is allowed but must
-    # remain byte-for-byte unchanged throughout packaging and runtime validation.
+    # remain byte-for-byte unchanged throughout packaging and release validation.
     foreach ($relative in @('', 'lib/commonlibsf', 'lib/commonlibsf/lib/commonlib-shared')) {
         $directory = Join-Path $repository $relative
         $revision = & git -C $directory rev-parse HEAD

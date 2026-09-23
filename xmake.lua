@@ -33,7 +33,6 @@ includes("tests", "examples")
 -- define targets
 target("OSF Settings")
     set_basename("OSFSettings")
-    add_rules("osfsettings.localization")
     add_rules("commonlibsf.plugin", {
         name = "OSF Settings",
         author = "ozooma10",
@@ -56,6 +55,7 @@ target("OSF Settings")
         add_installfiles("data/SFSE/Plugins/OSF/Settings/schemas/learning.json", { prefixdir = "SFSE/Plugins/OSF/Settings/schemas" })
     end
     before_build(function(target)
+        -- build-scaleform generates the shared English fallbacks before C++ compilation.
         local papyrusArgs = { "-NoProfile", "-File", path.join(os.projectdir(), "tools", "build-papyrus.ps1") }
         if has_config("test_harness") then table.insert(papyrusArgs, "-TestHarness") end
         os.execv("pwsh", papyrusArgs)

@@ -27,8 +27,8 @@ if ($Scrolling) { $schemas += Join-Path $repo 'tests/menu/scrolling.json' }
 if ($Watch -and $BuildOnly) { throw 'Use either -Watch or -BuildOnly.' }
 if (-not (Test-Path -LiteralPath $InterfaceArchive)) { throw "Interface archive missing: $InterfaceArchive. Supply -InterfaceArchive with your installation's path." }
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) { throw 'Python 3.9+ is required to read the local game archive.' }
-if (-not (Test-Path -LiteralPath $compiler)) { throw 'Run pwsh tools/setup-scaleform.ps1 first.' }
-if (-not $BuildOnly -and -not (Test-Path -LiteralPath $ruffle)) { & "$PSScriptRoot/setup-ruffle.ps1" }
+if (-not (Test-Path -LiteralPath $compiler)) { throw 'Run pwsh tools/setup.ps1 -Preview first.' }
+if (-not $BuildOnly -and -not (Test-Path -LiteralPath $ruffle)) { & "$PSScriptRoot/setup.ps1" -Preview }
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 
 function Build-Preview {
