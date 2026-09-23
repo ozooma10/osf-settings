@@ -490,6 +490,9 @@ package
             defaultValue.width = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 410 : 170;
             MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
+            buttonData.YButton.sButtonText = reporting ? tr("buttons.scrollUp") : tr("buttons.reset");
+            buttonData.XButton.sButtonText = reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding");
+            resetButton.SetButtonData(buttonData.YButton); clearButton.SetButtonData(buttonData.XButton);
             resetButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row && row.editable && row.type != "hotkey" && row.type != "action");
             clearButton.Visible = Boolean(!captureRow && !bindingBusy() && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
@@ -498,9 +501,6 @@ package
             acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
             acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action"))));
             backButton.Visible = !bindingBusy();
-            buttonData.YButton.sButtonText = reporting ? tr("buttons.scrollUp") : tr("buttons.reset");
-            buttonData.XButton.sButtonText = reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding");
-            resetButton.SetButtonData(buttonData.YButton); clearButton.SetButtonData(buttonData.XButton);
             if (reporting) {
                 acceptButton.Visible = false;
                 resetButton.Visible = clearButton.Visible = issueDetails.scrollable;
