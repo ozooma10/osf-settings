@@ -105,8 +105,7 @@ if (settings.Init() && settings.IsReady()) {
 ```
 
 `Init()` returns false if a compatible OSF Settings API is unavailable.
-Initialize before sharing the client across threads. This example reads once;
-subscribe as described below if your mod needs live changes.
+Initialize before sharing the client across threads. This example reads once; subscribe as described below if your mod needs live changes.
 
 | Read / write | C++ value |
 | --- | --- |
@@ -117,9 +116,7 @@ subscribe as described below if your mod needs live changes.
 | `GetString` / `SetString` | Free-form UTF-8 string |
 | `GetKey` / `SetKey` | `std::uint32_t` keyboard VK code; `kUnboundKey` is 255 |
 
-Scalar getters take an output pointer. Enum/string getters also accept an owning
-`std::string&`; setters accept strings directly. Getter/setter types must match
-exactly. Failed reads preserve the output.
+Scalar getters take an output pointer. Enum/string getters also accept an owning `std::string&`; setters accept strings directly. Getter/setter types must match exactly.
 
 ```cpp
 auto status = settings.SetBool("mymod", "enabled", false);
@@ -127,11 +124,8 @@ status = settings.Reset("mymod", "enabled");
 status = settings.ResetMod("mymod");
 ```
 
-Check each returned `Status`. `Ok` means success, including an unchanged value;
-writes and resets are already saved. Failed writes preserve the previous value.
-Common errors are `NotReady`, `UnknownMod`, `UnknownSetting`, `TypeMismatch`,
-`InvalidValue`, and `SaveFailed`. All statuses and raw buffer signatures are in
-[the header](../sdk/OSFSettings.h).
+Check each returned `Status`. `Ok` means success, including an unchanged value; writes and resets are already saved. Failed writes preserve the previous value.
+Common errors are `NotReady`, `UnknownMod`, `UnknownSetting`, `TypeMismatch`, `InvalidValue`, and `SaveFailed`. All statuses and raw buffer signatures are in [the header](../sdk/OSFSettings.h).
 
 ### Watch for changes
 
@@ -145,66 +139,40 @@ auto status = settings.Subscribe("mymod", OnChanged, nullptr, &token);
 // On success, read your initial values. Keep token for Unsubscribe(token).
 ```
 
-- Implement `OnChanged` to reread current values. `key == nullptr` means refresh
-  the whole mod, including the initial notification. Changes may coalesce.
-- Callbacks run serially on an SFSE task, without a main-thread guarantee.
-  Schedule engine/UI work in its required context; exceptions must not escape.
-- Callback strings last only for the call. Keep the client and context alive
-  until a successful `Unsubscribe(token)` returns. If unsubscribing inside the
-  callback, keep the context alive until that callback returns.
+- Implement `OnChanged` to reread current values. `key == nullptr` means refresh the whole mod (usually settings reset)
+- Callbacks run serially on an SFSE task, without a main-thread guarantee. Schedule engine/UI work in its required context;
 
-The [registry example](../examples/registry/README.md) demonstrates complete
-subscription, refresh, and cleanup ownership.
+The [registry example](../examples/registry/README.md) demonstrates complete subscription, refresh, and cleanup ownership.
 
 ## Papyrus integration
 
 Compile against [OSFSettings.psc](../data/Scripts/Source/OSFSettings.psc), supplied
-in `Scripts/Source`. OSF Settings supplies the compiled provider PEX; no framework
-ESM is needed. Attach this script to a player reference alias in your own running
-quest:
+in `Scripts/Source`. Use a Global script for the settings handler:
 
 ```papyrus
-ScriptName MyModSettings extends ReferenceAlias
+ScriptName MyModSettings Hidden
 
-Event OnInit()
-    InitializeSettings()
-EndEvent
-
-Event OnPlayerLoadGame()
-    InitializeSettings()
-EndEvent
-
-Function InitializeSettings()
+Function InitializeSettings() Global
     If OSFSettings.IsReady()
-        If OSFSettings.RegisterForChanges(Self, "mymod")
+        If OSFSettings.RegisterForChangesStatic("MyModSettings", "mymod")
             ReadSettings()
         EndIf
     EndIf
 EndFunction
 
-Function ReadSettings()
+Function ReadSettings() Global
     Bool enabled = OSFSettings.GetBool("mymod", "enabled", true)
     ; Apply enabled to your mod here.
 EndFunction
 
-Function OnOSFSettingChanged(String modId, String key)
+Function OnOSFSettingChanged(String modId, String key) Global
     ReadSettings()
 EndFunction
 ```
 
-Subscribe before reading. Implement `OnOSFSettingChanged` as a function with
-exactly two String parameters. An empty callback key requests a full refresh,
-including the initial notification. Notifications may coalesce; reread current
-values rather than counting changes.
+Call `MyModSettings.InitializeSettings()` from your mod's existing initialization and post-load path. An owning quest or alias must call it after each load. Registrations are cleared on load. Repeating a registration succeeds without adding duplicates.
 
-Registrations are cleared on load or return to the main menu. Register from
-`OnInit` and again from a player alias's `OnPlayerLoadGame`, as above. Repeating a
-registration succeeds without adding duplicates. Keep the receiving script alive.
-Other bound quest/reference scripts can also receive callbacks.
-
-Global scripts use `RegisterForChangesStatic("MyScript", "mymod")` with the same
-callback marked `Global`. An owning quest/alias must register them after each
-load. Papyrus schedules callbacks; delivery is not synchronous.
+Subscribe before reading. Implement `OnOSFSettingChanged` as a Global function with exactly two String parameters. Bound quest/reference scripts can use `RegisterForChanges` instead.
 
 ### Read, write, and reset
 
@@ -213,35 +181,17 @@ Bool enabled = OSFSettings.GetBool("mymod", "enabled", true)
 Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 ```
 
-- Reads: `GetBool`, `GetInt`, `GetFloat`, `GetEnum`, `GetString`. Each takes
-  `(modId, key, fallback)` and returns the fallback on failure.
-- Writes: matching `Set*` functions take `(modId, key, value)`.
-  `Reset(modId, key)` and `ResetMod(modId)` restore defaults.
-- Writes/resets return `true` when saved; failure leaves the old value unchanged.
-  Check the result; failures are logged in `OSFSettings.log`.
-- IDs, keys, and enum options use the schema's exact spelling. Enums and strings
-  are distinct types. There are no Papyrus `GetKey` / `SetKey` functions.
-- Papyrus integers are 32-bit and floats are single precision. Reads that overflow
-  return the fallback; float precision may be reduced.
+- Reads: `GetBool`, `GetInt`, `GetFloat`, `GetEnum`, `GetString`. Each takes `(modId, key, fallback)` and returns the fallback on failure.
+- Writes: matching `Set*` functions take `(modId, key, value)`. `Reset(modId, key)` and `ResetMod(modId)` restore defaults.
+- Writes/resets return `true` when saved; failure leaves the old value unchanged. Check the result; failures are logged in `OSFSettings.log`.
+- IDs, keys, and enum options use the schema's exact spelling. Enums and strings are distinct types. There are no Papyrus `GetKey` / `SetKey` functions.
+- Papyrus integers are 32-bit and floats are single precision. Reads that overflow return the fallback; float precision may be reduced.
 
-See the [instance and Global example](../examples/papyrus/README.md) for all value
-types, hotkeys, and action callbacks. Include your compiled consumer PEX and
-quest in your mod; depend on OSF Settings rather than bundling another provider
-DLL/PEX.
+See the [instance and Global example](../examples/papyrus/README.md) for all value types, hotkeys, and action callbacks.
 
 ## Related features
 
-- [Hotkeys](Keybindings.md): declare rebindable actions and handle them in C++ or
-  Papyrus, or open a registered native menu.
-- [Action buttons](ACTIONS.md): add a top-level `actions` array for buttons with
-  optional confirmation and asynchronous completion. Use `RegisterAction` and
-  `CompleteAction` in C++ or Papyrus. Actions have no stored value/default.
-- [Menu launchers](LAUNCHERS.md): add a top-level `menus` array for native menus
-  in the Launcher tab, or use the separate C++ launcher service for custom
-  interfaces. Each schema entry has `id`, `title`, and a registered `menu` name;
-  `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not
-  create stored values and use the same schema version.
-- [Settings registry](REGISTRY.md): discover mods, metadata, and current values
-  from C++ to build a browser or cache.
-- [Issue reporting](DIAGNOSTICS.md): report persistent problems in Mod Issues
-  from C++.
+- [Hotkeys](Keybindings.md): declare rebindable actions and handle them in C++ or Papyrus, or open a registered native menu.
+- [Action buttons](ACTIONS.md): add a top-level `actions` array for buttons with optional confirmation and asynchronous completion. Use `RegisterAction` and `CompleteAction` in C++ or Papyrus. Actions have no stored value/default.
+- [Menu launchers](LAUNCHERS.md): add a top-level `menus` array for native menus in the Launcher tab, or use the separate C++ launcher service for custom interfaces. Each schema entry has `id`, `title`, and a registered `menu` name; `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not create stored values and use the same schema version.
+- [Issue reporting](DIAGNOSTICS.md): report persistent problems in Mod Issues from C++.
