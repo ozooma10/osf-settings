@@ -90,19 +90,27 @@ Preview, large-text and harness flags participate in movie fingerprints.
 
 ## Game acceptance
 
-The [offline release runner](../tools/test-release.ps1) combines native and preview
+The [release runner](../tools/test-release.ps1) combines native and preview
 checks, production archive verification, disposable reinstall checks, and a
 source identity check. Run `pwsh -NoProfile -File tools/test-release.ps1` for the
-full offline pass, or add `-Plan` to list its stages. Reports and screenshots go
-under `build/release-validation`; exit code 0 means the offline checks passed.
-`pwsh -NoProfile -File tests/release_validation_tests.ps1` independently checks
-malformed-archive rejection and player-state preservation with synthetic fixtures.
-Neither command needs the sibling harness checkout or launches the game.
+offline pass. Reports and screenshots go under `build/release-validation`; exit
+code 0 means every requested stage passed, and the report's `scope` says whether
+the in-game suite was part of it. `-Plan` lists the stages and the in-game cases;
+that case list is read from the sibling harness's `Test-SettingsRelease.ps1 -Plan`,
+so this repo never carries its own copy.
 
 Native assertions and Ruffle previews do not replace input, controller, lifecycle
-or menu-handoff acceptance in Starfield. When requested, use the sibling
-`OSF Test Harness/Test-SettingsRelease.ps1 -Cases ...` runner. It already builds
-once and reuses that build across selected cases. `-SkipBuild` requires current
-harness artifacts; retain fresh sessions for lifecycle scenarios. Game orchestration
-and its results are owned by that project. This repo's obsolete `-RunGame` wrapper
-and mock tests for the old harness interface have been removed.
+or menu-handoff acceptance in Starfield. Add `-RunGame` to run the harness suite
+as the `runtime` stage (`-Harness` points at a checkout other than the sibling
+`OSF Test Harness`). The suite receives `-ResultPath` and writes its JSON summary
+there; the stage passes only when that receipt reports `completeSuite`,
+`automatedPassed`, and a `sourceIdentity` equal to the packaged candidate's.
+Focused rechecks use the harness directly, `Test-SettingsRelease.ps1 -Cases ...`;
+a filtered summary is never a complete suite. Game orchestration and its results
+are owned by that project.
+
+`pwsh -NoProfile -File tests/release_validation_tests.ps1` checks malformed-archive
+rejection and player-state preservation with synthetic fixtures. When the sibling
+harness checkout is present it also runs the real `Test-SettingsRelease.ps1` in
+a disposable tree with a fake game runner to verify the receipt contract above
+and that `-Plan` advertises exactly the harness cases. No game is launched.

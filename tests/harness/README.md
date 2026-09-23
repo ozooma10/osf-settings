@@ -135,5 +135,6 @@ It contains no vanilla overrides and is enabled only in the private acceptance
 profile. Do not ship the acceptance ESM or scripts in a release archive.
 
 Run the sibling harness's `Test-SettingsRelease.ps1` for the complete automated
-suite. See [release acceptance](../../docs/RELEASE_ACCEPTANCE.md) for recorded
-results, the tested profile, and remaining hardware/engine boundaries.
+suite, or `tools/test-release.ps1 -RunGame` to run it as the release runner's
+`runtime` stage. See [game acceptance](../README.md#game-acceptance) for the
+receipt contract and the remaining manual gates.

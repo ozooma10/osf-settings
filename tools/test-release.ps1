@@ -1,7 +1,9 @@
 #requires -Version 7.2
 [CmdletBinding()]
 param(
+    [switch]$RunGame,
     [switch]$Plan,
+    [string]$Harness = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'OSF Test Harness'),
     [string]$Manifest = '',
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]*$')][string]$Label = 'final-smoke',
     [string]$OutputDirectory = ''
@@ -10,19 +12,33 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'packaging/ReleaseValidation.ps1')
-$stages = @('native', 'preview-normal', 'preview-large', 'package', 'package-integrity', 'reinstall-preservation', 'source-unchanged')
-$unverified = @('In-game acceptance via OSF Test Harness/Test-SettingsRelease.ps1',
-    'Physical controller input', 'Visual review of retained screenshots',
+$stages = @('native', 'preview-normal', 'preview-large', 'package', 'package-integrity', 'reinstall-preservation', 'runtime', 'source-unchanged')
+$suite = Join-Path $Harness 'Test-SettingsRelease.ps1'
+$suiteFound = Test-Path -LiteralPath $suite -PathType Leaf
+$scope = if ($RunGame) { 'offline+runtime' } else { 'offline' }
+$unverified = @('Physical controller input', 'Visual review of retained screenshots',
     'Unmodified production ZIP: clean mod-manager installation, real consumer, restart and upgrade in-game',
     'External OSF UI provider handoff')
+if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame)") + $unverified }
 if ($Plan) {
+    # The harness owns the case list; ask it rather than advertising a copy here.
+    [string[]]$runtimeCases = @(if ($suiteFound) {
+        $harnessPlan = & pwsh -NoProfile -File $suite -Plan | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { throw "$suite -Plan returned $LASTEXITCODE" }
+        $harnessPlan.cases
+    })
     [ordered]@{
         stages = $stages
-        scope = 'offline'
+        scope = $scope
+        runGame = [bool]$RunGame
+        runtimeRunner = $suite
+        runtimeRunnerFound = $suiteFound
+        runtimeCases = $runtimeCases
         unverified = $unverified
     } | ConvertTo-Json -Depth 4
     exit 0
 }
+if ($RunGame -and -not $suiteFound) { throw "Harness suite not found: $suite (pass -Harness)." }
 $directory = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else {
     Join-Path $repo ('build/release-validation/' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0,8))
 }
@@ -30,8 +46,9 @@ if (Test-Path -LiteralPath $directory) { throw 'Use a new output directory; prev
 [IO.Directory]::CreateDirectory($directory) | Out-Null
 $report = [ordered]@{
     startedUtc = [DateTime]::UtcNow.ToString('o'); finishedUtc = $null; outcome = 'running'
-    scope = 'offline'; source = $null; package = $null; automatedPassed = $false
+    scope = $scope; source = $null; package = $null; automatedPassed = $false; completeAutomatedSuite = $false
     stages = @($stages | ForEach-Object { [ordered]@{ name=$_; status='not-run'; message=''; log=$null } })
+    runtime = $null
     unverified = $unverified
 }
 $exitCode = 2
@@ -40,13 +57,15 @@ $active = $null
 function Save-ReleaseReport {
     $path = Join-Path $directory 'result.json'
     [IO.File]::WriteAllText($path, ($report | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
-    $lines = @('# OSF Settings offline release validation', '', "Outcome: **$($report.outcome)**", '',
-        "Offline checks passed: $($report.automatedPassed)", '', '| Stage | Result | Evidence |', '| --- | --- | --- |')
+    $lines = @('# OSF Settings release validation', '', "Outcome: **$($report.outcome)**", '',
+        "Scope: $($report.scope)", "Automated checks passed: $($report.automatedPassed)",
+        "Complete automated suite (offline and in-game): $($report.completeAutomatedSuite)", '', '| Stage | Result | Evidence |', '| --- | --- | --- |')
     foreach ($stage in $report.stages) { $lines += "| $($stage.name) | $($stage.status) | $($stage.message.Replace('|','/')) |" }
     if ($report.package) { $lines += @('', "Archive: $($report.package.archive)", "SHA-256: $($report.package.sha256)") }
+    if ($report.runtime) { $lines += @('', "Game suite receipt: $($report.runtime)") }
     $lines += @('', '## Still requires acceptance', '')
     foreach ($gate in $report.unverified) { $lines += "- $gate" }
-    $lines += @('', 'Package integrity and disposable reinstall checks do not establish production gameplay. Run in-game checks separately from the OSF Test Harness project.')
+    $lines += @('', 'Package integrity and disposable reinstall checks do not establish production gameplay. The game suite uses instrumented builds of the same recorded source, not the production ZIP.')
     [IO.File]::WriteAllLines((Join-Path $directory 'report.md'), $lines, [Text.UTF8Encoding]::new($false))
 }
 
@@ -106,16 +125,34 @@ try {
     $sentinels = Test-ReleaseReinstall $report.package.archive (Join-Path $directory 'disposable-install')
     $sentinels | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'preserved-state.json')
     Complete-ReleaseStage 'Settings values, launcher history and unrelated Controls sentinel preserved on disk'
+    Start-ReleaseStage 'runtime'
+    if ($RunGame) {
+        # Contract with the harness suite: it writes its JSON summary to -ResultPath
+        # with completeSuite, automatedPassed and the sourceIdentity it built from.
+        $receipt = Join-Path $directory 'runtime-result.json'
+        $report.runtime = $receipt
+        Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-ResultPath',$receipt)
+        $runtime = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json -AsHashtable
+        if (-not $runtime.completeSuite) { throw "Runtime suite ran only: $($runtime.selectedCases -join ', ')" }
+        if (-not $runtime.automatedPassed) { $script:exitCode = 1; throw 'Runtime suite did not pass.' }
+        if (-not $runtime.sourceIdentity -or $runtime.sourceIdentity.sha256 -cne $report.source.sha256) { throw 'Runtime suite tested different source than this candidate.' }
+        Complete-ReleaseStage "$($runtime.runs.Count) fresh-session cases passed: $($runtime.cases -join ', ')"
+    } else {
+        $script:active.status = 'not-run'; $script:active.message = 'Use -RunGame to run the harness suite'
+        Save-ReleaseReport
+    }
     Start-ReleaseStage 'source-unchanged'
     if ((Get-ReleaseSourceIdentity $repo).sha256 -cne $report.source.sha256) { throw 'Source changed during validation; rerun against one fixed candidate.' }
     $null = Test-ReleaseArchive $Manifest
     Complete-ReleaseStage 'Source and candidate archive unchanged throughout validation'
     $report.automatedPassed = $true
-    $report.outcome = 'offline-passed'
+    $report.completeAutomatedSuite = [bool]$RunGame
+    $report.outcome = if ($RunGame) { 'automated-passed-manual-gates-open' } else { 'offline-passed' }
     $exitCode = 0
 } catch {
     if ($script:active) { $script:active.status = if ($exitCode -eq 1) { 'failed' } else { 'blocked' }; $script:active.message = $_.Exception.Message }
     $report.outcome = if ($exitCode -eq 1) { 'failed' } else { 'blocked' }
+    if ($report.runtime -and -not (Test-Path -LiteralPath $report.runtime)) { $report.runtime = $null }
     Write-Warning $_.Exception.Message
 } finally {
     $report.finishedUtc = [DateTime]::UtcNow.ToString('o')
