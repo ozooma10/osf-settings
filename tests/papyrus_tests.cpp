@@ -1,5 +1,7 @@
 #include "Papyrus/Subscriptions.h"
 #include "Papyrus/Values.h"
+#include "Papyrus/Issues.h"
+#include "Diagnostics/DiagnosticsService.h"
 #include "HotkeyTasks.h"
 
 #include <chrono>
@@ -231,6 +233,35 @@ int main()
         mixedInput.ProcessButton(0x75, "papyrusexample/toggle", 1, 0);
         mixed.Clear(); mixed.Resume(); HotkeyTasks::Run();
         check(events == std::vector<std::string>{"globalexample:hotkey:toggle"} && nativeCalls == 2, "session cleanup preserves already submitted Papyrus and native calls");
+
+        DiagnosticsService issueService;
+        API::DiagnosticsApi issueAdapter(issueService);
+        Issues issues(issueAdapter);
+        check(issues.ReportIssue("scriptmod", "missing-pack", "Missing animations", false, "Uses defaults", "Install the pack"),
+            "Papyrus can report a warning without a settings schema");
+        auto reported = issueService.Snapshot();
+        check(reported.size() == 1 && reported[0].severity == IssueSeverity::Warning &&
+            reported[0].impact == "Uses defaults" && reported[0].nextSteps == "Install the pack",
+            "Papyrus details reach the shared diagnostics service");
+        check(issues.ReportIssue("scriptmod", "missing-pack", "Animation failed", true, "", ""),
+            "Papyrus can replace a warning with an error");
+        reported = issueService.Snapshot();
+        check(reported.size() == 1 && reported[0].severity == IssueSeverity::Error &&
+            reported[0].title == "Animation failed" && reported[0].impact.empty() && reported[0].nextSteps.empty(),
+            "replacement clears omitted details and does not duplicate the issue");
+        check(!issues.ReportIssue("Bad/Mod", "missing-pack", "Invalid", false, "", "") &&
+            !issues.ReportIssue("scriptmod", "missing-pack", " ", false, "", "") &&
+            issueService.Snapshot().size() == 1, "invalid Papyrus reports leave current issues unchanged");
+        check(!issues.ClearIssue("scriptmod", " ") && !issues.ClearModIssues("Bad/Mod") &&
+            issueService.Snapshot().size() == 1, "invalid Papyrus clear requests fail without changing reports");
+        check(issues.ClearIssue("scriptmod", "missing-pack") && issues.ClearIssue("scriptmod", "missing-pack"),
+            "Papyrus clear is idempotent");
+        check(issues.ReportIssue("scriptmod", "one", "One", false, "", "") &&
+            issues.ReportIssue("scriptmod", "two", "Two", true, "", "") &&
+            issues.ReportIssue("othermod", "one", "Other", false, "", ""), "Papyrus reports retain per-mod identities");
+        check(issues.ClearModIssues("scriptmod") && issues.ClearModIssues("scriptmod") &&
+            issueService.Snapshot().size() == 1 && issueService.Snapshot()[0].modId == "othermod",
+            "Papyrus clear-mod removes only its own reports and tolerates repetition");
 
         SettingsService reload;
         reload.Load(schemas, values); reload.Start();

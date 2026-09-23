@@ -194,4 +194,4 @@ See the [instance and Global example](../examples/papyrus/README.md) for all val
 - [Hotkeys](Keybindings.md): declare rebindable actions and handle them in C++ or Papyrus, or open a registered native menu.
 - [Action buttons](ACTIONS.md): add a top-level `actions` array for buttons with optional confirmation and asynchronous completion. Use `RegisterAction` and `CompleteAction` in C++ or Papyrus. Actions have no stored value/default.
 - [Menu launchers](LAUNCHERS.md): add a top-level `menus` array for native menus in the Launcher tab, or use the separate C++ launcher service for custom interfaces. Each schema entry has `id`, `title`, and a registered `menu` name; `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not create stored values and use the same schema version.
-- [Issue reporting](DIAGNOSTICS.md): report persistent problems in Mod Issues from C++.
+- [Issue reporting](DIAGNOSTICS.md): report and clear problems in Mod Issues from C++ or Papyrus.

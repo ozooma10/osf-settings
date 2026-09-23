@@ -41,3 +41,10 @@ Bool Function RegisterAction(ScriptObject receiver, String modId, String actionI
 Bool Function RegisterActionStatic(String targetScript, String modId, String actionId) Global Native
 ; Call once when finished, including immediate completion. Keep invocation as an opaque string. Stale/duplicate completion returns false.
 Bool Function CompleteAction(String invocation, Bool succeeded, String message = "") Global Native
+
+; Report current problems in Mod Issues. The same (modId, issueId) replaces the full report. Omitted details clear prior details.
+; isError=false reports a warning; true reports an error. True means the report was accepted.
+Bool Function ReportIssue(String modId, String issueId, String title, Bool isError = false, String impact = "", String nextSteps = "") Global Native
+; Clearing an already absent issue succeeds. Reports last until cleared or the game exits.
+Bool Function ClearIssue(String modId, String issueId) Global Native
+Bool Function ClearModIssues(String modId) Global Native

@@ -2,6 +2,7 @@
 #include "Subscriptions.h"
 #include "Values.h"
 #include "Actions.h"
+#include "Issues.h"
 #include <charconv>
 #include "RE/B/BSScriptUtil.h"
 #include "RE/E/Events.h"
@@ -29,6 +30,7 @@ namespace OSFSettings::Papyrus
             return *listeners;
         }
         Values Access() { return Values(SettingsService::Get()); }
+        Issues IssueAccess() { return Issues(API::DiagnosticsApi::Get()); }
 
         bool DispatchAction(const Receiver& receiver, ActionService::Invocation invocation, const std::string& mod, const std::string& id)
         {
@@ -180,6 +182,19 @@ namespace OSFSettings::Papyrus
             return error == std::errc{} && end == text.data() + text.size() && invocation && ActionService::Get().Complete(invocation, succeeded, message.c_str()) == ActionError::None;
         }
 
+        bool ReportIssue(VM&, std::uint32_t, std::monostate, String mod, String id, String title, bool isError, String impact, String nextSteps)
+        {
+            return IssueAccess().ReportIssue(mod.c_str(), id.c_str(), title.c_str(), isError, impact.c_str(), nextSteps.c_str());
+        }
+        bool ClearIssue(VM&, std::uint32_t, std::monostate, String mod, String id)
+        {
+            return IssueAccess().ClearIssue(mod.c_str(), id.c_str());
+        }
+        bool ClearModIssues(VM&, std::uint32_t, std::monostate, String mod)
+        {
+            return IssueAccess().ClearModIssues(mod.c_str());
+        }
+
         void Bind(VM& vm)
         {
             vm.BindNativeMethod(Script, "GetVersion", &GetVersion, false, false);
@@ -203,6 +218,9 @@ namespace OSFSettings::Papyrus
             vm.BindNativeMethod(Script, "RegisterAction", &RegisterAction, false, false);
             vm.BindNativeMethod(Script, "RegisterActionStatic", &RegisterActionStatic, false, false);
             vm.BindNativeMethod(Script, "CompleteAction", &CompleteAction, false, false);
+            vm.BindNativeMethod(Script, "ReportIssue", &ReportIssue, false, false);
+            vm.BindNativeMethod(Script, "ClearIssue", &ClearIssue, false, false);
+            vm.BindNativeMethod(Script, "ClearModIssues", &ClearModIssues, false, false);
             REX::INFO("Papyrus: OSFSettings native registration attempted");
             TestHarness::BindPapyrus(vm);
         }

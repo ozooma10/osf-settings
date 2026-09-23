@@ -1,7 +1,30 @@
 # Issue reporting
 
-Report detected problems in the menu's **Mod Issues** tab. This C++ API needs no
-settings schema and has no Papyrus equivalent.
+Report detected problems in the menu's **Mod Issues** tab. C++ and Papyrus reports
+share the same list. Neither needs a settings schema.
+
+## Papyrus
+
+Compile against [OSFSettings.psc](../data/Scripts/Source/OSFSettings.psc), then
+report from your mod's existing script when it detects a problem:
+
+```papyrus
+Bool reported = OSFSettings.ReportIssue("mymod", "missing-assets", "Custom animations are unavailable", true, "Characters use default animations.", "Install this mod's animation pack.")
+
+; After confirming recovery:
+Bool cleared = OSFSettings.ClearIssue("mymod", "missing-assets")
+; Or remove every report owned by this mod:
+Bool clearedAll = OSFSettings.ClearModIssues("mymod")
+```
+
+`ReportIssue(modId, issueId, title, isError = false, impact = "", nextSteps = "")`
+returns `true` when accepted. `isError = false` reports a warning; `true` reports
+an error. The two clear calls return `true` for valid IDs even if no matching
+report exists. Call these from your normal initialization, post-load, or condition
+checks. They do not require `OSFSettings.IsReady()` or a listener registration.
+All three calls return `false` for invalid IDs or report text.
+
+## C++
 
 ```cpp
 #include "OSFSettings_Diagnostics.h"

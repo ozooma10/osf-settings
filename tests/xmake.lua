@@ -18,7 +18,8 @@ target("osfsettings-test-services")
     add_files("../src/Settings/SettingsService.cpp", "../src/API/*.cpp", "../src/Actions/*.cpp",
         "../src/Launcher/LauncherService.cpp", "../src/Input/KeyNames.cpp", "../src/Input/KeyCapture.cpp",
         "../src/Input/HotkeyInputState.cpp", "../src/Input/BSInputEventUserStandalone.cpp",
-        "../src/Papyrus/Actions.cpp", "../src/Papyrus/Values.cpp", "../src/Papyrus/Subscriptions.cpp")
+        "../src/Papyrus/Actions.cpp", "../src/Papyrus/Values.cpp", "../src/Papyrus/Subscriptions.cpp",
+        "../src/Papyrus/Issues.cpp")
     -- Use CommonLib's foundation once, instead of RE/Starfield.h per fixture.
     set_pcxxheader("../lib/commonlibsf/include/SFSE/Impl/PCH.h")
 target_end()
