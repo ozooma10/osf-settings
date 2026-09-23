@@ -49,7 +49,7 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 | `bool` | `true` | None |
 | `int` | `3` | Optional inclusive `min` / `max` |
 | `float` | `0.75` | Optional inclusive `min` / `max`; positive `step` defaults to `0.1` |
-| `enum` | `"normal"` | Required `options` array; optional matching `optionLabels` array |
+| `enum` | `"normal"` | Required `options`: value-to-label object or string array |
 | `string` | `"auto"` | `maxLength`: 1–4096 UTF-8 bytes; defaults to 256 |
 | `key` | `"F4"` | `allowUnbound` defaults to false; C++ reads/writes keyboard VK codes |
 
@@ -57,17 +57,28 @@ Defaults must satisfy the setting's type and limits.
 
 Float `step` controls the editor increment; writes need not be multiples of it.
 
-Enum options are unique, nonempty strings; the default and API values must match an option exactly.
+Enum option values are unique, nonempty strings; the default and API values must match a value exactly. Options appear in authored order. Use an object to give each value a display label:
 
 ```json
 {
   "key": "mode",
   "type": "enum",
   "default": "normal",
-  "options": ["quiet", "normal", "verbose"],
-  "optionLabels": ["Quiet", "Normal", "Verbose"]
+  "options": {
+    "quiet": "Quiet",
+    "normal": "Normal",
+    "verbose": "Verbose"
+  }
 }
 ```
+
+When the labels are also the values, use a string array:
+
+```json
+"options": ["quiet", "normal", "verbose"]
+```
+
+Object labels must be strings; an empty label falls back to its value. Labels may repeat. Only values are saved, so changing labels or order preserves existing selections.
 
 Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, and line/paragraph separators are rejected.  Limits count bytes, not characters. Values are preserved without trimming or truncation.
 

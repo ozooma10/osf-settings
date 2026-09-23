@@ -12,6 +12,7 @@
 #include <iostream>
 #include <iterator>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <type_traits>
 #include <nlohmann/json.hpp>
@@ -625,47 +626,70 @@ namespace
         if (!enumeration) return;
 
         auto document = schema;
-        document["groups"]["General"][modeIndex].erase("optionLabels");
+        document["groups"]["General"][modeIndex]["options"] = { "quiet", "normal", "verbose" };
         auto decoded = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
-        Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
-            "omitted option labels use the option values");
+        Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].value == "quiet" &&
+            std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
+            "string array options use each string as both value and label");
         document = schema;
-        document["groups"]["General"][modeIndex]["optionLabels"] = { "", "Same label", "Same label" };
+        document["groups"]["General"][modeIndex]["options"] = { { "quiet", "" }, { "normal", "Same label" }, { "verbose", "Same label" } };
         decoded = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
         Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
             "empty labels use the option value and display labels need not be unique");
         document = schema;
         auto& single = document["groups"]["General"][modeIndex];
-        single.erase("optionLabels"); single["options"] = { "normal" };
-        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "an enum can have a single option");
+        single["options"] = { { "normal", "Normal" } };
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "an enum object can have a single option");
+        single["options"] = { "normal" };
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "an enum array can have a single option");
         single["options"] = { "normal", "Normal" };
         Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "enum option identities are case-sensitive");
+        single["options"] = { { "normal", "Normal" }, { "Normal", "Normal" } };
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "enum object keys are case-sensitive");
+
+        std::istringstream duplicateOptions(R"({"groups":{"General":[
+            {"key":"mode","type":"enum","default":"normal","options":{"normal":"Normal","normal":"Repeated"}}
+        ]}})");
+        Check(!OSFSettings::SettingsJson::ParseSchema(duplicateOptions, "learning", error) && error == "duplicate option: normal",
+            "duplicate source option values cannot silently overwrite labels");
+        std::istringstream sharedOptions(R"({"groups":{"General":[
+            {"key":"first","type":"enum","default":"normal","options":{"verbose":"Verbose","normal":"Normal"}},
+            {"key":"second","type":"enum","default":"normal","options":{"normal":"Normal"}}
+        ]}})");
+        decoded = OSFSettings::SettingsJson::ParseSchema(sharedOptions, "learning", error);
+        Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("first")->definition).options[0].value == "verbose",
+            "source objects preserve authored order and separate settings may reuse option values");
 
         document = schema;
         document["groups"]["General"][modeIndex].erase("options");
-        Reject(document, "options must be a non-empty array");
+        Reject(document, "options must be a non-empty array or object");
         for (const auto& options : std::vector<Json>{ Json::array(), Json::object(), nullptr, true, 1, "quiet" }) {
             document = schema;
             document["groups"]["General"][modeIndex]["options"] = options;
-            Reject(document, "options must be a non-empty array");
+            Reject(document, "options must be a non-empty array or object");
         }
         for (const auto& option : std::vector<Json>{ "", true, 1, 1.0, nullptr, Json::array(), Json::object() }) {
             document = schema;
-            document["groups"]["General"][modeIndex]["options"][0] = option;
+            document["groups"]["General"][modeIndex]["options"] = Json::array({ option, "normal" });
             Reject(document, "each option must be a non-empty string");
         }
         document = schema;
-        document["groups"]["General"][modeIndex]["options"][0] = "normal";
+        document["groups"]["General"][modeIndex]["options"] = { "normal", "normal" };
         Reject(document, "duplicate option");
-        for (const auto& labels : std::vector<Json>{ Json::array(), Json::array({ "Quiet", "Normal" }),
-            Json::array({ "Quiet", "Normal", "Verbose", "Extra" }), Json::object(), nullptr, true, "labels" }) {
+        for (const auto& value : { std::string{}, std::string("bad\0option", 10) }) {
             document = schema;
-            document["groups"]["General"][modeIndex]["optionLabels"] = labels;
-            Reject(document, "optionLabels must be an array with one label per option");
+            document["groups"]["General"][modeIndex]["options"][value] = "Invalid";
+            Reject(document, value.empty() ? "each option must be a non-empty string" : "option value must not contain NUL");
         }
+        document = schema;
+        document["groups"]["General"][modeIndex]["options"] = { "normal", std::string("bad\0option", 10) };
+        Reject(document, "option value must not contain NUL");
+        document = schema;
+        document["groups"]["General"][modeIndex]["optionLabels"] = { "Quiet", "Normal", "Verbose" };
+        Reject(document, "optionLabels is no longer supported; use an options object");
         for (const auto& label : std::vector<Json>{ nullptr, true, 1, Json::array(), Json::object() }) {
             document = schema;
-            document["groups"]["General"][modeIndex]["optionLabels"][0] = label;
+            document["groups"]["General"][modeIndex]["options"]["quiet"] = label;
             Reject(document, "each option label must be a string");
         }
         document = schema;
@@ -736,14 +760,12 @@ namespace
         const auto savedSelection = Read(valuesFile);
         document = schema;
         auto& reordered = document["groups"]["General"][modeIndex];
-        reordered["options"] = { "verbose", "quiet", "normal" };
-        reordered["optionLabels"] = { "Detailed", "Minimal", "Standard" };
+        reordered["options"] = { { "verbose", "Detailed" }, { "quiet", "Minimal" }, { "normal", "Standard" } };
         Write(schemaFile, document.dump(2));
         restarted.LoadAll(schemas, values);
         Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} } &&
             Read(valuesFile) == savedSelection, "reordering options and changing labels preserve the saved selection without rewriting it");
         reordered["options"] = { "quiet", "normal" };
-        reordered.erase("optionLabels");
         Write(schemaFile, document.dump(2));
         restarted.LoadAll(schemas, values);
         Check(restarted.LoadErrors().size() == 1 && restarted.GetValue("learning", "notificationMode") == mode->DefaultValue() &&

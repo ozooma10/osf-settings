@@ -5,7 +5,7 @@
   "groups": {
     "General": [
       { "key": "enabled", "type": "bool", "label": "Enable feature", "hint": "Turn this feature on.", "default": true },
-      { "key": "mode", "type": "enum", "label": "Mode", "hint": "Choose how much information to show.", "default": "quiet", "options": ["quiet", "normal"], "optionLabels": ["Quiet", "Normal"] }
+      { "key": "mode", "type": "enum", "label": "Mode", "hint": "Choose how much information to show.", "default": "quiet", "options": { "quiet": "Quiet", "normal": "Normal" } }
     ]
   },
   "hotkeys": [{ "id": "open", "label": "Open example menu", "menu": "LocalizationExampleMenu" }],

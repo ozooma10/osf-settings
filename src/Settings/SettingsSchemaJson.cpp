@@ -67,7 +67,9 @@ namespace OSFSettings::SettingsJson
         error.clear();
         try {
             std::set<std::string> groupNames;
+            std::set<std::string> optionValues;
             bool inGroups{};
+            bool inOptions{};
             const auto document = nlohmann::ordered_json::parse(input,
                 [&](int depth, nlohmann::ordered_json::parse_event_t event, nlohmann::ordered_json& value) {
                     if (event == nlohmann::ordered_json::parse_event_t::key) {
@@ -76,6 +78,14 @@ namespace OSFSettings::SettingsJson
                         } else if (depth == 2 && inGroups) {
                             const auto& name = value.get_ref<const std::string&>();
                             Require(groupNames.insert(name).second, "duplicate group name: " + name);
+                        } else if (depth == 4 && inGroups) {
+                            inOptions = value == "options";
+                            if (inOptions) {
+                                optionValues.clear();
+                            }
+                        } else if (depth == 5 && inGroups && inOptions) {
+                            const auto& option = value.get_ref<const std::string&>();
+                            Require(optionValues.insert(option).second, "duplicate option: " + option);
                         }
                     }
                     return true;
@@ -158,23 +168,23 @@ namespace OSFSettings::SettingsJson
                         defaultError = "default must be a string matching an option: ";
                         EnumDefinition definition;
                         const auto options = sourceSetting.find("options");
-                        Require(options != sourceSetting.end() && options->is_array() && !options->empty(), "options must be a non-empty array: " + setting.key);
-                        const auto labels = sourceSetting.find("optionLabels");
-                        Require(labels == sourceSetting.end() || (labels->is_array() && labels->size() == options->size()), "optionLabels must be an array with one label per option: " + setting.key);
+                        Require(options != sourceSetting.end() && (options->is_array() || options->is_object()) && !options->empty(), "options must be a non-empty array or object: " + setting.key);
+                        Require(!sourceSetting.contains("optionLabels"), "optionLabels is no longer supported; use an options object: " + setting.key);
                         std::set<std::string> optionValues;
-                        for (std::size_t index = 0; index < options->size(); ++index) {
-                            const auto& sourceOption = (*options)[index];
-                            Require(sourceOption.is_string() && !sourceOption.get_ref<const std::string&>().empty(), "each option must be a non-empty string: " + setting.key);
+                        for (const auto& [key, value] : options->items()) {
                             EnumOption option;
-                            option.value = sourceOption.get<std::string>();
+                            if (options->is_object()) {
+                                option.value = key;
+                                Require(value.is_string(), "each option label must be a string: " + setting.key);
+                                option.label = value.get<std::string>();
+                            } else {
+                                Require(value.is_string(), "each option must be a non-empty string: " + setting.key);
+                                option.value = value.get<std::string>();
+                            }
+                            Require(!option.value.empty(), "each option must be a non-empty string: " + setting.key);
                             Require(option.value.find('\0') == std::string::npos, "option value must not contain NUL: " + setting.key);
                             Require(optionValues.insert(option.value).second, "duplicate option: " + setting.key + " / " + option.value);
-                            option.label = option.value;
-                            if (labels != sourceSetting.end()) {
-                                const auto& label = (*labels)[index];
-                                Require(label.is_string(), "each option label must be a string: " + setting.key);
-                                if (!label.get_ref<const std::string&>().empty()) option.label = label.get<std::string>();
-                            }
+                            if (option.label.empty()) option.label = option.value;
                             definition.options.push_back(std::move(option));
                         }
                         setting.definition = std::move(definition);

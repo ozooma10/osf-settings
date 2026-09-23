@@ -42,8 +42,11 @@
         "label": "Notification mode",
         "hint": "Choose how much detail notifications show. This test setting has no gameplay behavior.",
         "default": "normal",
-        "options": ["quiet", "normal", "verbose"],
-        "optionLabels": ["Quiet", "Normal", "Verbose"]
+        "options": {
+          "quiet": "Quiet",
+          "normal": "Normal",
+          "verbose": "Verbose"
+        }
       },
       {
         "key": "notificationKey",

@@ -159,7 +159,7 @@ int main()
                 {"key":"enabled","type":"bool","label":"Enabled","hint":"A hint","requires":"restart","default":false},
                 {"key":"count","type":"int","default":-9007199254740993,"min":-9223372036854775808,"max":9223372036854775807},
                 {"key":"scale","type":"float","default":0.15,"min":-1.25,"max":2.5,"step":0.125},
-                {"key":"mode","type":"enum","default":"quiet","options":["verbose","quiet"],"optionLabels":["Verbose label","Quiet label"]},
+                {"key":"mode","type":"enum","default":"quiet","options":{"verbose":"Verbose label","quiet":"Quiet label"}},
                 {"key":"key","type":"key","default":"UNBOUND","allowUnbound":true},
                 {"key":"text","type":"string","default":"Original text","maxLength":32}
             ],"first":[],"extra":[
@@ -176,7 +176,7 @@ int main()
         schema["description"] = unicode;
         schema["groups"]["First group"][0]["label"] = embedded;
         schema["groups"]["First group"][0]["hint"] = unicode;
-        schema["groups"]["First group"][3]["optionLabels"][1] = embedded;
+        schema["groups"]["First group"][3]["options"]["quiet"] = embedded;
         schema["groups"] = {{"First group", schema["groups"]["First group"]},
             {unicode, TestJson::array()}, {"extra", schema["groups"]["extra"]}};
         Write(schemas / "alpha.json", schema);
