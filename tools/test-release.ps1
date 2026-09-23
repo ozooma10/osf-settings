@@ -46,7 +46,7 @@ if (Test-Path -LiteralPath $directory) { throw 'Use a new output directory; prev
 [IO.Directory]::CreateDirectory($directory) | Out-Null
 $report = [ordered]@{
     startedUtc = [DateTime]::UtcNow.ToString('o'); finishedUtc = $null; outcome = 'running'
-    scope = $scope; source = $null; package = $null; automatedPassed = $false; completeAutomatedSuite = $false
+    scope = $scope; revision = $null; package = $null; automatedPassed = $false; completeAutomatedSuite = $false
     stages = @($stages | ForEach-Object { [ordered]@{ name=$_; status='not-run'; message=''; log=$null } })
     runtime = $null
     unverified = $unverified
@@ -92,7 +92,7 @@ function Invoke-ReleaseProcess([string]$Program, [string[]]$Arguments) {
 
 Push-Location $repo
 try {
-    $report.source = Get-ReleaseSourceIdentity $repo
+    $report.revision = Get-ReleaseRevision $repo
     Start-ReleaseStage 'native'
     Invoke-ReleaseProcess 'xmake' @('test','-j4')
     Complete-ReleaseStage 'All native suites'
@@ -110,7 +110,7 @@ try {
         Complete-ReleaseStage "$($captures.Count) fresh screenshots retained"
     }
     Start-ReleaseStage 'package'
-    if ($Manifest) { $Manifest = [IO.Path]::GetFullPath($Manifest); Complete-ReleaseStage 'Explicit existing candidate; source identity is checked next' }
+    if ($Manifest) { $Manifest = [IO.Path]::GetFullPath($Manifest); Complete-ReleaseStage 'Explicit existing candidate; its commit is checked next' }
     else {
         $receipt = Join-Path $directory 'package-path.txt'
         Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',(Join-Path $repo 'packaging/build-archive.ps1'),'-Label',$Label,'-ResultPath',$receipt)
@@ -120,7 +120,7 @@ try {
     Start-ReleaseStage 'package-integrity'
     $report.package = Test-ReleaseArchive $Manifest $repo
     Copy-Item -LiteralPath $Manifest -Destination (Join-Path $directory 'candidate.manifest.json')
-    Complete-ReleaseStage "$($report.package.files) allowlisted files; hashes, APIs and production markers checked"
+    Complete-ReleaseStage "$($report.package.files) allowlisted files; checksum, APIs and production markers checked"
     Start-ReleaseStage 'reinstall-preservation'
     $sentinels = Test-ReleaseReinstall $report.package.archive (Join-Path $directory 'disposable-install')
     $sentinels | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'preserved-state.json')
@@ -128,21 +128,21 @@ try {
     Start-ReleaseStage 'runtime'
     if ($RunGame) {
         # Contract with the harness suite: it writes its JSON summary to -ResultPath
-        # with completeSuite, automatedPassed and the sourceIdentity it built from.
+        # with completeSuite, automatedPassed and the revision it built from.
         $receipt = Join-Path $directory 'runtime-result.json'
         $report.runtime = $receipt
         Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-ResultPath',$receipt)
         $runtime = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json -AsHashtable
         if (-not $runtime.completeSuite) { throw "Runtime suite ran only: $($runtime.selectedCases -join ', ')" }
         if (-not $runtime.automatedPassed) { $script:exitCode = 1; throw 'Runtime suite did not pass.' }
-        if (-not $runtime.sourceIdentity -or $runtime.sourceIdentity.sha256 -cne $report.source.sha256) { throw 'Runtime suite tested different source than this candidate.' }
+        if ($runtime.revision -cne $report.revision) { throw 'Runtime suite tested a different commit than this candidate.' }
         Complete-ReleaseStage "$($runtime.runs.Count) fresh-session cases passed: $($runtime.cases -join ', ')"
     } else {
         $script:active.status = 'not-run'; $script:active.message = 'Use -RunGame to run the harness suite'
         Save-ReleaseReport
     }
     Start-ReleaseStage 'source-unchanged'
-    if ((Get-ReleaseSourceIdentity $repo).sha256 -cne $report.source.sha256) { throw 'Source changed during validation; rerun against one fixed candidate.' }
+    if ((Get-ReleaseRevision $repo) -cne $report.revision) { throw 'Source changed during validation; rerun against one fixed candidate.' }
     $null = Test-ReleaseArchive $Manifest
     Complete-ReleaseStage 'Source and candidate archive unchanged throughout validation'
     $report.automatedPassed = $true

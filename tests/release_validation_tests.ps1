@@ -22,7 +22,6 @@ function New-Candidate([string]$Name, [string]$Fault = '') {
     [IO.Directory]::CreateDirectory($directory) | Out-Null
     $archive = Join-Path $directory 'candidate.zip'
     $zip = [IO.Compression.ZipFile]::Open($archive, 'Create')
-    $records = @()
     try {
         $paths = @(Get-ReleasePayloadPaths)
         if ($Fault -eq 'traversal') { $paths[-1] = '../escaped.dll' }
@@ -38,14 +37,12 @@ function New-Candidate([string]$Name, [string]$Fault = '') {
             $entry = $zip.CreateEntry($path)
             $stream = $entry.Open()
             try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
-            $records += @{ path=$path; bytes=$bytes.Length; sha256=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)) }
         }
     } finally { $zip.Dispose() }
-    if ($Fault -eq 'file-hash') { $records[0].sha256 = '0' * 64 }
     $hash = (Get-FileHash -LiteralPath $archive).Hash
     "$hash  candidate.zip" | Set-Content -LiteralPath "$archive.sha256"
     $manifest = Join-Path $directory 'candidate.manifest.json'
-    @{ archive='candidate.zip'; sha256=$hash; configuration='windows/x64/releasedbg; test_harness=n'; files=$records } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifest
+    @{ archive='candidate.zip'; sha256=$hash; configuration='windows/x64/releasedbg; test_harness=n' } | ConvertTo-Json | Set-Content -LiteralPath $manifest
     return $manifest
 }
 $good = New-Candidate 'valid'
@@ -54,15 +51,29 @@ Check ($candidate.files -eq 15) 'Valid archive has all expected payloads'
 $preserved = Test-ReleaseReinstall $candidate.archive (Join-Path $scratch 'reinstall')
 Check ($preserved.Count -eq 3) 'Reinstall preserves all player-state sentinels'
 foreach ($fault in @(
-    @('traversal','Unexpected or duplicate'), @('duplicate','Invalid payload record'),
+    @('traversal','Unexpected or duplicate'), @('duplicate','Unexpected or duplicate'),
     @('test-dll','Instrumented DLL'), @('test-movie','Development movie'),
-    @('bad-pex','PEX header'), @('file-hash','Payload checksum')
+    @('bad-pex','PEX header')
 )) {
     $manifest = New-Candidate $fault[0] $fault[0]
     Reject { Test-ReleaseArchive $manifest } $fault[1]
 }
 Add-Content -LiteralPath $candidate.archive -Value 'tampered'
 Reject { Test-ReleaseArchive $good } 'archive checksum'
+
+# A candidate is a clean commit: edits and untracked files block it.
+$source = Join-Path $scratch 'source'
+[IO.Directory]::CreateDirectory($source) | Out-Null
+& git -C $source init -q
+'tracked' | Set-Content -LiteralPath (Join-Path $source 'tracked.txt')
+& git -C $source add tracked.txt
+& git -C $source -c user.name=selftest -c user.email=selftest@invalid commit -qm fixture
+Check ((Get-ReleaseRevision $source) -ceq (& git -C $source rev-parse HEAD)) 'A clean checkout is identified by its commit'
+'stray' | Set-Content -LiteralPath (Join-Path $source 'stray.cpp')
+Reject { Get-ReleaseRevision $source } 'stray.cpp'
+Remove-Item -LiteralPath (Join-Path $source 'stray.cpp')
+'edited' | Set-Content -LiteralPath (Join-Path $source 'tracked.txt')
+Reject { Get-ReleaseRevision $source } 'tracked.txt'
 
 # Contract between tools/test-release.ps1 -RunGame and the harness suite. The real
 # Test-SettingsRelease.ps1 and Common.ps1 run in a disposable tree whose game runner
@@ -77,7 +88,7 @@ else {
     "@{ MO2 = '$fake'; TestProfile = 'OSF Testing'; OutputDirectory = 'artifacts'; SettingsProject = '$(Join-Path $fake 'settings')'; CommandTimeoutSeconds = 15 }" |
         Set-Content -LiteralPath (Join-Path $fake 'config.psd1')
     'fixture-source' | Set-Content -LiteralPath (Join-Path $fake 'settings/identity.txt')
-    'function Get-ReleaseSourceIdentity([string]$Repository) { @{ algorithm = ''self-test''; sha256 = (Get-Content -LiteralPath (Join-Path $Repository ''identity.txt'') -Raw).Trim() } }' |
+    'function Get-ReleaseRevision([string]$Repository) { (Get-Content -LiteralPath (Join-Path $Repository ''identity.txt'') -Raw).Trim() }' |
         Set-Content -LiteralPath (Join-Path $fake 'settings/packaging/ReleaseValidation.ps1')
     @'
 param([string]$Action, [string]$Scenario, [switch]$SkipBuild, [switch]$Acceptance, [string]$AcceptancePhase, [switch]$LargeText,
@@ -103,7 +114,7 @@ if ($mode -eq 'failed') { exit 1 } elseif ($mode -eq 'blocked') { exit 2 } else 
             & pwsh @arguments > (Join-Path $scratch "$mode.log") 2>&1
             $exitCode = $LASTEXITCODE
             $result = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json -AsHashtable
-            Check ($result.sourceIdentity.sha256 -ceq 'fixture-source' -and -not $result.physicalControllerVerified) "$mode receipt records built source and no controller acceptance"
+            Check ($result.revision -ceq 'fixture-source' -and -not $result.physicalControllerVerified) "$mode receipt records built source and no controller acceptance"
             switch ($mode) {
                 'passed' { Check ($exitCode -eq 0 -and $result.completeSuite -and $result.automatedPassed -and $result.runs.Count -eq 9 -and @($result.runs | Where-Object outcome -ne 'passed').Count -eq 0) 'Full suite passes with nine fresh receipts' }
                 'filtered' { Check ($exitCode -eq 0 -and -not $result.completeSuite -and $result.automatedPassed -and $result.runs.Count -eq 2) 'Filtered pass never becomes a complete suite' }

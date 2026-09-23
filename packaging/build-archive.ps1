@@ -12,7 +12,7 @@ $repo = Split-Path $PSScriptRoot -Parent
 if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'README.txt'))) {
     throw 'Missing packaging input: README.txt'
 }
-$sourceIdentity = Get-ReleaseSourceIdentity $repo
+$revision = Get-ReleaseRevision $repo
 $project = Get-Content -LiteralPath (Join-Path $repo 'xmake.lua') -Raw
 $versionMatch = [regex]::Match($project, 'set_version\("([0-9]+\.[0-9]+\.[0-9]+)"\)')
 if (-not $versionMatch.Success) { throw 'Cannot read the project version from xmake.lua.' }
@@ -39,10 +39,6 @@ try {
     Invoke-XMake @('f', "--project=$repo", '-y', '-p', 'windows', '-a', 'x64', '-m', 'releasedbg', '-o', 'build', '--test_harness=n')
     Invoke-XMake @('build', "--project=$repo", '-y', '-j4', 'OSF Settings')
     Invoke-XMake @('install', "--project=$repo", '-y', 'OSF Settings')
-    $revision = & git rev-parse HEAD
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot record source revision.' }
-    $sourceStatus = @(& git status --porcelain=v1 --untracked-files=all)
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot record source status.' }
     $submodules = @(& git submodule status --recursive)
     if ($LASTEXITCODE -ne 0) { throw 'Cannot record dependency revisions.' }
 } finally {
@@ -66,12 +62,6 @@ foreach ($file in Get-ChildItem -LiteralPath $stage -File -Recurse) {
     $relative = [IO.Path]::GetRelativePath($stage, $file.FullName).Replace('\', '/')
     if ($relative -cnotin $allowedStageFiles) { throw "Unexpected staged file: $relative" }
 }
-$manifestFiles = foreach ($relative in $files) {
-    $path = Join-Path $stage $relative
-    $file = Get-Item -LiteralPath $path
-    if ($file.Length -eq 0) { throw "Empty payload: $relative" }
-    [ordered]@{ path = $relative; bytes = $file.Length; sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash }
-}
 
 $archive = Join-Path $run "$name.zip"
 $partial = "$archive.partial"
@@ -91,24 +81,20 @@ try {
 Move-Item -LiteralPath $partial -Destination $archive
 $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
 "$archiveHash  $name.zip" | Set-Content -LiteralPath "$archive.sha256" -Encoding utf8NoBOM
-if ((Get-ReleaseSourceIdentity $repo).sha256 -cne $sourceIdentity.sha256) { throw 'Source changed during packaging; candidate cannot be accepted.' }
+if ((Get-ReleaseRevision $repo) -cne $revision) { throw 'Source changed during packaging; candidate cannot be accepted.' }
 $manifestPath = Join-Path $run "$name.manifest.json"
 [ordered]@{
     version = $version
     label = $Label
     createdUtc = [DateTime]::UtcNow.ToString('o')
     revision = $revision
-    dirty = $sourceStatus.Count -ne 0
-    sourceStatus = $sourceStatus
     submodules = $submodules
-    sourceIdentity = $sourceIdentity
     configuration = 'windows/x64/releasedbg; test_harness=n'
     archive = "$name.zip"
     sha256 = $archiveHash
-    files = @($manifestFiles)
-} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
-# The shared validator checks the ZIP against the staged hashes, required payloads
-# and production markers. Keep these checks in one place for builds and retests.
+} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
+# The shared validator checks the checksum, the payload allowlist and production
+# markers. Keep these checks in one place for builds and retests.
 $null = Test-ReleaseArchive $manifestPath
 if ($ResultPath) { [IO.File]::WriteAllText([IO.Path]::GetFullPath($ResultPath), $manifestPath, [Text.UTF8Encoding]::new($false)) }
 Write-Host "Verified archive: $archive"
