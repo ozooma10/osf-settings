@@ -68,9 +68,11 @@ namespace OSFSettings::SettingsJson
         try {
             std::set<std::string> groupNames;
             std::set<std::string> hotkeyIds;
+            std::set<std::string> menuIds;
             std::set<std::string> optionValues;
             bool inGroups{};
             bool inHotkeys{};
+            bool inMenus{};
             bool inOptions{};
             const auto document = nlohmann::ordered_json::parse(input,
                 [&](int depth, nlohmann::ordered_json::parse_event_t event, nlohmann::ordered_json& value) {
@@ -78,12 +80,16 @@ namespace OSFSettings::SettingsJson
                         if (depth == 1) {
                             inGroups = value == "groups";
                             inHotkeys = value == "hotkeys";
+                            inMenus = value == "menus";
                         } else if (depth == 2 && inGroups) {
                             const auto& name = value.get_ref<const std::string&>();
                             Require(groupNames.insert(name).second, "duplicate group name: " + name);
                         } else if (depth == 2 && inHotkeys) {
                             const auto& id = value.get_ref<const std::string&>();
                             Require(hotkeyIds.insert(id).second, "duplicate hotkey id: " + id);
+                        } else if (depth == 2 && inMenus) {
+                            const auto& id = value.get_ref<const std::string&>();
+                            Require(menuIds.insert(id).second, "duplicate menu id: " + id);
                         } else if (depth == 4 && inGroups) {
                             inOptions = value == "options";
                             if (inOptions) {
@@ -269,14 +275,15 @@ namespace OSFSettings::SettingsJson
                 }
             }
             if (const auto menus = document.find("menus"); menus != document.end()) {
-                Require(menus->is_array(), "menus must be an array");
+                Require(menus->is_object(), "menus must be an object keyed by id");
                 if (!menus->empty()) Require(mod.id.size() <= 128 && IsValidString(mod.title, 256),
                     "launcher owner id must fit 128 bytes and title must be single-line UTF-8 within 256 bytes");
-                std::set<std::string> ids;
-                for (const auto& source : *menus) {
+                for (const auto& [id, source] : menus->items()) {
                     Require(source.is_object(), "each menu must be an object");
+                    Require(!source.contains("id"), "menu id must be the object key: " + id);
                     MenuDefinition menu;
-                    menu.id = RequiredText(source, "id");
+                    menu.id = id;
+                    Require(!menu.id.empty(), "menu id must not be empty");
                     menu.title = RequiredText(source, "title");
                     menu.description = OptionalText(source, "description");
                     menu.menu = RequiredText(source, "menu");
@@ -284,7 +291,6 @@ namespace OSFSettings::SettingsJson
                         IsValidString(menu.menu, 256) && IsValidString(menu.description, 4096),
                         "menu text must be single-line UTF-8 (id/title/menu: 256 bytes; description: 4096 bytes)");
                     Require(menu.menu != "OSFSettingsMenu", "a launcher cannot open OSFSettingsMenu itself");
-                    Require(ids.insert(menu.id).second, "duplicate menu id: " + menu.id);
                     mod.menus.push_back(std::move(menu));
                 }
             }

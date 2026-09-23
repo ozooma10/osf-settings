@@ -200,7 +200,7 @@ int main()
                 "duplicate source IDs cannot overwrite hotkeys, including escaped and case-folded keys");
         }
         result = parseText(R"({"hotkeys":{"same":{"label":"same","group":"same"},"other":{"label":"Other","group":"same"}},
-            "groups":{"same":[]},"menus":[{"id":"same","title":"same","menu":"SameMenu"}]})");
+            "groups":{"same":[]},"menus":{"same":{"title":"same","menu":"SameMenu"}}})");
         check(result && error.empty() && result->hotkeys.size() == 2 && result->hotkeys[0].id == "same" &&
             result->hotkeys[1].id == "other" && result->groups[0].id == "same" && result->menus[0].id == "same",
             "duplicate detection is scoped to hotkey keys and ignores declaration fields and other sections");
@@ -226,26 +226,60 @@ int main()
         check(!result && error == "duplicate setting key: enabled", "setting keys remain unique across groups");
 
         const auto menuDocument = Json::parse(R"({"schemaVersion":1,"title":"Sample Mod","groups":{},
-            "menus":[{"id":"panel","title":"Sample Panel","description":"Open the panel.","menu":"SampleMenu"}]})");
+            "menus":{"panel":{"title":"Sample Panel","description":"Open the panel.","menu":"SampleMenu"}}})");
         result = SettingsJson::ParseSchema(menuDocument, "osfsettings", error);
         check(result && result->menus.size() == 1 && result->menus[0].id == "panel" && result->menus[0].menu == "SampleMenu" &&
             result->menus[0].title == "Sample Panel" && result->menus[0].description == "Open the panel.", "menu-only schema retains launcher metadata");
         check(result->groups.empty() && !result->FindSetting("panel"), "menus create neither implicit groups nor setting values");
-        changed = menuDocument; changed["menus"][0].erase("description");
+        changed = menuDocument; changed["menus"]["panel"].erase("description");
         result = SettingsJson::ParseSchema(changed, "osfsettings", error);
         check(result && result->menus[0].description.empty(), "menu description is optional");
-        changed["menus"] = Json::array();
-        check(SettingsJson::ParseSchema(changed, "osfsettings", error)->menus.empty(), "empty menu list is valid");
-        changed = menuDocument; changed["menus"] = Json::object(); reject(changed);
-        changed = menuDocument; changed["menus"][0] = Json(nullptr); reject(changed);
-        for (const auto* field : {"id", "title", "menu"}) {
-            changed = menuDocument; changed["menus"][0].erase(field); reject(changed);
+        changed["menus"] = Json::object();
+        check(SettingsJson::ParseSchema(changed, "osfsettings", error)->menus.empty(), "empty menu object is valid");
+        for (const auto& value : {Json(nullptr), Json(true), Json(1), Json("menu"), Json::array(),
+                Json::array({{{"id", "panel"}, {"title", "Sample Panel"}, {"menu", "SampleMenu"}}})}) {
+            changed = menuDocument; changed["menus"] = value; reject(changed);
+            check(error == "menus must be an object keyed by id", "menus require an object, including when empty");
         }
-        changed = menuDocument; changed["menus"][0]["title"] = std::string("hidden\0text", 11); reject(changed);
-        changed = menuDocument; changed["menus"][0]["description"] = "bad\ntext"; reject(changed);
-        changed = menuDocument; changed["menus"][0]["menu"] = "OSFSettingsMenu"; reject(changed);
-        changed = menuDocument; changed["menus"].push_back(changed["menus"][0]); reject(changed);
+        for (const auto& value : {Json(nullptr), Json(true), Json(1), Json("menu"), Json::array()}) {
+            changed = menuDocument; changed["menus"]["panel"] = value; reject(changed);
+            check(error == "each menu must be an object", "menu values must be declarations");
+        }
+        for (const auto* field : {"title", "menu"}) {
+            changed = menuDocument; changed["menus"]["panel"].erase(field); reject(changed);
+        }
+        for (const auto* id : {"panel", "other"}) {
+            changed = menuDocument; changed["menus"]["panel"]["id"] = id; reject(changed);
+            check(error == "menu id must be the object key: panel", "nested IDs cannot repeat or override the object key");
+        }
+        for (const auto& id : {std::string{}, std::string("bad\nid"), std::string("hidden\0id", 9), std::string(257, 'x')}) {
+            changed = menuDocument;
+            changed["menus"] = Json::object({{id, {{"title", "Invalid ID"}, {"menu", "SampleMenu"}}}});
+            reject(changed);
+        }
+        changed = menuDocument; changed["menus"]["panel"]["title"] = std::string("hidden\0text", 11); reject(changed);
+        changed = menuDocument; changed["menus"]["panel"]["description"] = "bad\ntext"; reject(changed);
+        changed = menuDocument; changed["menus"]["panel"]["menu"] = "OSFSettingsMenu"; reject(changed);
         changed = menuDocument; changed["title"] = std::string(257, 'x'); reject(changed);
+        result = parseText(R"({"groups":{},"menus":{"zPanel":{"title":"Z","menu":"ZMenu"},"Panel":{"title":"Upper","menu":"UpperMenu"},
+            "panel":{"title":"Lower","menu":"LowerMenu"}}})");
+        check(result && error.empty() && result->menus.size() == 3 && result->menus[0].id == "zPanel" &&
+            result->menus[1].id == "Panel" && result->menus[2].id == "panel" && result->menus[2].menu == "LowerMenu",
+            "menu IDs are case-sensitive and keep authored order");
+        for (const auto* source : {
+            R"({"groups":{},"menus":{"panel":{"title":"First","menu":"A"},"panel":{"title":"Second","menu":"B"}}})",
+            R"({"groups":{},"menus":{"panel":{"title":"First","menu":"A"},"panel":{"title":"Second","menu":"B"}}})",
+            R"({"menus":{"panel":{"title":"First","menu":"A"},"panel":{"title":"Second","menu":"B"}},"groups":{}})"
+        }) {
+            check(!parseText(source) && error == "duplicate menu id: panel",
+                "duplicate source IDs cannot overwrite menus, including escaped keys");
+        }
+        {
+            std::ifstream input("examples/launchers/absolute-control.json");
+            result = SettingsJson::ParseSchema(input, "absolute-control", error);
+            check(result && error.empty() && result->menus.size() == 1 && result->menus[0].id == "panel" &&
+                result->menus[0].menu == "AbsoluteControlPanelMenu", "shipped launcher example loads through the source parser");
+        }
         check(!SettingsJson::ParseSchema(menuDocument, std::string(129, 'x'), error),
             "launcher mod IDs retain their length limit when supplied by the filename");
 
@@ -270,7 +304,7 @@ int main()
             })},
             {"A second page", Json::array()}
         });
-        changed["menus"] = Json::array({{{"id", "enabled"}, {"title", "Open panel"}, {"menu", "SampleMenu"}}});
+        changed["menus"] = Json::object({{"enabled", {{"title", "Open panel"}, {"menu", "SampleMenu"}}}});
         { std::ofstream file(root / "schemas/osfsettings.json"); file << changed; }
         SettingsStore store;
         store.LoadAll(root / "schemas", root / "values");

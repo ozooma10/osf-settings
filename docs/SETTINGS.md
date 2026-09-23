@@ -263,5 +263,5 @@ Gameplay-dependent script work may remain pending until gameplay resumes.
 ## Related features
 
 - [Hotkeys](Keybindings.md): declare rebindable actions and handle them in C++ or Papyrus, or open a registered native menu.
-- [Menu launchers](LAUNCHERS.md): add a top-level `menus` array for native menus in the Launcher tab, or use the separate C++ launcher service for custom interfaces. Each schema entry has `id`, `title`, and a registered `menu` name; `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not create stored values and use the same schema version.
+- [Menu launchers](LAUNCHERS.md): add a top-level `menus` object keyed by ID for native menus in the Launcher tab, or use the separate C++ launcher service for custom interfaces. Each schema entry has a `title` and a registered `menu` name; `description` is optional. Menu-only mods can use `"groups": {}`. Menus do not create stored values and use the same schema version.
 - [Issue reporting](DIAGNOSTICS.md): report and clear problems in Mod Issues from C++ or Papyrus.

@@ -2,12 +2,11 @@
   "schemaVersion": 1,
   "title": "Absolute Control",
   "groups": {},
-  "menus": [
-    {
-      "id": "panel",
+  "menus": {
+    "panel": {
       "title": "Absolute Control",
       "description": "Configure installed Absolute control modules.",
       "menu": "AbsoluteControlPanelMenu"
     }
-  ]
+  }
 }
