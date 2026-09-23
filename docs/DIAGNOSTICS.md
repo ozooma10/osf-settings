@@ -1,6 +1,6 @@
 # Issue reporting
 
-Report detected problems in the menu's **Mod Issues** tab.
+Report detected problems in the menu's **Mod Issues** tab. OSF Settings also lists schema files that failed to load there, under its own name.
 
 ## Papyrus
 

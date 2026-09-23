@@ -24,9 +24,9 @@ mod applies it after restarting Starfield.
 KEYBINDINGS searches native MainGameplay keyboard/mouse actions and registered
 mod hotkeys, with primary/alternate slots.
 It cannot discover every mod's privately implemented hotkeys. MOD ISSUES shows
-reports supplied by supporting mods; an empty page is not a health check of
-every installed mod. Physical controller operation remains unverified, and
-text entry requires a keyboard.
+settings files that failed to load and reports supplied by supporting mods; an
+empty page is not a health check of every installed mod. Physical controller
+operation remains unverified, and text entry requires a keyboard.
 
 Settings persist across saves in Data/SFSE/Plugins/OSF/Settings/values.
 Native hotkeys use Starfield's Controls storage separately. Keep both when

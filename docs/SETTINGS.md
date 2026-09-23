@@ -31,7 +31,7 @@ Player values are saved separately for each mod in `Data/SFSE/Plugins/OSF/Settin
 
 Ship just the schema file; OSF Settings manages your mod's values file.
 
-Load failures are reported in `OSF Settings.log` under `Documents/My Games/Starfield/SFSE/Logs`.
+A schema that fails to load is shown as an error in the menu's **Mod Issues** tab, and the details are written to `OSF Settings.log` under `Documents/My Games/Starfield/SFSE/Logs`.
 
 Display text can be translated with separate [localization catalogs](LOCALIZATION.md) without modifying the schema. IDs and stored values remain unchanged.
 

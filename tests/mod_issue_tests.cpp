@@ -47,6 +47,25 @@ int main()
         settings.pop_back();
         check(IssueModName(issue, settings) == "sample", "unrelated schemas do not supply a display name");
 
+        const std::vector<SettingsLoadError> loadErrors{
+            { "schemas/broken.json", "unexpected end of input", true },
+            { "values/sample.json", "saved value does not match the setting's type or validation rules: gain" },
+            { "schemas/Not A Mod ID.json", "schemaVersion must be the integer 1 when present", true }
+        };
+        const auto schemaIssues = SchemaLoadIssues(loadErrors);
+        check(schemaIssues.size() == 2, "only schema failures become issues; saved-value problems stay in the log");
+        check(schemaIssues[0].modId == "osfsettings" && schemaIssues[0].id == "schema:broken.json" &&
+            schemaIssues[0].severity == IssueSeverity::Error, "OSF owns schema failures as errors keyed by filename");
+        check(schemaIssues[0].title.find("broken.json") != std::string::npos &&
+            schemaIssues[0].impact.find("unexpected end of input") != std::string::npos && !schemaIssues[0].nextSteps.empty(),
+            "a schema issue names the file, gives the reason, and says what to do");
+        check(schemaIssues[1].id == "schema:Not A Mod ID.json", "files whose names are not valid mod IDs are still reported");
+        IssueRegistry schemaRegistry;
+        check(schemaRegistry.Report(schemaIssues[0]) && schemaRegistry.Report(schemaIssues[1]) && schemaRegistry.Report(schemaIssues[0]) &&
+            schemaRegistry.Snapshot().size() == 2, "reporting schema failures again replaces them instead of duplicating");
+        check(schemaRegistry.ClearMod("broken") == 0 && schemaRegistry.Snapshot().size() == 2,
+            "a mod clearing its own issues cannot hide an OSF schema failure");
+
         IssueRegistry registry;
         check(registry.Snapshot().empty(), "a new registry has no active issues");
         ModIssue warning{

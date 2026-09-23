@@ -192,9 +192,9 @@ namespace
             restarted.LoadAll(schemas, values);
             Check(restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{3} } &&
                 restarted.GetValue("learning", "notifications") == SettingValue{ false } &&
-                restarted.LoadErrors().size() == 1 && restarted.LoadErrors()[0].file == valuesFile &&
+                restarted.LoadErrors().size() == 1 && restarted.LoadErrors()[0].file == valuesFile && !restarted.LoadErrors()[0].schema &&
                 restarted.LoadErrors()[0].message.find("notificationLimit") != std::string::npos && Read(valuesFile) == saved.dump(),
-                "invalid saved integers retain defaults, report their key, and preserve valid neighbors and the file");
+                "invalid saved integers retain defaults, report their key as a values error, and preserve valid neighbors and the file");
         }
         Write(valuesFile, Json{ { "formatVersion", 1 }, { "values", { { "notifications", false } } } }.dump());
         restarted.LoadAll(schemas, values);
@@ -614,6 +614,7 @@ namespace
         store.LoadAll(schemas, values);
         Check(store.Mods().size() == 1 && store.LoadErrors().size() == 3,
             "valid schemas survive malformed, unsupported, and mismatched neighboring files");
+        Check(std::ranges::all_of(store.LoadErrors(), &OSFSettings::SettingsLoadError::schema), "rejected schema files are marked as schema errors");
         Check(store.GetValue("learning", "notifications") == SettingValue{ true }, "the store owns the true default");
         Check(!store.GetValue("missing", "notifications").has_value(), "unknown mod returns no value");
         Check(!store.GetValue("learning", "missing").has_value(), "unknown key returns no value");
@@ -632,8 +633,8 @@ namespace
             "reloading replaces defaults without duplicating mods; false is not a missing value");
 
         store.LoadAll(root / "missing", values);
-        Check(store.Mods().empty() && store.LoadErrors().size() == 1,
-            "a missing directory reports an error and clears stale values");
+        Check(store.Mods().empty() && store.LoadErrors().size() == 1 && store.LoadErrors()[0].schema,
+            "a missing directory reports a schema error and clears stale values");
         store.LoadAll(schemas / "learning.json", values);
         Check(store.Mods().empty() && store.LoadErrors().size() == 1, "a file is not accepted as the schema directory");
 

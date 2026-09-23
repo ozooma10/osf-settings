@@ -1,4 +1,5 @@
 #include "ModIssue.h"
+#include "Settings/Localization.h"
 #include "Settings/SettingsSchema.h"
 
 namespace OSFSettings
@@ -11,5 +12,24 @@ namespace OSFSettings
             }
         }
         return issue.modId;
+    }
+
+    std::vector<ModIssue> SchemaLoadIssues(std::span<const SettingsLoadError> errors)
+    {
+        std::vector<ModIssue> issues;
+        for (const auto& error : errors) {
+            if (!error.schema) continue;
+            const auto name = error.file.filename().u8string();
+            const std::string file(reinterpret_cast<const char*>(name.data()), name.size());
+            issues.push_back({
+                .modId = "osfsettings",
+                .id = "schema:" + file,
+                .severity = IssueSeverity::Error,
+                .title = tr("issues.schemaFailed", {{ "file", file }}),
+                .impact = tr("issues.schemaFailedImpact", {{ "reason", error.message }}),
+                .nextSteps = tr("issues.schemaFailedNextSteps")
+            });
+        }
+        return issues;
     }
 }

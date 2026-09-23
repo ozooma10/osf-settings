@@ -1,6 +1,7 @@
 #include "Runtime.h"
 #include "SettingsDispatcher.h"
 #include "Actions/ActionService.h"
+#include "Diagnostics/DiagnosticsService.h"
 #include "Launcher/LauncherService.h"
 #include "Utils/Paths.h"
 
@@ -27,6 +28,8 @@ namespace OSFSettings
         for (const auto& error : errors) {
             REX::ERROR("Settings {}: {}", error.file.string(), error.message);
         }
+        // English until the game's language loads; Localization::Initialize reports again.
+        ReportLoadIssues();
 
         std::size_t settingCount = 0;
         for (const auto& mod : mods) {
@@ -54,6 +57,13 @@ namespace OSFSettings
         settings.Start();
         m_initialized = true;
         return true;
+    }
+
+    void Runtime::ReportLoadIssues()
+    {
+        for (auto& issue : SchemaLoadIssues(SettingsService::Get().LoadErrors())) {
+            if (!DiagnosticsService::Get().Report(std::move(issue))) REX::ERROR("Could not report a schema load failure in Mod Issues");
+        }
     }
 
     SettingsError Runtime::SetValue(std::string_view mod, std::string_view key, SettingValue value)

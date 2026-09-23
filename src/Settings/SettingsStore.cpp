@@ -15,7 +15,7 @@ namespace OSFSettings
 
         std::error_code error;
         if (!std::filesystem::is_directory(schemaDir, error)) {
-            m_loadErrors.push_back({ schemaDir, error ? error.message() : "schema directory is missing or is not a directory" });
+            m_loadErrors.push_back({ schemaDir, error ? error.message() : "schema directory is missing or is not a directory", true });
             return;
         }
 
@@ -25,22 +25,22 @@ namespace OSFSettings
             if (it->is_regular_file(entryError) && it->path().extension() == ".json") {
                 files.push_back(it->path());
             }
-            if (entryError) m_loadErrors.push_back({ it->path(), entryError.message() });
+            if (entryError) m_loadErrors.push_back({ it->path(), entryError.message(), true });
         }
-        if (error) m_loadErrors.push_back({ schemaDir, error.message() });
+        if (error) m_loadErrors.push_back({ schemaDir, error.message(), true });
         std::ranges::sort(files);
 
         for (const auto& path : files) {
             try {
                 std::ifstream input(path);
                 if (!input) {
-                    m_loadErrors.push_back({ path, "cannot open schema file" });
+                    m_loadErrors.push_back({ path, "cannot open schema file", true });
                     continue;
                 }
                 std::string message;
                 auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message);
                 if (!schema) {
-                    m_loadErrors.push_back({ path, std::move(message) });
+                    m_loadErrors.push_back({ path, std::move(message), true });
                     continue;
                 }
 
@@ -57,7 +57,7 @@ namespace OSFSettings
                 SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
                 m_mods.push_back(std::move(mod));
             } catch (const std::exception& exception) {
-                m_loadErrors.push_back({ path, exception.what() });
+                m_loadErrors.push_back({ path, exception.what(), true });
             }
         }
     }

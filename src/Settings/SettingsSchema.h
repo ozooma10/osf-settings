@@ -127,5 +127,6 @@ namespace OSFSettings
     {
         std::filesystem::path file;
         std::string message;
-    };  
+        bool schema{}; // The schema file or directory failed, so the mod has no page.
+    };
 }

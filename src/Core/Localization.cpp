@@ -1,3 +1,4 @@
+#include "Runtime.h"
 #include "Settings/Localization.h"
 #include "Settings/SettingsService.h"
 #include "Utils/Paths.h"
@@ -18,7 +19,10 @@ namespace OSFSettings::Localization
             settings.Localize(Paths::LocalizationDir(), language);
             const auto catalog = Get();
             REX::INFO("Localization: game language={}, catalog={}", language, catalog->Language());
-            for (const auto& error : catalog->Errors()) REX::WARN("Localization {}: {}", error.file.string(), error.message);
+            for (const auto& error : catalog->Errors()) {
+                REX::WARN("Localization {}: {}", error.file.string(), error.message);
+            }
+            Runtime::ReportLoadIssues();
         });
     }
 }

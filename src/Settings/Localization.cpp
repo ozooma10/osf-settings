@@ -104,13 +104,16 @@ namespace OSFSettings::Localization
                     Text(entry, "hint", setting->hint, field, true, true);
                     if (auto options = entry.find("optionLabels"); options != entry.end()) {
                         auto* definition = std::get_if<EnumDefinition>(&setting->definition);
-                        if (!definition || !options->is_object()) Error(field + "optionLabels");
-                        else for (const auto& [value, label] : options->items()) {
-                            auto option = std::ranges::find(definition->options, value, &EnumOption::value);
-                            if (option == definition->options.end() || !ValidText(label, false, false)) {
-                                Error(field + "optionLabels/" + value);
-                            } else {
-                                option->label = label.template get<std::string>();
+                        if (!definition || !options->is_object()) {
+                            Error(field + "optionLabels");
+                        } else {
+                            for (const auto& [value, label] : options->items()) {
+                                auto option = std::ranges::find(definition->options, value, &EnumOption::value);
+                                if (option == definition->options.end() || !ValidText(label, false, false)) {
+                                    Error(field + "optionLabels/" + value);
+                                } else {
+                                    option->label = label.template get<std::string>();
+                                }
                             }
                         }
                     }
