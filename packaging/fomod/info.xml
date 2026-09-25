@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<fomod>
+  <Name>OSF Settings</Name>
+  <Author>ozooma10</Author>
+  <Version MachineVersion="1.0.0">1.0.0</Version>
+  <Website>https://github.com/ozooma10/osf-settings-slim</Website>
+  <Description>A shared native Starfield menu for mod settings, keybindings, interface launchers and reported mod issues. Mods ship a JSON schema and OSF Settings builds their page; values persist across saves. Requires SFSE and Address Library for SFSE Plugins (1.16.244.0, v21). OSF UI is not required.</Description>
+  <Groups>
+    <element>Utilities</element>
+    <element>User Interface</element>
+    <element>Modders Resources</element>
+  </Groups>
+</fomod>

@@ -1,0 +1,80 @@
+[center][img]REPLACE-WITH-NEXUS-URL/osf-settings-header.png[/img][/center]
+
+[center][size=5][b]OSF Settings - one native menu for mod settings, keybindings and mod issues in Starfield.[/b][/size][/center]
+
+[center][b][color=#9cc774]1.0.0 - report anything broken[/color][/b][/center]
+
+[line]
+
+[center][img]REPLACE-WITH-NEXUS-URL/01-overview.png[/img][/center]
+OSF Settings is a shared, native settings menu for Starfield mods. It adds [b]MOD SETTINGS[/b] to the Pause menu and gives every supporting mod its own page, built from a small JSON file the mod ships. There's no web overlay and no plugin slot: it's a Scaleform menu styled to match the game.
+
+It's also where you [b]rebind keys[/b]. The Keybindings tab puts Starfield's own gameplay actions and registered mod hotkeys on one searchable keyboard, and [b]Mod Issues[/b] lists problems your mods report, so a missing file or a failed setup shows up somewhere you can see it.
+
+The framework carries no settings of its own beyond its opening key. Pages appear as you install mods that support it.
+
+[center][img]REPLACE-WITH-NEXUS-URL/02-features.png[/img][/center]
+[list]
+[*][b]Mod settings pages[/b]: toggles, sliders, choices, text fields and key pickers, grouped into tabs. Changes save instantly, and each setting can be reset to the mod author's default. A diamond marks anything you've changed.[/*]
+[*][b]Action buttons[/b]: one-click maintenance tasks a mod exposes (rescan, rebuild an index), with optional confirmation.[/*]
+[*][b]Keybindings tab[/b]: search native MainGameplay keyboard and mouse actions alongside registered mod hotkeys, with primary and alternate slots and a conflict prompt.[/*]
+[*][b]Interface launchers[/b]: the Home tab lists launch cards for mods' own menus and interfaces, so they all open from one place.[/*]
+[*][b]Mod Issues[/b]: errors and warnings reported by mods, with what's affected and what to do next. Settings files that fail to load show up here too.[/*]
+[*][b]Localized[/b]: follows the game's language. English and Japanese are included, and translators can ship drop-in catalogs for any mod's page without touching it.[/*]
+[*][b]Persistent[/b]: values are shared across all saves and kept when you update.[/*]
+[/list]
+
+[center][img]REPLACE-WITH-NEXUS-URL/03-get-started.png[/img][/center]
+[b]Requires:[/b] Starfield [font=Courier New]1.16.244.0[/font] (Steam), the matching [url=https://www.nexusmods.com/starfield/mods/106]SFSE[/url], and [url=https://www.nexusmods.com/starfield/mods/3256]Address Library for SFSE Plugins[/url] with the 1.16.244.0 database (v21). Other game versions haven't been verified.
+[b]Not required:[/b] OSF UI and WebView2. OSF Settings runs on its own.
+
+Install with MO2 or Vortex and enable it. No ESM or ESP activation is needed. Then in-game:
+[list]
+[*]Launch through SFSE and load a save.[/*]
+[*]Press [font=Courier New]F10[/font], or choose [b]MOD SETTINGS[/b] in the Pause menu.[/*]
+[*]Rebind the opening key on the OSF Settings page or in the [b]KEYBINDINGS[/b] tab.[/*]
+[/list]
+[b]Upgrading:[/b] your values live in [font=Courier New]Data/SFSE/Plugins/OSF/Settings/values[/font], and native hotkeys are stored in Starfield's own Controls file. Keep both. In MO2, files written at runtime may be in [b]Overwrite[/b] or an output mod, so keep those when you replace the framework. Don't delete the shared [font=Courier New]OSF[/font] folder, since other mods may own files there.
+
+[center][img]REPLACE-WITH-NEXUS-URL/04-for-authors.png[/img][/center]
+Ship one JSON file, [font=Courier New]Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json[/font], and OSF Settings builds your page from it. Read and write values from C++ or Papyrus.
+[code]{
+  "title": "My mod",
+  "groups": {
+    "General": [
+      { "key": "enabled", "type": "bool", "label": "Enable feature", "default": true }
+    ]
+  },
+  "hotkeys": {
+    "toggle": { "label": "Toggle feature", "default": "F6" }
+  }
+}[/code]
+[list]
+[*][b]Settings[/b]: [font=Courier New]bool[/font], [font=Courier New]int[/font], [font=Courier New]float[/font], [font=Courier New]enum[/font], [font=Courier New]string[/font] and [font=Courier New]key[/font], with ranges, hints and restart notices. Subscribe to live changes from C++ or Papyrus.[/*]
+[*][b]Hotkeys[/b]: declare rebindable actions and get a callback per key press, or open a registered native menu directly.[/*]
+[*][b]Action buttons[/b]: run your own maintenance tasks from the menu and report completion.[/*]
+[*][b]Launchers[/b]: add cards for native menus in the schema, or register a C++ callback for custom interfaces like ImGui or WebView overlays.[/*]
+[*][b]Issue reporting[/b]: report and clear problems in Mod Issues from C++ ([font=Courier New]OSFSettings_Diagnostics.h[/font]) or Papyrus ([font=Courier New]OSFSettings.ReportIssue[/font]).[/*]
+[/list]
+The SDK is header-only, with nothing to link. Guides, examples and the full schema reference are on [url=https://github.com/ozooma10/osf-settings-slim]GitHub[/url].
+
+[center][img]REPLACE-WITH-NEXUS-URL/05-troubleshooting.png[/img][/center]
+[list]
+[*][b]Menu missing?[/b] Confirm SFSE loaded [font=Courier New]OSFSettings.dll[/font] and the matching Address Library is installed. Check for older copies of the DLL or menu SWFs, and don't install two mods that both provide [font=Courier New]OSFSettings.dll[/font].[/*]
+[*][b]A mod has no page?[/b] Pages need a schema and an integration supplied by that mod. Existing OSF UI or older Settings integrations aren't automatically compatible, so follow each mod's own requirements.[/*]
+[*][b]Keybindings[/b] can't discover hotkeys a mod implements privately; only registered hotkeys are listed.[/*]
+[*][b]Mod Issues[/b] shows what mods report and schemas that failed to load. An empty page isn't a health check of every installed mod.[/*]
+[*][b]Controller[/b] operation is unverified on physical hardware, and text entry needs a keyboard.[/*]
+[*]Restart the game after changing language or installing translations.[/*]
+[/list]
+[b]Reporting a bug:[/b] include your game, SFSE and mod versions, steps to reproduce, and the OSF Settings and SFSE logs from [font=Courier New]Documents/My Games/Starfield/SFSE/Logs[/font].
+
+[center][img]REPLACE-WITH-NEXUS-URL/06-credits.png[/img][/center]
+[list]
+[*][b]ianpatt and the SFSE team[/b] ([url=https://sfse.silverlock.org/]SFSE[/url]), the script extender everything here loads through[/*]
+[*][b]libxse[/b] ([url=https://github.com/libxse/commonlibsf]CommonLibSF[/url]), the SFSE plugin library OSF Settings is built on[/*]
+[*][b]meh321[/b] ([url=https://www.nexusmods.com/starfield/mods/3256]Address Library[/url]), for version-independent addresses[/*]
+[*]Plus the Apache Flex SDK for building the menu, and [url=https://ruffle.rs/]Ruffle[/url] for previewing it during development.[/*]
+[/list]
+
+Source, author guides and issue tracker on [url=https://github.com/ozooma10/osf-settings-slim]GitHub[/url]. Let me know about every bug and complaint.
