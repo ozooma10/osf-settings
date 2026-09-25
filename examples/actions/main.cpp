@@ -17,7 +17,7 @@ namespace
     }
     void OnMessage(SFSE::MessagingInterface::Message* message)
     {
-        if (!message || message->type != SFSE::MessagingInterface::kPostPostLoad) return;
+        if (!message || message->type != SFSE::MessagingInterface::kPostLoad) return;
         if (!g_actions.Init()) { REX::WARN("Action example: provider unavailable"); return; }
         const auto result = g_actions.RegisterAction("osfsettings-actions-example", "run", OnAction, &g_actions);
         REX::INFO("Action example registration status={}", static_cast<std::uint32_t>(result));

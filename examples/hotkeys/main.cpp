@@ -20,7 +20,7 @@ namespace
 
     void OnMessage(SFSE::MessagingInterface::Message* message)
     {
-        if (!message || message->type != SFSE::MessagingInterface::kPostPostLoad || g_registered) return;
+        if (!message || message->type != SFSE::MessagingInterface::kPostLoad || g_registered) return;
         if (!g_settings.Init()) {
             REX::WARN("Hotkey example: OSF Settings is unavailable");
             return;

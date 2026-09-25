@@ -37,7 +37,7 @@ void Open(const char* modId, const char* id, void* context) noexcept
 
 Client launcher;
 
-// During SFSE kPostPostLoad:
+// During SFSE kPostLoad:
 if (launcher.Init()) {
     auto status = launcher.Register({
         .modId = "mymod", .id = "editor", .modTitle = "My Mod",

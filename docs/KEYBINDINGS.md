@@ -23,7 +23,7 @@ To migrate an existing array, move each declaration's `id` to its object key and
 
 ## C++ callbacks
 
-For a C++ callback, register once after [client initialization](SETTINGS.md#c-integration) at SFSE `kPostPostLoad`:
+For a C++ callback, register once after [client initialization](SETTINGS.md#c-integration) at SFSE `kPostLoad`:
 
 ```cpp
 void OnHotkey(const char* mod, const char* id, void* context) noexcept;

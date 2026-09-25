@@ -23,7 +23,7 @@ Bool clearedAll = OSFSettings.ClearModIssues("mymod")
 
 OSFSettings::API::Diagnostics::Client diagnostics;
 
-// During SFSE kPostPostLoad:
+// During SFSE kPostLoad:
 if (diagnostics.Init()) {
     auto status = diagnostics.Report({
         .modId = "mymod",

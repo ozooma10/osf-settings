@@ -105,7 +105,7 @@ namespace
 
     void OnMessage(SFSE::MessagingInterface::Message* message)
     {
-        if (message && message->type == SFSE::MessagingInterface::kPostPostLoad) RunExample();
+        if (message && message->type == SFSE::MessagingInterface::kPostLoad) RunExample();
     }
 }
 

@@ -25,7 +25,7 @@ namespace
     void OnMessage(SFSE::MessagingInterface::Message* message)
     {
         static RegistryExample::RegistryConsumer* consumer{};
-        if (!message || message->type != SFSE::MessagingInterface::kPostPostLoad || consumer) return;
+        if (!message || message->type != SFSE::MessagingInterface::kPostLoad || consumer) return;
         OSFSettings::API::Client settings;
         if (!settings.Init()) {
             REX::WARN("Registry example: OSF Settings is unavailable");

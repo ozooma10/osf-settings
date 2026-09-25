@@ -88,14 +88,14 @@ Add `"requires": "restart"` to show a restart notice. This is only a notice: val
 
 ## C++ integration
 
-Add [OSFSettings.h](../sdk/OSFSettings.h) to your plugin's includes. Initialize the client at SFSE `kPostPostLoad`:
+Add [OSFSettings.h](../sdk/OSFSettings.h) to your plugin's includes. Initialize the client at SFSE `kPostLoad` or later and check `IsReady()`. OSF Settings loads schemas and values and starts its services during its own plugin load callback. `kPostLoad` is the earliest point independent of plugin load order; `kPostPostLoad` is also valid but is not required. Game language has separate readiness: `GetLanguage()` can return `NotReady` until translation resources load.
 
 ```cpp
 #include "OSFSettings.h"
 
 OSFSettings::API::Client settings;
 
-// In your kPostPostLoad handler:
+// In your kPostLoad handler:
 if (settings.Init() && settings.IsReady()) {
     bool enabled = true;
     if (settings.GetBool("mymod", "enabled", &enabled) == OSFSettings::API::Status::Ok) {
@@ -225,7 +225,7 @@ void OnRescan(std::uint64_t invocation, const char* mod, const char* id, void* c
     api.CompleteAction(invocation, true, "Animation index reloaded.");
 }
 
-// In the kPostPostLoad listener:
+// In the kPostLoad listener:
 if (actions.Init()) {
     auto result = actions.RegisterAction("mymod", "rescan", OnRescan, &actions);
 }
