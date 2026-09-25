@@ -313,7 +313,9 @@ package
                     }
                     require(launcher && launcher.visible && !launcher.expanded && list.visible, "Home combines interfaces and mod settings");
                     require(findNamed(menu,"launcher") == null, "separate Launcher tab removed");
-                    require(findNamed(menu,"launcher_" + (launcher.columns - 1)) != null && findNamed(menu,"launcher_" + launcher.columns) == null, "recent shelf reserves the final card for overflow");
+                    require(findNamed(menu,"launcher_5") != null && findNamed(menu,"launcher_6") == null &&
+                        Object(findNamed(menu,"launcher_5")).row.more && Object(findNamed(menu,"launcher_5")).row.badge == "+5",
+                        "Home shows five interfaces and a +5 more card");
                     require(Object(findNamed(menu,"launcher_0")).row.title == "Absolute Control", "recent order overrides alphabetical order");
                     require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "Home tab label");
                     requireGlyphs("INTERFACES"); requireGlyphs("MODS");
@@ -327,10 +329,10 @@ package
                     require(launcher.focused && list.disableInput, "Up from the first mod focuses the interface shelf");
                     require(launcher.current.title == "Absolute Control" && homeDetail().title == "Absolute Control", "detail card follows the focused interface");
                     capture("home-interface");
-                    userEvent("Down"); break;
+                    launcher.navigate("Down"); userEvent("Down"); break;
                 case 56:
                     require(!launcher.focused && !list.disableInput, "Down from the shelf returns to mod settings");
-                    findNamed(menu,"launcher_" + (launcher.columns - 1)).dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    findNamed(menu,"launcher_5").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 57:
                     require(launcher.expanded && !list.visible, "Show more expands interfaces inside Home");
                     require(launcher.current.type == "launcher" && launcher.focused, "expanded grid selects an actual interface");

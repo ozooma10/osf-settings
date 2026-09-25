@@ -27,6 +27,7 @@
     "home.mods": "MOD",
     "home.interface": "インターフェース",
     "home.showAll": "すべて表示",
+    "home.more": "その他",
     "home.emptyTitle": "OSF Settingsを使用するMODはまだありません",
     "home.emptyBody": "OSF Settingsに対応したMODをインストールすると、設定・ホットキー・メニューがここに表示されます。インストール後にStarfieldを再起動してください。",
     "home.opensMenu": "このメニューを開く",

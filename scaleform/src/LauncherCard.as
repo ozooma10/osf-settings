@@ -21,24 +21,35 @@ package
             row = data; index = position; cardWidth = width; cardHeight = height;
             name = "launcher_" + position; mouseChildren = false; buttonMode = Boolean(row.editable);
             var large:Boolean = CONFIG::largeText;
-            var compact:Boolean = height < 150;
-            var diameter:Number = compact ? 48 : large ? 64 : 56;
-            var top:Number = compact ? 12 : 18;
-            tint = row.more ? Badge.MORE : Badge.color(row.mod + "/" + row.key);
-            badge = new Badge(row.more ? String(row.badge) : Badge.initials(String(row.title)), diameter);
-            badge.x = (width - diameter) / 2; badge.y = top; addChild(badge);
-            var size:Number = compact ? (large ? 25 : 21) : (large ? 28 : 24);
-            var titleTop:Number = top + diameter + (compact ? 6 : 12);
-            var tagHeight:Number = row.editable ? 0 : size;
-            title = field(String(row.title).toUpperCase(), titleTop, height - titleTop - tagHeight - 8, size);
-            if (!row.editable) tag = field(tr("home.unavailable"), height - tagHeight - 8, tagHeight + 4, size - 5);
+            if (row.more) {
+                title = field(String(row.badge) + " " + String(row.title), 20, 0, height - 32, large ? 28 : 24);
+                center(title);
+                title.height = title.textHeight + 4;
+                title.y = (height - title.height) / 2;
+                select(false); return;
+            }
+            var diameter:Number = large ? 56 : 48;
+            tint = Badge.color(row.mod + "/" + row.key);
+            badge = new Badge(Badge.initials(String(row.title)), diameter);
+            badge.x = 20; badge.y = (height - diameter) / 2; addChild(badge);
+            var size:Number = large ? 28 : 24;
+            var left:Number = badge.x + diameter + 16;
+            var tagHeight:Number = row.editable ? 0 : size + 4;
+            title = field(String(row.title), left, 0, height - 32 - tagHeight, size);
+            title.height = title.textHeight + 4;
+            title.y = (height - title.height - tagHeight) / 2;
+            if (!row.editable) tag = field(tr("home.unavailable"), left, title.y + title.height + 4, tagHeight, size - 5);
             select(false);
         }
-        private function field(value:String, y:Number, height:Number, size:Number):TextField
+        private function center(text:TextField):void
         {
-            var text:TextField = MenuStyle.field(value, 14, y, cardWidth - 28, height, size, MenuStyle.WHITE, true);
-            var format:TextFormat = text.defaultTextFormat; format.align = "center";
+            var format:TextFormat = text.defaultTextFormat;
+            format.align = "center";
             text.defaultTextFormat = format; text.setTextFormat(format);
+        }
+        private function field(value:String, left:Number, y:Number, height:Number, size:Number):TextField
+        {
+            var text:TextField = MenuStyle.field(value, left, y, cardWidth - left - 20, height, size);
             text.wordWrap = text.multiline = true;
             // Truncate at a fixed readable size; the detail card shows the full title.
             while (value.length && text.textHeight > height - 4) {
@@ -53,7 +64,7 @@ package
             graphics.lineStyle(1, selected ? MenuStyle.WHITE : 0x34424B);
             graphics.beginFill(selected ? MenuStyle.WHITE : 0x0E1B23);
             graphics.drawRect(0, 0, cardWidth, cardHeight); graphics.endFill();
-            badge.paint(selected ? MenuStyle.INK : row.editable ? tint : MenuStyle.LINE);
+            if (badge) badge.paint(selected ? MenuStyle.INK : row.editable ? tint : MenuStyle.LINE);
             title.textColor = selected ? MenuStyle.INK : row.editable ? MenuStyle.WHITE : MenuStyle.MUTED;
             if (tag) tag.textColor = selected ? 0x3D4F58 : MenuStyle.MUTED;
         }

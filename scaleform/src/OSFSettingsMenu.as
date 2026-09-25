@@ -173,6 +173,9 @@ package
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
             configureList(options, "OptionListEntry");
             options.addEventListener("SettingsOptionEntry_ValueChanged", valueChanged);
+            // Restore Home's list before vanilla handles a row's hover. Selection
+            // events cannot do this while the interface shelf has disabled the list.
+            options.addEventListener(MouseEvent.MOUSE_OVER, mouseFocus, true);
             detailLabel = label(tr("menu.selectedSetting"), 1210, 363, 630, 36, 21, MenuStyle.MUTED, true);
             detailTitle = label("", 1210, 409, 634, 102, CONFIG::largeText ? 38 : 34);
             detailTitle.multiline = true; detailTitle.wordWrap = true;
@@ -516,7 +519,7 @@ package
             detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage() && !homePage();
             MenuStyle.setText(detailLabel, row && row.type == "action" ? tr("menu.selectedAction") : tr("menu.selectedSetting"));
             homeDetails.visible = homePage() && !homeEmptyState();
-            if (homeDetails.visible) homeDetails.show(homeDetail(row), launcher.visible && !expandedLauncher() ? homeMods.y : 305);
+            if (homeDetails.visible) homeDetails.show(homeDetail(row), launcher.visible ? launcher.y : MenuStyle.LIST_TOP);
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
             MenuStyle.setText(detailTitle, row ? row.title : tr("menu.nothingSelected"));
@@ -798,7 +801,8 @@ package
         }
         private function mouseFocus(event:MouseEvent):void
         {
-            CONFIG::testHarness { testMouseDown = testMouseEvent(event, testMouseDown); }
+            if (event.type == MouseEvent.MOUSE_OVER && (!launcherPage() || expandedLauncher())) return;
+            CONFIG::testHarness { if (event.type == MouseEvent.MOUSE_DOWN) testMouseDown = testMouseEvent(event, testMouseDown); }
             if (captureRow || bindingBusy() || editingString() || confirmingAction()) return;
             if (!initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
@@ -905,7 +909,10 @@ package
             if (name != "Up" && name != "Down" && name != "Left" && name != "Right" && name != "PageUp" && name != "PageDown") return false;
             if (pressed && !refreshing && !requestedRefresh && navigationFrame != frame) {
                 navigationFrame = frame;
-                if (name == "Down" && !launcher.expanded && options.entryCount) { focusLauncher(false); options.selectedIndex = 0; }
+                if (name == "Down" && !launcher.expanded && options.entryCount &&
+                    (launcher.count <= launcher.columns || launcher.selectedIndex >= launcher.columns)) {
+                    focusLauncher(false); options.selectedIndex = 0;
+                }
                 else launcher.navigate(name);
             }
             return true;
