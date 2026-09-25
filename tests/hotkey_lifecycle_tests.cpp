@@ -221,9 +221,6 @@ int main()
             "failed registration destroys the handler and leaves the optional ready for retry");
 
         check(HotkeyInput::Install(), "install the single initialization hook");
-        const auto allocated = REL::GetTrampoline().allocated_size();
-        check(HotkeyInput::Install() && REL::GetTrampoline().allocated_size() == allocated,
-            "repeated installation reuses the initialization hook");
         events.clear();
         initialize(&controls);
         check(initializations == 1 && constructions == 2 && attached && controls.GetHandlerCount() == 8 &&

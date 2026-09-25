@@ -168,10 +168,6 @@ int main()
         load(&reset, vanilla);
         check(parsedTexts.size() == 3 && parsedMap == &reset && parsedTexts[1] == parsedTexts[2],
             "a vanilla reset receives the same definitions exactly once");
-        check(OSFSettings::NativeHotkeys::Install() && formattedRows.size() == 3,
-            "repeated installation neither rebuilds rows nor chains the hook twice");
-        load(&reset, vanilla);
-        check(parsedTexts.size() == 4 && parsedTexts[2] == parsedTexts[3], "repeated installation preserves one parser call");
         const char pauseContexts[] = "Pause\t0x1b\t0xff\t0xff\t1\t0\t0\t0x8\t0\t1\r\n\r\n"
             "// Menu context\r\nPause\t0x70\t0xff\t0xff\t1\t0\t0\t0x8\t0\t1\r\n\r\n"
             "AnotherPause\t0x71\t0xff\t0xff\t1\t0\t0\t0x8\t0\t1";
@@ -180,7 +176,7 @@ int main()
             "Pause contexts remain intact without adding action-specific links");
         fixture.Reset();
         load(&reset, vanilla);
-        check(parsedTexts.size() == 6 && parsedTexts.back() == vanilla &&
+        check(parsedTexts.size() == 5 && parsedTexts.back() == vanilla &&
             !OSFSettings::NativeHotkeys::g_parseHook,
             "fixture restores the original call and destroys the hook before host teardown");
         std::cout << checks << '/' << checks << " native registration checks passed\n";

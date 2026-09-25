@@ -81,9 +81,6 @@ namespace OSFSettings::HotkeyInput
 
     bool Install()
     {
-        if (g_initializeHook) {
-            return g_initializeHook->GetEnabled();
-        }
         if (RE::MenuControls::GetSingleton()) {
             REX::ERROR("Hotkeys: MenuControls already exists; safe startup registration was missed");
             return false;

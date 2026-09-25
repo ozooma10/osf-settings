@@ -15,8 +15,6 @@ namespace OSFSettings
 
     bool Runtime::Initialize() noexcept
     {
-        if (m_initialized) return true;
-
         if (!Paths::Initialize()) return false;
         const auto schemaDir = Paths::SchemasDir();
         REX::INFO("Loading schemas from {}", schemaDir.string());
@@ -58,7 +56,6 @@ namespace OSFSettings
             REX::ERROR("Settings service cannot start before its schemas are loaded");
             return false;
         }
-        m_initialized = true;
         return true;
     }
 

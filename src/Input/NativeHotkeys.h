@@ -14,6 +14,6 @@ namespace OSFSettings::NativeHotkeys
         std::optional<std::string> menu;
     };
 
-    bool Install();
+    bool Install(); // Called once from Plugin::OnLoad, after settings load.
     const Action* FindAction(std::string_view action);
 }

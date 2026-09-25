@@ -34,13 +34,7 @@ namespace OSFSettings::NativeHotkeys
 
     bool Install()
     {
-        if (g_parseHook) {
-            return g_parseHook->GetEnabled();
-        }
-
         //Need to build hotkey definitions that will get pre-pended to vanilla binding map
-        g_hotkeyDefinitions.clear();
-        g_actions.clear();
         HotkeyInputState::Declarations declarations;
         for (const auto& mod : SettingsService::Get().Snapshot()) {
             auto& targets = declarations[mod.schema.id];
