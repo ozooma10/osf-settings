@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cstring>
 #include <limits>
-#include <stdexcept>
 #include <type_traits>
 
 namespace OSFSettings::API
@@ -32,9 +31,10 @@ namespace OSFSettings::API
             return Status::InternalError;
         }
 
-        std::uint32_t Count(std::size_t size)
+        // Schema validation bounds every projected size; exceeding the ABI's 32-bit counts is a contract violation, not a runtime error.
+        std::uint32_t Count(std::size_t size) noexcept
         {
-            if (size > std::numeric_limits<std::uint32_t>::max()) throw std::length_error("registry field is too large");
+            if (size > std::numeric_limits<std::uint32_t>::max()) REX::FAIL("registry field is too large: {} elements", size);
             return static_cast<std::uint32_t>(size);
         }
 

@@ -54,7 +54,10 @@ namespace OSFSettings
         ActionService::Get().Initialize(mods);
         LauncherService::Get().Initialize(mods);
         LauncherService::Get().LoadHistory(Paths::ValuesDir().parent_path());
-        settings.Start();
+        if (!settings.Start()) {
+            REX::ERROR("Settings service cannot start before its schemas are loaded");
+            return false;
+        }
         m_initialized = true;
         return true;
     }
