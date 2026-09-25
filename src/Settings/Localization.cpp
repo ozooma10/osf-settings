@@ -167,6 +167,14 @@ namespace OSFSettings::Localization
         }
     }
 
+    namespace
+    {
+        std::atomic_bool g_initialized{ false };
+    }
+
+    bool Initialized() { return g_initialized.load(std::memory_order_acquire); }
+    void MarkInitialized() { g_initialized.store(true, std::memory_order_release); }
+
     std::string NormalizeLanguage(std::string_view language)
     {
         if (language.empty() || language.size() > 32 || language.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != language.npos) return "en";

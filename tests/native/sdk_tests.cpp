@@ -23,6 +23,7 @@ namespace
         struct Provider final : ISettings
         {
             bool ready{};
+            std::string language{ "en" };
             std::string enumValue{ "quiet" };
             std::string nextEnumValue;
             Status enumCopyStatus{ Status::Ok };
@@ -70,6 +71,15 @@ namespace
             Status ReadRegistry(const char*, RegistryFn, void*) noexcept override { return Status::NotReady; }
             Status RegisterAction(const char*, const char*, ActionFn, void*) noexcept override { return Status::NotReady; }
             Status CompleteAction(Invocation, bool, const char*) noexcept override { return Status::NotReady; }
+            Status GetLanguage(char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override
+            {
+                if (!ready) return Status::NotReady;
+                *required = static_cast<std::uint32_t>(language.size() + 1);
+                if (!out || capacity < *required) return Status::BufferTooSmall;
+                language.copy(out, language.size());
+                out[language.size()] = '\0';
+                return Status::Ok;
+            }
         } provider;
 
         Client client;
@@ -112,6 +122,13 @@ namespace
         Check(client.GetEnum("learning", "mode", mode) == Status::UnknownSetting && mode == "quiet",
             "SDK string reads preserve output when copying fails after a successful size query");
         provider.enumCopyStatus = Status::Ok;
+
+        std::string language = "unchanged";
+        Check(client.Attach(&provider, kBaseVersion) && client.GetLanguage(language) == Status::NotReady && language == "unchanged",
+            "SDK language reads refuse a 1.0 provider without calling it");
+        provider.language = "ptbr";
+        Check(client.Attach(&provider, kLanguageVersion) && client.GetLanguage(language) == Status::Ok && language == "ptbr",
+            "SDK language reads use the 1.1 slot and exclude the terminating NUL");
 
         Check(!client.Attach(&provider, 0x00020000u) && !client && !client.Raw() && client.Version() == 0,
             "incompatible SDK attachment clears an existing service");

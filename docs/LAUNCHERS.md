@@ -55,6 +55,7 @@ launcher.SetAvailable("mymod", "editor", false, "Requires My Mod Assets.");
 
 ## Opening
 
+- An accepted launch closes the Pause menu if open, then closes Settings and hands off to your interface.
 - Your `open` callback must return promptly and queue the open on your usual UI or runtime thread.
 - A rejected request leaves Settings open. You handle and report any failure after handoff (see [Issue reporting](DIAGNOSTICS.md)).
 - Handoff is canceled if a main menu or loading screen is already open when Settings closes.

@@ -1,12 +1,12 @@
 #include "SettingsApi.h"
 #include "../../sdk/OSFSettingsRegistry.h"
 #include "Input/HotkeyInputState.h"
+#include "Settings/Localization.h"
 #include "Settings/SettingsService.h"
 
 #include <algorithm>
 #include <cstring>
 #include <limits>
-#include <stdexcept>
 #include <type_traits>
 
 namespace OSFSettings::API
@@ -31,9 +31,10 @@ namespace OSFSettings::API
             return Status::InternalError;
         }
 
-        std::uint32_t Count(std::size_t size)
+        // Schema validation bounds every projected size; exceeding the ABI's 32-bit counts is a contract violation, not a runtime error.
+        std::uint32_t Count(std::size_t size) noexcept
         {
-            if (size > std::numeric_limits<std::uint32_t>::max()) throw std::length_error("registry field is too large");
+            if (size > std::numeric_limits<std::uint32_t>::max()) REX::FAIL("registry field is too large: {} elements", size);
             return static_cast<std::uint32_t>(size);
         }
 
@@ -148,6 +149,19 @@ namespace OSFSettings::API
     }
 
     bool SettingsApi::IsReady() noexcept { return m_service.IsReady(); }
+
+    Status SettingsApi::GetLanguage(char* out, std::uint32_t capacity, std::uint32_t* required) noexcept
+    {
+        if (!required || (!out && capacity)) return Status::InvalidArgument;
+        if (!Localization::Initialized()) return Status::NotReady;
+        const auto catalog = Localization::Get();
+        const auto& text = catalog->Language();
+        if (text.size() >= std::numeric_limits<std::uint32_t>::max()) return Status::InternalError;
+        *required = static_cast<std::uint32_t>(text.size() + 1);
+        if (capacity < *required) return Status::BufferTooSmall;
+        std::memcpy(out, text.c_str(), *required);
+        return Status::Ok;
+    }
 
     Status SettingsApi::ReadRegistry(const char* mod, RegistryFn callback, void* context) noexcept
     {

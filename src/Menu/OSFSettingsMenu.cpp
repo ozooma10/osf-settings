@@ -154,6 +154,10 @@ namespace OSFSettings
                 auto destination = LauncherService::Get().Find(ArgString(params, 0), ArgString(params, 1));
                 if (destination && destination->available && (destination->open || ui->IsMenuRegistered(RE::BSFixedString(destination->menu.c_str())))) {
                     m_launch = std::move(destination);
+                    // Dismiss Pause before Settings leaves the stack and hands off to the destination.
+                    if (ui->IsMenuOpen("PauseMenu")) {
+                        queue->AddMessage(RE::BSFixedString("PauseMenu"), RE::UI_MESSAGE_TYPE::kHide);
+                    }
                     Close();
                     accepted = true;
                 }

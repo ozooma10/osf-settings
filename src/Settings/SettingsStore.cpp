@@ -31,34 +31,31 @@ namespace OSFSettings
         std::ranges::sort(files);
 
         for (const auto& path : files) {
-            try {
-                std::ifstream input(path);
-                if (!input) {
-                    m_loadErrors.push_back({ path, "cannot open schema file", true });
-                    continue;
-                }
-                std::string message;
-                auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message);
-                if (!schema) {
-                    m_loadErrors.push_back({ path, std::move(message), true });
-                    continue;
-                }
-
-                ModSettings mod;
-                mod.schema = std::move(*schema);
-                for (const auto& group : mod.schema.groups) {
-                    for (const auto& control : group.controls) {
-                        const auto* valueSetting = std::get_if<SettingDefinition>(&control);
-                        if (!valueSetting) continue;
-                        const auto& setting = *valueSetting;
-                        mod.values.emplace(setting.key, setting.DefaultValue());
-                    }
-                }
-                SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
-                m_mods.push_back(std::move(mod));
-            } catch (const std::exception& exception) {
-                m_loadErrors.push_back({ path, exception.what(), true });
+            std::ifstream input(path);
+            if (!input) {
+                m_loadErrors.push_back({ path, "cannot open schema file", true });
+                continue;
             }
+            std::string message;
+            auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message);
+            if (!schema) {
+                m_loadErrors.push_back({ path, std::move(message), true });
+                continue;
+            }
+
+            ModSettings mod;
+            mod.schema = std::move(*schema);
+            for (const auto& group : mod.schema.groups) {
+                for (const auto& control : group.controls) {
+                    const auto* valueSetting = std::get_if<SettingDefinition>(&control);
+                    if (!valueSetting) continue;
+                    const auto& setting = *valueSetting;
+                    mod.values.emplace(setting.key, setting.DefaultValue());
+                }
+            }
+            SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
+            m_mods.push_back(std::move(mod));
+
         }
     }
 

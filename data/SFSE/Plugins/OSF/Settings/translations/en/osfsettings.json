@@ -27,6 +27,7 @@
     "home.mods": "MODS",
     "home.interface": "INTERFACE",
     "home.showAll": "SHOW ALL",
+    "home.more": "MORE",
     "home.emptyTitle": "No mods use OSF Settings yet",
     "home.emptyBody": "Mods that support OSF Settings add their settings, hotkeys and menus here. Install one, then restart Starfield.",
     "home.opensMenu": "OPENS THIS MENU",

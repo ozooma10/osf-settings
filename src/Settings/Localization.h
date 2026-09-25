@@ -36,6 +36,8 @@ namespace OSFSettings::Localization
     std::string Text(std::string_view key);
     std::string Text(std::string_view key, std::initializer_list<std::pair<std::string_view, std::string_view>> arguments);
     void Initialize(); // Engine startup, after the stock translation resource loads.
+    bool Initialized(); // True once Initialize() has applied the game's language.
+    void MarkInitialized();
 }
 
 namespace OSFSettings

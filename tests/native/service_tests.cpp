@@ -76,7 +76,7 @@ int TestSettingsService()
     std::uint32_t version = 42;
     check(!OSFSettings_RequestAPI(0x00020000u, &version) && version == 0, "export rejects a different major");
     version = 42;
-    check(!OSFSettings_RequestAPI(0x00010001u, &version) && version == 0, "export rejects a newer minor");
+    check(!OSFSettings_RequestAPI(API::kVersion + 1, &version) && version == 0, "export rejects a newer minor");
     auto* exported = static_cast<API::ISettings*>(OSFSettings_RequestAPI(API::kBaseVersion, &version));
     check(exported && version == API::kVersion && !exported->IsReady() &&
         OSFSettings_RequestAPI(API::kBaseVersion, nullptr) == exported, "export returns the same interface before readiness");

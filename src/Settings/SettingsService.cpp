@@ -2,7 +2,6 @@
 #include "Localization.h"
 #include "REX/LOG.h"
 
-#include <stdexcept>
 #include <utility>
 
 namespace OSFSettings
@@ -30,11 +29,12 @@ namespace OSFSettings
         m_loaded = true;
     }
 
-    void SettingsService::Start()
+    bool SettingsService::Start()
     {
         std::lock_guard lock(m_mutex);
-        if (!m_loaded) throw std::logic_error("settings must be loaded before starting the service");
+        if (!m_loaded) return false;
         m_ready.store(true, std::memory_order_release);
+        return true;
     }
 
     bool SettingsService::IsReady() const noexcept { return m_ready.load(std::memory_order_acquire); }

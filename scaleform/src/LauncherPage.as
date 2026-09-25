@@ -6,7 +6,7 @@ package
     import flash.text.TextField;
 
     // Home's recent shelf and expanded, paged grid share the same selection.
-    // Expanded, the grid keeps the left column so Home's detail card stays visible.
+    // Both layouts keep the left column so Home's detail card stays beside them.
     public final class LauncherPage extends MovieClip
     {
         public static const GRID_TOP:Number = 350;
@@ -30,11 +30,12 @@ package
             addChild(cards); addChild(pager);
             addEventListener(MouseEvent.MOUSE_WHEEL, wheel);
         }
-        public function get columns():int { return CONFIG::largeText ? 4 : 5; }
+        public function get columns():int { return 3; }
         private function get gridColumns():int { return isExpanded ? GRID_COLUMNS : columns; }
         private function get gridRows():int { return CONFIG::largeText ? 3 : 4; }
-        public function get capacity():int { return isExpanded ? GRID_COLUMNS * gridRows : columns; }
-        public function get shelfHeight():Number { return CONFIG::largeText ? 200 : 170; }
+        public function get capacity():int { return isExpanded ? GRID_COLUMNS * gridRows : columns * 2; }
+        private function get shelfCardHeight():Number { return CONFIG::largeText ? 110 : 96; }
+        public function get shelfHeight():Number { return entries.length > columns ? shelfCardHeight * 2 + 16 : shelfCardHeight; }
         public function get expanded():Boolean { return isExpanded; }
         // With no mod settings to show, the grid is the whole page and cannot collapse.
         public function get locked():Boolean { return isLocked; }
@@ -66,12 +67,12 @@ package
             if (!preserve || isLocked && !lock) { isExpanded = false; hasFocus = false; }
             isLocked = lock;
             if (isLocked) isExpanded = true;
-            else if (entries.length <= columns) isExpanded = false;
-            displayed = isExpanded || entries.length <= columns ? entries.concat() : entries.slice(0, columns - 1);
-            if (!isExpanded && entries.length > columns) {
-                var remaining:int = entries.length - displayed.length;
+            else if (entries.length <= columns * 2) isExpanded = false;
+            displayed = isExpanded ? entries.concat() : entries.slice(0, entries.length > capacity ? capacity - 1 : capacity);
+            if (!isExpanded && entries.length > capacity) {
                 displayed.push({type:"launcherMore", more:true, editable:true, mod:"", key:"@more",
-                    title:tr("home.showAll"), hint:tr("home.browseAll", {count:entries.length}), badge:"+" + remaining});
+                    title:tr("home.more"), hint:tr("home.browseAll", {count:entries.length}),
+                    badge:"+" + (entries.length - displayed.length)});
             }
             selected = displayed.length ? 0 : -1;
             for (var i:int = 0; previous && i < displayed.length; ++i)
@@ -97,6 +98,9 @@ package
         }
         public function navigate(direction:String):void
         {
+            if (!isExpanded && direction == "PageDown" && entries.length > displayed.length) {
+                toggleExpanded(); return;
+            }
             if (!displayed.length) return;
             var next:int = Math.max(0, selected);
             var across:int = gridColumns;
@@ -121,11 +125,11 @@ package
         private function over(event:MouseEvent):void { select(LauncherCard(event.currentTarget).index); }
         private function press(event:MouseEvent):void { select(LauncherCard(event.currentTarget).index); activated(); }
         // Returns the button's left edge so header controls can be laid out right to left.
-        private function pageButton(text:String, right:Number, callback:Function, enabled:Boolean = true):Number
+        private function pageButton(text:String, right:Number, callback:Function, enabled:Boolean = true, buttonName:String = ""):Number
         {
             var label:TextField = MenuStyle.field(text, 4, 0, 300, 36, CONFIG::largeText ? 25 : 22, MenuStyle.WHITE, true);
             label.width = Math.min(300, label.textWidth + 8); MenuStyle.fit(label, text);
-            var button:Sprite = new Sprite(); button.x = right - label.width - 8; button.y = -45;
+            var button:Sprite = new Sprite(); button.name = buttonName; button.x = right - label.width - 8; button.y = -45;
             button.mouseChildren = false; button.buttonMode = enabled; button.alpha = enabled ? 1 : 0.35;
             button.graphics.beginFill(0, 0); button.graphics.drawRect(0, 0, label.width + 8, 36); button.graphics.endFill();
             button.addChild(label);
@@ -136,10 +140,10 @@ package
         {
             while (cards.numChildren) cards.removeChildAt(0);
             while (pager.numChildren) pager.removeChildAt(0);
-            var gap:Number = 20, rowGap:Number = isExpanded ? 14 : gap, across:int = gridColumns;
-            var width:Number = ((isExpanded ? MenuStyle.LIST_WIDTH : MenuStyle.RIGHT - MenuStyle.LEFT) - gap * (across - 1)) / across;
+            var gap:Number = 20, rowGap:Number = isExpanded ? 14 : 16, across:int = gridColumns;
+            var width:Number = (MenuStyle.LIST_WIDTH - gap * (across - 1)) / across;
             // The grid runs from GRID_TOP to just above the footer divider.
-            var height:Number = isExpanded ? (894 - GRID_TOP - rowGap * (gridRows - 1)) / gridRows : shelfHeight;
+            var height:Number = isExpanded ? (894 - GRID_TOP - rowGap * (gridRows - 1)) / gridRows : shelfCardHeight;
             for (var i:int = first; i < Math.min(displayed.length, first + capacity); ++i) {
                 var card:LauncherCard = new LauncherCard(displayed[i], i, width, height);
                 card.x = (i - first) % across * (width + gap);
