@@ -21,9 +21,6 @@ namespace OSFSettings::Plugin
             }
 
             if(message->type == SFSE::MessagingInterface::kPostPostDataLoad) {
-                if (!Papyrus::RegisterSinks()) {
-                    REX::ERROR("Papyrus subscription event sources are unavailable");
-                }
                 const bool available = OSFSettingsMenu::Register() && PauseMenu::RegisterSink();
                 REX::INFO("[kPostPostDataLoad] Settings menu integration available={}", available);
             } 

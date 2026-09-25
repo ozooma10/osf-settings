@@ -308,16 +308,16 @@ namespace OSFSettings::Papyrus
         return true;
     }
 
-    bool RegisterSinks()
+    void RegisterSinks()
     {
         static bool installed{};
-        if (installed) return true;
+        if (installed) return;
         static auto* events = new SessionEvents;
         RE::SaveLoadEvent::GetEventSource()->RegisterSink(events);
         RE::TESLoadGameEvent::GetEventSource()->RegisterSink(events);
         RE::UI::GetSingleton()->RegisterSink<RE::MenuOpenCloseEvent>(events);
         installed = true;
-        return true;
+        return;
     }
 
 }
