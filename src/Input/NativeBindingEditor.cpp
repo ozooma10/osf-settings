@@ -56,10 +56,6 @@ namespace OSFSettings
         m_input = RE::SettingsDataModel::GetSingleton();
         if (!m_input) return false;
         m_hotkeyBlock = HotkeyInputState::Get().AcquireBlock();
-        if (!m_hotkeyBlock) {
-            m_input = nullptr;
-            return false;
-        }
         s_active = true;
         return true;
     }

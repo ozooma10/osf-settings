@@ -68,10 +68,8 @@ namespace OSFSettings
     HotkeyInputState::Block HotkeyInputState::AcquireBlock()
     {
         std::lock_guard lock(m_mutex);
-        if (!m_nextBlock) return 0; // Never recycle a token after wraparound.
-        const auto block = m_nextBlock;
+        const auto block = m_nextBlock++;
         m_blocks.insert(block);
-        m_nextBlock++;
         m_pressed.clear();
         return block;
     }

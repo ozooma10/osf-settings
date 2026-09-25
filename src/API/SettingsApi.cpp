@@ -302,9 +302,7 @@ namespace OSFSettings::API
     Status SettingsApi::AcquireHotkeyBlock(HotkeyBlock* out) noexcept
     {
         if (!out) return Status::InvalidArgument;
-        const auto block = m_input.AcquireBlock();
-        if (!block) return Status::InternalError;
-        *out = block;
+        *out = m_input.AcquireBlock();
         return Status::Ok;
     }
 
