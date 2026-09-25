@@ -65,49 +65,45 @@ namespace OSFSettings
         m_historyDirty = false;
         m_recent.clear();
         m_revision++;
-        try {
-            if (!std::filesystem::exists(m_dataPath)) return;
-            std::ifstream input(m_dataPath);
-            if (!input) throw std::runtime_error("cannot open internal data file");
-            const auto document = nlohmann::json::parse(input);
-            const auto& history = document.at("recentLaunchers");
-            if (!history.is_array() || history.size() > 256) {
-                throw std::runtime_error("invalid history format");
-            }
-            std::vector<std::pair<std::string, std::string>> recent;
-            for (const auto& item : history) {
-                auto identity = std::pair{ item.at("mod").get<std::string>(), item.at("id").get<std::string>() };
-                if (!IsValidModId(identity.first) || identity.first.size() > 128 || !ValidID(identity.second)) {
-                    throw std::runtime_error("invalid destination identity");
-                }
-                if (std::ranges::find(recent, identity) == recent.end()) {
-                    recent.push_back(std::move(identity));
-                }
-            }
-            m_recent = std::move(recent);
-        } catch (const std::exception& error) {
-            REX::WARN("Launcher history {}: {}", m_dataPath.string(), error.what());
+        const auto warn = [&](std::string_view problem) { REX::WARN("Launcher history {}: {}", m_dataPath.string(), problem); };
+        std::ifstream input(m_dataPath);
+        if (!input) {
+            std::error_code error;
+            if (std::filesystem::exists(m_dataPath, error)) warn("cannot open internal data file");
+            return;
         }
+        const auto document = nlohmann::json::parse(input, nullptr, false);
+        if (document.is_discarded()) return warn("invalid JSON");
+        const auto history = document.find("recentLaunchers");
+        if (history == document.end() || !history->is_array() || history->size() > 256) return warn("invalid history format");
+        std::vector<std::pair<std::string, std::string>> recent;
+        for (const auto& item : *history) {
+            const auto mod = item.find("mod");
+            const auto id = item.find("id");
+            if (mod == item.end() || id == item.end() || !mod->is_string() || !id->is_string()) return warn("invalid destination identity");
+            auto identity = std::pair{ mod->get<std::string>(), id->get<std::string>() };
+            if (!IsValidModId(identity.first) || identity.first.size() > 128 || !ValidID(identity.second)) return warn("invalid destination identity");
+            if (std::ranges::find(recent, identity) == recent.end()) {
+                recent.push_back(std::move(identity));
+            }
+        }
+        m_recent = std::move(recent);
     }
 
     void LauncherService::SaveHistory()
     {
         if (m_dataPath.empty() || !m_historyDirty) return;
-        try {
-            auto recent = nlohmann::json::array();
-            for (const auto& [mod, id] : m_recent) {
-                recent.push_back({{"mod", mod}, {"id", id}});
-            }
-            const nlohmann::json document = {{"recentLaunchers", recent}};
-            std::string error;
-            if (!Persistence::WriteAtomic(m_dataPath, document.dump(2) + '\n', error)) {
-                REX::WARN("Launcher history {}: {}", m_dataPath.string(), error);
-                return;
-            }
-            m_historyDirty = false;
-        } catch (const std::exception& error) {
-            REX::WARN("Launcher history {}: {}", m_dataPath.string(), error.what());
+        auto recent = nlohmann::json::array();
+        for (const auto& [mod, id] : m_recent) {
+            recent.push_back({{"mod", mod}, {"id", id}});
         }
+        const nlohmann::json document = {{"recentLaunchers", recent}};
+        std::string error;
+        if (!Persistence::WriteAtomic(m_dataPath, document.dump(2) + '\n', error)) {
+            REX::WARN("Launcher history {}: {}", m_dataPath.string(), error);
+            return;
+        }
+        m_historyDirty = false;
     }
 
     bool LauncherService::RecordOpened(std::string_view mod, std::string_view id)
