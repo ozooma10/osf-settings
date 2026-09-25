@@ -30,8 +30,6 @@ Sage matches the green launch-card rings already drawn in the in-game menu.
 
 ## Fonts
 
-Sources name Bahnschrift first (same as the siblings). The committed PNGs were rendered off-Windows
-with Barlow Semi Condensed / JetBrains Mono standing in for Bahnschrift / Consolas, so letterforms
-differ slightly from OSF UI's and OSF Animation's PNGs. For exact parity, re-rasterize on Windows the
-way `../section-headers/README.md` in OSF Animation describes (open the SVG in a browser, capture at
-native size with a transparent background).
+Sources name Bahnschrift first (same as the siblings). The header and both patch PNGs were
+re-rasterized on Windows in Bahnschrift (headless Edge, native size, transparent background). The
+emblem PNG was rendered off-Windows with Barlow Semi Condensed standing in, but it has no text.
