@@ -54,7 +54,7 @@ xmake build 'OSF Settings'
 The instrumented plugin requires `Data/SFSE/Plugins/OSFSettingsTestHarness.json`
 with `{"valuesDir":"C:/Modding/Starfield/OSF Test Harness/state/settings-values"}`.
 Each mod saves its own JSON file there; launcher recency uses `internal.json` in
-the parent directory. Keep both locations isolated from live player state.
+the same directory. Keep it isolated from live player state.
 The harness prepares this directory and config. The path must be nonempty and
 absolute; missing/invalid config prevents plugin initialization. This keeps tests
 away from the player's Documents store. Normal builds ignore this configuration.

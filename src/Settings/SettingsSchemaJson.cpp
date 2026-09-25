@@ -121,6 +121,8 @@ namespace OSFSettings::SettingsJson
             ModSchema mod;
             mod.id = modId;
             Require(IsValidModId(mod.id), "mod id must use lowercase ASCII letters, digits, dots, underscores, or hyphens");
+            // Values share a folder with OSF Settings' internal.json.
+            Require(mod.id != "internal", "mod id 'internal' is reserved");
             if (document.contains("id")) {
                 Require(RequiredText(document, "id") == mod.id, "schema id must match the filename stem");
             }

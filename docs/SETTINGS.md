@@ -27,7 +27,7 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 The filename without `.json` is your mod ID: `mymod.json` gives `mymod`.
 OSF builds your mod's configuration menu from this file. Schemas load at startup; restart Starfield after editing them.
 
-Player values are saved separately for each mod in `<Documents>/My Games/Starfield/OSF/Settings/values/<modId>.json`. Documents is resolved through Windows, including redirected locations such as OneDrive. Values are shared across save games, mod-manager profiles, and game installations using that Documents folder. Launcher history is stored alongside `values` in `internal.json`.
+Player values are saved separately for each mod in `<Documents>/My Games/Starfield/OSF/Settings/<modId>.json`. Documents is resolved through Windows, including redirected locations such as OneDrive. Values are shared across save games, mod-manager profiles, and game installations using that Documents folder. Launcher history is stored in the same folder in `internal.json`, so the mod id `internal` is reserved.
 
 Ship just the schema file; OSF Settings manages your mod's values file.
 

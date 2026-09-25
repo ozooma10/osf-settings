@@ -19,24 +19,19 @@ namespace OSFSettings::Paths
 			std::filesystem::path valuesDir;
 			if (!TestHarness::InitializeValues(gamePath.parent_path(), valuesDir)) return false;
 
-			std::filesystem::path userDataDir;
-			if (!valuesDir.empty()) {
-				// Keep harness storage separate from the player's files.
-				userDataDir = valuesDir.parent_path();
-			} else {
+			// Harness storage stays separate from the player's files.
+			if (valuesDir.empty()) {
 				const auto logs = SFSE::log::log_directory();
 				if (!logs) {
 					REX::ERROR("Cannot resolve the SFSE log directory for settings");
 					return false;
 				}
-				userDataDir = logs->parent_path().parent_path() / "OSF" / "Settings";
-				valuesDir = userDataDir / "values";
+				valuesDir = logs->parent_path().parent_path() / "OSF" / "Settings";
 			}
 			g_dataDir = dataDir;
-			g_userDataDir = userDataDir;
+			g_userDataDir = valuesDir;
 			g_valuesDir = valuesDir;
 			REX::INFO("Settings user data: {}", g_userDataDir.string());
-			REX::INFO("Settings values: {}", g_valuesDir.string());
 			return true;
 		} catch (const std::exception& error) {
 			REX::ERROR("Cannot initialize settings paths: {}", error.what());

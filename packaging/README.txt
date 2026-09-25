@@ -28,9 +28,9 @@ settings files that failed to load and reports supplied by supporting mods; an
 empty page is not a health check of every installed mod. Physical controller
 operation remains unverified, and text entry requires a keyboard.
 
-Settings persist in Documents/My Games/Starfield/OSF/Settings/values, shared
+Settings persist in Documents/My Games/Starfield/OSF/Settings, shared
 across saves, mod-manager profiles and game installations using that Documents
-folder. Launcher history is stored alongside values in internal.json.
+folder. Launcher history is stored in the same folder in internal.json.
 Documents follows the Windows location, including OneDrive redirection.
 Native hotkeys use Starfield's Controls storage separately. Keep both when
 upgrading. Schemas and translations remain in Data.
