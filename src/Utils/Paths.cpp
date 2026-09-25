@@ -1,7 +1,6 @@
 #include "Paths.h"
 #include "Harness/TestHarness.h"
-#include "REX/W32/OLE32.h"
-#include "REX/W32/SHELL32.h"
+#include "SFSE/Logger.h"
 
 namespace OSFSettings::Paths
 {
@@ -25,15 +24,12 @@ namespace OSFSettings::Paths
 				// Keep harness storage separate from the player's files.
 				userDataDir = valuesDir.parent_path();
 			} else {
-				wchar_t* buffer{};
-				const auto result = REX::W32::SHGetKnownFolderPath(REX::W32::FOLDERID_Documents,
-					REX::W32::KF_FLAG_DEFAULT, nullptr, &buffer);
-				const std::unique_ptr<wchar_t[], decltype(&REX::W32::CoTaskMemFree)> documents(buffer, REX::W32::CoTaskMemFree);
-				if (result != 0 || !documents) {
-					REX::ERROR("Cannot resolve the Documents folder for settings: HRESULT {}", result);
+				const auto logs = SFSE::log::log_directory();
+				if (!logs) {
+					REX::ERROR("Cannot resolve the SFSE log directory for settings");
 					return false;
 				}
-				userDataDir = std::filesystem::path(documents.get()) / "My Games" / "Starfield" / "OSF" / "Settings";
+				userDataDir = logs->parent_path().parent_path() / "OSF" / "Settings";
 				valuesDir = userDataDir / "values";
 			}
 			g_dataDir = dataDir;

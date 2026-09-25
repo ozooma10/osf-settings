@@ -43,7 +43,7 @@ namespace OSFSettings
                         REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current);
                     }
                 }, value);
-                ++settingCount;
+                settingCount++;
             }
         }
         REX::INFO("OSF Settings Loaded: {} mod(s), {} setting(s), {} load error(s)", mods.size(), settingCount, errors.size());
@@ -65,7 +65,9 @@ namespace OSFSettings
     void Runtime::ReportLoadIssues()
     {
         for (auto& issue : SchemaLoadIssues(SettingsService::Get().LoadErrors())) {
-            if (!DiagnosticsService::Get().Report(std::move(issue))) REX::ERROR("Could not report a schema load failure in Mod Issues");
+            if (!DiagnosticsService::Get().Report(std::move(issue))) {
+                REX::ERROR("Could not report a schema load failure in Mod Issues");
+            }
         }
     }
 
