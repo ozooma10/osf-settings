@@ -76,7 +76,7 @@ int TestKeySettings()
         ++checks;
         if (!passed) throw std::runtime_error(std::string("Key settings: ") + message);
     };
-    static_assert(API::kVersion == 0x00010000u);
+    static_assert(API::kVersion == 0x00010001u);
     static_assert(API::kUnboundKey == KeyBinding::Unbound);
     check(KeyCodeFromName("F4") == 0x73 && !KeyCodeFromName("unknown") && KeyCodeFromName("unbound") == KeyBinding::Unbound,
         "missing input manager uses the fallback table and preserves unknown names");

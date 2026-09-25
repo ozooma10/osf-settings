@@ -17,6 +17,7 @@ namespace OSFSettings::Localization
             const auto language = setting && setting->GetType() == RE::Setting::Type::kString ? setting->GetString() : std::string_view("en");
             auto& settings = SettingsService::Get();
             settings.Localize(Paths::LocalizationDir(), language);
+            MarkInitialized();
             const auto catalog = Get();
             REX::INFO("Localization: game language={}, catalog={}", language, catalog->Language());
             for (const auto& error : catalog->Errors()) {
