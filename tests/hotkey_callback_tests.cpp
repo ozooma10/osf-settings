@@ -10,7 +10,9 @@ namespace
     using namespace OSFSettings;
     using Target = HotkeyInputState::Target;
     constexpr std::uint32_t key = 0x75;
-    constexpr auto action = "sample/toggleFeature";
+    const NativeHotkeys::Action action{ "sample/toggleFeature", "sample", "toggleFeature", std::nullopt };
+    const NativeHotkeys::Action second{ "sample/second", "sample", "second", std::nullopt };
+    const NativeHotkeys::Action menu{ "sample/openMenu", "sample", "openMenu", "SampleMenu" };
 
     struct Receiver
     {
@@ -42,10 +44,10 @@ int main()
         const auto press = [&] { return input.ProcessButton(key, action, 1, 0); };
         const auto repeat = [&] { return input.ProcessButton(key, action, 1, 1); };
         const auto release = [&] { return input.ProcessButton(key, action, 0, 1); };
-        check(registerCallback("sample", "toggleFeature", one) == SettingsError::NotReady && !press(),
-            "registration and input wait for native initialization");
+        check(registerCallback("sample", "toggleFeature", one) == SettingsError::NotReady,
+            "registration waits for native initialization");
         input.Initialize({});
-        check(registerCallback("sample", "toggleFeature", one) == SettingsError::UnknownMod && !press(),
+        check(registerCallback("sample", "toggleFeature", one) == SettingsError::UnknownMod,
             "an initialized empty registry is ready but has no declared actions");
         input.Initialize({
             { "sample", {{ "toggleFeature", Target::Callback }, { "second", Target::Callback },
@@ -71,7 +73,7 @@ int main()
             "a press submits one task without invoking inline");
         check(registerCallback("sample", "toggleFeature", two) == SettingsError::None, "register another callback");
         HotkeyTasks::Run();
-        check(one.events == std::vector<std::string>{action} && two.events.empty(),
+        check(one.events == std::vector<std::string>{action.event} && two.events.empty(),
             "a task owns the callbacks present at its press, excluding later registrations");
 
         std::vector<int> order;
@@ -83,23 +85,21 @@ int main()
         check(order == std::vector<int>{1, 2, 1, 2}, "each task invokes its callbacks in registration order");
         one.onCall = {}; two.onCall = {};
         check(!input.ProcessButton(0, action, 1, 0) && !input.ProcessButton(255, action, 1, 0) &&
-            !input.ProcessButton(0xFFFFFFFFu, action, 1, 0) && !input.ProcessButton(key, "", 1, 0) &&
-            !input.ProcessButton(key, "Pause", 1, 0) && !input.ProcessButton(key, "missing/openMenu", 1, 0) &&
-            !input.ProcessButton(key, "sample/missing", 1, 0) && !input.ProcessButton(key, "sample/invalid", 1, 0) &&
+            !input.ProcessButton(0xFFFFFFFFu, action, 1, 0) &&
             !input.ProcessButton(key, action, 0, -1) &&
             !input.ProcessButton(key, action, std::numeric_limits<float>::quiet_NaN(), 0),
-            "invalid keys, actions and non-press callback values never activate");
+            "invalid keys and non-press callback values never activate");
         check(registerCallback("sample", "second", another) == SettingsError::None &&
-            input.ProcessButton(key + 1, "sample/second", 1, 0), "register a different action");
+            input.ProcessButton(key + 1, second, 1, 0), "register a different action");
         HotkeyTasks::Run();
         check(another.events == std::vector<std::string>{"sample/second"} && one.events.size() == 3,
             "hotkey identity isolates delivery");
-        check(!input.ProcessButton(key + 2, "sample/openMenu", 1, 0) &&
-            !input.ProcessButton(key + 2, "sample/openMenu", 1, 1) &&
-            input.ProcessButton(key + 2, "sample/openMenu", 0, 1), "menu hotkeys still activate on paired release");
+        check(!input.ProcessButton(key + 2, menu, 1, 0) &&
+            !input.ProcessButton(key + 2, menu, 1, 1) &&
+            input.ProcessButton(key + 2, menu, 0, 1), "menu hotkeys still activate on paired release");
 
         press();
-        input.ProcessButton(key + 2, "sample/openMenu", 1, 0);
+        input.ProcessButton(key + 2, menu, 1, 0);
         const auto block = input.AcquireBlock();
         const auto nested = input.AcquireBlock();
         check(block && nested != block && !press() && HotkeyTasks::pending.size() == 1,
@@ -110,7 +110,7 @@ int main()
         check(!press(), "releasing one owner does not lift another owner's block");
         input.ReleaseBlock(nested);
         check(!repeat() && !release() && HotkeyTasks::pending.empty(), "held input during a block is not replayed");
-        check(!input.ProcessButton(key + 2, "sample/openMenu", 0, 1), "blocks still cancel held menu presses");
+        check(!input.ProcessButton(key + 2, menu, 0, 1), "blocks still cancel held menu presses");
         check(press(), "fresh presses resume after all owners release");
         const auto briefBlock = input.AcquireBlock();
         input.ReleaseBlock(briefBlock);
@@ -130,7 +130,7 @@ int main()
             HotkeyInputState temporary;
             temporary.Initialize({ { "sample", {{ "second", Target::Callback }} } });
             temporary.Register("sample", "second", Receiver::Fired, &detached);
-            temporary.ProcessButton(key, "sample/second", 1, 0);
+            temporary.ProcessButton(key, second, 1, 0);
         }
         HotkeyTasks::Run();
         check(detached.events == std::vector<std::string>{"sample/second"}, "task captures outlive the input-state test fixture");

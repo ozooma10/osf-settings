@@ -8,6 +8,7 @@ namespace OSFSettings::NativeHotkeys
 {
     struct Action
     {
+        std::string event;
         std::string mod;
         std::string id;
         std::optional<std::string> menu;

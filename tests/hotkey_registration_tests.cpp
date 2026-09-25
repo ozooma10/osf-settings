@@ -138,7 +138,8 @@ int main()
         const auto* otherMenu = FindAction("anothermod/openMenu");
         const auto* callback = FindAction("osfsettings/unbound");
         check(menu && menu->menu == "OSFSettingsMenu" && otherMenu && otherMenu->menu == "OtherMenu" &&
-            callback && !callback->menu && callback->mod == "osfsettings" && callback->id == "unbound" &&
+            callback && !callback->menu && callback->event == "osfsettings/unbound" &&
+            callback->mod == "osfsettings" && callback->id == "unbound" &&
             !FindAction("osfsettings/invalid") && !FindAction("osfsettings/badCallback") && !FindAction("Pause"),
             "valid native actions retain callback identity or a menu target, excluding invalid defaults");
         auto& input = OSFSettings::HotkeyInputState::Get();
@@ -151,7 +152,7 @@ int main()
             "registration publishes schema validation outcomes, including mods without hotkeys");
         check(input.Register("osfsettings", "unbound", fired, &calls) == SettingsError::None,
             "valid unbound native actions accept callbacks");
-        check(input.ProcessButton(0x75, "osfsettings/unbound", 1, 0) && calls == 0 && HotkeyTasks::pending.size() == 1,
+        check(input.ProcessButton(0x75, *callback, 1, 0) && calls == 0 && HotkeyTasks::pending.size() == 1,
             "production registration submits the callback through the real SFSE AddTask wrapper");
         HotkeyTasks::Run();
         check(calls == 1, "the SFSE task delegate runs the callback and destroys its captured work");

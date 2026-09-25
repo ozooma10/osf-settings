@@ -57,7 +57,7 @@ namespace OSFSettings::NativeHotkeys
                 const auto mask = hotkey.menu ? RE::USER_EVENT_FLAG::TabMenuMaybe : RE::USER_EVENT_FLAG::Movement;
                 g_hotkeyDefinitions += RE::ControlMap::FormatMappingRow(event.c_str(), key, kUnbound, kUnbound,
                     true, false, false, static_cast<std::uint32_t>(mask), 0u, false);
-                g_actions.emplace(event, Action{ mod.schema.id, hotkey.id, hotkey.menu });
+                g_actions.emplace(event, Action{ event, mod.schema.id, hotkey.id, hotkey.menu });
                 if (!hotkey.menu) {
                     target = HotkeyInputState::Target::Callback;
                 }

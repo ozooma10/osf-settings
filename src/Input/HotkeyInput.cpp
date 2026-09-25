@@ -31,7 +31,7 @@ namespace OSFSettings::HotkeyInput
                     return false;
                 }
                 const auto* button = static_cast<const RE::ButtonEvent*>(event);
-                return !button->disabled && NativeHotkeys::FindAction(button->QUserEvent().c_str());
+                return !button->disabled;
             }
 
             void OnButtonEvent(const RE::ButtonEvent* button) override
@@ -40,7 +40,7 @@ namespace OSFSettings::HotkeyInput
                 const auto* action = NativeHotkeys::FindAction(button->QUserEvent().c_str());
                 if (!action) return;
                 const auto key = static_cast<std::uint32_t>(button->idCode);
-                if (!HotkeyInputState::Get().ProcessButton(key, button->QUserEvent().c_str(), button->value, button->heldDownSecs)) return;
+                if (!HotkeyInputState::Get().ProcessButton(key, *action, button->value, button->heldDownSecs)) return;
                 if (action->menu) {
                     auto* queue = RE::UIMessageQueue::GetSingleton();
                     if (!queue) return;

@@ -18,6 +18,7 @@ namespace
     using Kind = Subscriptions::Kind;
     using TestJson = nlohmann::ordered_json;
     constexpr auto Mod = "papyrusexample";
+    const NativeHotkeys::Action toggle{ "papyrusexample/toggle", Mod, "toggle", std::nullopt };
 }
 
 int main()
@@ -142,9 +143,9 @@ int main()
         check(listeners.Register(instance, Kind::Hotkey, "PAPYRUSEXAMPLE", "TOGGLE") == SettingsError::None, "pooled hotkey casing deduplicates registration");
         check(listeners.Register(global, Kind::Hotkey, Mod, "missing") == SettingsError::UnknownHotkey, "unknown hotkey fails");
         check(listeners.Register(global, Kind::Hotkey, Mod, "menu") == SettingsError::TypeMismatch, "menu hotkeys reject Papyrus handlers");
-        const auto press = [&] { return input.ProcessButton(0x75, "papyrusexample/toggle", 1, 0); };
+        const auto press = [&] { return input.ProcessButton(0x75, toggle, 1, 0); };
         check(press() && events == std::vector<std::string>{"example:hotkey:toggle"} && HotkeyTasks::pending.empty(), "hotkey submits at admission without a bridge task or poll");
-        check(!input.ProcessButton(0x75, "papyrusexample/toggle", 1, 1) && !input.ProcessButton(0x75, "papyrusexample/toggle", 0, 1), "repeats and releases do not activate");
+        check(!input.ProcessButton(0x75, toggle, 1, 1) && !input.ProcessButton(0x75, toggle, 0, 1), "repeats and releases do not activate");
         check(events == std::vector<std::string>{"example:hotkey:toggle"}, "one callback per fresh down");
         events.clear();
         const auto block = input.AcquireBlock();
@@ -227,10 +228,10 @@ int main()
             ++*static_cast<int*>(user);
         }, &nativeCalls);
         check(mixed.Register(global, Kind::Hotkey, Mod, "toggle") == SettingsError::None, "Global hotkey target registers alongside native callback");
-        mixedInput.ProcessButton(0x75, "papyrusexample/toggle", 1, 0);
+        mixedInput.ProcessButton(0x75, toggle, 1, 0);
         check(events == std::vector<std::string>{"globalexample:hotkey:toggle"} && nativeCalls == 0, "Global submission is immediate while native callbacks use SFSE tasks");
         events.clear();
-        mixedInput.ProcessButton(0x75, "papyrusexample/toggle", 1, 0);
+        mixedInput.ProcessButton(0x75, toggle, 1, 0);
         mixed.Clear(); mixed.Resume(); HotkeyTasks::Run();
         check(events == std::vector<std::string>{"globalexample:hotkey:toggle"} && nativeCalls == 2, "session cleanup preserves already submitted Papyrus and native calls");
 

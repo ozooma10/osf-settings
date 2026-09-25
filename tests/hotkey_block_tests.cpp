@@ -43,7 +43,9 @@ int main()
         };
         input.Initialize(menus);
         constexpr std::uint32_t key = 0x79;
-        constexpr auto action = "osfsettings/openMenu";
+        const NativeHotkeys::Action action{ "osfsettings/openMenu", "osfsettings", "openMenu", "OSFSettingsMenu" };
+        const NativeHotkeys::Action otherMenu{ "anothermod/openMenu", "anothermod", "openMenu", "OtherMenu" };
+        const NativeHotkeys::Action callback{ "sample/toggleFeature", "sample", "toggleFeature", std::nullopt };
         const auto press = [&] { return input.ProcessButton(key, action, 1, 0); };
         const auto repeat = [&] { return input.ProcessButton(key, action, 1, 1); };
         const auto release = [&] { return input.ProcessButton(key, action, 0, 1); };
@@ -76,7 +78,7 @@ int main()
         check(!release() && !press() && release(), "nested focus restoration requires a fresh press");
 
         press();
-        check(!input.ProcessButton(key, "anothermod/openMenu", 0, 1) && !release(),
+        check(!input.ProcessButton(key, otherMenu, 0, 1) && !release(),
             "a changed action on the same key cannot inherit the previous press");
         press();
         check(!input.ProcessButton(key + 1, action, 0, 1) && release(),
@@ -85,8 +87,8 @@ int main()
         check(!input.ProcessButton(key, action, 0, -1) && !release(),
             "cancelled release discards the pending press");
         check(!input.ProcessButton(0, action, 1, 0) && !input.ProcessButton(255, action, 1, 0) &&
-            !input.ProcessButton(0xFFFFFFFFu, action, 1, 0) && !input.ProcessButton(key, "", 1, 0),
-            "invalid keys and empty actions do not arm input");
+            !input.ProcessButton(0xFFFFFFFFu, action, 1, 0),
+            "invalid keys do not arm input");
 
         // Keep every token held until all threads acquired one, then release together.
         std::array<API::HotkeyBlock, 8> tokens{};
@@ -162,7 +164,7 @@ int main()
             "hotkey API exposes declaration validation statuses with exact IDs");
         check(client.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::Ok,
             "client registers a process-lifetime callback through the extended interface");
-        input.ProcessButton(0x75, "sample/toggleFeature", 1, 0);
+        input.ProcessButton(0x75, callback, 1, 0);
         check(callbacks == 0, "public callbacks do not run on the producer");
         HotkeyTasks::Run();
         check(callbacks == 1, "client registration and input share the callback state");
@@ -182,7 +184,7 @@ int main()
         SettingsService::Get().Start();
         productionInput.Initialize(declarations);
         check(client.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::Ok &&
-            productionInput.ProcessButton(0x75, "sample/toggleFeature", 1, 0),
+            productionInput.ProcessButton(0x75, callback, 1, 0),
             "production export shares the callback registry and queue used by input");
         HotkeyTasks::Run();
         check(callbacks == 2, "the exported interface invokes a real registered callback");

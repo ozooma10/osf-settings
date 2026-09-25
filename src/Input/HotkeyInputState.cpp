@@ -82,36 +82,29 @@ namespace OSFSettings
         return m_blocks.erase(block) != 0;
     }
 
-    bool HotkeyInputState::ProcessButton(std::uint32_t key, std::string_view action, float value, float heldSeconds)
+    bool HotkeyInputState::ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds)
     {
         constexpr std::uint32_t kUnbound = 0xFF;
-        if (!key || key >= kUnbound || action.empty()) return false;
+        if (!key || key >= kUnbound) return false;
 
         std::unique_lock lock(m_mutex);
         if (!m_blocks.empty()) return false;
-        const auto separator = action.find('/');
-        if (separator == std::string_view::npos) return false;
-        const auto mod = m_declarations.find(action.substr(0, separator));
-        if (mod == m_declarations.end()) return false;
-        const auto hotkey = mod->second.find(action.substr(separator + 1));
-        if (hotkey == mod->second.end() || hotkey->second == Target::Invalid) return false;
-
-        if (hotkey->second == Target::Callback) {
+        if (!action.menu) {
             if (!(value > 0) || heldSeconds != 0) return false;
-            const auto callbacks = m_callbacks.find(action);
+            const auto callbacks = m_callbacks.find(action.event);
             std::vector<Listener> listeners;
             if (callbacks != m_callbacks.end()) {
                 listeners = callbacks->second;
             }
             std::vector<std::shared_ptr<Observer>> observers;
             for (const auto& [token, observer] : m_observers) {
-                if (observer->action == action) {
+                if (observer->action == action.event) {
                     observers.push_back(observer);
                 }
             }
             if (listeners.empty() && observers.empty()) return false;
             const bool hasNative = !listeners.empty();
-            auto task = [listeners = std::move(listeners), mod = mod->first, id = hotkey->first] {
+            auto task = [listeners = std::move(listeners), mod = action.mod, id = action.id] {
                 for (const auto& listener : listeners) {
                     listener.callback(mod.c_str(), id.c_str(), listener.context);
                 }
@@ -128,14 +121,14 @@ namespace OSFSettings
 
         if (value > 0) {
             if (heldSeconds == 0) {
-                m_pressed.insert_or_assign(key, action);
+                m_pressed.insert_or_assign(key, action.event);
             }
             return false;
         }
 
         const auto press = m_pressed.find(key);
         if (press == m_pressed.end()) return false;
-        const bool activate = value == 0 && heldSeconds >= 0 && press->second == action;
+        const bool activate = value == 0 && heldSeconds >= 0 && press->second == action.event;
         m_pressed.erase(press);
         return activate;
     }

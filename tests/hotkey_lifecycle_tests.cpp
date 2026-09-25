@@ -133,9 +133,9 @@ namespace OSFSettings::NativeHotkeys
 {
     const Action* FindAction(std::string_view action)
     {
-        static const Action settings{ "osfsettings", "openMenu", "OSFSettingsMenu" };
-        static const Action other{ "anothermod", "openMenu", "OtherMenu" };
-        static const Action callback{ "anothermod", "toggleFeature", std::nullopt };
+        static const Action settings{ "osfsettings/openMenu", "osfsettings", "openMenu", "OSFSettingsMenu" };
+        static const Action other{ "anothermod/openMenu", "anothermod", "openMenu", "OtherMenu" };
+        static const Action callback{ "anothermod/toggleFeature", "anothermod", "toggleFeature", std::nullopt };
         if (action == "osfsettings/openMenu") return &settings;
         if (action == "anothermod/openMenu") return &other;
         if (action == "anothermod/toggleFeature") return &callback;
@@ -239,8 +239,11 @@ int main()
             });
             Event settings("osfsettings/openMenu"), otherMenu("anothermod/openMenu"), pause("Pause");
             check(handler->ShouldHandleEvent(&settings) && handler->ShouldHandleEvent(&otherMenu) &&
-                !handler->ShouldHandleEvent(&pause) && !handler->ShouldHandleEvent(nullptr),
-                "our handler accepts declared menu actions without impersonating or accepting Pause");
+                handler->ShouldHandleEvent(&pause) && !handler->ShouldHandleEvent(nullptr),
+                "the event filter admits keyboard buttons before action resolution");
+            handler->OnButtonEvent(&pause);
+            check(pause.status == RE::InputEvent::Status::kUnhandled && messages.empty() && HotkeyTasks::pending.empty(),
+                "unregistered vanilla actions remain unhandled");
             settings.disabled = true;
             check(!handler->ShouldHandleEvent(&settings), "disabled mapped actions are rejected");
             settings.disabled = false;

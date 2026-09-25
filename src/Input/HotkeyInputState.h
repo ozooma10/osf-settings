@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Settings/SettingsError.h"
+#include "NativeHotkeys.h"
 
 #include <cstdint>
 #include <atomic>
@@ -34,7 +35,8 @@ namespace OSFSettings
         Block AcquireBlock();
         bool ReleaseBlock(Block block);
 
-        bool ProcessButton(std::uint32_t key, std::string_view action, float value, float heldSeconds);
+        // The native handler resolves the action before passing it here.
+        bool ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds);
 
     private:
         struct Listener
