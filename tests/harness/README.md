@@ -57,7 +57,7 @@ Each mod saves its own JSON file there; launcher recency uses `internal.json` in
 the parent directory. Keep both locations isolated from live player state.
 The harness prepares this directory and config. The path must be nonempty and
 absolute; missing/invalid config prevents plugin initialization. This keeps tests
-away from MO2's shared overwrite values. Normal builds ignore this configuration.
+away from the player's Documents store. Normal builds ignore this configuration.
 
 Only this build exports `uint32_t __cdecl OSFSettings_TestSnapshot(char*, uint32_t)`.
 It returns the required UTF-8 buffer size including the NUL; insufficient capacity

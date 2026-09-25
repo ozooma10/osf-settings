@@ -34,7 +34,7 @@ Install with MO2 or Vortex and enable it. No ESM or ESP activation is needed. Th
 [*]Press [font=Courier New]F10[/font], or choose [b]MOD SETTINGS[/b] in the Pause menu.[/*]
 [*]Rebind the opening key on the OSF Settings page or in the [b]KEYBINDINGS[/b] tab.[/*]
 [/list]
-[b]Upgrading:[/b] your values live in [font=Courier New]Data/SFSE/Plugins/OSF/Settings/values[/font], and native hotkeys are stored in Starfield's own Controls file. Keep both. In MO2, files written at runtime may be in [b]Overwrite[/b] or an output mod, so keep those when you replace the framework. Don't delete the shared [font=Courier New]OSF[/font] folder, since other mods may own files there.
+[b]Upgrading:[/b] your values live in [font=Courier New]Documents/My Games/Starfield/OSF/Settings/values[/font], with launcher history in the adjacent [font=Courier New]internal.json[/font]. Documents follows your Windows location, including OneDrive redirection. Settings are shared across saves, mod-manager profiles and game installations using that Documents folder. Native hotkeys remain in Starfield's own Controls file. Schemas and translations remain in Data; don't delete the shared [font=Courier New]OSF[/font] folder, since other mods may own files there.
 
 [center][img]REPLACE-WITH-NEXUS-URL/04-for-authors.png[/img][/center]
 Ship one JSON file, [font=Courier New]Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json[/font], and OSF Settings builds your page from it. Read and write values from C++ or Papyrus.

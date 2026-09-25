@@ -5,6 +5,7 @@ namespace OSFSettings::Paths
 {
 	bool Initialize();
 	std::filesystem::path SchemasDir();
+	std::filesystem::path UserDataDir();
 	std::filesystem::path ValuesDir();
 	std::filesystem::path LocalizationDir();
 }

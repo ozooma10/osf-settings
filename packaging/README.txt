@@ -28,10 +28,12 @@ settings files that failed to load and reports supplied by supporting mods; an
 empty page is not a health check of every installed mod. Physical controller
 operation remains unverified, and text entry requires a keyboard.
 
-Settings persist across saves in Data/SFSE/Plugins/OSF/Settings/values.
+Settings persist in Documents/My Games/Starfield/OSF/Settings/values, shared
+across saves, mod-manager profiles and game installations using that Documents
+folder. Launcher history is stored alongside values in internal.json.
+Documents follows the Windows location, including OneDrive redirection.
 Native hotkeys use Starfield's Controls storage separately. Keep both when
-upgrading. In MO2, runtime-written files may be in Overwrite or an assigned
-output mod: preserve those files when replacing the framework installation.
+upgrading. Schemas and translations remain in Data.
 Do not delete the shared OSF directory; other mods may own files there.
 
 OSF Settings owns configuration, keybindings and shared issue reporting.
