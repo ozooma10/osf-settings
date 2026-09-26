@@ -62,6 +62,9 @@ namespace OSFSettings
 
     std::optional<std::uint32_t> KeyCodeFromName(std::string_view name)
     {
+        if (name.size() == 6 && ::_strnicmp(name.data(), "MOUSE", 5) == 0 && name[5] >= '1' && name[5] <= '5') {
+            return MouseVirtualKey(static_cast<std::uint32_t>(name[5] - '1'));
+        }
         if (name.size() == 7 && ::_strnicmp(name.data(), "UNBOUND", 7) == 0) {
             return KeyBinding::Unbound;
         }
@@ -94,6 +97,9 @@ namespace OSFSettings
 
     std::string KeyName(std::uint32_t keyCode)
     {
+        for (std::uint32_t button = 0; button < 5; ++button) {
+            if (MouseVirtualKey(button) == keyCode) return "Mouse " + std::to_string(button + 1);
+        }
         if (keyCode == KeyBinding::Unbound) return tr("values.unbound");
         if (keyCode > 0 && keyCode < KeyBinding::Unbound) {
             const auto* manager = RE::BSInputDeviceManager::GetSingleton();

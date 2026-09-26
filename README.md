@@ -15,6 +15,7 @@ For mod authors, start with [Settings](docs/SETTINGS.md) to define a page and co
 
 - [Menu launchers](docs/LAUNCHERS.md): add native menus or custom interfaces to the launch cards listing.
 - [Localization](docs/LOCALIZATION.md): Translate an existing mod with drop-in catalogs
+- [Runtime providers](docs/PROVIDERS.md): register settings with caller-owned persistence and observe key settings.
 
 </details>
 

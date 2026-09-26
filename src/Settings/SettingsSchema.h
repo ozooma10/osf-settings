@@ -46,6 +46,7 @@ namespace OSFSettings
     {
         KeyBinding defaultValue;
         bool allowUnbound{ true };
+        bool allowMouse{};
     };
 
     struct StringDefinition

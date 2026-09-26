@@ -6,10 +6,11 @@ namespace OSFSettings
 {
     bool KeyCapture::IsActive() const { return m_state != State::Idle; }
 
-    void KeyCapture::BeginCapture()
+    void KeyCapture::BeginCapture(bool allowMouse)
     {
         std::lock_guard lock(m_mutex);
         m_state = State::WaitingForKey;
+        m_allowMouse = allowMouse;
         m_selectedKeyCode = KeyBinding::Unbound;
         m_selectedKeyReleased = false;
     }
@@ -46,6 +47,12 @@ namespace OSFSettings
         return IsActive() || (keyCode < m_heldKeys.size() && m_heldKeys[keyCode]);
     }
 
+    bool KeyCapture::ShouldConsumeMouse(std::uint32_t keyCode) const
+    {
+        std::lock_guard lock(m_mutex);
+        return IsMouseKey(keyCode) && ((m_allowMouse && m_state == State::WaitingForKey) || m_heldKeys[keyCode]);
+    }
+
     bool KeyCapture::HandleKeyEvent(std::uint32_t keyCode, bool isDown, bool isRepeat)
     {
         std::lock_guard lock(m_mutex);
@@ -68,7 +75,7 @@ namespace OSFSettings
         if (keyCode == REX::W32::VK_ESCAPE) {
             m_state = State::Cancelled;
         } else if (m_state == State::WaitingForKey) {
-            if (IsBindableKey(keyCode)) {
+            if (IsBindableKey(keyCode) || (m_allowMouse && IsMouseKey(keyCode))) {
                 m_selectedKeyCode = keyCode;
                 m_selectedKeyReleased = false;
                 m_state = State::KeySelected;

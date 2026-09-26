@@ -127,6 +127,27 @@ namespace OSFSettings
         return SettingsError::None;
     }
 
+    SettingsError SettingsService::RegisterProvider(ModSettings mod, SettingsStore::Save save, std::uint64_t& registration)
+    {
+        std::lock_guard lock(m_mutex);
+        if (!IsReady()) return SettingsError::NotReady;
+        const auto id = mod.schema.id;
+        const auto result = m_store.RegisterProvider(std::move(mod), std::move(save), registration);
+        if (result == SettingsError::None) { ++m_revision; Notify(id, std::nullopt); }
+        return result;
+    }
+
+    SettingsError SettingsService::UnregisterProvider(std::uint64_t registration)
+    {
+        std::lock_guard lock(m_mutex);
+        if (const auto id = m_store.UnregisterProvider(registration)) {
+            ++m_revision;
+            Notify(*id, std::nullopt);
+            return SettingsError::None;
+        }
+        return SettingsError::InvalidArgument;
+    }
+
     SettingsError SettingsService::Unsubscribe(Subscription subscription)
     {
         std::unique_lock lock(m_mutex);

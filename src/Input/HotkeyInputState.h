@@ -34,6 +34,7 @@ namespace OSFSettings
 
         Block AcquireBlock();
         bool ReleaseBlock(Block block);
+        bool Blocked();
 
         // The native handler resolves the action before passing it here.
         bool ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds);

@@ -66,7 +66,8 @@ namespace OSFSettings
         }
         if (const auto* definition = std::get_if<KeyDefinition>(&setting.definition)) {
             const auto* key = std::get_if<KeyBinding>(&value);
-            return key && (key->keyCode == KeyBinding::Unbound ? definition->allowUnbound : IsBindableKey(key->keyCode));
+            return key && (key->keyCode == KeyBinding::Unbound ? definition->allowUnbound :
+                IsBindableKey(key->keyCode) || (definition->allowMouse && (key->keyCode == 1 || key->keyCode == 2 || key->keyCode == 4 || key->keyCode == 5 || key->keyCode == 6)));
         }
         return std::holds_alternative<BoolDefinition>(setting.definition) && std::holds_alternative<bool>(value);
     }

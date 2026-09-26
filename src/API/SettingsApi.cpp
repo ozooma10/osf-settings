@@ -27,6 +27,7 @@ namespace OSFSettings::API
             case SettingsError::UnknownSubscription: return Status::UnknownSubscription;
             case SettingsError::InternalError: return Status::InternalError;
             case SettingsError::UnknownHotkey: return Status::UnknownHotkey;
+            case SettingsError::AlreadyRegistered: return Status::AlreadyRegistered;
             }
             return Status::InternalError;
         }
@@ -78,6 +79,7 @@ namespace OSFSettings::API
                 } else if constexpr (std::is_same_v<Definition, KeyDefinition>) {
                     view.type = SettingType::Key;
                     view.allowUnbound = definition.allowUnbound;
+                    view.allowMouse = definition.allowMouse;
                 } else if constexpr (std::is_same_v<Definition, StringDefinition>) {
                     view.type = SettingType::String;
                     view.maxLength = definition.maxLength;

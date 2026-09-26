@@ -58,6 +58,7 @@ namespace OSFSettings::API
         std::uint32_t optionCount{};
         std::uint32_t maxLength{}; // String only; UTF-8 bytes, excluding NUL.
         bool allowUnbound{}; // Key only.
+        bool allowMouse{}; // Key only; permits the five physical mouse buttons.
     };
 
     struct GroupView

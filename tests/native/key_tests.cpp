@@ -76,7 +76,7 @@ int TestKeySettings()
         ++checks;
         if (!passed) throw std::runtime_error(std::string("Key settings: ") + message);
     };
-    static_assert(API::kVersion == 0x00010001u);
+    static_assert(API::kVersion == 0x00010000u);
     static_assert(API::kUnboundKey == KeyBinding::Unbound);
     check(KeyCodeFromName("F4") == 0x73 && !KeyCodeFromName("unknown") && KeyCodeFromName("unbound") == KeyBinding::Unbound,
         "missing input manager uses the fallback table and preserves unknown names");
@@ -283,6 +283,17 @@ int TestKeySettings()
         capture.HandleKeyEvent(invalidCode, false, false);
     }
     check(capture.GetSnapshot().state == State::WaitingForKey, "invalid native codes are rejected without narrowing");
+    capture.ResetForMenuClose();
+    capture.BeginCapture();
+    check(!capture.ShouldConsumeMouse(1), "ordinary keyboard capture permits mouse UI controls");
+    capture.ResetForMenuClose();
+    capture.BeginCapture(true);
+    check(capture.ShouldConsumeMouse(4) && !capture.ShouldConsumeMouse(0), "mouse-enabled capture accepts only physical buttons");
+    capture.HandleKeyEvent(4, true, false);
+    check(capture.GetSnapshot().selectedKeyCode == 4 && capture.ShouldConsumeMouse(4), "middle-button capture retains its release");
+    capture.HandleKeyEvent(4, false, false);
+    check(!capture.ShouldConsumeMouse(1) && !capture.ShouldConsumeMouse(4), "selected binding permits mouse confirmation after release");
+    check(KeyCodeFromName("MOUSE3") == 4 && KeyCodeFromName("mouse5") == 6, "authored mouse names use VK codes");
     capture.ResetForMenuClose();
     return checks;
 }

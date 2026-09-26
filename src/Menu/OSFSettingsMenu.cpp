@@ -170,7 +170,7 @@ namespace OSFSettings
             break;
         }
         case Function::Revision:
-            root->CreateString(params.ret, (std::to_string(ActionService::Get().Revision()) + ":" +
+            root->CreateString(params.ret, (std::to_string(SettingsService::Get().Revision()) + ":" + std::to_string(ActionService::Get().Revision()) + ":" +
                 std::to_string(LauncherService::Get().Revision()) + ":" +
                 std::to_string(DiagnosticsService::Get().Revision())).c_str());
             break;
@@ -234,7 +234,14 @@ namespace OSFSettings
             if (ok) {
                 m_captureMod = mod;
                 m_captureKey = key;
-                m_capture.BeginCapture();
+                bool allowMouse = false;
+                for (const auto& record : SettingsService::Get().Snapshot()) {
+                    if (record.schema.id != mod) continue;
+                    const auto* setting = record.schema.FindSetting(key);
+                    const auto* binding = setting ? std::get_if<KeyDefinition>(&setting->definition) : nullptr;
+                    allowMouse = binding && binding->allowMouse;
+                }
+                m_capture.BeginCapture(allowMouse);
             }
             root->CreateObject(params.ret);
             params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
@@ -502,6 +509,8 @@ namespace OSFSettings
         const auto bindingInput = m_bindingEditor.ProcessInput(event);
         if (bindingInput == NativeBindingEditor::InputResult::Cancelled) menuObj.Invoke("onNativeBindingCancelled");
         if (bindingInput != NativeBindingEditor::InputResult::Unhandled) return false;
+        if (event && event->deviceType == RE::InputEvent::DeviceType::kMouse && event->eventType == RE::InputEvent::EventType::kButton &&
+            m_capture.ShouldConsumeMouse(MouseVirtualKey(static_cast<std::uint32_t>(static_cast<const RE::ButtonEvent*>(event)->idCode)))) return true;
         if (event && event->deviceType == RE::InputEvent::DeviceType::kKeyboard && event->eventType == RE::InputEvent::EventType::kButton &&
             m_capture.ShouldConsumeKey(static_cast<std::uint32_t>(static_cast<const RE::ButtonEvent*>(event)->idCode))) return true;
         return RE::GameMenuBase::ShouldHandleEvent(event);
@@ -511,6 +520,9 @@ namespace OSFSettings
     void OSFSettingsMenu::OnButtonEvent(const RE::ButtonEvent* event)
     {
         TestHarness::ObserveInput(event, false);
+        if (event && event->deviceType == RE::InputEvent::DeviceType::kMouse &&
+            m_capture.ShouldConsumeMouse(MouseVirtualKey(static_cast<std::uint32_t>(event->idCode))) &&
+            m_capture.HandleKeyEvent(MouseVirtualKey(static_cast<std::uint32_t>(event->idCode)), event->value > 0, event->heldDownSecs > 0)) return;
         if (event && event->deviceType == RE::InputEvent::DeviceType::kKeyboard &&
             m_capture.HandleKeyEvent(static_cast<std::uint32_t>(event->idCode), event->value > 0, event->heldDownSecs > 0)) return;
         RE::GameMenuBase::OnButtonEvent(event);

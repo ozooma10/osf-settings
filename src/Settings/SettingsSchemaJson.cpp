@@ -197,6 +197,9 @@ namespace OSFSettings::SettingsJson
                     } else if (type == "key") {
                         defaultError = "default must be a keyboard virtual-key integer or recognized key name (255/UNBOUND disallowed when allowUnbound is false): ";
                         KeyDefinition definition;
+                        const auto mouse = sourceSetting.find("allowMouse");
+                        Require(mouse == sourceSetting.end() || mouse->is_boolean(), "allowMouse must be a boolean: " + setting.key);
+                        if (mouse != sourceSetting.end()) definition.allowMouse = mouse->get<bool>();
                         const auto unbound = sourceSetting.find("allowUnbound");
                         Require(unbound == sourceSetting.end() || unbound->is_boolean(), "allowUnbound must be a boolean: " + setting.key);
                         if (unbound != sourceSetting.end()) {

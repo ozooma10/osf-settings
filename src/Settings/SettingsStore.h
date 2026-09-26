@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <functional>
 
 namespace OSFSettings
 {
@@ -27,6 +28,9 @@ namespace OSFSettings
         SetResult Reset(std::string_view mod, std::string_view key);
         SetResult ResetMod(std::string_view mod);
         const ModSettings* FindMod(std::string_view mod) const;
+        using Save = std::function<bool(const SettingValues&)>;
+        Error RegisterProvider(ModSettings mod, Save save, std::uint64_t& registration);
+        std::optional<std::string> UnregisterProvider(std::uint64_t registration);
 
         // Borrowed views for startup logging; valid until the next LoadAll.
         // Set replaces a values map, so do not retain references to its entries.
@@ -38,5 +42,8 @@ namespace OSFSettings
         std::vector<ModSettings> m_mods;
         std::vector<SettingsLoadError> m_loadErrors;
         std::filesystem::path m_valuesDir;
+        struct Provider { std::uint64_t token; Save save; };
+        std::map<std::string, Provider, std::less<>> m_providers;
+        std::uint64_t m_nextProvider{ 1 };
     };
 }

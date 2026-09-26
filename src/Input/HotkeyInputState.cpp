@@ -79,6 +79,12 @@ namespace OSFSettings
         return m_blocks.erase(block) != 0;
     }
 
+    bool HotkeyInputState::Blocked()
+    {
+        std::lock_guard lock(m_mutex);
+        return !m_blocks.empty();
+    }
+
     bool HotkeyInputState::ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds)
     {
         constexpr std::uint32_t kUnbound = 0xFF;

@@ -10,6 +10,7 @@ namespace OSFSettings
     void SettingsStore::LoadAll(const std::filesystem::path& schemaDir, const std::filesystem::path& valuesDir)
     {
         m_mods.clear();
+        m_providers.clear();
         m_loadErrors.clear();
         m_valuesDir = valuesDir;
 
@@ -80,11 +81,47 @@ namespace OSFSettings
     {
         if (mod.values == proposed) return { true, {} };
         std::string error;
-        if (!SettingsJson::SaveValues(m_valuesDir / (mod.schema.id + ".json"), proposed, error)) {
+        const auto provider = m_providers.find(mod.schema.id);
+        const bool saved = provider != m_providers.end() ? provider->second.save(proposed) :
+            SettingsJson::SaveValues(m_valuesDir / (mod.schema.id + ".json"), proposed, error);
+        if (!saved) {
+            if (error.empty()) error = "settings provider could not save " + mod.schema.id;
             return { false, std::move(error), Error::SaveFailed };
         }
         mod.values.swap(proposed);
         return { true, {}, Error::None, true };
+    }
+
+    SettingsStore::Error SettingsStore::RegisterProvider(ModSettings mod, Save save, std::uint64_t& registration)
+    {
+        const auto existing = std::ranges::find(m_mods, mod.schema.id, [](const auto& entry) { return entry.schema.id; });
+        const auto owner = m_providers.find(mod.schema.id);
+        if (existing != m_mods.end()) {
+            if (owner == m_providers.end() || !registration || owner->second.token != registration) return Error::AlreadyRegistered;
+            for (auto& [key, value] : mod.values) {
+                const auto old = existing->values.find(key);
+                const auto* setting = mod.schema.FindSetting(key);
+                if (old != existing->values.end() && setting && IsValidValue(*setting, old->second)) value = old->second;
+            }
+            *existing = std::move(mod);
+            owner->second.save = std::move(save);
+        } else {
+            if (registration || !m_nextProvider) return Error::InvalidArgument;
+            registration = m_nextProvider++;
+            m_providers.emplace(mod.schema.id, Provider{ registration, std::move(save) });
+            m_mods.push_back(std::move(mod));
+        }
+        return Error::None;
+    }
+
+    std::optional<std::string> SettingsStore::UnregisterProvider(std::uint64_t registration)
+    {
+        const auto found = std::ranges::find_if(m_providers, [registration](const auto& entry) { return entry.second.token == registration; });
+        if (found == m_providers.end()) return std::nullopt;
+        const auto id = found->first;
+        std::erase_if(m_mods, [&](const auto& mod) { return mod.schema.id == id; });
+        m_providers.erase(found);
+        return id;
     }
 
     SettingsStore::SetResult SettingsStore::Set(std::string_view mod, std::string_view key, SettingValue value)

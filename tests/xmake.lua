@@ -17,7 +17,7 @@ target("osfsettings-test-services")
     add_deps("osfsettings-test-core", "commonlibsf", { public = true })
     add_files("../src/Settings/SettingsService.cpp", "../src/API/*.cpp", "../src/Actions/*.cpp",
         "../src/Launcher/LauncherService.cpp", "../src/Input/KeyNames.cpp", "../src/Input/KeyCapture.cpp",
-        "../src/Input/HotkeyInputState.cpp", "../src/Input/BSInputEventUserStandalone.cpp",
+        "../src/Input/HotkeyInputState.cpp", "../src/Input/KeyActions.cpp", "../src/Input/BSInputEventUserStandalone.cpp",
         "../src/Papyrus/Actions.cpp", "../src/Papyrus/Values.cpp", "../src/Papyrus/Subscriptions.cpp",
         "../src/Papyrus/Issues.cpp")
     -- Use CommonLib's foundation once, instead of RE/Starfield.h per fixture.
@@ -50,6 +50,10 @@ test_target("osfsettings-store-tests", "settings")
 
 test_target("osfsettings-service-tests", "settings", true)
     add_files("native/service_tests.cpp")
+
+test_target("osfsettings-providers-tests", "settings", true)
+    add_files("providers_api_tests.cpp")
+    add_includedirs("../sdk")
 
 test_target("osfsettings-key-tests", "input", true)
     add_files("native/key_tests.cpp", "native/engine_string_stubs.cpp")

@@ -12,12 +12,13 @@ namespace OSFSettings
     public:
         enum class State { Idle, WaitingForKey, KeySelected, ConfirmationRequested, Cancelled };
         struct Snapshot { State state; std::uint32_t selectedKeyCode; bool selectedKeyReleased; };
-        void BeginCapture();
+        void BeginCapture(bool allowMouse = false);
         void EndCapture();
         void ResetForMenuClose();
         void RequestCancel();
         void RetryConfirmation();
         bool ShouldConsumeKey(std::uint32_t keyCode) const;
+        bool ShouldConsumeMouse(std::uint32_t keyCode) const;
         bool HandleKeyEvent(std::uint32_t keyCode, bool isDown, bool isRepeat);
         Snapshot GetSnapshot() const;
 
@@ -27,6 +28,7 @@ namespace OSFSettings
         State m_state{ State::Idle };
         std::uint32_t m_selectedKeyCode{ KeyBinding::Unbound };
         bool m_selectedKeyReleased{};
+        bool m_allowMouse{};
         std::bitset<256> m_heldKeys;
     };
 }

@@ -9,6 +9,12 @@ namespace OSFSettings
 {
     // Native keyboard virtual-key codes. Escape is reserved for cancellation.
     bool IsBindableKey(std::uint32_t keyCode);
+    constexpr bool IsMouseKey(std::uint32_t code) { return code == 1 || code == 2 || code == 4 || code == 5 || code == 6; }
+    constexpr std::uint32_t MouseVirtualKey(std::uint32_t button)
+    {
+        constexpr std::uint32_t keys[]{ 1, 2, 4, 5, 6 };
+        return button < 5 ? keys[button] : 0;
+    }
 
     // Virtual-key to DirectInput scan code; returns 0 if unmappable.
     std::uint32_t VirtualKeyToKeycode(std::uint32_t virtualKey);

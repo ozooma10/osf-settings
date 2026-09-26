@@ -15,6 +15,7 @@ namespace OSFSettings
         UnknownSubscription,
         InternalError,
         UnknownSuppression,
-        UnknownHotkey
+        UnknownHotkey,
+        AlreadyRegistered
     };
 }

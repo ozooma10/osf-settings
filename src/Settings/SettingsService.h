@@ -39,6 +39,9 @@ namespace OSFSettings
         SettingsError SetValue(std::string_view mod, std::string_view key, SettingValue value);
         SettingsError Reset(std::string_view mod, std::string_view key);
         SettingsError ResetMod(std::string_view mod);
+        SettingsError RegisterProvider(ModSettings mod, SettingsStore::Save save, std::uint64_t& registration);
+        SettingsError UnregisterProvider(std::uint64_t registration);
+        std::uint64_t Revision() const noexcept { return m_revision.load(); }
         SettingsError Subscribe(std::string_view mod, Changed callback, Subscription& out);
         SettingsError Unsubscribe(Subscription subscription);
 
@@ -66,5 +69,6 @@ namespace OSFSettings
         std::atomic_bool m_ready{};
         std::atomic_bool m_pending{};
         std::atomic_bool m_dispatching{};
+        std::atomic_uint64_t m_revision{};
     };
 }

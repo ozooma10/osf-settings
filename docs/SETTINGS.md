@@ -82,7 +82,7 @@ Object labels must be strings; an empty label falls back to its value. Labels ma
 
 Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, and line/paragraph separators are rejected. Limits count bytes, not characters. Values are preserved without trimming or truncation.
 
-A `key` setting stores a value for your own input handler. Use [hotkeys](KEYBINDINGS.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers. Unbinding and `"UNBOUND"` / `255` defaults are allowed unless `allowUnbound` is explicitly `false`.
+A `key` setting stores a value for your own input handler. Use [hotkeys](KEYBINDINGS.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers. Unbinding and `"UNBOUND"` / `255` defaults are allowed unless `allowUnbound` is explicitly `false`. `allowMouse: true` also permits the five physical mouse buttons (`MOUSE1` through `MOUSE5`, VK `1, 2, 4, 5, 6`). [Runtime providers](PROVIDERS.md) can observe key settings without consuming input.
 
 Add `"requires": "restart"` to show a restart notice. This is only a notice: values still save immediately, and your mod decides when to apply them.
 
