@@ -1,4 +1,3 @@
-#include "HotkeyTasks.h"
 #include "SFSE/Impl/PCH.h"
 #include "../src/Input/NativeBindingEditor.cpp"
 
@@ -152,9 +151,9 @@ int main()
         hotkeys.ProcessButton(0x75, callbackAction, 1, 0);
         hotkeys.ProcessButton(0x79, menuAction, 1, 0);
         check(fixture.editor.Begin(), "begin OSF capture");
-        HotkeyTasks::Run();
+
         check(callbacks == 1 && !hotkeys.ProcessButton(0x75, callbackAction, 1, 0),
-            "native capture permits submitted tasks to finish but blocks new callback presses");
+            "native capture blocks new callback presses after earlier inline delivery");
         check(candidate() == 2, "populated primary requires confirmation for another action's key");
         check(candidate(Slot::kAlternate) == 2, "secondary requires the same confirmation");
         owners[0].bindingSlot = Slot::kAlternate;
@@ -197,7 +196,7 @@ int main()
         check(hotkeys.ProcessButton(0x79, menuAction, 0, 1),
             "new presses work after native and external owners release");
         check(hotkeys.ProcessButton(0x75, callbackAction, 1, 0), "fresh callback presses work after all owners release");
-        HotkeyTasks::Run();
+
         check(callbacks == 2, "capture cleanup restores callback delivery");
         check(owners[0].keyCode == 0x20 && owners[1].keyCode == 0x79,
             "confirmation policy never mutates bindings before the native decision");

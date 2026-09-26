@@ -31,10 +31,10 @@ select their relevant coverage once. A passing unchanged rerun adds little evide
 
 `osfsettings-test-core` compiles settings, persistence and diagnostics objects once.
 `osfsettings-test-services` compiles compatible engine-facing services once, using
-one foundation PCH. `osfsettings-test-tasks` shares the standalone task wrapper.
+one foundation PCH.
 Each fixture remains a separate executable with its own stubs and process state.
 Sources included directly in fixtures, the lifecycle harness definition, and the
-callback suite's SFSE stub retain their separate compilation contexts.
+engine-independent callback suite retain their separate compilation contexts.
 
 The `osfsettings.localization` rule runs `tools/generate-localization.py` before
 building the test core library. Plugin builds generate the same files through

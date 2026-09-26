@@ -24,14 +24,6 @@ target("osfsettings-test-services")
     set_pcxxheader("../lib/commonlibsf/include/SFSE/Impl/PCH.h")
 target_end()
 
-target("osfsettings-test-tasks")
-    set_kind("static")
-    set_default(false)
-    set_group("tests/support")
-    add_deps("commonlibsf", { public = true })
-    add_files("HotkeyTasks.cpp")
-target_end()
-
 local function test_target(name, group, engine)
     target(name)
     set_kind("binary")
@@ -40,7 +32,7 @@ local function test_target(name, group, engine)
     set_rundir(os.projectdir())
     add_tests("default")
     if engine then
-        add_deps("osfsettings-test-services", "osfsettings-test-tasks")
+        add_deps("osfsettings-test-services")
         add_forceincludes("SFSE/Impl/PCH.h")
     else
         add_deps("osfsettings-test-core")
@@ -101,7 +93,7 @@ test_target("osfsettings-diagnostics-api-tests", "diagnostics", true)
 test_target("osfsettings-hotkey-block-tests", "input", true)
     add_files("hotkey_block_tests.cpp")
 
--- This fixture intentionally uses its own SFSE stub, not the real task wrapper.
+-- Callback state has no engine dependency.
 target("osfsettings-hotkey-callback-tests")
     set_kind("binary")
     set_default(false)
@@ -109,7 +101,7 @@ target("osfsettings-hotkey-callback-tests")
     set_rundir(os.projectdir())
     add_tests("default")
     add_files("hotkey_callback_tests.cpp", "../src/Input/HotkeyInputState.cpp")
-    add_includedirs("stubs", "../src")
+    add_includedirs("../src")
 
 test_target("osfsettings-string-tests", "settings", true)
     add_files("string_settings_tests.cpp")

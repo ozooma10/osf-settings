@@ -49,6 +49,7 @@ namespace OSFSettings::API
     // Reread current settings. key == nullptr requests a full refresh, including the initial notification.
     // Callbacks run serially from an SFSE task; no main-thread guarantee.
     using ChangedFn = void (*)(const char* mod, const char* key, void* context) noexcept;
+    // Runs inline during input handling, outside the input-state lock. Return promptly.
     using HotkeyFn = void (*)(const char* mod, const char* id, void* context) noexcept;
 
     // Submitted on an SFSE task, with no main-thread guarantee. Return promptly;

@@ -2,7 +2,6 @@
 #include "Papyrus/Values.h"
 #include "Papyrus/Issues.h"
 #include "Diagnostics/DiagnosticsService.h"
-#include "HotkeyTasks.h"
 
 #include <chrono>
 #include <fstream>
@@ -144,7 +143,7 @@ int main()
         check(listeners.Register(global, Kind::Hotkey, Mod, "missing") == SettingsError::UnknownHotkey, "unknown hotkey fails");
         check(listeners.Register(global, Kind::Hotkey, Mod, "menu") == SettingsError::TypeMismatch, "menu hotkeys reject Papyrus handlers");
         const auto press = [&] { return input.ProcessButton(0x75, toggle, 1, 0); };
-        check(press() && events == std::vector<std::string>{"example:hotkey:toggle"} && HotkeyTasks::pending.empty(), "hotkey submits at admission without a bridge task or poll");
+        check(press() && events == std::vector<std::string>{"example:hotkey:toggle"}, "hotkey submits at admission without a bridge task or poll");
         check(!input.ProcessButton(0x75, toggle, 1, 1) && !input.ProcessButton(0x75, toggle, 0, 1), "repeats and releases do not activate");
         check(events == std::vector<std::string>{"example:hotkey:toggle"}, "one callback per fresh down");
         events.clear();
@@ -229,11 +228,11 @@ int main()
         }, &nativeCalls);
         check(mixed.Register(global, Kind::Hotkey, Mod, "toggle") == SettingsError::None, "Global hotkey target registers alongside native callback");
         mixedInput.ProcessButton(0x75, toggle, 1, 0);
-        check(events == std::vector<std::string>{"globalexample:hotkey:toggle"} && nativeCalls == 0, "Global submission is immediate while native callbacks use SFSE tasks");
+        check(events == std::vector<std::string>{"globalexample:hotkey:toggle"} && nativeCalls == 1, "Global and native callbacks both run inline");
         events.clear();
         mixedInput.ProcessButton(0x75, toggle, 1, 0);
-        mixed.Clear(); mixed.Resume(); HotkeyTasks::Run();
-        check(events == std::vector<std::string>{"globalexample:hotkey:toggle"} && nativeCalls == 2, "session cleanup preserves already submitted Papyrus and native calls");
+        mixed.Clear(); mixed.Resume();
+        check(events == std::vector<std::string>{"globalexample:hotkey:toggle"} && nativeCalls == 2, "session cleanup preserves already delivered Papyrus and native calls");
 
         DiagnosticsService issueService;
         API::DiagnosticsApi issueAdapter(issueService);

@@ -1,5 +1,4 @@
 #include "HotkeyInputState.h"
-#include "SFSE/API.h"
 
 #include <utility>
 
@@ -101,19 +100,15 @@ namespace OSFSettings
                 }
             }
             if (listeners.empty() && observers.empty()) return false;
-            const bool hasNative = !listeners.empty();
-            auto task = [listeners = std::move(listeners), mod = action.mod, id = action.id] {
-                for (const auto& listener : listeners) {
-                    listener.callback(mod.c_str(), id.c_str(), listener.context);
-                }
-            };
             lock.unlock();
             for (const auto& observer : observers) {
                 if (observer->active.load()) {
                     observer->callback();
                 }
             }
-            if (hasNative) SFSE::GetTaskInterface()->AddTask(std::move(task));
+            for (const auto& listener : listeners) {
+                listener.callback(action.mod.c_str(), action.id.c_str(), listener.context);
+            }
             return true;
         }
 

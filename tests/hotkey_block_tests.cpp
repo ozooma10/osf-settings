@@ -1,4 +1,3 @@
-#include "HotkeyTasks.h"
 #include "API/SettingsApi.h"
 #include "Input/HotkeyInputState.h"
 #include "Settings/SettingsService.h"
@@ -165,8 +164,7 @@ int main()
         check(client.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::Ok,
             "client registers a process-lifetime callback through the extended interface");
         input.ProcessButton(0x75, callback, 1, 0);
-        check(callbacks == 0, "public callbacks do not run on the producer");
-        HotkeyTasks::Run();
+
         check(callbacks == 1, "client registration and input share the callback state");
 
         std::uint32_t version{};
@@ -185,8 +183,8 @@ int main()
         productionInput.Initialize(declarations);
         check(client.RegisterHotkey("sample", "toggleFeature", fired, &callbacks) == Status::Ok &&
             productionInput.ProcessButton(0x75, callback, 1, 0),
-            "production export shares the callback registry and queue used by input");
-        HotkeyTasks::Run();
+            "production export shares the callback registry used by input");
+
         check(callbacks == 2, "the exported interface invokes a real registered callback");
         std::cout << checks << '/' << checks << " hotkey block/API checks passed\n";
     } catch (const std::exception& error) {

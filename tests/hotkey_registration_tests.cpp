@@ -7,7 +7,6 @@
 #include "Input/KeyNames.h"
 #include "REL/ASM.h"
 #include "REL/Trampoline.h"
-#include "HotkeyTasks.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -152,10 +151,9 @@ int main()
             "registration publishes schema validation outcomes, including mods without hotkeys");
         check(input.Register("osfsettings", "unbound", fired, &calls) == SettingsError::None,
             "valid unbound native actions accept callbacks");
-        check(input.ProcessButton(0x75, *callback, 1, 0) && calls == 0 && HotkeyTasks::pending.size() == 1,
-            "production registration submits the callback through the real SFSE AddTask wrapper");
-        HotkeyTasks::Run();
-        check(calls == 1, "the SFSE task delegate runs the callback and destroys its captured work");
+        check(input.ProcessButton(0x75, *callback, 1, 0) && calls == 1,
+            "production registration invokes the callback inline");
+
 
         load(&first, vanilla);
         check(parsedTexts.size() == 2 && parsedMap == &first && parsedTexts.back().ends_with(vanilla),

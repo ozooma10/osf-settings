@@ -15,7 +15,7 @@ namespace
         auto& enabled = *static_cast<std::atomic_uint*>(context);
         const bool next = enabled.fetch_xor(1u) == 0;
         REX::INFO("Hotkey example: {}/{} enabled={}", mod, id, next);
-        // Schedule game effects in their required context; this is an SFSE task.
+        // Schedule game effects in their required context; this callback runs inline during input handling.
     }
 
     void OnMessage(SFSE::MessagingInterface::Message* message)

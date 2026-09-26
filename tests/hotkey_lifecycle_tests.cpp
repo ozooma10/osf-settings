@@ -1,4 +1,3 @@
-#include "HotkeyTasks.h"
 #include "SFSE/Impl/PCH.h"
 // Exercise the production startup hook and input callback against executable fixtures.
 #include "../src/Input/HotkeyInput.cpp"
@@ -239,7 +238,7 @@ int main()
                 handler->ShouldHandleEvent(&pause) && !handler->ShouldHandleEvent(nullptr),
                 "the event filter admits keyboard buttons before action resolution");
             handler->OnButtonEvent(&pause);
-            check(pause.status == RE::InputEvent::Status::kUnhandled && messages.empty() && HotkeyTasks::pending.empty(),
+            check(pause.status == RE::InputEvent::Status::kUnhandled && messages.empty(),
                 "unregistered vanilla actions remain unhandled");
             settings.disabled = true;
             check(!handler->ShouldHandleEvent(&settings), "disabled mapped actions are rejected");
@@ -332,33 +331,32 @@ int main()
                 if (handler->ShouldHandleEvent(&callback)) handler->OnButtonEvent(&callback);
             };
             callbackButton(1, 0);
-            check(handler->ShouldHandleEvent(&callback) && callback.status == RE::InputEvent::Status::kUnhandled &&
-                HotkeyTasks::pending.empty(), "declarations without registered callbacks remain unconsumed");
+            check(handler->ShouldHandleEvent(&callback) && callback.status == RE::InputEvent::Status::kUnhandled, "declarations without registered callbacks remain unconsumed");
             unsigned calls{};
             check(input.Register("anothermod", "toggleFeature", +[](const char*, const char*, void* context) noexcept {
                 ++*static_cast<unsigned*>(context);
             }, &calls) == SettingsError::None, "register a native callback fixture");
             callback.disabled = true;
             callbackButton(1, 0);
-            check(!handler->ShouldHandleEvent(&callback) && HotkeyTasks::pending.empty(), "disabled callback actions are filtered");
+            check(!handler->ShouldHandleEvent(&callback) && calls == 0, "disabled callback actions are filtered");
             callback.disabled = false;
             callback.deviceType = RE::InputEvent::DeviceType::kGamepad;
             callbackButton(1, 0);
-            check(!handler->ShouldHandleEvent(&callback) && HotkeyTasks::pending.empty(), "callback actions remain keyboard-only");
+            check(!handler->ShouldHandleEvent(&callback) && calls == 0, "callback actions remain keyboard-only");
             callback.deviceType = RE::InputEvent::DeviceType::kKeyboard;
             callback.eventType = RE::InputEvent::EventType::kChar;
             callbackButton(1, 0);
-            check(!handler->ShouldHandleEvent(&callback) && HotkeyTasks::pending.empty(), "text events cannot activate callbacks");
+            check(!handler->ShouldHandleEvent(&callback) && calls == 0, "text events cannot activate callbacks");
             callback.eventType = RE::InputEvent::EventType::kButton;
             queue = nullptr;
             callbackButton(1, 0);
-            check(callback.status == RE::InputEvent::Status::kStop && !HotkeyTasks::pending.empty() && calls == 0,
-                "callback key-down is consumed when queued without requiring a UI queue or invoking inline");
+            check(callback.status == RE::InputEvent::Status::kStop && calls == 1,
+                "callback key-down is consumed with an inline callback and no UI queue");
             callbackButton(1, 1);
             callbackButton(0, 1);
             check(callback.status == RE::InputEvent::Status::kUnhandled, "callback repeats and releases are unconsumed");
-            HotkeyTasks::Run();
-            check(calls == 1 && messages.size() == 3, "one callback runs on dispatch without opening a menu");
+
+            check(calls == 1 && messages.size() == 3, "one callback runs per press without opening a menu");
             queue = &queueStorage;
             callbackButton(1, 0);
             const auto callbackBlock = input.AcquireBlock();
@@ -368,10 +366,10 @@ int main()
             input.ReleaseBlock(callbackBlock);
             callbackButton(1, 1);
             callbackButton(0, 1);
-            HotkeyTasks::Run();
-            check(calls == 2, "focus blocks leave submitted tasks intact while held input cannot replay");
+
+            check(calls == 2, "focus blocks prevent callbacks while held input cannot replay");
             callbackButton(1, 0);
-            HotkeyTasks::Run();
+
             check(calls == 3, "a fresh callback press works after focus restoration");
         }
         events.clear();
