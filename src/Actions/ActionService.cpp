@@ -13,7 +13,6 @@ namespace OSFSettings
 
     void ActionService::Initialize(const std::vector<ModSettings>& mods)
     {
-        std::lock_guard gate(m_dispatchMutex);
         std::lock_guard lock(m_mutex);
         if (m_ready) return;
         for (const auto& mod : mods) {
@@ -46,51 +45,30 @@ namespace OSFSettings
         return ActionError::None;
     }
 
-    ActionError ActionService::Begin(std::string_view mod, std::string_view id, Invocation& out)
+    ActionError ActionService::Invoke(std::string_view mod, std::string_view id, Invocation& out)
     {
-        std::lock_guard lock(m_mutex);
-        if (!m_ready || !m_transitions.empty()) return ActionError::NotReady;
-        const auto found = m_actions.find({ std::string(mod), std::string(id) });
-        if (found == m_actions.end()) return ActionError::UnknownAction;
-        auto& entry = found->second;
-        if (!entry.callback) return ActionError::NotReady;
-        if (entry.invocation) return ActionError::Busy;
-        if (!m_nextInvocation) return ActionError::NotReady; // Exhaustion must never reuse an old token.
-        entry.invocation = m_nextInvocation++;
-        entry.submitted = false;
-        entry.state = ActionState::Running;
-        entry.message.clear();
-        out = entry.invocation;
-        m_revision++;
-        return ActionError::None;
-    }
-
-    void ActionService::Dispatch(Invocation invocation) noexcept
-    {
-        if (!invocation) return;
-        std::lock_guard gate(m_dispatchMutex);
         Callback callback;
-        Key key;
+        const Key key{ mod, id };
+        Invocation invocation;
         {
             std::lock_guard lock(m_mutex);
-            const auto found = std::ranges::find_if(m_actions, [&](const auto& item) { 
-                return item.second.invocation == invocation; 
-            });
-            if (found == m_actions.end() || found->second.submitted) return;
+            if (!m_ready || !m_transitions.empty()) return ActionError::NotReady;
+            const auto found = m_actions.find(key);
+            if (found == m_actions.end()) return ActionError::UnknownAction;
             auto& entry = found->second;
-            if (!m_transitions.empty()) {
-                entry.message = tr("actions.interrupted");
-                entry.state = ActionState::Failed;
-                entry.invocation = 0;
-                m_revision++;
-                return;
-            }
+            if (!entry.callback) return ActionError::NotReady;
+            if (entry.invocation) return ActionError::Busy;
+            if (!m_nextInvocation) return ActionError::NotReady; // Exhaustion must never reuse an old token.
             callback = entry.callback;
-            key = found->first;
-            entry.submitted = true;
+            invocation = entry.invocation = m_nextInvocation++;
+            entry.state = ActionState::Running;
+            entry.message.clear();
+            out = invocation;
+            m_revision++;
         }
         // The handler must submit lengthy work and return promptly. No store lock is held.
         callback(invocation, key.first, key.second);
+        return ActionError::None;
     }
 
     ActionError ActionService::Complete(Invocation invocation, bool succeeded, std::string message)
@@ -129,7 +107,6 @@ namespace OSFSettings
 
     void ActionService::Suspend(std::uint8_t operation)
     {
-        std::lock_guard gate(m_dispatchMutex);
         std::lock_guard lock(m_mutex);
         m_transitions[operation]++;
         m_revision++;
@@ -147,7 +124,6 @@ namespace OSFSettings
 
     void ActionService::ClearSession()
     {
-        std::lock_guard gate(m_dispatchMutex);
         std::lock_guard lock(m_mutex);
         for (auto& [key, entry] : m_actions) {
             if (entry.sessionScoped) {

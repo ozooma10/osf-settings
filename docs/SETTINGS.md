@@ -233,7 +233,7 @@ if (actions.Init()) {
 
 Exactly one native **or** Papyrus handler owns each declaration. Native registration is process lifetime; another registration returns `AlreadyRegistered`.
 
-Callbacks run on SFSE tasks with no main-thread guarantee. The menu pauses the game; your handler may queue work that will run after it closes.
+Action callbacks run inline when the menu invokes them, outside the service lock. Return promptly and schedule engine/UI work in its required context. The menu pauses the game; your handler may queue work that will run after it closes.
 OSF does not close menus, wait for gameplay, create worker threads, or cancel the mod's work.
 
 Complete immediately inside the callback or retain the token and complete later.

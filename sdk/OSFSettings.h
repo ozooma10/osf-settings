@@ -52,7 +52,7 @@ namespace OSFSettings::API
     // Runs inline during input handling, outside the input-state lock. Return promptly.
     using HotkeyFn = void (*)(const char* mod, const char* id, void* context) noexcept;
 
-    // Submitted on an SFSE task, with no main-thread guarantee. Return promptly;
+    // Runs inline when the menu invokes the action, outside the service lock. Return promptly;
     // CompleteAction may be called inside this callback or later from another thread.
     using ActionFn = void (*)(Invocation invocation, const char* mod, const char* id, void* context) noexcept;
 

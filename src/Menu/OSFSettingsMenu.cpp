@@ -180,12 +180,8 @@ namespace OSFSettings
             ActionService::Invocation invocation{};
             auto result = ActionError::InvalidArgument;
             std::string error;
-            const auto* tasks = SFSE::GetTaskInterface();
-            if (params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString() && tasks) {
-                result = ActionService::Get().Begin(ArgString(params, 0), ArgString(params, 1), invocation);
-                if (result == ActionError::None) {
-                    tasks->AddTask([invocation] { ActionService::Get().Dispatch(invocation); });
-                }
+            if (params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString()) {
+                result = ActionService::Get().Invoke(ArgString(params, 0), ArgString(params, 1), invocation);
             }
             if (result != ActionError::None) {
                 error = result == ActionError::Busy ? tr("actions.busy") : tr("actions.unavailable");

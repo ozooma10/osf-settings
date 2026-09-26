@@ -65,7 +65,6 @@
     "actions.cancelled": "アクションをキャンセルしました。",
     "actions.submitted": "アクションの実行を要求しました。設定画面は引き続き使用することも、閉じることもできます。",
     "actions.confirmControls": "左 / 右：選択     Enter / 決定：確定     Escape / 戻る：キャンセル",
-    "actions.interrupted": "ゲームセッションの変更によりアクションが中断されました。",
     "actions.unknown": "不明なアクションです。",
     "actions.sessionChanging": "ゲームセッションを変更しています。",
     "actions.noHandler": "このアクションの処理が登録されていません。",

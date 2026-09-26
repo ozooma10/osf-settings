@@ -26,8 +26,7 @@ namespace OSFSettings
         static ActionService& Get();
         void Initialize(const std::vector<ModSettings>& mods);
         ActionError Register(std::string_view mod, std::string_view id, Callback callback, bool sessionScoped = false);
-        ActionError Begin(std::string_view mod, std::string_view id, Invocation& out);
-        void Dispatch(Invocation invocation) noexcept; // Called once by the task dispatcher, never by the movie.
+        ActionError Invoke(std::string_view mod, std::string_view id, Invocation& out);
         ActionError Complete(Invocation invocation, bool succeeded, std::string message);
         ActionStatus Status(std::string_view mod, std::string_view id) const;
         std::uint64_t Revision() const noexcept { return m_revision.load(); }
@@ -43,11 +42,9 @@ namespace OSFSettings
             Callback callback;
             bool sessionScoped{};
             Invocation invocation{};
-            bool submitted{};
             ActionState state{};
             std::string message;
         };
-        std::recursive_mutex m_dispatchMutex;
         mutable std::mutex m_mutex;
         std::map<Key, Entry> m_actions;
         std::map<std::uint8_t, std::uint32_t> m_transitions;

@@ -65,7 +65,6 @@
     "actions.cancelled": "Action cancelled.",
     "actions.submitted": "Action submitted. You can keep using or close Settings.",
     "actions.confirmControls": "Left / Right: choose     Enter / Accept: select     Escape / Back: cancel",
-    "actions.interrupted": "Action interrupted by a game session change.",
     "actions.unknown": "Unknown action.",
     "actions.sessionChanging": "A game session change is in progress.",
     "actions.noHandler": "This action has no registered handler.",
