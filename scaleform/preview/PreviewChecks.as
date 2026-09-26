@@ -353,14 +353,14 @@ package
                         for each (var item:Object in rows) if (item.type == "launcher" && item.mod == "launcher-preview-8") item.recentOrder = 100;
                         return rows;
                     };
-                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "promoted"; }; break;
+                    Object(menu).BGSCodeObj.revision = function():String { return "promoted"; }; break;
                 case 60: break;
                 case 61:
                     require(Object(findNamed(menu,"launcher_0")).row.title == "Ship Planner", "new native history moves the last-opened interface first");
                     Object(menu).BGSCodeObj.getRows = function():Array {
                         return originalRows().filter(function(row:Object, index:int, source:Array):Boolean { return row.type != "launcher"; });
                     };
-                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "no-interfaces"; }; break;
+                    Object(menu).BGSCodeObj.revision = function():String { return "no-interfaces"; }; break;
                 case 62: break;
                 case 63:
                     require(!launcher.visible && list.visible && list.y == 362 && !list.disableInput, "no interfaces restores the full settings list");
@@ -370,7 +370,7 @@ package
                         return [{type:"hotkey", mod:"osfsettings", modTitle:"OSF Settings", modDescription:"", group:"general", groupTitle:"General",
                             key:"openMenu", action:"osfsettings/openMenu", registered:true, title:"Open mod settings", hint:"", defaultName:"F10"}];
                     };
-                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "empty"; }; break;
+                    Object(menu).BGSCodeObj.revision = function():String { return "empty"; }; break;
                 case 64: break;
                 case 65:
                     require(findNamed(menu,"homeEmpty").visible && !list.visible && !launcher.visible, "OSF Settings alone shows the empty state");
@@ -381,7 +381,7 @@ package
                     Object(menu).BGSCodeObj.getRows = function():Array {
                         return originalRows().filter(function(row:Object, index:int, source:Array):Boolean { return row.type == "launcher"; });
                     };
-                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "interfaces-only"; };
+                    Object(menu).BGSCodeObj.revision = function():String { return "interfaces-only"; };
                     findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 67: break;
                 case 68:
@@ -390,7 +390,7 @@ package
                     require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "interfaces-only Home keeps its tab");
                     capture("home-interfaces-only");
                     Object(menu).BGSCodeObj.getRows = originalRows;
-                    Object(menu).BGSCodeObj.launcherRevision = function():String { return "restored"; }; break;
+                    Object(menu).BGSCodeObj.revision = function():String { return "restored"; }; break;
                 case 69: break;
                 case 70:
                     require(launcher.visible && !launcher.expanded && list.visible && list.entryCount == 3, "mod settings bring back the shelf and list");

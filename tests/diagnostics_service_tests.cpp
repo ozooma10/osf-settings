@@ -25,20 +25,22 @@ int TestDiagnosticsService()
     };
 
     DiagnosticsService service;
-    check(service.Snapshot().empty(), "a new diagnostics service is empty");
+    check(service.Snapshot().empty() && service.Revision() == 0, "a new diagnostics service is empty at revision zero");
     auto input = Issue("sample", "Original");
-    check(service.Report(input), "reporting works without settings initialization");
+    check(service.Report(input) && service.Revision() == 1, "reporting works without settings initialization");
     input.title = "Caller edit";
     auto snapshot = service.Snapshot();
     check(snapshot.size() == 1 && snapshot[0].title == "Original", "the service owns reported strings");
     snapshot[0].title = "Snapshot edit";
     check(service.Snapshot()[0].title == "Original", "service snapshots own their strings");
-    check(!service.Report(Issue("sample", "")) && service.Snapshot()[0].title == "Original",
-        "invalid reports preserve the existing issue");
+    check(!service.Report(Issue("sample", "")) && service.Snapshot()[0].title == "Original" && service.Revision() == 1,
+        "invalid reports preserve the existing issue and revision");
     check(service.Report(Issue("sample", "Updated")) && service.Snapshot().size() == 1 &&
-        service.Snapshot()[0].title == "Updated", "service reports update the same identity");
-    check(service.Clear("sample", "status") && !service.Clear("sample", "status"),
+        service.Snapshot()[0].title == "Updated" && service.Revision() == 2, "service reports update the same identity");
+    check(service.Clear("sample", "status") && service.Revision() == 3 && !service.Clear("sample", "status") && service.Revision() == 3,
         "service clears remove issues and tolerate repetition");
+    check(service.Report(input) && service.ClearMod("sample") == 1 && service.Revision() == 5 &&
+        service.ClearMod("sample") == 0 && service.Revision() == 5, "only effective mod clears advance the revision");
 
     check(service.Report(Issue("sentinel", "Sentinel")), "unrelated issue is present before concurrent operations");
     constexpr int workerCount = 4;

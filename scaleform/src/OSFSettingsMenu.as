@@ -32,7 +32,6 @@ package
         private var allRows:Array = [];
         private var issues:Array = [];
         private var rootPage:String = "mods";
-        private var nextIssuePoll:int = 0;
         private var mods:Array = [];
         private var groups:Array = [];
         private var modID:String = "";
@@ -43,11 +42,10 @@ package
         private var stringEditor:StringSetting;
         private var actionConfirmation:ActionConfirmation;
         private var actionAcceptHeld:Boolean = false;
-        private var actionRevision:String = "";
-        private var launcherRevision:String = "";
+        private var revision:String = "";
         private var launcher:LauncherPage;
         private var launcherAcceptHeld:Boolean = false;
-        private var nextActionPoll:int = 0;
+        private var nextRevisionPoll:int = 0;
         private var stringConfirmHeld:Boolean;
         private var searchExitFrame:int = -10;
         private var navigationFrame:int = -1;
@@ -124,7 +122,7 @@ package
             try {
                 Localization.initialize(BGSCodeObj.getLocalization ? BGSCodeObj.getLocalization() : null);
                 menuStage = stage; buildMenu(); initialized = true;
-                startupPhase = "populate settings"; readIssues(); refresh(false);
+                startupPhase = "populate settings"; refresh(false);
                 startupPhase = "ready"; BGSCodeObj.startup(startupPhase);
             } catch (error:Error) {
                 initialized = false; closing = true;
@@ -307,7 +305,7 @@ package
             else rootPage = id;
             if (bindingsPage()) keybindings.open(allRows);
             else keybindings.close();
-            readIssues(); populate(); drawTabs();
+            populate(); drawTabs();
         }
         private function button(text:String, eventName:String, callback:Function, target:Object = null):Object
         {
@@ -322,24 +320,11 @@ package
             var format:TextFormat = field.defaultTextFormat; format.align = "right";
             field.defaultTextFormat = format; field.setTextFormat(format);
         }
-        private function readIssues():Boolean
-        {
-            nextIssuePoll = getTimer() + 1000;
-            var latest:Array = BGSCodeObj.getIssues() as Array || [];
-            var changed:Boolean = latest.length != issues.length;
-            for (var i:int = 0; !changed && i < latest.length; ++i) {
-                for each (var field:String in ["mod", "id", "modTitle", "title", "severity", "severityLabel", "impact", "nextSteps"]) {
-                    if (latest[i][field] != issues[i][field]) { changed = true; break; }
-                }
-            }
-            if (changed) issues = latest;
-            return changed;
-        }
         private function refresh(preserve:Boolean = true):void
         {
             // Read the revision first so a concurrent completion triggers another refresh.
-            actionRevision = String(BGSCodeObj.actionRevision());
-            launcherRevision = String(BGSCodeObj.launcherRevision());
+            revision = String(BGSCodeObj.revision());
+            issues = BGSCodeObj.getIssues() as Array || [];
             allRows = BGSCodeObj.getRows() as Array || [];
             mods = []; var seen:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
@@ -754,7 +739,7 @@ package
             if (frame <= searchExitFrame + 1) return;
             if (closing || dragging() || requestedRefresh) return;
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
-            if (modID) { modID = ""; groupID = ""; rootPage = "mods"; readIssues(); refresh(false); return; }
+            if (modID) { modID = ""; groupID = ""; rootPage = "mods"; refresh(false); return; }
             closing = true; options.disableInput = true; BGSCodeObj.close();
         }
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
@@ -935,16 +920,11 @@ package
                 options.disableInput = launcherPage() || bindingBusy() || searching() || Boolean(captureRow) || editingString() || confirmingAction();
                 if (captureRow) pollBinding();
                 else if (!editingString() && !confirmingAction()) {
-                    if (getTimer() >= nextActionPoll && !bindingBusy() && !dragging() && !searching()) {
-                        nextActionPoll = getTimer() + 250;
-                        if (String(BGSCodeObj.actionRevision()) != actionRevision) requestedRefresh = true;
-                        if (String(BGSCodeObj.launcherRevision()) != launcherRevision) requestedRefresh = true;
+                    if (getTimer() >= nextRevisionPoll && !bindingBusy() && !dragging() && !searching()) {
+                        nextRevisionPoll = getTimer() + 250;
+                        if (String(BGSCodeObj.revision()) != revision) requestedRefresh = true;
                     }
                     if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
-                    if (getTimer() >= nextIssuePoll && !bindingBusy() && !dragging() && readIssues()) {
-                        if (issuesPage()) populate(true);
-                        drawTabs();
-                    }
                     decorate();
                 }
             }

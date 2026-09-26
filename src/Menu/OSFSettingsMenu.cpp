@@ -20,7 +20,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, ActionRevision, Launch, LauncherRevision, GetLocalization };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization };
 
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -94,9 +94,8 @@ namespace OSFSettings
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
         RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
-        RegisterNativeFunction("actionRevision", static_cast<std::uint64_t>(Function::ActionRevision));
+        RegisterNativeFunction("revision", static_cast<std::uint64_t>(Function::Revision));
         RegisterNativeFunction("launch", static_cast<std::uint64_t>(Function::Launch));
-        RegisterNativeFunction("launcherRevision", static_cast<std::uint64_t>(Function::LauncherRevision));
         RegisterNativeFunction("requestBindings", static_cast<std::uint64_t>(Function::RequestBindings));
         RegisterNativeFunction("pollBindings", static_cast<std::uint64_t>(Function::PollBindings));
         RegisterNativeFunction("textInput", static_cast<std::uint64_t>(Function::TextInput));
@@ -143,9 +142,6 @@ namespace OSFSettings
         const auto function = static_cast<Function>(reinterpret_cast<std::uintptr_t>(params.userData));
         auto& runtime = Runtime::Get();
         switch (function) {
-        case Function::LauncherRevision:
-            root->CreateString(params.ret, std::to_string(LauncherService::Get().Revision()).c_str());
-            break;
         case Function::Launch: {
             bool accepted = false;
             auto* ui = RE::UI::GetSingleton();
@@ -173,8 +169,10 @@ namespace OSFSettings
             }
             break;
         }
-        case Function::ActionRevision:
-            root->CreateString(params.ret, std::to_string(ActionService::Get().Revision()).c_str());
+        case Function::Revision:
+            root->CreateString(params.ret, (std::to_string(ActionService::Get().Revision()) + ":" +
+                std::to_string(LauncherService::Get().Revision()) + ":" +
+                std::to_string(DiagnosticsService::Get().Revision())).c_str());
             break;
         case Function::InvokeAction: {
             ActionService::Invocation invocation{};

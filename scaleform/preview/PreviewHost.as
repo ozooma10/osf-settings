@@ -163,7 +163,7 @@ package
         {
             menu = event.target.content;
             menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
-                actionRevision:function():String { return "0"; }, invokeAction:invokeAction, launcherRevision:function():String { return "0"; },
+                revision:function():String { return "0:0:0"; }, invokeAction:invokeAction,
                 launch:function(mod:String, id:String):Boolean {
                     trace("[preview] launch " + mod + "/" + id);
                     return false; // The preview cannot open engine/provider menus.
