@@ -117,16 +117,6 @@ namespace OSFSettings
         TestHarness::RegisterMenuFunctions(*this);
     }
 
-    RE::UI_MESSAGE_RESULT OSFSettingsMenu::ProcessMessage(RE::UIMessageData& message)
-    {
-        if (message.type == RE::UI_MESSAGE_TYPE::kHide) {
-            m_bindings->Invalidate();
-            m_bindingEditor.End(true);
-            m_capture.ResetForMenuClose();
-        }
-        return RE::GameMenuBase::ProcessMessage(message);
-    }
-
     void OSFSettingsMenu::OnStartupFailed(std::string_view message)
     {
         REX::ERROR("OSF Settings menu startup failed: {}", message);
@@ -577,9 +567,6 @@ namespace OSFSettings
 
     void OSFSettingsMenu::Close() 
     { 
-        m_bindings->Invalidate();
-        m_bindingEditor.End(true);
-        m_capture.EndCapture();
         if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
             queue->AddMessage(RE::BSFixedString(MENU_NAME.data()), RE::UI_MESSAGE_TYPE::kHide); 
         }

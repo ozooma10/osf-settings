@@ -4,7 +4,7 @@ Run from the repository root with the existing XMake configuration. XMake builds
 selected tests before running them, so a separate build command is unnecessary.
 
 ```powershell
-# All 21 native suites, including SDK, service and key coverage.
+# All 22 native suites, including SDK, service and key coverage.
 xmake test -j4
 
 # One area, or several related suites in one invocation.
@@ -89,6 +89,11 @@ variants and also accepts `-Variant Normal`, `-Variant Large`, and `-Force`.
 Preview, large-text and harness flags participate in movie fingerprints.
 
 ## Game acceptance
+
+For a single automated development entrypoint, including uncommitted changes,
+use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame`. The
+[smoke bench guide](../docs/SMOKE_TESTS.md) describes coverage, isolation, report
+formats and remaining acceptance gaps. Omit `-RunGame` for an offline run.
 
 The [release runner](../tools/test-release.ps1) combines native and preview
 checks, production archive verification, disposable reinstall checks, and a

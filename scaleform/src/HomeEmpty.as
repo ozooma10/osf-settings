@@ -10,8 +10,8 @@ package
     // thing the player can still do here, which is change the key that opens it.
     public final class HomeEmpty extends Sprite
     {
-        private static const TOP:Number = 258;
-        private static const BOTTOM:Number = 914;
+        private static const TOP:Number = MenuStyle.TABS_LINE;
+        private static const BOTTOM:Number = MenuStyle.FOOTER_LINE;
         private static const CENTER:Number = (MenuStyle.LEFT + MenuStyle.RIGHT) / 2;
         private var stack:Sprite = new Sprite();
         private var keyLine:Sprite = new Sprite();

@@ -54,7 +54,9 @@ package
         private var bar:Object;
         private var background:MovieClip;
         private var menuStage:Stage;
+        private var crumb:TextField;
         private var heading:TextField;
+        private var headerSummary:TextField;
         private var section:TextField;
         private var count:TextField;
         private var homeMods:TextField;
@@ -70,6 +72,10 @@ package
         private var detailHint:TextField;
         private var defaultLabel:TextField;
         private var defaultValue:TextField;
+        private var rangeLabel:TextField;
+        private var rangeValue:TextField;
+        private var detailOptions:Sprite = new Sprite();
+        private var optionsSignature:String = "";
         private var status:TextField;
         private var empty:TextField;
         private var tabs:Sprite = new Sprite();
@@ -81,8 +87,13 @@ package
         private var acceptButton:Object;
         private var backButton:Object;
         private var buttonData:Object = {};
-        private var pageBar:Object;
+        private var previousButton:Object;
+        private var nextButton:Object;
         private var clearButton:Object;
+        // Keyboard and gamepad moves carry their direction past section headers.
+        private var moveDirection:int = 0;
+        private var moveFrame:int = -10;
+        private var listData:Array = [];
         private var captureRow:Object;
         private var captureBinding:MovieClip;
         private var captureReady:Boolean = false;
@@ -143,30 +154,29 @@ package
             startupPhase = "build authored menu text";
             var chrome:Sprite = new Sprite(); chrome.mouseEnabled = false; addChild(chrome);
             chrome.graphics.lineStyle(1, MenuStyle.LINE);
-            chrome.graphics.moveTo(MenuStyle.LEFT, 258); chrome.graphics.lineTo(MenuStyle.RIGHT, 258);
-            chrome.graphics.moveTo(MenuStyle.LEFT, 914); chrome.graphics.lineTo(MenuStyle.RIGHT, 914);
+            chrome.graphics.moveTo(MenuStyle.LEFT, MenuStyle.TABS_LINE); chrome.graphics.lineTo(MenuStyle.RIGHT, MenuStyle.TABS_LINE);
+            chrome.graphics.moveTo(MenuStyle.LEFT, MenuStyle.FOOTER_LINE); chrome.graphics.lineTo(MenuStyle.RIGHT, MenuStyle.FOOTER_LINE);
             chrome.graphics.lineStyle();
             detailDivider.mouseEnabled = false; addChild(detailDivider);
             detailDivider.graphics.lineStyle(1, MenuStyle.LINE);
-            detailDivider.graphics.moveTo(1210, 656); detailDivider.graphics.lineTo(MenuStyle.RIGHT, 656);
-            // Match SettingsPanel's 40px rail and roughly 47px stripe pitch.
-            for (var i:int = 0; i < 14; ++i) {
-                var y:Number = 274 + i * 47.25;
-                chrome.graphics.beginFill(MenuStyle.WHITE); chrome.graphics.moveTo(60, y);
-                chrome.graphics.lineTo(100, y + 40); chrome.graphics.lineTo(100, y + 62.3);
-                chrome.graphics.lineTo(60, y + 22.3); chrome.graphics.endFill();
-            }
-            var rail:TextField = label(tr("menu.title"), 0, 0, 250, 40, 25, 0xD3DDDF, true);
-            rail.rotation = -90; rail.x = 60; rail.y = 268;
-            heading = label("", MenuStyle.LEFT, 98, 1320, 85, CONFIG::largeText ? 60 : 52, MenuStyle.WHITE, true);
-            tabViewport.x = MenuStyle.LEFT; tabViewport.y = 196;
-            tabViewport.scrollRect = new Rectangle(0, 0, 1728, 64); tabViewport.addChild(tabs); addChild(tabViewport);
-            section = label("", MenuStyle.LEFT, 305, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
-            count = label("", 902, 308, 230, 40, 23, MenuStyle.MUTED, true); alignRight(count);
+            detailDivider.graphics.moveTo(MenuStyle.DETAIL_X, 0); detailDivider.graphics.lineTo(MenuStyle.RIGHT, 0);
+            // One header line: MOD SETTINGS / MOD TITLE, with the mod's summary at the right.
+            crumb = label(tr("menu.title") + "  /", MenuStyle.LEFT, MenuStyle.TITLE_TOP + MenuStyle.TITLE_SIZE - MenuStyle.SECTION_SIZE - 4,
+                600, MenuStyle.SECTION_SIZE + 12, MenuStyle.SECTION_SIZE, MenuStyle.MUTED, true);
+            crumb.width = crumb.textWidth + 8;
+            heading = label("", MenuStyle.LEFT, MenuStyle.TITLE_TOP, 1100, MenuStyle.TITLE_SIZE + 16, MenuStyle.TITLE_SIZE, MenuStyle.WHITE, true);
+            headerSummary = label("", MenuStyle.RIGHT - 620, crumb.y + 2, 620, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            alignRight(headerSummary);
+            tabViewport.x = MenuStyle.LEFT; tabViewport.y = MenuStyle.TABS_TOP;
+            tabViewport.scrollRect = new Rectangle(0, 0, MenuStyle.RIGHT - MenuStyle.LEFT, MenuStyle.TABS_LINE - MenuStyle.TABS_TOP);
+            tabViewport.addChild(tabs); addChild(tabViewport);
+            section = label("", MenuStyle.LEFT, MenuStyle.SECTION_TOP, 750, MenuStyle.SECTION_SIZE + 14, MenuStyle.SECTION_SIZE, MenuStyle.WHITE, true);
+            count = label("", MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 230, MenuStyle.SECTION_TOP + 3, 230, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            alignRight(count);
             // Home headings carry their count right after the title: INTERFACES 10, MODS 3.
-            headerCount = label("", MenuStyle.LEFT, 308, 200, 40, 23, MenuStyle.MUTED, true);
-            homeMods = label(tr("home.mods"), MenuStyle.LEFT, 0, 750, 45, CONFIG::largeText ? 30 : 27, MenuStyle.WHITE, true);
-            homeCount = label("", MenuStyle.LEFT, 0, 200, 40, 23, MenuStyle.MUTED, true);
+            headerCount = label("", MenuStyle.LEFT, MenuStyle.SECTION_TOP + 3, 200, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            homeMods = label(tr("home.mods"), MenuStyle.LEFT, 0, 750, MenuStyle.SECTION_SIZE + 14, MenuStyle.SECTION_SIZE, MenuStyle.WHITE, true);
+            homeCount = label("", MenuStyle.LEFT, 0, 200, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             homeMods.visible = homeCount.visible = headerCount.visible = false;
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
             configureList(options, "OptionListEntry");
@@ -174,38 +184,44 @@ package
             // Restore Home's list before vanilla handles a row's hover. Selection
             // events cannot do this while the interface shelf has disabled the list.
             options.addEventListener(MouseEvent.MOUSE_OVER, mouseFocus, true);
-            detailLabel = label(tr("menu.selectedSetting"), 1210, 363, 630, 36, 21, MenuStyle.MUTED, true);
-            detailTitle = label("", 1210, 409, 634, 102, CONFIG::largeText ? 38 : 34);
+            // The detail column flows top-down from the list top; describe() places each part.
+            var detailWidth:Number = MenuStyle.DETAIL_WIDTH;
+            detailLabel = label(tr("menu.selectedSetting"), MenuStyle.DETAIL_X, 0, detailWidth, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
+            detailTitle = label("", MenuStyle.DETAIL_X, 0, detailWidth, 80, MenuStyle.DETAIL_TITLE_SIZE);
             detailTitle.multiline = true; detailTitle.wordWrap = true;
-            detailHint = label("", 1210, 486, 634, 160, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED);
+            detailHint = label("", MenuStyle.DETAIL_X, 0, detailWidth, 120, MenuStyle.DETAIL_BODY_SIZE, MenuStyle.MUTED);
             detailHint.multiline = true; detailHint.wordWrap = true; detailHint.mouseEnabled = true;
             var descriptionFormat:TextFormat = detailHint.defaultTextFormat;
-            descriptionFormat.leading = CONFIG::largeText ? 12 : 10; detailHint.defaultTextFormat = descriptionFormat;
+            descriptionFormat.leading = CONFIG::largeText ? 8 : 6; detailHint.defaultTextFormat = descriptionFormat;
             detailHint.addEventListener(MouseEvent.MOUSE_WHEEL, scrollDescription);
-            defaultLabel = label(tr("menu.default"), 1210, 680, 420, 44, 23, MenuStyle.MUTED, true);
-            defaultValue = label("", 1674, 680, 170, 44, 25, MenuStyle.WHITE, true); alignRight(defaultValue);
+            defaultLabel = label(tr("menu.default"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            defaultValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(defaultValue);
+            rangeLabel = label(tr("menu.range"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(rangeValue);
+            detailOptions.x = MenuStyle.DETAIL_X; detailOptions.mouseEnabled = detailOptions.mouseChildren = false; addChild(detailOptions);
             issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
             homeDetails = new HomeDetails(); homeDetails.visible = false; addChild(homeDetails);
             homeEmpty = new HomeEmpty(function():void {
                 if (!captureRow && !bindingBusy() && !requestedRefresh) selectPage("bindings");
             });
             addChild(homeEmpty);
-            status = label(tr("menu.autoSave"), MenuStyle.LEFT, 938, 1180, 52, 21, MenuStyle.MUTED, true);
-            var legend:TextField = label(tr("menu.changed"), 1450, 938, 394, 36, 21, MenuStyle.MUTED, true);
+            // The footer is one line: status at the left, every button hint at the right.
+            status = label(tr("menu.autoSave"), MenuStyle.LEFT, 0, 900, 52, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            status.multiline = true; status.wordWrap = true;
+            // The changed marker only means something beside settings, so it closes the detail column.
+            var legend:TextField = label(tr("menu.changed"), MenuStyle.DETAIL_X, MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 14, detailWidth,
+                MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
             changedLegend.mouseEnabled = false; changedLegend.mouseChildren = false;
             addChild(changedLegend); changedLegend.addChild(legend);
-            alignRight(legend); MenuStyle.diamond(changedLegend.graphics, 1840 - legend.textWidth - 20, 954, MenuStyle.ACCENT);
-            empty = label("", MenuStyle.LEFT + 20, MenuStyle.LIST_TOP + 22, 970, 130, MenuStyle.BODY_SIZE, MenuStyle.MUTED);
+            alignRight(legend);
+            MenuStyle.diamond(changedLegend.graphics, MenuStyle.RIGHT - legend.textWidth - 22, legend.y + legend.height / 2 - 1, MenuStyle.ACCENT);
+            empty = label("", MenuStyle.LEFT + 16, MenuStyle.LIST_TOP + 16, MenuStyle.LIST_WIDTH - 40, 130, MenuStyle.BODY_SIZE, MenuStyle.MUTED);
             empty.multiline = true; empty.wordWrap = true;
-            pageBar = create("Shared.Components.ButtonControls.ButtonBar.ButtonBar");
-            pageBar.x = MenuStyle.LEFT; pageBar.y = 1008; addChild(pageBar as MovieClip); pageBar.Initialize(0, 28);
-            pageBar.scaleX = 1.1; pageBar.scaleY = 1.1;
-            button(tr("buttons.previousPage"), "LShoulder", function():void { changePage(-1); }, pageBar);
-            button(tr("buttons.nextPage"), "RShoulder", function():void { changePage(1); }, pageBar);
-            pageBar.RefreshButtons();
             bar = create("Shared.Components.ButtonControls.ButtonBar.ButtonBar");
-            bar.x = MenuStyle.RIGHT; bar.y = 1008; addChild(bar as MovieClip); bar.Initialize(1, 38);
-            bar.scaleX = 1.25; bar.scaleY = 1.25;
+            // Native button scale; the _LRG movie's vanilla buttons are already larger.
+            bar.x = MenuStyle.RIGHT; bar.y = MenuStyle.FOOTER_Y; addChild(bar as MovieClip); bar.Initialize(1, 30);
+            previousButton = button(tr("buttons.previousPage"), "LShoulder", function():void { changePage(-1); });
+            nextButton = button(tr("buttons.nextPage"), "RShoulder", function():void { changePage(1); });
             acceptButton = button(tr("buttons.toggle"), "Accept", accept);
             resetButton = button(tr("buttons.reset"), "YButton", reset);
             clearButton = button(tr("buttons.clearBinding"), "XButton", clearBinding);
@@ -244,7 +260,7 @@ package
         {
             list.x = MenuStyle.LEFT; list.y = MenuStyle.LIST_TOP; addChild(list as MovieClip);
             var config:Object = create("Shared.AS3.BSScrollingConfigParams");
-            config.EntryClassName = entryClass; config.VerticalSpacing = 4;
+            config.EntryClassName = entryClass; config.VerticalSpacing = MenuStyle.ROW_GAP;
             config.TruncateToFit = true; config.RestoreIndex = true; config.WrapAround = false;
             list.Configure(config);
             list.Border_mc.x = 0; list.Border_mc.y = 0;
@@ -298,6 +314,33 @@ package
             return modID ? groups : [{id:"mods", title:tr("menu.home")}, {id:"bindings", title:tr("menu.keybindings")}, {id:"issues", title:tr("menu.issues") + (issues.length ? " (" + issues.length + ")" : "")}];
         }
         private function activePage():String { return modID ? groupID : rootPage; }
+        private function activeTab():Object
+        {
+            for each (var tab:Object in groups) if (tab.id == groupID) return tab;
+            return null;
+        }
+        // Keybinding and issue rows show a second line; everything else is one line.
+        private function rowHeight():Number { return bindingsPage() || issuesPage() ? MenuStyle.TALL_ROW_HEIGHT : MenuStyle.ROW_HEIGHT; }
+        // The nearest non-header entry from index, trying step first and then fallback.
+        private function settingFrom(index:int, step:int, fallback:int):int
+        {
+            for each (var direction:int in [step, fallback]) {
+                for (var i:int = index + direction; direction && i >= 0 && i < listData.length; i += direction)
+                    if (listData[i].row.type != "section") return i;
+            }
+            return -1;
+        }
+        private function noteMove(direction:int):void { moveDirection = direction; moveFrame = frame; }
+        // Vanilla selection can land on a header; carry keyboard and gamepad moves past it.
+        private function skipSection():Boolean
+        {
+            var index:int = options.selectedIndex;
+            if (index < 0 || index >= listData.length || listData[index].row.type != "section") return false;
+            var step:int = frame - moveFrame <= 1 && moveDirection ? moveDirection : 1;
+            var target:int = settingFrom(index, step, -step);
+            if (target >= 0 && target != index) options.selectedIndex = target;
+            return true;
+        }
         private function selectPage(id:String):void
         {
             launcherAcceptHeld = false;
@@ -345,14 +388,22 @@ package
             });
             for each (mod in mods) { mod.parts = summaryParts(mod); mod.summary = mod.parts.join("  |  "); mod.chips = summaryParts(mod, false); }
             if (!seen[modID]) modID = "";
-            groups = []; seen = new Dictionary();
+            // Groups titled "Tab - Section" share a tab, and each section gets a header
+            // in its list. A tab keeps its first group's ID so unfolded groups keep theirs.
+            groups = []; seen = new Dictionary(); var folded:Object = {};
             for each (row in allRows) {
-                if (row.type == "launcher") continue;
-                if (row.mod == modID && !seen[row.group]) {
-                    seen[row.group] = true; groups.push({id:row.group, title:row.groupTitle});
-                }
+                if (row.type == "launcher" || row.mod != modID || seen[row.group]) continue;
+                seen[row.group] = true;
+                var title:String = String(row.groupTitle); var split:int = title.indexOf(" - ");
+                var name:String = split > 0 ? title.substr(0, split) : title;
+                var tab:Object = folded.hasOwnProperty(name) ? folded[name] : null;
+                if (!tab) { tab = folded[name] = {id:row.group, title:name, groups:{}, count:0, sections:false}; groups.push(tab); }
+                tab.groups[row.group] = split > 0 ? title.substr(split + 3) : title;
+                tab.sections = tab.sections || split > 0 || ++tab.count > 1;
             }
-            if (!seen[groupID]) groupID = groups.length ? groups[0].id : "";
+            var found:Boolean = false;
+            for each (tab in groups) if (tab.id == groupID) found = true;
+            if (!found) groupID = groups.length ? groups[0].id : "";
             populate(preserve); drawTabs();
         }
         // The detail card lists hotkeys themselves, so its chips leave out their count.
@@ -375,32 +426,42 @@ package
             if (homePage()) launcher.populate(allRows, preserve, !mods.length);
             launcher.visible = homePage() && launcher.hasEntries;
             launcher.mouseEnabled = launcher.mouseChildren = launcher.visible;
-            launcher.y = expandedLauncher() ? LauncherPage.GRID_TOP : 342;
+            launcher.y = expandedLauncher() ? LauncherPage.GRID_TOP : MenuStyle.LIST_TOP;
             MovieClip(options).visible = !expandedLauncher() && !homeEmptyState();
             homeEmpty.visible = homeEmptyState();
-            count.x = 902;
             homeMods.visible = homeCount.visible = launcher.visible && !expandedLauncher();
-            homeMods.y = launcher.y + launcher.shelfHeight + 20;
+            homeMods.y = launcher.y + launcher.shelfHeight + 18;
             homeCount.y = homeMods.y + 3;
             options.disableSelection = bindingBusy();
-            // Keybindings results run from under the column labels to the footer divider.
-            options.y = bindingsPage() ? 570 : homeMods.visible ? homeMods.y + 50 : MenuStyle.LIST_TOP;
-            var listHeight:Number = bindingsPage() ? 342 : homeMods.visible ? 894 - options.y : MenuStyle.LIST_HEIGHT;
+            // Mod pages start the list under the tabs; the tab and its section headers name it.
+            options.y = bindingsPage() ? KeybindingsPage.LIST_TOP : homeMods.visible ? homeMods.y + MenuStyle.SECTION_SIZE + 20 :
+                modID ? MenuStyle.SECTION_TOP : MenuStyle.LIST_TOP;
+            // Whole rows only, so the last visible row is never cut by the footer.
+            var pitch:Number = rowHeight() + MenuStyle.ROW_GAP;
+            var listHeight:Number = Math.max(1, Math.floor((MenuStyle.LIST_BOTTOM - options.y + MenuStyle.ROW_GAP) / pitch)) * pitch - MenuStyle.ROW_GAP;
             options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
             MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,MenuStyle.LIST_WIDTH,listHeight);
-            section.visible = !bindingsPage() && !homeEmptyState();
-            count.visible = !bindingsPage() && !homePage();
+            section.visible = !bindingsPage() && !homeEmptyState() && !modID;
+            count.visible = issuesPage();
             headerCount.visible = section.visible && homePage();
-            empty.y = options.y + 22;
+            empty.y = options.y + 16;
             var hasHotkeys:Boolean = false;
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
             var selectedIssue:Object = preserve && (issuesPage() || bindingsPage()) ? current() : null;
             if (preserve && bindingsPage() && !selectedIssue && bindingSelection) selectedIssue = {identity:bindingSelection};
             var data:Array = []; var source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
+            var page:Object = activeTab(); var lastGroup:String = null;
             for each (var row:Object in source) {
                 if (row.type == "launcher") continue;
-                if (modID && (row.mod != modID || row.group != groupID)) continue;
+                if (modID && (row.mod != modID || !page || !page.groups.hasOwnProperty(row.group))) continue;
+                if (modID && page.sections && row.group != lastGroup) {
+                    // Headers are list entries so scrolling stays uniform; selection skips them.
+                    lastGroup = row.group;
+                    data.push({row:{type:"section", title:page.groups[row.group], mod:row.mod, id:"@section/" + row.group, editable:false},
+                        sText:"", uID:data.length, bDisabled:true, bShowSpinner:false, uCategory:0, bEnabled:false, bSubSetting:false,
+                        uType:types.SDT_LINK, sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:false}});
+                }
                 if (row.type == "hotkey") hasHotkeys = true;
                 var slider:Boolean = modID != "" && NumericSetting.isSlider(row);
                 // The vanilla entry multiplies fValue by 100. Our slider stores integer offsets.
@@ -422,7 +483,10 @@ package
             var openKey:String = "";
             for each (row in allRows) if (row.mod == "osfsettings" && row.key == "openMenu" && row.type == "hotkey") openKey = String(row.value || "");
             homeEmpty.show(openKey);
-            options.selectedIndex = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
+            selected = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
+            listData = data;
+            if (selected >= 0 && data[selected].row.type == "section") selected = settingFrom(selected, 1, -1);
+            options.selectedIndex = selected;
             options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             if (homePage() && launcher.hasEntries && !data.length) launcher.focused = true;
             options.disableInput = bindingBusy() || searching() || launcherPage();
@@ -430,12 +494,15 @@ package
             if (!searching()) menuStage.focus = launcherPage() ? launcher : options as MovieClip;
             empty.visible = !expandedLauncher() && !homeEmptyState();
             MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? tr("menu.noIssues") : tr("menu.noSettings"));
-            var title:String = tr("menu.title"); var group:String = tr("menu.title");
-            for each (var mod:Object in mods) if (mod.mod == modID) title = mod.title;
-            for each (var page:Object in groups) if (page.id == groupID) group = page.title;
+            var title:String = tr("menu.title"); var summary:String = "";
+            for each (var mod:Object in mods) if (mod.mod == modID) { title = mod.title; summary = mod.summary; }
+            crumb.visible = Boolean(modID);
+            heading.x = modID ? crumb.x + crumb.width + 10 : MenuStyle.LEFT;
+            heading.width = 1100 - (heading.x - MenuStyle.LEFT);
             MenuStyle.fit(heading, title.toUpperCase());
-            MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : homePage() ? tr("home.mods") : group.toUpperCase());
-            MenuStyle.setText(count, tr(issuesPage() ? "counts.issues" : "counts.items", {count:data.length}));
+            MenuStyle.fit(headerSummary, summary);
+            MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : homePage() ? tr("home.mods") : "");
+            MenuStyle.setText(count, tr("counts.issues", {count:data.length}));
             MenuStyle.setText(headerCount, String(launcher.visible ? launcher.count : data.length));
             headerCount.x = section.x + section.textWidth + 18;
             MenuStyle.setText(homeCount, String(data.length));
@@ -461,22 +528,24 @@ package
             var x:Number = 0; var activeX:Number = 0; var activeWidth:Number = 0;
             for each (var page:Object in pages) {
                 var tab:Sprite = new Sprite(); tab.name = page.id; tab.x = x; tab.buttonMode = true;
-                var text:TextField = MenuStyle.field(String(page.title).toUpperCase(), 0, 10, 440, 42,
-                    CONFIG::largeText ? 29 : 25, page.id == active ? MenuStyle.WHITE : MenuStyle.MUTED, true);
+                var text:TextField = MenuStyle.field(String(page.title).toUpperCase(), 0, 8, 440, MenuStyle.TAB_SIZE + 14,
+                    MenuStyle.TAB_SIZE, page.id == active ? MenuStyle.WHITE : MenuStyle.MUTED, true);
                 text.width = Math.min(440, text.textWidth + 8); MenuStyle.fit(text, String(page.title).toUpperCase());
                 if (!modID && page.id == "issues" && issues.length && page.id != active) {
                     var countStart:int = text.text.lastIndexOf("(");
                     if (countStart >= 0) text.setTextFormat(new TextFormat(null, null, MenuStyle.ACCENT), countStart, text.length);
                 }
-                tab.graphics.beginFill(0, 0); tab.graphics.drawRect(0, 0, text.width + 34, 62); tab.graphics.endFill();
+                var underline:Number = MenuStyle.TABS_LINE - MenuStyle.TABS_TOP - 2;
+                tab.graphics.beginFill(0, 0); tab.graphics.drawRect(0, 0, text.width + 30, underline); tab.graphics.endFill();
                 if (page.id == active) {
-                    tab.graphics.lineStyle(3, MenuStyle.WHITE); tab.graphics.moveTo(0, 62); tab.graphics.lineTo(text.width, 62);
+                    tab.graphics.lineStyle(3, MenuStyle.WHITE); tab.graphics.moveTo(0, underline); tab.graphics.lineTo(text.width, underline);
                     activeX = x; activeWidth = text.width;
                 }
                 tab.addChild(text); tab.addEventListener(MouseEvent.CLICK, tabClicked); tabs.addChild(tab);
-                x += text.width + 42;
+                x += text.width + 36;
             }
-            if (activeX + activeWidth > 1728) tabs.x = 1728 - activeX - activeWidth;
+            var viewport:Number = MenuStyle.RIGHT - MenuStyle.LEFT;
+            if (activeX + activeWidth > viewport) tabs.x = viewport - activeX - activeWidth;
         }
         private function tabClicked(event:MouseEvent):void
         {
@@ -499,27 +568,43 @@ package
         {
             var row:Object = current();
             var reporting:Boolean = issuesPage();
-            detailLabel.y = 363;
-            detailTitle.y = detailLabel.y + 46;
-            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = !reporting && !bindingsPage() && !homePage();
+            var settings:Boolean = !reporting && !bindingsPage() && !homePage();
+            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = settings;
             MenuStyle.setText(detailLabel, row && row.type == "action" ? tr("menu.selectedAction") : tr("menu.selectedSetting"));
             homeDetails.visible = homePage() && !homeEmptyState();
             if (homeDetails.visible) homeDetails.show(homeDetail(row), launcher.visible ? launcher.y : MenuStyle.LIST_TOP);
             changedLegend.visible = Boolean(modID);
             issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
+            // The column flows top-down from the list top: title, hint, then the value facts.
+            detailLabel.y = options.y - 4;
+            detailTitle.y = detailLabel.y + MenuStyle.SMALL_SIZE + 12;
             MenuStyle.setText(detailTitle, row ? row.title : tr("menu.nothingSelected"));
-            detailHint.y = detailTitle.y + Math.max(68, detailTitle.textHeight + 20);
-            detailHint.height = Math.max(64, 630 - detailHint.y);
+            detailTitle.height = detailTitle.textHeight + 8;
             var hint:String = row ? String(row.hint || "") : "";
             if (row && row.type == "action" && row.message) hint += (hint ? "\n\n" : "") + row.message;
-            MenuStyle.setText(detailHint, (row && row.requiresRestart ? tr("menu.restart") + (hint ? "\n\n" : "") : "") + hint);
+            hint = (row && row.requiresRestart ? tr("menu.restart") + (hint ? "\n\n" : "") : "") + hint;
+            detailHint.y = detailTitle.y + detailTitle.height + 4;
+            MenuStyle.setText(detailHint, hint);
+            // Long hints scroll with the wheel rather than pushing the facts off the column.
+            detailHint.height = hint ? Math.min(detailHint.textHeight + 10, CONFIG::largeText ? 300 : 260) : 0;
             detailHint.scrollV = 1;
+            var cursor:Number = detailHint.y + detailHint.height + (hint ? 16 : 8);
+            detailDivider.y = cursor; cursor += 14;
+            // Enum defaults are marked in the option list instead.
+            var enumRow:Boolean = Boolean(row && modID && row.type == "enum");
             MenuStyle.setText(defaultLabel, tr("menu.default"));
-            if (row && row.type == "action") { defaultLabel.visible = defaultValue.visible = detailDivider.visible = false; changedLegend.visible = false; }
-            defaultValue.x = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 1434 : 1674;
-            defaultValue.width = row && (row.type == "enum" || row.type == "key" || row.type == "string") ? 410 : 170;
+            if (row && row.type == "action" || enumRow) defaultLabel.visible = defaultValue.visible = false;
+            if (row && row.type == "action") { detailDivider.visible = false; changedLegend.visible = false; }
+            defaultLabel.y = cursor; defaultValue.y = cursor - 1;
             MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
+            if (defaultLabel.visible) cursor += MenuStyle.VALUE_SIZE + 16;
+            var range:String = settings && row && modID ? NumericSetting.range(row) : "";
+            rangeLabel.visible = rangeValue.visible = Boolean(range);
+            rangeLabel.y = cursor; rangeValue.y = cursor - 1; MenuStyle.fit(rangeValue, range);
+            if (range) cursor += MenuStyle.VALUE_SIZE + 16;
+            showOptions(settings && enumRow ? row : null, cursor);
+            stringEditor.y = cursor + 6;
             buttonData.YButton.sButtonText = reporting ? tr("buttons.scrollUp") : tr("buttons.reset");
             buttonData.XButton.sButtonText = reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding");
             resetButton.SetButtonData(buttonData.YButton); clearButton.SetButtonData(buttonData.XButton);
@@ -549,9 +634,48 @@ package
                 resetButton.Visible = clearButton.Visible = changedLegend.visible = false;
             }
             if (homeEmptyState()) acceptButton.Visible = !bindingBusy();
-            pageBar.visible = !captureRow && !bindingBusy() && !searching() && pages().length > 1;
-            if (editingString()) { resetButton.Visible = clearButton.Visible = false; pageBar.visible = false; }
+            previousButton.Visible = nextButton.Visible = !captureRow && !bindingBusy() && !searching() && !editingString() && pages().length > 1;
+            if (editingString()) resetButton.Visible = clearButton.Visible = false;
             bar.RefreshButtons();
+            // Status wraps within whatever the button hints leave free.
+            status.width = Math.max(320, MenuStyle.RIGHT - MovieClip(bar).width - MenuStyle.LEFT - 48);
+            status.y = MenuStyle.FOOTER_Y - status.textHeight / 2 - 4;
+        }
+        // The selected enum's choices, with the current one filled and the default tagged.
+        private function showOptions(row:Object, top:Number):void
+        {
+            var labels:Array = row ? EnumSetting.labels(row) : [];
+            var signature:String = row ? [top, row.mod, row.key, row.value, row.defaultValue, labels.join("\n")].join("|") : "";
+            if (signature == optionsSignature) return;
+            optionsSignature = signature;
+            while (detailOptions.numChildren) detailOptions.removeChildAt(0);
+            detailOptions.graphics.clear();
+            detailOptions.visible = Boolean(row);
+            if (!row) return;
+            detailOptions.y = top;
+            var columnWidth:Number = MenuStyle.DETAIL_WIDTH;
+            detailOptions.addChild(MenuStyle.field(tr("menu.options"), 0, 0, columnWidth, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true));
+            var pitch:Number = MenuStyle.VALUE_SIZE + 14; var first:Number = MenuStyle.SMALL_SIZE + 16;
+            // Stop above the changed-from-default legend that closes the column.
+            var room:int = Math.max(1, Math.floor((MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 30 - top - first) / pitch));
+            var shown:int = labels.length > room ? room - 1 : labels.length;
+            for (var i:int = 0; i < shown; ++i) {
+                var line:Number = first + i * pitch;
+                var selected:Boolean = row.options[i].value === row.value;
+                detailOptions.graphics.lineStyle(2, selected ? MenuStyle.WHITE : MenuStyle.LINE);
+                if (selected) detailOptions.graphics.beginFill(MenuStyle.WHITE);
+                detailOptions.graphics.drawCircle(7, line + pitch / 2 - 3, 5);
+                if (selected) detailOptions.graphics.endFill();
+                var option:TextField = MenuStyle.field("", 26, line, columnWidth - 170, pitch, MenuStyle.VALUE_SIZE, selected ? MenuStyle.WHITE : MenuStyle.MUTED, true);
+                detailOptions.addChild(option); MenuStyle.fit(option, String(labels[i]));
+                if (row.options[i].value === row.defaultValue) {
+                    var tag:TextField = MenuStyle.field(tr("menu.default"), columnWidth - 160, line + 2, 160, pitch, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true);
+                    alignRight(tag); detailOptions.addChild(tag);
+                }
+            }
+            if (shown < labels.length)
+                detailOptions.addChild(MenuStyle.field(tr("menu.moreOptions", {count:labels.length - shown}), 26, first + shown * pitch,
+                    columnWidth - 26, pitch, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true));
         }
         // The card describes whichever Home item is selected: a mod, an interface or SHOW ALL.
         private function homeDetail(row:Object):Object
@@ -573,7 +697,7 @@ package
         {
             detailHint.scrollV -= event.delta; event.stopPropagation();
         }
-        private function selectionChanged(event:Event):void { if (!refreshing) { if (homePage() && !expandedLauncher()) focusLauncher(false); else describe(); } }
+        private function selectionChanged(event:Event):void { if (!refreshing) { if (skipSection()) return; if (homePage() && !expandedLauncher()) focusLauncher(false); else describe(); } }
         private function focusSound(event:Event):void { Object(definition("Shared.GlobalFunc")).PlayMenuSound("UIMenuGeneralFocus"); }
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
@@ -652,7 +776,7 @@ package
             if (!row.confirmation) { invokeAction(row); return; }
             options.disableInput = options.disableSelection = true;
             MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = false;
-            tabs.mouseChildren = false; MovieClip(bar).visible = pageBar.visible = false;
+            tabs.mouseChildren = false; MovieClip(bar).visible = false;
             menuStage.focus = null;
             actionConfirmation.open(row, actionAcceptHeld);
         }
@@ -746,6 +870,7 @@ package
         {
             if (name == "Accept") actionAcceptHeld = pressed;
             if (!initialized || closing) return false;
+            if (pressed && (name == "Up" || name == "Down")) noteMove(name == "Up" ? -1 : 1);
             if (confirmingAction()) return actionConfirmation.userEvent(name, pressed);
             if (editingString()) {
                 if (name == "Cancel") { if (!pressed) finishString(true); return true; }
@@ -776,10 +901,8 @@ package
             }
             if (bindingsPage() && navigateBindings(name, pressed)) return true;
             if (bar.ProcessUserEvent(name, pressed)) return true;
-            if (name == "LShoulder" || name == "RShoulder") {
-                if (pageBar.visible) pageBar.ProcessUserEvent(name, pressed);
-                return true;
-            }
+            // Hidden page buttons still swallow the shoulder events.
+            if (name == "LShoulder" || name == "RShoulder") return true;
             if (launcherPage()) return false;
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
             return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
@@ -814,6 +937,8 @@ package
             if (bindingBusy()) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (keybindings && keybindings.searchKey(event)) return;
+            if (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.PAGE_UP) noteMove(-1);
+            else if (event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.PAGE_DOWN) noteMove(1);
             if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
             if (homePage() && launcher.hasEntries && !launcherPage() && event.keyCode == Keyboard.UP && options.selectedIndex <= 0) {
                 if (navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }
@@ -926,6 +1051,7 @@ package
                     }
                     if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
                     decorate();
+                    status.y = MenuStyle.FOOTER_Y - status.textHeight / 2 - 4;
                 }
             }
             CONFIG::testHarness { advanceTestObservations(); }
@@ -950,10 +1076,9 @@ package
             decorate();
             var clip:MovieClip = options.FindClipForEntry(options.selectedIndex) as MovieClip;
             clip.addChild(captureBinding);
-            captureBinding.x = 720; captureBinding.y = (MenuStyle.ROW_HEIGHT - captureBinding.height) / 2;
+            captureBinding.x = MenuStyle.LIST_WIDTH - 296; captureBinding.y = (MenuStyle.ROW_HEIGHT - captureBinding.height) / 2;
             Object(captureBinding).SetBinding({aButtonName:[], aPCKeyName:[]});
             Object(captureBinding).SetState("listening"); captureBinding.visible = true;
-            pageBar.visible = false;
             MenuStyle.setText(status, tr("bindings.capture"));
             status.textColor = MenuStyle.MUTED;
             describe();
@@ -1009,6 +1134,9 @@ package
         {
             if (expandedLauncher()) return;
             var needsLayout:Boolean = false;
+            var entryHeight:Number = rowHeight();
+            // Vanilla controls keep their offsets from the row's right edge.
+            var controlX:Number = MenuStyle.LIST_WIDTH - 476;
             for (var i:int = 0; i < options.totalEntryClips; ++i) {
                 var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;
                 if (!clip || Object(clip).itemIndex < 0) continue;
@@ -1025,15 +1153,17 @@ package
                 var showSlider:Boolean = modID != "" && NumericSetting.isSlider(item.row);
                 var stepper:Object = Object(clip).LargeStepper_mc;
                 var showStepper:Boolean = modID != "" && item.row.type == "enum" && item.row.editable;
-                var binding:DisplayObject = modID || bindingsPage() ? nativeHotkeys.decorate(clip, item.row, Object(clip).itemIndex == options.selectedIndex) : null;
+                var binding:DisplayObject = modID || bindingsPage() ? nativeHotkeys.decorate(clip, item.row, Object(clip).itemIndex == options.selectedIndex, entryHeight) : null;
                 clip.setChildIndex(view as DisplayObject, 0);
                 for (var child:int = 0; child < clip.numChildren; ++child) {
                     var display:DisplayObject = clip.getChildAt(child);
                     display.visible = display == view || display == binding || (showSlider && display == slider) || (showStepper && display == stepper);
                 }
                 clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider || showStepper || binding != null;
+                // Section headers take no pointer input, so hovering or clicking one changes nothing.
+                clip.mouseEnabled = item.row.type != "section";
                 if (showSlider) {
-                    slider.x = 540; slider.y = (MenuStyle.ROW_HEIGHT - slider.height) / 2; slider.width = 330;
+                    slider.x = controlX; slider.y = (entryHeight - slider.height) / 2; slider.width = 330;
                     slider.maxValue = NumericSetting.steps(item.row);
                     slider.disableRounding = false; slider.mouseWheelValueChange = 1;
                     if (!slider.dragging) slider.value = NumericSetting.position(item.row);
@@ -1043,16 +1173,16 @@ package
                 if (showStepper) {
                     // Keep vanilla arrows and hit areas; SettingsRow draws the label in our font.
                     stepper.textField.visible = false;
-                    stepper.x = 540; stepper.width = 450;
-                    stepper.y = (MenuStyle.ROW_HEIGHT - stepper.height) / 2;
+                    stepper.x = controlX; stepper.width = 450;
+                    stepper.y = (entryHeight - stepper.height) / 2;
                     stepper.transform.colorTransform = Object(clip).itemIndex == options.selectedIndex ?
                         new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
                 }
                 var border:MovieClip = Object(clip).Border_mc;
                 border.x = 0; border.y = 0; border.width = MenuStyle.LIST_WIDTH;
-                if (border.height != MenuStyle.ROW_HEIGHT) { border.height = MenuStyle.ROW_HEIGHT; needsLayout = true; }
-                clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (MenuStyle.ROW_HEIGHT + 4);
-                view.update(item.row, Object(clip).itemIndex == options.selectedIndex && !launcherPage(), modID == "" && !bindingsPage());
+                if (border.height != entryHeight) { border.height = entryHeight; needsLayout = true; }
+                clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (entryHeight + MenuStyle.ROW_GAP);
+                view.update(item.row, Object(clip).itemIndex == options.selectedIndex && !launcherPage(), modID == "" && !bindingsPage(), entryHeight);
             }
             if (needsLayout && !dragging()) options.UpdateContainerRect();
         }

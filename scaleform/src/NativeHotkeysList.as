@@ -97,7 +97,7 @@ package
             }
         }
 
-        public function decorate(host:MovieClip, row:Object, selected:Boolean):DisplayObject
+        public function decorate(host:MovieClip, row:Object, selected:Boolean, height:Number):DisplayObject
         {
             var view:Object = views[host];
             if (row.type != "hotkey") {
@@ -133,10 +133,10 @@ package
                 CONFIG::preview { bridge.previewBindingCell(cell); }
                 cell.scaleX = cell.scaleY = 1;
                 var bounds:Rectangle = cell.getBounds(clip);
-                cell.scaleX = cell.scaleY = Math.min(1, 224 / bounds.width, (MenuStyle.ROW_HEIGHT - 12) / bounds.height);
+                cell.scaleX = cell.scaleY = Math.min(1, 224 / bounds.width, (height - 12) / bounds.height);
                 bounds = cell.getBounds(clip);
                 cell.x += right - bounds.right;
-                cell.y += (MenuStyle.ROW_HEIGHT - bounds.height) / 2 - bounds.top;
+                cell.y += (height - bounds.height) / 2 - bounds.top;
                 right -= fullPage ? 238 : bounds.width + 24;
             }
             return clip as DisplayObject;

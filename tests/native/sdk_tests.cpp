@@ -124,11 +124,12 @@ namespace
         provider.enumCopyStatus = Status::Ok;
 
         std::string language = "unchanged";
-        Check(client.Attach(&provider, kBaseVersion) && client.GetLanguage(language) == Status::NotReady && language == "unchanged",
-            "SDK language reads refuse a 1.0 provider without calling it");
+        client.Attach(nullptr);
+        Check(client.GetLanguage(language) == Status::NotReady && language == "unchanged",
+            "detached SDK language reads preserve the caller's string");
         provider.language = "ptbr";
-        Check(client.Attach(&provider, kLanguageVersion) && client.GetLanguage(language) == Status::Ok && language == "ptbr",
-            "SDK language reads use the 1.1 slot and exclude the terminating NUL");
+        Check(client.Attach(&provider, kBaseVersion) && client.GetLanguage(language) == Status::Ok && language == "ptbr",
+            "SDK language reads use the current 1.0 contract and exclude the terminating NUL");
 
         Check(!client.Attach(&provider, 0x00020000u) && !client && !client.Raw() && client.Version() == 0,
             "incompatible SDK attachment clears an existing service");

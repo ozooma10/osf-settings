@@ -21,6 +21,7 @@ namespace
     std::vector<std::string_view> events;
     RE::UIMessageQueue queueStorage;
     RE::UIMessageQueue* queue = &queueStorage;
+    RE::UI* ui{}; // This fixture exercises native actions without a gameplay UI.
     std::vector<std::pair<std::string, RE::UI_MESSAGE_TYPE>> messages;
     class Event final : public RE::ButtonEvent
     {
@@ -159,6 +160,7 @@ namespace REL
         case 123859: address = reinterpret_cast<std::uintptr_t>(&Append); break;
         case 392794: address = reinterpret_cast<std::uintptr_t>(allocatorVtable); break;
         case 937897: address = reinterpret_cast<std::uintptr_t>(&queue); break;
+        case 937580: address = reinterpret_cast<std::uintptr_t>(&ui); break;
         case 130659: address = reinterpret_cast<std::uintptr_t>(&RecordMessage); break;
         case 1186742: address = reinterpret_cast<std::uintptr_t>(&GetString); break;
         case 139340: address = reinterpret_cast<std::uintptr_t>(&ReleaseString); break;

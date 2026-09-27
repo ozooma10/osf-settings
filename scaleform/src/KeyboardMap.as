@@ -6,6 +6,11 @@ package
 
     public final class KeyboardMap extends Sprite
     {
+        // One key unit; the full map is 23 units wide and 6 rows tall.
+        public static const KEY_WIDTH:Number = CONFIG::largeText ? 72 : 62;
+        public static const KEY_HEIGHT:Number = CONFIG::largeText ? 40 : 34;
+        public static const HEIGHT:Number = KEY_HEIGHT * 6;
+        private static const LABEL_SIZE:Number = CONFIG::largeText ? 18 : 15;
         private var keys:Array = [];
         private var choose:Function;
         private var previous:String = "";
@@ -33,8 +38,8 @@ package
         }
         private function legendItem(text:String, color:uint, column:Number, row:Number):void
         {
-            graphics.beginFill(color); graphics.drawRect(column * 75 + 6,row * 43 + 18,22,3); graphics.endFill();
-            var label:TextField = MenuStyle.field("",column * 75 + 32,row * 43 + 4,column == 17 ? 80 : 74,29,CONFIG::largeText ? 19 : 17,MenuStyle.MUTED,true);
+            graphics.beginFill(color); graphics.drawRect(column * KEY_WIDTH + 6,row * KEY_HEIGHT + KEY_HEIGHT / 2 - 3,18,3); graphics.endFill();
+            var label:TextField = MenuStyle.field("",column * KEY_WIDTH + 28,row * KEY_HEIGHT + 3,KEY_WIDTH * (column == 17 ? 1.1 : 1) - 2,KEY_HEIGHT - 8,LABEL_SIZE - 1,MenuStyle.MUTED,true);
             addChild(label); MenuStyle.fit(label,text);
         }
         private function row(codes:Array, labels:Array, x:Number, y:Number):void
@@ -43,11 +48,11 @@ package
         }
         private function addKey(code:uint, text:String, column:Number, row:Number, width:Number = 1, height:Number = 1):void
         {
-            var key:Sprite = new Sprite(); key.x = column * 75; key.y = row * 43;
+            var key:Sprite = new Sprite(); key.x = column * KEY_WIDTH; key.y = row * KEY_HEIGHT;
             key.name = "key_" + code; key.buttonMode = true;
-            var label:TextField = MenuStyle.field(text,4,4,width * 75 - 13,29,CONFIG::largeText ? 21 : 19,MenuStyle.WHITE,true);
+            var label:TextField = MenuStyle.field(text,3,3,width * KEY_WIDTH - 11,KEY_HEIGHT - 8,LABEL_SIZE,MenuStyle.WHITE,true);
             key.addChild(label); key.addEventListener(MouseEvent.CLICK,function(event:MouseEvent):void { choose(int(code)); });
-            keys.push({clip:key,code:code,label:label,width:width * 75 - 6,height:height * 43 - 5}); addChild(key);
+            keys.push({clip:key,code:code,label:label,width:width * KEY_WIDTH - 5,height:height * KEY_HEIGHT - 4}); addChild(key);
             if (code >= 96 && code <= 111) names[code] = tr("keys.numpad", {key:text});
             else names[code] = text;
         }

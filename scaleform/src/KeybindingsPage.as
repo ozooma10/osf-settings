@@ -11,6 +11,11 @@ package
 
     public final class KeybindingsPage extends Sprite
     {
+        public static const KEYBOARD_TOP:Number = MenuStyle.TABS_LINE + 14;
+        // Column labels sit under the keyboard; the results list starts under them.
+        private static const COLUMNS_TOP:Number = KEYBOARD_TOP + KeyboardMap.HEIGHT + 14;
+        public static const LIST_TOP:Number = COLUMNS_TOP + MenuStyle.SMALL_SIZE + 14;
+        private static const BOX:Number = MenuStyle.VALUE_SIZE + 22;
         public var rows:Array = [];
         public var state:String = "loading";
         public var selectedKey:int = -1;
@@ -41,30 +46,33 @@ package
         public function KeybindingsPage(code:Object, nativeEditor:NativeHotkeysList, notify:Function, resultsFocus:Function)
         {
             bridge = code; editor = nativeEditor; changed = notify; leaveSearch = resultsFocus;
-            keyboard = new KeyboardMap(selectKey); keyboard.x = MenuStyle.LEFT; keyboard.y = 270; addChild(keyboard);
+            keyboard = new KeyboardMap(selectKey); keyboard.x = MenuStyle.LEFT; keyboard.y = KEYBOARD_TOP; addChild(keyboard);
             // Filters share the right column so the results list can start under the keyboard.
-            placeholder = field(tr("bindings.searchHint"),1222,545,610,38,CONFIG::largeText ? 28 : 25,MenuStyle.MUTED);
-            search = field("",1222,545,610,38,CONFIG::largeText ? 28 : 25);
+            var left:Number = MenuStyle.DETAIL_X, column:Number = MenuStyle.DETAIL_WIDTH, top:Number = LIST_TOP;
+            var size:Number = MenuStyle.VALUE_SIZE + 2, line:Number = size + 12, inset:Number = (BOX - line) / 2 + 2;
+            placeholder = field(tr("bindings.searchHint"),left + 12,top + inset,column - 24,line,size,MenuStyle.MUTED);
+            search = field("",left + 12,top + inset,column - 24,line,size);
             nameField(search,"bindingSearch"); search.type = "input"; search.selectable = true; search.mouseEnabled = true;
             search.maxChars = 128;
             search.addEventListener(Event.CHANGE,filtersChanged);
             search.addEventListener(FocusEvent.FOCUS_IN,focusChanged);
             search.addEventListener(FocusEvent.FOCUS_OUT,focusChanged);
-            sourceLabel = field("",1222,605,610,38,CONFIG::largeText ? 27 : 24);
+            sourceLabel = field("",left + 12,top + BOX + 12 + inset,column - 24,line,MenuStyle.VALUE_SIZE);
             nameField(sourceLabel,"bindingSource").addEventListener(MouseEvent.CLICK,nextSource); sourceLabel.mouseEnabled = true;
-            keyLabel = field("",1222,665,400,38,CONFIG::largeText ? 27 : 24);
+            keyLabel = field("",left + 12,top + (BOX + 12) * 2 + inset,400,line,MenuStyle.VALUE_SIZE);
             keyChip = nameField(keyLabel,"bindingKeyFilter"); keyChip.addEventListener(MouseEvent.CLICK,clearKey);
             keyLabel.mouseEnabled = true;
-            clearLabel = field(tr("bindings.clearFilters"),1480,665,364,38,CONFIG::largeText ? 27 : 24,MenuStyle.MUTED);
+            clearLabel = field(tr("bindings.clearFilters"),MenuStyle.RIGHT - 300,top + (BOX + 12) * 2 + inset,300,line,MenuStyle.VALUE_SIZE,MenuStyle.MUTED);
             clearLabel.width = Math.min(364,clearLabel.textWidth + 8); clearLabel.x = MenuStyle.RIGHT - clearLabel.width;
             clear = nameField(clearLabel,"clearBindingFilters"); clear.addEventListener(MouseEvent.CLICK,clearFilters);
             clearLabel.mouseEnabled = true;
-            notice = field("",1210,728,634,150,CONFIG::largeText ? 24 : 21,MenuStyle.MUTED);
+            notice = field("",left,0,column,150,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
             notice.multiline = true; notice.wordWrap = true;
-            field(tr("bindings.primary"),MenuStyle.LEFT + 566,538,210,30,20,MenuStyle.MUTED);
-            field(tr("bindings.alternate"),MenuStyle.LEFT + 804,538,210,30,20,MenuStyle.MUTED);
-            graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(1210,540,634,48);
-            graphics.drawRect(1210,600,634,48);
+            // Labels sit over the native binding cells, which are anchored to the row's right edge.
+            field(tr("bindings.primary"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 450,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
+            field(tr("bindings.alternate"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 212,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
+            graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(left,top,column,BOX);
+            graphics.drawRect(left,top + BOX + 12,column,BOX);
             visible = false;
         }
         private function field(text:String,x:Number,y:Number,w:Number,h:Number,size:Number,color:uint = 0xF1F2EC):TextField
@@ -138,10 +146,10 @@ package
                 keyLabel.width = 400; MenuStyle.fit(keyLabel,tr("bindings.keyFilter", {key:KeyboardMap.keyName(selectedKey,0)}));
                 keyLabel.width = Math.min(400,keyLabel.textWidth + 8);
                 keyChip.graphics.clear(); keyChip.graphics.lineStyle(2,MenuStyle.WHITE); keyChip.graphics.beginFill(MenuStyle.INK,0);
-                keyChip.graphics.drawRect(1210,660,keyLabel.width + 24,48); keyChip.graphics.endFill();
+                keyChip.graphics.drawRect(MenuStyle.DETAIL_X,LIST_TOP + (BOX + 12) * 2,keyLabel.width + 24,BOX); keyChip.graphics.endFill();
             }
             clear.visible = Boolean(search.text) || source != "all" || selectedKey >= 0;
-            notice.y = keyChip.visible || clear.visible ? 728 : 668;
+            notice.y = LIST_TOP + (BOX + 12) * (keyChip.visible || clear.visible ? 3 : 2) + 6;
             showNotice();
         }
         private function showNotice():void

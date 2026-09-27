@@ -22,7 +22,6 @@ namespace OSFSettings
             return RE::BSEventNotifyControl::kContinue;
         }
         void PostCreate() override;
-        RE::UI_MESSAGE_RESULT ProcessMessage(RE::UIMessageData& message) override;
         bool UseEventDispatcher() override { return true; }
         void MapCodeObjectFunctions() override;
         void Call(const RE::Scaleform::GFx::FunctionHandler::Params& params) noexcept override;

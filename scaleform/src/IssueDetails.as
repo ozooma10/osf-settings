@@ -8,8 +8,8 @@ package
 
     public final class IssueDetails extends Sprite
     {
-        private static const WIDTH:Number = 634;
-        private static const HEIGHT:Number = 506;
+        private static const WIDTH:Number = MenuStyle.DETAIL_WIDTH;
+        private static const HEIGHT:Number = MenuStyle.LIST_BOTTOM - MenuStyle.LIST_TOP;
         private var viewport:Sprite = new Sprite();
         private var content:Sprite = new Sprite();
         private var position:Number = 0;
@@ -18,7 +18,7 @@ package
 
         public function IssueDetails()
         {
-            x = 1210; y = 363;
+            x = MenuStyle.DETAIL_X; y = MenuStyle.LIST_TOP - 4;
             viewport.scrollRect = new Rectangle(0, 0, WIDTH, HEIGHT);
             viewport.addChild(content); addChild(viewport);
             // A transparent hit area lets the wheel work between paragraphs too.
@@ -39,21 +39,21 @@ package
             while (content.numChildren) content.removeChildAt(0);
             content.graphics.clear(); extent = 0;
             if (row) {
-                line(tr("issues.selected"), 21, MenuStyle.MUTED, true, 16);
-                line(row.modTitle + " / " + (row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning")), CONFIG::largeText ? 25 : 23, MenuStyle.MUTED, true, 12);
-                line(row.title, CONFIG::largeText ? 38 : 34, MenuStyle.WHITE, false, 32);
+                line(tr("issues.selected"), MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true, 10);
+                line(row.modTitle + " / " + (row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning")), MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true, 8);
+                line(row.title, MenuStyle.DETAIL_TITLE_SIZE, MenuStyle.WHITE, false, 22);
                 if (row.impact) {
-                    line(tr("issues.impact"), 21, MenuStyle.MUTED, true, 12);
-                    line(row.impact, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED, false, 30);
+                    line(tr("issues.impact"), MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true, 8);
+                    line(row.impact, MenuStyle.DETAIL_BODY_SIZE, MenuStyle.MUTED, false, 22);
                 }
                 if (row.nextSteps) {
                     if (row.impact) {
                         content.graphics.lineStyle(1, MenuStyle.LINE);
                         content.graphics.moveTo(0, extent); content.graphics.lineTo(WIDTH - 18, extent);
-                        content.graphics.lineStyle(); extent += 24;
+                        content.graphics.lineStyle(); extent += 18;
                     }
-                    line(tr("issues.nextSteps"), 21, MenuStyle.MUTED, true, 12);
-                    line(row.nextSteps, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED, false, 8);
+                    line(tr("issues.nextSteps"), MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true, 8);
+                    line(row.nextSteps, MenuStyle.DETAIL_BODY_SIZE, MenuStyle.MUTED, false, 8);
                 }
             }
             if (!preserve) position = 0;
@@ -64,7 +64,7 @@ package
         {
             var field:TextField = MenuStyle.field("", 0, extent, WIDTH - 18, 40, size, color, label);
             field.multiline = true; field.wordWrap = true;
-            var format:TextFormat = field.defaultTextFormat; format.leading = label ? 3 : 8;
+            var format:TextFormat = field.defaultTextFormat; format.leading = label ? 2 : 6;
             field.defaultTextFormat = format; MenuStyle.setText(field, text);
             field.height = field.textHeight + 8; content.addChild(field);
             extent += field.height + after;

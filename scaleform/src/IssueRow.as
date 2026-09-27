@@ -15,16 +15,19 @@ package
         public function IssueRow()
         {
             mouseEnabled = false; mouseChildren = false;
-            title = MenuStyle.field("", 20, 8, 690, 44, MenuStyle.BODY_SIZE);
-            mod = MenuStyle.field("", 20, CONFIG::largeText ? 53 : 43, 690, 36, CONFIG::largeText ? 25 : 22, MenuStyle.MUTED);
-            severity = MenuStyle.field("", 806, (MenuStyle.ROW_HEIGHT - 32) / 2, 190, 38, CONFIG::largeText ? 28 : 25, MenuStyle.WHITE, true);
+            var rowWidth:Number = MenuStyle.LIST_WIDTH;
+            title = MenuStyle.field("", 16, 4, rowWidth - 326, MenuStyle.BODY_SIZE + 14, MenuStyle.BODY_SIZE);
+            mod = MenuStyle.field("", 16, 0, rowWidth - 326, MenuStyle.SMALL_SIZE + 10, MenuStyle.SMALL_SIZE, MenuStyle.MUTED);
+            severity = MenuStyle.field("", rowWidth - 210, 0, 190, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true);
             addChild(title); addChild(mod); addChild(severity);
         }
 
-        public function update(row:Object, selected:Boolean, modList:Boolean):void
+        public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number):void
         {
             if (previous == row && wasSelected == selected) return;
             previous = row; wasSelected = selected;
+            mod.y = rowHeight - MenuStyle.SMALL_SIZE - 13;
+            severity.y = (rowHeight - severity.height) / 2 + 2;
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
             title.textColor = color;
             mod.textColor = selected ? MenuStyle.LINE : MenuStyle.MUTED;
@@ -32,8 +35,8 @@ package
             MenuStyle.fit(title, row.title); MenuStyle.fit(mod, row.modTitle);
             MenuStyle.fit(severity, row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning"));
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
-            graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, MenuStyle.ROW_HEIGHT); graphics.endFill();
-            var x:Number = 768; var y:Number = MenuStyle.ROW_HEIGHT / 2;
+            graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, rowHeight); graphics.endFill();
+            var x:Number = MenuStyle.LIST_WIDTH - 248; var y:Number = rowHeight / 2;
             graphics.lineStyle(2, severity.textColor);
             if (row.severity == "ERROR") graphics.drawCircle(x, y, 14);
             else {

@@ -14,11 +14,13 @@ package
 
         public function StringSetting()
         {
-            x = 1210; y = 754;
-            graphics.lineStyle(1, MenuStyle.LINE); graphics.drawRect(0, 30, 634, 52);
-            var label:TextField = MenuStyle.field(tr("strings.edit"), 0, 0, 634, 30, 21, MenuStyle.MUTED, true);
+            // The menu sets y under the selected setting's details.
+            var column:Number = MenuStyle.DETAIL_WIDTH, box:Number = MenuStyle.DETAIL_BODY_SIZE + 22;
+            x = MenuStyle.DETAIL_X;
+            graphics.lineStyle(1, MenuStyle.LINE); graphics.drawRect(0, 26, column, box);
+            var label:TextField = MenuStyle.field(tr("strings.edit"), 0, 0, column, 26, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
             addChild(label);
-            input = MenuStyle.field("", 8, 34, 618, 44, CONFIG::largeText ? 30 : 27);
+            input = MenuStyle.field("", 8, 30, column - 16, box - 6, MenuStyle.DETAIL_BODY_SIZE);
             // The shared-font field is timeline-authored, so its name is read-only.
             input.type = "input";
             input.selectable = true; input.mouseEnabled = true;
@@ -28,7 +30,7 @@ package
             input.addEventListener(Event.CHANGE, changed);
             input.addEventListener(TextEvent.TEXT_INPUT, entering);
             addChild(input);
-            feedback = MenuStyle.field("", 0, 90, 634, 64, 21, MenuStyle.MUTED, true);
+            feedback = MenuStyle.field("", 0, 34 + box, column, 60, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
             feedback.multiline = true; feedback.wordWrap = true; addChild(feedback);
             visible = false;
         }

@@ -9,8 +9,9 @@ package
     // Both layouts keep the left column so Home's detail card stays beside them.
     public final class LauncherPage extends MovieClip
     {
-        public static const GRID_TOP:Number = 350;
-        private static const GRID_COLUMNS:int = 3;
+        // The expanded grid starts where the shelf does; its pager shares the section label's row.
+        public static const GRID_TOP:Number = MenuStyle.LIST_TOP;
+        private static const GRID_COLUMNS:int = 4;
         private var entries:Array = [];
         private var displayed:Array = [];
         private var cards:Sprite = new Sprite();
@@ -30,12 +31,13 @@ package
             addChild(cards); addChild(pager);
             addEventListener(MouseEvent.MOUSE_WHEEL, wheel);
         }
-        public function get columns():int { return 3; }
+        public function get columns():int { return 4; }
         private function get gridColumns():int { return isExpanded ? GRID_COLUMNS : columns; }
-        private function get gridRows():int { return CONFIG::largeText ? 3 : 4; }
+        // As many shelf-height rows as fit between the grid top and the list bottom.
+        private function get gridRows():int { return Math.max(1, int((MenuStyle.LIST_BOTTOM - GRID_TOP + 14) / (shelfCardHeight + 14))); }
         public function get capacity():int { return isExpanded ? GRID_COLUMNS * gridRows : columns * 2; }
-        private function get shelfCardHeight():Number { return CONFIG::largeText ? 110 : 96; }
-        public function get shelfHeight():Number { return entries.length > columns ? shelfCardHeight * 2 + 16 : shelfCardHeight; }
+        private function get shelfCardHeight():Number { return CONFIG::largeText ? 86 : 72; }
+        public function get shelfHeight():Number { return entries.length > columns ? shelfCardHeight * 2 + 14 : shelfCardHeight; }
         public function get expanded():Boolean { return isExpanded; }
         // With no mod settings to show, the grid is the whole page and cannot collapse.
         public function get locked():Boolean { return isLocked; }
@@ -127,11 +129,11 @@ package
         // Returns the button's left edge so header controls can be laid out right to left.
         private function pageButton(text:String, right:Number, callback:Function, enabled:Boolean = true, buttonName:String = ""):Number
         {
-            var label:TextField = MenuStyle.field(text, 4, 0, 300, 36, CONFIG::largeText ? 25 : 22, MenuStyle.WHITE, true);
+            var label:TextField = MenuStyle.field(text, 4, 0, 300, MenuStyle.SMALL_SIZE + 14, MenuStyle.SMALL_SIZE + 2, MenuStyle.WHITE, true);
             label.width = Math.min(300, label.textWidth + 8); MenuStyle.fit(label, text);
-            var button:Sprite = new Sprite(); button.name = buttonName; button.x = right - label.width - 8; button.y = -45;
+            var button:Sprite = new Sprite(); button.name = buttonName; button.x = right - label.width - 8; button.y = MenuStyle.SECTION_TOP - GRID_TOP + 2;
             button.mouseChildren = false; button.buttonMode = enabled; button.alpha = enabled ? 1 : 0.35;
-            button.graphics.beginFill(0, 0); button.graphics.drawRect(0, 0, label.width + 8, 36); button.graphics.endFill();
+            button.graphics.beginFill(0, 0); button.graphics.drawRect(0, 0, label.width + 8, MenuStyle.SMALL_SIZE + 14); button.graphics.endFill();
             button.addChild(label);
             if (enabled) button.addEventListener(MouseEvent.CLICK, function(event:MouseEvent):void { callback(); });
             pager.addChild(button); return button.x;
@@ -140,10 +142,10 @@ package
         {
             while (cards.numChildren) cards.removeChildAt(0);
             while (pager.numChildren) pager.removeChildAt(0);
-            var gap:Number = 20, rowGap:Number = isExpanded ? 14 : 16, across:int = gridColumns;
+            var gap:Number = 16, rowGap:Number = 14, across:int = gridColumns;
             var width:Number = (MenuStyle.LIST_WIDTH - gap * (across - 1)) / across;
             // The grid runs from GRID_TOP to just above the footer divider.
-            var height:Number = isExpanded ? (894 - GRID_TOP - rowGap * (gridRows - 1)) / gridRows : shelfCardHeight;
+            var height:Number = isExpanded ? (MenuStyle.LIST_BOTTOM - GRID_TOP - rowGap * (gridRows - 1)) / gridRows : shelfCardHeight;
             for (var i:int = first; i < Math.min(displayed.length, first + capacity); ++i) {
                 var card:LauncherCard = new LauncherCard(displayed[i], i, width, height);
                 card.x = (i - first) % across * (width + gap);
@@ -158,7 +160,7 @@ package
             if (displayed.length > capacity) {
                 right = pageButton(">", right, function():void { turnPage(1); }, first + capacity < displayed.length);
                 var position:TextField = MenuStyle.field((int(first / capacity) + 1) + " / " + Math.ceil(displayed.length / capacity),
-                    0, -45, 120, 36, CONFIG::largeText ? 25 : 22, MenuStyle.MUTED, true);
+                    0, MenuStyle.SECTION_TOP - GRID_TOP + 2, 120, MenuStyle.SMALL_SIZE + 14, MenuStyle.SMALL_SIZE + 2, MenuStyle.MUTED, true);
                 position.width = position.textWidth + 8; position.x = right - position.width - 4; pager.addChild(position);
                 pageButton("<", position.x - 4, function():void { turnPage(-1); }, first > 0);
             }

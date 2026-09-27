@@ -13,13 +13,35 @@ package
         public static const ROW:uint = 0x24363F;
         public static const LINE:uint = 0x52646D;
         public static const ACCENT:uint = 0xDE9D65;
-        public static const LEFT:Number = 116;
-        public static const RIGHT:Number = 1844;
-        public static const LIST_WIDTH:Number = 1016;
-        public static const LIST_TOP:Number = 362;
-        public static const LIST_HEIGHT:Number = 506;
-        public static const ROW_HEIGHT:Number = CONFIG::largeText ? 96 : 78;
-        public static const BODY_SIZE:Number = CONFIG::largeText ? 32 : 28;
+        // Desk-distance layout on the 1920x1080 stage. The _LRG movie keeps roomier
+        // sizes for Starfield's large menu text option.
+        public static const LEFT:Number = 64;
+        public static const RIGHT:Number = 1856;
+        public static const TITLE_TOP:Number = 26;
+        public static const TITLE_SIZE:Number = CONFIG::largeText ? 40 : 34;
+        public static const TABS_TOP:Number = 88;
+        public static const TAB_SIZE:Number = CONFIG::largeText ? 24 : 20;
+        public static const TABS_LINE:Number = 140;
+        // Home and Issues label the list above it; mod pages start the list here.
+        public static const SECTION_TOP:Number = 154;
+        public static const SECTION_SIZE:Number = CONFIG::largeText ? 24 : 20;
+        public static const LIST_TOP:Number = CONFIG::largeText ? 200 : 194;
+        public static const LIST_BOTTOM:Number = 990;
+        public static const LIST_WIDTH:Number = 1200;
+        public static const LIST_HEIGHT:Number = LIST_BOTTOM - LIST_TOP;
+        public static const ROW_HEIGHT:Number = CONFIG::largeText ? 56 : 44;
+        // Keybinding and issue rows carry a second line under the title.
+        public static const TALL_ROW_HEIGHT:Number = CONFIG::largeText ? 76 : 62;
+        public static const ROW_GAP:Number = 2;
+        public static const BODY_SIZE:Number = CONFIG::largeText ? 26 : 21;
+        public static const VALUE_SIZE:Number = CONFIG::largeText ? 22 : 18;
+        public static const SMALL_SIZE:Number = CONFIG::largeText ? 20 : 16;
+        public static const DETAIL_X:Number = 1312;
+        public static const DETAIL_WIDTH:Number = RIGHT - DETAIL_X;
+        public static const DETAIL_TITLE_SIZE:Number = CONFIG::largeText ? 32 : 27;
+        public static const DETAIL_BODY_SIZE:Number = CONFIG::largeText ? 24 : 20;
+        public static const FOOTER_LINE:Number = 1004;
+        public static const FOOTER_Y:Number = 1042;
 
         public static function field(text:String, x:Number, y:Number, width:Number, height:Number,
                                      size:Number, color:uint = WHITE, label:Boolean = false):TextField

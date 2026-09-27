@@ -22,20 +22,20 @@ package
             name = "launcher_" + position; mouseChildren = false; buttonMode = Boolean(row.editable);
             var large:Boolean = CONFIG::largeText;
             if (row.more) {
-                title = field(String(row.badge) + " " + String(row.title), 20, 0, height - 32, large ? 28 : 24);
+                title = field(String(row.badge) + " " + String(row.title), 16, 0, height - 16, MenuStyle.BODY_SIZE - 1);
                 center(title);
                 title.height = title.textHeight + 4;
                 title.y = (height - title.height) / 2;
                 select(false); return;
             }
-            var diameter:Number = large ? 56 : 48;
+            var diameter:Number = large ? 48 : 40;
             tint = Badge.color(row.mod + "/" + row.key);
             badge = new Badge(Badge.initials(String(row.title)), diameter);
-            badge.x = 20; badge.y = (height - diameter) / 2; addChild(badge);
-            var size:Number = large ? 28 : 24;
-            var left:Number = badge.x + diameter + 16;
-            var tagHeight:Number = row.editable ? 0 : size + 4;
-            title = field(String(row.title), left, 0, height - 32 - tagHeight, size);
+            badge.x = 16; badge.y = (height - diameter) / 2; addChild(badge);
+            var size:Number = MenuStyle.BODY_SIZE - 1;
+            var left:Number = badge.x + diameter + 14;
+            var tagHeight:Number = row.editable ? 0 : size + 2;
+            title = field(String(row.title), left, 0, height - 16 - tagHeight, size);
             title.height = title.textHeight + 4;
             title.y = (height - title.height - tagHeight) / 2;
             if (!row.editable) tag = field(tr("home.unavailable"), left, title.y + title.height + 4, tagHeight, size - 5);

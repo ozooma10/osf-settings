@@ -313,9 +313,11 @@ package
                     }
                     require(launcher && launcher.visible && !launcher.expanded && list.visible, "Home combines interfaces and mod settings");
                     require(findNamed(menu,"launcher") == null, "separate Launcher tab removed");
-                    require(findNamed(menu,"launcher_5") != null && findNamed(menu,"launcher_6") == null &&
-                        Object(findNamed(menu,"launcher_5")).row.more && Object(findNamed(menu,"launcher_5")).row.badge == "+5",
-                        "Home shows five interfaces and a +5 more card");
+                    // The shelf holds two rows; its last card links to the rest of the ten interfaces.
+                    var moreCard:String = "launcher_" + (launcher.columns * 2 - 1);
+                    require(findNamed(menu,moreCard) != null && findNamed(menu,"launcher_" + launcher.columns * 2) == null &&
+                        Object(findNamed(menu,moreCard)).row.more && Object(findNamed(menu,moreCard)).row.badge == "+" + (11 - launcher.columns * 2),
+                        "Home fills two shelf rows and adds a more card");
                     require(Object(findNamed(menu,"launcher_0")).row.title == "Absolute Control", "recent order overrides alphabetical order");
                     require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "Home tab label");
                     requireGlyphs("INTERFACES"); requireGlyphs("MODS");
@@ -332,12 +334,13 @@ package
                     launcher.navigate("Down"); userEvent("Down"); break;
                 case 56:
                     require(!launcher.focused && !list.disableInput, "Down from the shelf returns to mod settings");
-                    findNamed(menu,"launcher_5").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    findNamed(menu,"launcher_" + (launcher.columns * 2 - 1)).dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 57:
                     require(launcher.expanded && !list.visible, "Show more expands interfaces inside Home");
                     require(launcher.current.type == "launcher" && launcher.focused, "expanded grid selects an actual interface");
-                    require(findNamed(menu,"launcher_3").y > findNamed(menu,"launcher_0").y && findNamed(menu,"launcher_2").y == findNamed(menu,"launcher_0").y,
-                        "expanded grid is three across");
+                    require(findNamed(menu,"launcher_" + launcher.columns).y > findNamed(menu,"launcher_0").y &&
+                        findNamed(menu,"launcher_" + (launcher.columns - 1)).y == findNamed(menu,"launcher_0").y,
+                        "expanded grid keeps the shelf's columns");
                     capture("home-expanded"); userEvent("PageDown"); break;
                 case 58:
                     require(launcher.scrollPosition == (launcher.capacity < 10 ? launcher.capacity : 0), "Page Down reaches the remaining interfaces");
@@ -363,7 +366,7 @@ package
                     Object(menu).BGSCodeObj.revision = function():String { return "no-interfaces"; }; break;
                 case 62: break;
                 case 63:
-                    require(!launcher.visible && list.visible && list.y == 362 && !list.disableInput, "no interfaces restores the full settings list");
+                    require(!launcher.visible && list.visible && list.y == menu.loaderInfo.applicationDomain.getDefinition("MenuStyle").LIST_TOP && !list.disableInput, "no interfaces restores the full settings list");
                     capture("home-no-interfaces");
                     Object(menu).BGSCodeObj.getRows = function():Array {
                         // OSF Settings' own hotkey alone leaves Home with nothing to list.

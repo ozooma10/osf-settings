@@ -35,6 +35,16 @@ package
                 Number(row.sliderMinimum) + position * Number(row.sliderStep);
             return value / Number(row.sliderScale);
         }
+        // Inclusive bounds for the detail column, or "" when the schema set none.
+        public static function range(row:Object):String
+        {
+            if (row.type == "int" && row.minimum !== undefined && row.maximum !== undefined)
+                return row.minimum + " - " + row.maximum;
+            if (row.type == "float" && row.sliderScale)
+                return text(row, Number(row.sliderMinimum) / Number(row.sliderScale)) + " - " +
+                    text(row, Number(row.sliderMaximum) / Number(row.sliderScale));
+            return "";
+        }
         public static function text(row:Object, value:*):String
         {
             if (row.type == "bool") return value ? tr("values.on") : tr("values.off");

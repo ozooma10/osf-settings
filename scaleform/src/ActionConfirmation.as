@@ -16,22 +16,31 @@ package
         private var acceptDown:Boolean;
         private var mouseDownChoice:Object;
         private var done:Function;
+        private static const BOX_WIDTH:Number = 880;
+        private static const BOX_HEIGHT:Number = CONFIG::largeText ? 480 : 430;
+        private static const BOX_X:Number = (1920 - BOX_WIDTH) / 2;
+        private static const BOX_Y:Number = (1080 - BOX_HEIGHT) / 2;
+        private static const CHOICE_WIDTH:Number = (BOX_WIDTH - 72 - 20) / 2;
+        private static const CHOICE_HEIGHT:Number = CONFIG::largeText ? 56 : 50;
 
         public function ActionConfirmation(finished:Function)
         {
             done = finished;
             graphics.beginFill(0, 0.85); graphics.drawRect(-4096, -4096, 10000, 10000); graphics.endFill();
             graphics.beginFill(MenuStyle.ROW); graphics.lineStyle(1, MenuStyle.LINE);
-            graphics.drawRect(410, 230, 1100, 610); graphics.endFill();
-            heading = MenuStyle.field("", 450, 284, 1020, 68, CONFIG::largeText ? 38 : 34);
+            // A compact centered box; the message scrolls when it outgrows it.
+            graphics.drawRect(BOX_X, BOX_Y, BOX_WIDTH, BOX_HEIGHT); graphics.endFill();
+            var left:Number = BOX_X + 36, inner:Number = BOX_WIDTH - 72;
+            heading = MenuStyle.field("", left, BOX_Y + 30, inner, MenuStyle.DETAIL_TITLE_SIZE + 20, MenuStyle.DETAIL_TITLE_SIZE + 3);
             addChild(heading);
-            message = MenuStyle.field("", 450, 390, 1020, 280, CONFIG::largeText ? 30 : 27, MenuStyle.MUTED);
+            message = MenuStyle.field("", left, BOX_Y + 96, inner, BOX_HEIGHT - 226, MenuStyle.DETAIL_BODY_SIZE, MenuStyle.MUTED);
             message.multiline = message.wordWrap = true; addChild(message);
-            addChild(MenuStyle.field(tr("actions.confirmControls"), 450, 795, 1020, 32, 20, MenuStyle.MUTED));
+            addChild(MenuStyle.field(tr("actions.confirmControls"), left, BOX_Y + BOX_HEIGHT - 46, inner, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED));
             for (var i:int = 0; i < 2; ++i) {
-                var choice:Sprite = new Sprite(); choice.x = 450 + i * 530; choice.y = 708;
+                var choice:Sprite = new Sprite(); choice.x = left + i * (CHOICE_WIDTH + 20); choice.y = BOX_Y + BOX_HEIGHT - 116;
                 choice.name = String(i); choice.buttonMode = true; choice.mouseChildren = false;
-                var text:TextField = MenuStyle.field(i == 0 ? tr("buttons.cancel") : tr("buttons.runAction"), 20, 12, 450, 44, CONFIG::largeText ? 30 : 27);
+                var text:TextField = MenuStyle.field(i == 0 ? tr("buttons.cancel") : tr("buttons.runAction"), 18, (CHOICE_HEIGHT - MenuStyle.DETAIL_BODY_SIZE) / 2 - 4,
+                    CHOICE_WIDTH - 36, MenuStyle.DETAIL_BODY_SIZE + 14, MenuStyle.DETAIL_BODY_SIZE);
                 choice.addChild(text); choices.push(choice); addChild(choice);
                 choice.addEventListener(MouseEvent.MOUSE_DOWN, mousePress);
                 choice.addEventListener(MouseEvent.CLICK, mouseClick);
@@ -83,7 +92,7 @@ package
             for (var i:int = 0; i < choices.length; ++i) {
                 var choice:Sprite = choices[i]; choice.graphics.clear();
                 choice.graphics.beginFill(i == selected ? MenuStyle.WHITE : MenuStyle.INK);
-                choice.graphics.drawRect(0, 0, 490, 64); choice.graphics.endFill();
+                choice.graphics.drawRect(0, 0, CHOICE_WIDTH, CHOICE_HEIGHT); choice.graphics.endFill();
                 TextField(choice.getChildAt(0)).textColor = i == selected ? MenuStyle.INK : MenuStyle.WHITE;
             }
         }
