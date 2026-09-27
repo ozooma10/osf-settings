@@ -110,10 +110,10 @@ package
                     require(findNamed(menu, "Playback") == playbackTab, "reset reuses tabs");
                     findNamed(menu, "Camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 3:
-                    require(list.selectedEntry.row.key == "freeCamera" && navFocused(), "a sidebar section jumps the list to its first setting");
+                    require(list.selectedEntry.row.key == "freeCamera" && list.entryCount == 2 && navFocused(), "a sidebar section lists only its own settings");
                     key(221); break;
                 case 4:
-                    require(list.selectedEntry.row.key == "hotkeys", "next page walks to the next section");
+                    require(list.selectedEntry.row.key == "hotkeys" && list.entryCount == 3, "next page walks to the next section");
                     key(221); break;
                 case 5:
                     require(list.selectedEntry.row.key == "debug", "the last section is reachable");
@@ -417,7 +417,7 @@ package
                     findNamed(menu,"Advanced").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 72:
                     var advanced:int = indexOf("debug");
-                    require(advanced > 0 && list.GetDataForEntry(advanced - 1).row.type == "section" &&
+                    require(advanced == 0 && list.entryCount == 4 &&
                         list.GetDataForEntry(advanced + 1).row.key == "rescan" && list.GetDataForEntry(advanced + 2).row.key == "resetIndex" &&
                         list.GetDataForEntry(advanced + 3).row.key == "language", "settings and actions preserve declaration order");
                     userEvent("Right"); list.selectedIndex = advanced + 1; userEvent("YButton");
@@ -456,7 +456,8 @@ package
             }
             if (step == 63) return !launcher.visible;
             if (step == 65) return findNamed(menu,"homeEmpty").visible;
-            if (step == 68) return launcher.locked;
+            // Locked alone is left over from the empty state; wait for the interfaces to arrive.
+            if (step == 68) return launcher.locked && launcher.visible;
             if (step == 70) return launcher.visible && !launcher.locked;
             return true;
         }

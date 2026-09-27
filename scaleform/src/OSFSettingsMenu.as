@@ -35,6 +35,7 @@ package
         private var mods:Array = [];
         private var groups:Array = [];
         private var modID:String = "";
+        // The open sidebar section's ID; empty while the whole mod is open.
         private var groupID:String = "";
         private var options:Object;
         private var nativeHotkeys:NativeHotkeysList;
@@ -346,16 +347,17 @@ package
             if (!item || item.kind == "heading") return;
             launcherAcceptHeld = false;
             var mod:String = item.kind == "page" ? "" : item.kind == "mod" ? item.id : item.mod;
-            // Pages reload whenever they are chosen, as their tabs did; sections of the open mod only scroll.
-            var reload:Boolean = mod != modID || item.kind == "page";
+            // A mod lists all its settings; one of its sections lists only its own.
+            var tab:String = item.kind == "section" ? item.tab : "";
+            // Pages reload whenever they are chosen, as their tabs did.
+            var reload:Boolean = mod != modID || tab != groupID || item.kind == "page";
             if (item.kind == "page") rootPage = item.id;
             if (mod != modID) { modID = mod; groupID = ""; buildTabs(); }
+            groupID = tab;
             if (bindingsPage()) { if (reload) keybindings.open(allRows); }
             else keybindings.close();
             navSelection = NavigationPane.key(item);
             if (reload) populate();
-            if (item.kind == "section") showTab(item.tab);
-            else if (item.kind == "mod") showTab(groups.length ? groups[0].id : "");
             updateNav(); describe(); decorate();
         }
         private function navClicked(item:Object):void
@@ -376,18 +378,11 @@ package
             menuStage.focus = value ? nav : launcherPage() ? launcher : options as MovieClip;
             describe(); decorate();
         }
-        // Scroll the open mod's list so a section's header leads it.
-        private function showTab(tab:String):void
+        private function tabOf(row:Object):String { return groupTabs[row.group] ? groupTabs[row.group].id : row.group; }
+        // Whether a row belongs on the open mod's page, narrowed to the open section if there is one.
+        private function inPage(row:Object):Boolean
         {
-            groupID = tab;
-            for (var i:int = 0; i < listData.length; ++i) {
-                if (listData[i].row.tab != tab) continue;
-                var first:int = listData[i].row.type == "section" ? settingFrom(i, 1, -1) : i;
-                refreshing = true;
-                options.selectedIndex = first;
-                options.scrollPosition = Math.min(i, options.maxScrollPosition);
-                refreshing = false; return;
-            }
+            return modID != "" && row.mod == modID && row.type != "launcher" && (!groupID || tabOf(row) == groupID);
         }
         // Sidebar input: Up/Down open entries as they pass, Accept or Right enters the page.
         private function navigate(name:String, pressed:Boolean):Boolean
@@ -492,9 +487,13 @@ package
                 if (!tab) { tab = folded[name] = {id:row.group, title:name, size:0}; groups.push(tab); }
                 groupTabs[row.group] = tab; ++tab.size;
             }
+            // A section that is gone (or no longer has siblings) falls back to the whole mod.
             var found:Boolean = false;
-            for each (tab in groups) if (tab.id == groupID) found = true;
-            if (!found) groupID = groups.length ? groups[0].id : "";
+            for each (tab in groups) if (tab.id == groupID && groups.length > 1) found = true;
+            if (!found) {
+                groupID = "";
+                if (modID && navSelection.indexOf("section/") == 0) navSelection = "mod/" + modID;
+            }
         }
         // The detail card lists hotkeys themselves, so its chips leave out their count.
         private function summaryParts(mod:Object, hotkeys:Boolean = true):Array
@@ -541,24 +540,25 @@ package
             var selectedIssue:Object = preserve && (issuesPage() || bindingsPage()) ? current() : null;
             if (preserve && bindingsPage() && !selectedIssue && bindingSelection) selectedIssue = {identity:bindingSelection};
             var data:Array = []; var source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
-            // A mod with more than one group heads each group; a single group needs no header.
+            // A page with more than one group heads each group; a single group needs no header.
             var headed:Boolean = false, lastGroup:String = null, firstGroup:String = null;
-            for each (row in allRows) if (modID && row.mod == modID && row.type != "launcher") {
+            for each (row in allRows) if (inPage(row)) {
                 if (firstGroup == null) firstGroup = row.group; else if (row.group != firstGroup) headed = true;
             }
             for each (var row:Object in source) {
                 if (row.type == "launcher") continue;
-                if (modID && row.mod != modID) continue;
+                if (modID && !inPage(row)) continue;
                 if (modID && headed && row.group != lastGroup) {
                     // Headers are list entries so scrolling stays uniform; selection skips them.
                     lastGroup = row.group;
-                    data.push({row:{type:"section", title:row.groupTitle, mod:row.mod, id:"@section/" + row.group, group:row.group,
-                        tab:groupTabs[row.group] ? groupTabs[row.group].id : row.group, editable:false},
+                    // Inside a "Tab - Section" section the sidebar already names the tab.
+                    var groupTitle:String = String(row.groupTitle), split:int = groupTitle.indexOf(" - ");
+                    if (groupID && split > 0) groupTitle = groupTitle.substr(split + 3);
+                    data.push({row:{type:"section", title:groupTitle, mod:row.mod, id:"@section/" + row.group, group:row.group, editable:false},
                         sText:"", uID:data.length, bDisabled:true, bShowSpinner:false, uCategory:0, bEnabled:false, bSubSetting:false,
                         uType:types.SDT_LINK, sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:false}});
                 }
                 if (row.type == "hotkey") hasHotkeys = true;
-                if (modID) row.tab = groupTabs[row.group] ? groupTabs[row.group].id : row.group;
                 var slider:Boolean = modID != "" && NumericSetting.isSlider(row);
                 // The vanilla entry multiplies fValue by 100. Our slider stores integer offsets.
                 data.push({row:row, sText:html(String(row.title)), uID:data.length, bDisabled:false, bShowSpinner:false,
@@ -622,12 +622,6 @@ package
             var row:Object = current();
             var reporting:Boolean = issuesPage();
             var settings:Boolean = !reporting && !bindingsPage() && !homePage();
-            // While the page has focus the sidebar follows the section that holds the selection.
-            if (modID && row && row.tab && !nav.focused) {
-                groupID = row.tab;
-                var here:String = groups.length > 1 ? "section/" + modID + "/" + groupID : "mod/" + modID;
-                if (here != navSelection) { navSelection = here; nav.update(navItems(), navSelection); }
-            }
             detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = settings;
             MenuStyle.setText(detailLabel, row && row.type == "action" ? tr("menu.selectedAction") : tr("menu.selectedSetting"));
             homeDetails.visible = homePage() && !homeEmptyState();
