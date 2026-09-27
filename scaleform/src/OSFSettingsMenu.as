@@ -189,6 +189,7 @@ package
             options.addEventListener(MouseEvent.MOUSE_OVER, hoverEntry);
             options.addEventListener(MouseEvent.MOUSE_OUT, hoverEntry);
             options.addEventListener(MouseEvent.MOUSE_WHEEL, wheelList);
+            options.addEventListener(MouseEvent.CLICK, clickStepper, true);
             // The detail column flows top-down from the list top; describe() places each part.
             var detailWidth:Number = MenuStyle.DETAIL_WIDTH;
             detailLabel = label(tr("menu.selectedSetting"), MenuStyle.DETAIL_X, 0, detailWidth, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
@@ -987,6 +988,27 @@ package
             var next:int = Math.max(0, Math.min(options.scrollPosition + (event.delta < 0 ? 1 : -1), options.maxScrollPosition));
             if (next != options.scrollPosition) { options.scrollPosition = next; decorate(); }
             event.stopPropagation();
+        }
+        // A click that misses the vanilla arrow catchers reaches the row press, which always
+        // advances. Resolve the arrow columns by position so either side steps its own way.
+        private function clickStepper(event:MouseEvent):void
+        {
+            if (!modID || !initialized || closing || refreshing || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || editingString() || confirmingAction()) return;
+            var entry:DisplayObject = event.target as DisplayObject;
+            while (entry && entry != options && !("itemIndex" in entry)) entry = entry.parent;
+            if (!entry || entry == options) return;
+            var item:Object = options.GetDataForEntry(Object(entry).itemIndex);
+            var stepper:Object = Object(entry).LargeStepper_mc;
+            if (!item || item.row.type != "enum" || !item.row.editable || !stepper.visible) return;
+            var left:Rectangle = DisplayObject(stepper.LeftCatcher_mc).getBounds(menuStage);
+            var right:Rectangle = DisplayObject(stepper.RightCatcher_mc).getBounds(menuStage);
+            var code:uint = event.stageX >= left.left && event.stageX <= left.right ? Keyboard.LEFT :
+                event.stageX >= right.left && event.stageX <= right.right ? Keyboard.RIGHT : 0;
+            if (!code) return;
+            event.stopImmediatePropagation();
+            // The keyboard path steps, wraps, plays the vanilla sound, and reports the change.
+            Object(entry).onKeyDownHandler(new KeyboardEvent(KeyboardEvent.KEY_DOWN, true, true, 0, code));
         }
         private function mouseFocus(event:MouseEvent):void
         {
