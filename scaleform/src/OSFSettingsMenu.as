@@ -187,6 +187,7 @@ package
             options.addEventListener(MouseEvent.MOUSE_OVER, mouseFocus, true);
             options.addEventListener(MouseEvent.MOUSE_OVER, hoverEntry);
             options.addEventListener(MouseEvent.MOUSE_OUT, hoverEntry);
+            options.addEventListener(MouseEvent.MOUSE_WHEEL, wheelList);
             // The detail column flows top-down from the list top; describe() places each part.
             var detailWidth:Number = MenuStyle.DETAIL_WIDTH;
             detailLabel = label(tr("menu.selectedSetting"), MenuStyle.DETAIL_X, 0, detailWidth, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
@@ -982,6 +983,16 @@ package
                 for (var target:DisplayObject = event.target as DisplayObject; target && target != options; target = target.parent)
                     if ("itemIndex" in target) { index = Object(target).itemIndex; break; }
             if (index != hoverIndex) { hoverIndex = index; decorate(); }
+        }
+        // Vanilla ignores the wheel while the list's input is off, which it is whenever the
+        // sidebar has focus. Scroll the page anyway; focus and selection stay where they are.
+        private function wheelList(event:MouseEvent):void
+        {
+            if (!nav.focused || !event.delta || !initialized || closing || refreshing) return;
+            if (captureRow || bindingBusy() || editingString() || confirmingAction() || dragging()) return;
+            var next:int = Math.max(0, Math.min(options.scrollPosition + (event.delta < 0 ? 1 : -1), options.maxScrollPosition));
+            if (next != options.scrollPosition) { options.scrollPosition = next; decorate(); }
+            event.stopPropagation();
         }
         private function mouseFocus(event:MouseEvent):void
         {

@@ -20,7 +20,17 @@
       { "key": "row13", "type": "bool", "label": "Test row 13", "default": true },
       { "key": "row14", "type": "bool", "label": "Test row 14", "default": false },
       { "key": "row15", "type": "bool", "label": "Test row 15", "default": true },
-      { "key": "row16", "type": "bool", "label": "Last test row 16", "hint": "The last setting must remain visible and editable at the bottom of the list.", "default": false }
+      { "key": "row16", "type": "bool", "label": "Test row 16", "default": false }
+    ],
+    "Third group": [
+      { "key": "row17", "type": "bool", "label": "Test row 17", "hint": "The list is taller than the page from here on; the wheel must scroll it.", "default": true },
+      { "key": "row18", "type": "bool", "label": "Test row 18", "default": false },
+      { "key": "row19", "type": "bool", "label": "Test row 19", "default": true },
+      { "key": "row20", "type": "bool", "label": "Test row 20", "default": false },
+      { "key": "row21", "type": "bool", "label": "Test row 21", "default": true },
+      { "key": "row22", "type": "bool", "label": "Test row 22", "default": false },
+      { "key": "row23", "type": "bool", "label": "Test row 23", "default": true },
+      { "key": "row24", "type": "bool", "label": "Last test row 24", "hint": "The last setting must remain visible and editable at the bottom of the list.", "default": false }
     ]
   }
 }
