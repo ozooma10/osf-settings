@@ -6,8 +6,9 @@ package
 
     public final class KeyboardMap extends Sprite
     {
-        // One key unit; the full map is 23 units wide and 6 rows tall.
-        public static const KEY_WIDTH:Number = CONFIG::largeText ? 72 : 62;
+        // One key unit; the full map is 23 units wide and 6 rows tall, which must fit
+        // between the navigation column and the right margin.
+        public static const KEY_WIDTH:Number = 62;
         public static const KEY_HEIGHT:Number = CONFIG::largeText ? 40 : 34;
         public static const HEIGHT:Number = KEY_HEIGHT * 6;
         private static const LABEL_SIZE:Number = CONFIG::largeText ? 18 : 15;

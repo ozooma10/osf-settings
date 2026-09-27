@@ -53,6 +53,13 @@ package
             Object(menu).ProcessUserEvent(name, true); Object(menu).ProcessUserEvent(name, false);
         }
         private function homeDetail():Object { return Object(findNamed(menu,"homeDetails")).detail; }
+        private function navFocused():Boolean { return Object(findNamed(menu,"navigation")).focused; }
+        // A mod's groups share one list under headers, so rows are found by key.
+        private function indexOf(key:String):int
+        {
+            for (var i:int = 0; i < list.entryCount; ++i) if (list.GetDataForEntry(i).row.key == key) return i;
+            return -1;
+        }
         private function searchField():TextField { return DisplayObjectContainer(findNamed(menu,"bindingSearch")).getChildAt(0) as TextField; }
         private function key(code:uint):void
         {
@@ -77,14 +84,16 @@ package
                     require(list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview", "Home opens with the settings list selected");
                     require(findNamed(menu, "mods") != null && findNamed(menu, "issues") != null, "both root tabs are reachable");
                     checkLocalization();
+                    require(navFocused(), "menu opens in the sidebar");
                     capture("all-mods");
                     if (bindingsOnly) step = 34;
-                    else userEvent("Accept"); break;
+                    else { userEvent("Accept"); require(!navFocused(), "Accept enters Home from the sidebar"); userEvent("Accept"); }
+                    break;
                 case 0:
                     require(Object(menu).startupPhase == "ready" && list != null, "menu ready");
                     requireGlyphs("SELECTED SETTING");
                     requireGlyphs("Auto-advance stages");
-                    require(list.entryCount == 6, "playback has six settings");
+                    require(list.entryCount == 19 && list.GetDataForEntry(0).row.type == "section", "the mod's four groups share one list under headers");
                     require(list.selectedEntry.row.key == "autoAdvance", "first setting selected");
                     require(findInput(menu) == null, "menu has no text input");
                     key(Keyboard.F);
@@ -101,26 +110,26 @@ package
                     require(findNamed(menu, "Playback") == playbackTab, "reset reuses tabs");
                     findNamed(menu, "Camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 3:
-                    require(list.entryCount == 2 && list.selectedEntry.row.key == "freeCamera", "camera tab filters settings");
+                    require(list.selectedEntry.row.key == "freeCamera" && navFocused(), "a sidebar section jumps the list to its first setting");
                     key(221); break;
                 case 4:
-                    require(list.entryCount == 3 && list.selectedEntry.row.key == "hotkeys", "keyboard changes group");
+                    require(list.selectedEntry.row.key == "hotkeys", "next page walks to the next section");
                     key(221); break;
                 case 5:
-                    require(list.entryCount == 4 && list.selectedEntry.row.key == "debug", "advanced tab with mixed controls reachable");
+                    require(list.selectedEntry.row.key == "debug", "the last section is reachable");
                     key(221); break;
                 case 6:
-                    require(list.entryCount == 6 && list.selectedEntry.row.key == "autoAdvance", "next page wraps to playback");
+                    require(list.selectedEntry.row.mod != "design-preview" && list.selectedEntry.row.type == "hotkey", "next page continues to the next mod");
                     key(219); break;
                 case 7:
-                    require(list.entryCount == 4 && list.selectedEntry.row.key == "debug", "previous page wraps to advanced");
-                    userEvent("Cancel"); break;
-                case 8:
-                    require(list.entryCount == 3 && list.selectedEntry.row.title == "OSF Animation", "back opens mod list");
+                    require(list.selectedEntry.row.key == "autoAdvance", "previous page reopens the mod at its top");
                     userEvent("Accept"); break;
+                case 8:
+                    require(!navFocused() && !list.disableInput, "Accept enters the page");
+                    userEvent("Cancel"); break;
                 case 9:
-                    require(list.entryCount == 6, "opening a mod returns to playback");
-                    list.selectedIndex = 5; break;
+                    require(navFocused() && list.selectedEntry.row.key == "autoAdvance", "Back returns to the sidebar and keeps the page");
+                    userEvent("Right"); list.selectedIndex = indexOf("restoreView"); break;
                 case 10:
                     require(list.selectedEntry.row.key == "restoreView", "last row reachable");
                     capture("last-row");
@@ -134,7 +143,7 @@ package
                     Object(menu).BGSCodeObj.setBool = setter;
                     findNamed(menu, "Controls").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 12:
-                    list.selectedIndex = 1; userEvent("Accept"); break;
+                    userEvent("Right"); list.selectedIndex = indexOf("toggleKey"); userEvent("Accept"); break;
                 case 13:
                     require(list.disableInput && Object(menu).BGSCodeObj.pollKeyCapture().state == "waiting", "key capture disables list input");
                     capture("key-waiting");
@@ -157,7 +166,7 @@ package
                     require(list.selectedEntry.row.value == 255, "optional key can be cleared");
                     capture("key-unbound"); userEvent("YButton"); break;
                 case 19:
-                    list.selectedIndex = 2; userEvent("XButton");
+                    list.selectedIndex = indexOf("advanceKey"); userEvent("XButton");
                     require(list.selectedEntry.row.value == 13, "required key cannot be cleared");
                     userEvent("Accept"); break;
                 case 20:
@@ -168,7 +177,7 @@ package
                     Object(menu).BGSCodeObj.previewKey(27, false); break;
                 case 22:
                     require(list.selectedEntry.row.value == 13 && !list.disableInput, "Escape preserves previous binding");
-                    list.selectedIndex = 1; userEvent("Accept"); break;
+                    list.selectedIndex = indexOf("toggleKey"); userEvent("Accept"); break;
                 case 23:
                     Object(menu).BGSCodeObj.previewKey(13, true);
                     Object(menu).BGSCodeObj.previewKey(13, true); break;
@@ -326,6 +335,8 @@ package
                     require(list.selectedEntry.row.summary == "13 SETTINGS  |  2 ACTIONS" && list.GetDataForEntry(1).row.summary == "4 HOTKEYS",
                         "mod rows summarize settings, actions and hotkeys");
                     require(homeDetail().title == "OSF Animation" && homeDetail().chips.join() == "13 SETTINGS,2 ACTIONS", "detail card describes the selected mod");
+                    userEvent("Right");
+                    require(!navFocused(), "Right enters Home from the sidebar");
                     capture("home"); userEvent("Up"); break;
                 case 55:
                     require(launcher.focused && list.disableInput, "Up from the first mod focuses the interface shelf");
@@ -388,6 +399,7 @@ package
                     findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 67: break;
                 case 68:
+                    userEvent("Right");
                     require(launcher.visible && launcher.expanded && launcher.locked && launcher.focused && !list.visible && !findNamed(menu,"homeEmpty").visible,
                         "interfaces without mod settings fill Home");
                     require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "interfaces-only Home keeps its tab");
@@ -404,15 +416,16 @@ package
                 case 71:
                     findNamed(menu,"Advanced").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 72:
-                    require(list.entryCount == 4 && list.GetDataForEntry(0).row.key == "debug" &&
-                        list.GetDataForEntry(1).row.key == "rescan" && list.GetDataForEntry(2).row.key == "resetIndex" &&
-                        list.GetDataForEntry(3).row.key == "language", "settings and actions preserve declaration order");
-                    list.selectedIndex = 1; userEvent("YButton");
+                    var advanced:int = indexOf("debug");
+                    require(advanced > 0 && list.GetDataForEntry(advanced - 1).row.type == "section" &&
+                        list.GetDataForEntry(advanced + 1).row.key == "rescan" && list.GetDataForEntry(advanced + 2).row.key == "resetIndex" &&
+                        list.GetDataForEntry(advanced + 3).row.key == "language", "settings and actions preserve declaration order");
+                    userEvent("Right"); list.selectedIndex = advanced + 1; userEvent("YButton");
                     require(list.selectedEntry.row.actionState == "Run", "reset leaves action controls unchanged");
                     userEvent("Accept"); break;
                 case 73:
                     require(list.selectedEntry.row.key == "rescan" && list.selectedEntry.row.actionState == "Completed", "inline action completes and preserves selection");
-                    list.selectedIndex = 2; userEvent("Accept"); break;
+                    list.selectedIndex = indexOf("resetIndex"); userEvent("Accept"); break;
                 case 74:
                     require(list.disableInput, "inline confirmation blocks the underlying list");
                     userEvent("Accept"); break;
@@ -423,7 +436,7 @@ package
                     userEvent("Right"); userEvent("Accept"); break;
                 case 77:
                     require(!list.disableInput && list.selectedEntry.row.key == "resetIndex" && list.selectedEntry.row.actionState == "Completed", "confirmed inline action completes");
-                    list.selectedIndex = 3;
+                    list.selectedIndex = indexOf("language");
                     require(list.selectedEntry.row.type == "string", "setting after actions remains reachable");
                     capture("mixed-controls");
                     menu.removeEventListener(Event.ENTER_FRAME, advance);

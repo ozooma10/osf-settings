@@ -11,7 +11,7 @@ package
     {
         // The expanded grid starts where the shelf does; its pager shares the section label's row.
         public static const GRID_TOP:Number = MenuStyle.LIST_TOP;
-        private static const GRID_COLUMNS:int = 4;
+        private static const GRID_COLUMNS:int = 3;
         private var entries:Array = [];
         private var displayed:Array = [];
         private var cards:Sprite = new Sprite();
@@ -31,7 +31,7 @@ package
             addChild(cards); addChild(pager);
             addEventListener(MouseEvent.MOUSE_WHEEL, wheel);
         }
-        public function get columns():int { return 4; }
+        public function get columns():int { return 3; }
         private function get gridColumns():int { return isExpanded ? GRID_COLUMNS : columns; }
         // As many shelf-height rows as fit between the grid top and the list bottom.
         private function get gridRows():int { return Math.max(1, int((MenuStyle.LIST_BOTTOM - GRID_TOP + 14) / (shelfCardHeight + 14))); }
