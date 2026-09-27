@@ -1,6 +1,7 @@
 package
 {
     import flash.display.Sprite;
+    import flash.events.MouseEvent;
     import flash.text.TextField;
     import flash.text.TextFormat;
 
@@ -15,10 +16,13 @@ package
         private var tint:uint;
         private var title:TextField;
         private var tag:TextField;
+        private var isSelected:Boolean;
+        private var isHovered:Boolean;
 
         public function LauncherCard(data:Object, position:int, width:Number, height:Number)
         {
             row = data; index = position; cardWidth = width; cardHeight = height;
+            addEventListener(MouseEvent.ROLL_OVER, hover); addEventListener(MouseEvent.ROLL_OUT, hover);
             name = "launcher_" + position; mouseChildren = false; buttonMode = Boolean(row.editable);
             var large:Boolean = CONFIG::largeText;
             if (row.more) {
@@ -58,11 +62,13 @@ package
             }
             addChild(text); return text;
         }
+        private function hover(event:MouseEvent):void { isHovered = event.type == MouseEvent.ROLL_OVER; select(isSelected); }
         public function select(selected:Boolean):void
         {
+            isSelected = selected;
             graphics.clear();
-            graphics.lineStyle(1, selected ? MenuStyle.WHITE : 0x34424B);
-            graphics.beginFill(selected ? MenuStyle.WHITE : 0x0E1B23);
+            graphics.lineStyle(1, selected ? MenuStyle.WHITE : isHovered ? MenuStyle.LINE : 0x34424B);
+            graphics.beginFill(selected ? MenuStyle.WHITE : isHovered ? 0x182A33 : 0x0E1B23);
             graphics.drawRect(0, 0, cardWidth, cardHeight); graphics.endFill();
             if (badge) badge.paint(selected ? MenuStyle.INK : row.editable ? tint : MenuStyle.LINE);
             title.textColor = selected ? MenuStyle.INK : row.editable ? MenuStyle.WHITE : MenuStyle.MUTED;

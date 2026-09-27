@@ -25,7 +25,7 @@ package
             heading = MenuStyle.field("", 2, 0, 600, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true); addChild(heading);
         }
         // Columns are anchored to the list's right edge so they follow LIST_WIDTH.
-        public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number):void
+        public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number, hovered:Boolean = false):void
         {
             var rowWidth:Number = MenuStyle.LIST_WIDTH;
             var section:Boolean = row.type == "section";
@@ -33,7 +33,7 @@ package
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
             var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action");
             var displayValue:String = section ? "" : modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
-            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.mod, rowHeight].join("|");
+            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.mod, rowHeight, hovered].join("|");
             if (signature == previous) return;
             previous = signature;
             graphics.clear();
@@ -60,7 +60,7 @@ package
             }
             value.visible = !row.capturing && row.type != "hotkey";
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
-            graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
+            graphics.beginFill(selected ? MenuStyle.WHITE : hovered ? MenuStyle.HOVER : MenuStyle.ROW);
             graphics.drawRect(0, 0, rowWidth, rowHeight); graphics.endFill();
             title.textColor = color; value.textColor = modList ? (selected ? 0x3D4F58 : MenuStyle.MUTED) : color;
             title.width = modList ? rowWidth - 576 : slider || choice ? rowWidth - 546 : rowWidth - 366;

@@ -11,6 +11,8 @@ package
         public static const WHITE:uint = 0xF1F2EC;
         public static const MUTED:uint = 0xAABCC6;
         public static const ROW:uint = 0x24363F;
+        // Under the pointer but not selected: a step lighter than a row.
+        public static const HOVER:uint = 0x344B56;
         public static const LINE:uint = 0x52646D;
         public static const ACCENT:uint = 0xDE9D65;
         // Desk-distance layout on the 1920x1080 stage: navigation at the left, then the

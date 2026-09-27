@@ -95,6 +95,8 @@ package
         private var moveDirection:int = 0;
         private var moveFrame:int = -10;
         private var listData:Array = [];
+        // The list entry under the pointer, lit whichever side has focus.
+        private var hoverIndex:int = -1;
         private var captureRow:Object;
         private var captureBinding:MovieClip;
         private var captureReady:Boolean = false;
@@ -183,6 +185,8 @@ package
             // Restore Home's list before vanilla handles a row's hover. Selection
             // events cannot do this while the interface shelf has disabled the list.
             options.addEventListener(MouseEvent.MOUSE_OVER, mouseFocus, true);
+            options.addEventListener(MouseEvent.MOUSE_OVER, hoverEntry);
+            options.addEventListener(MouseEvent.MOUSE_OUT, hoverEntry);
             // The detail column flows top-down from the list top; describe() places each part.
             var detailWidth:Number = MenuStyle.DETAIL_WIDTH;
             detailLabel = label(tr("menu.selectedSetting"), MenuStyle.DETAIL_X, 0, detailWidth, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
@@ -361,7 +365,8 @@ package
         // The sidebar and the page share input: one of them has focus.
         private function focusNav(value:Boolean):void
         {
-            if (value == nav.focused && (!value || menuStage.focus == nav)) return;
+            // Repaint only when focus actually moves; a press on the sidebar must not redraw it.
+            if (value == nav.focused) { if (value) menuStage.focus = nav; return; }
             nav.focused = value; navAcceptHeld = false;
             if (value) { launcher.focused = false; launcherAcceptHeld = false; }
             else if (homePage() && launcher.hasEntries && (!options.entryCount || expandedLauncher())) launcher.focused = true;
@@ -399,7 +404,9 @@ package
                 return true;
             }
             if (name == "Cancel") { if (!pressed) back(); return true; }
-            return true;
+            // Anything else stays unhandled: a mouse button arrives as a disabled named event, and
+            // only when the movie declines it does the engine forward the real Scaleform click.
+            return false;
         }
         private function enterPage():void
         {
@@ -563,7 +570,7 @@ package
                     scroll = Math.max(0, selected - (options.selectedIndex - options.scrollPosition));
                 }
             }
-            options.InitializeEntries(data);
+            options.InitializeEntries(data); hoverIndex = -1;
             // Home's detail card and empty state show current keys, which come from vanilla Controls.
             var homeKeys:Boolean = homeEmptyState();
             for each (mod in mods) if (homePage() && mod.hotkeys.length) homeKeys = true;
@@ -968,6 +975,14 @@ package
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
             return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
         }
+        private function hoverEntry(event:MouseEvent):void
+        {
+            var index:int = -1;
+            if (event.type == MouseEvent.MOUSE_OVER)
+                for (var target:DisplayObject = event.target as DisplayObject; target && target != options; target = target.parent)
+                    if ("itemIndex" in target) { index = Object(target).itemIndex; break; }
+            if (index != hoverIndex) { hoverIndex = index; decorate(); }
+        }
         private function mouseFocus(event:MouseEvent):void
         {
             if (event.type == MouseEvent.MOUSE_OVER && (!launcherPage() || expandedLauncher())) return;
@@ -1260,7 +1275,7 @@ package
                 border.x = 0; border.y = 0; border.width = MenuStyle.LIST_WIDTH;
                 if (border.height != entryHeight) { border.height = entryHeight; needsLayout = true; }
                 clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (entryHeight + MenuStyle.ROW_GAP);
-                view.update(item.row, chosen, modID == "" && !bindingsPage(), entryHeight);
+                view.update(item.row, chosen, modID == "" && !bindingsPage(), entryHeight, Object(clip).itemIndex == hoverIndex && !chosen);
             }
             if (needsLayout && !dragging()) options.UpdateContainerRect();
         }

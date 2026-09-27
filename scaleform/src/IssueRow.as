@@ -11,6 +11,7 @@ package
         private var severity:TextField;
         private var previous:Object;
         private var wasSelected:Boolean;
+        private var wasHovered:Boolean;
 
         public function IssueRow()
         {
@@ -22,10 +23,10 @@ package
             addChild(title); addChild(mod); addChild(severity);
         }
 
-        public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number):void
+        public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number, hovered:Boolean = false):void
         {
-            if (previous == row && wasSelected == selected) return;
-            previous = row; wasSelected = selected;
+            if (previous == row && wasSelected == selected && wasHovered == hovered) return;
+            previous = row; wasSelected = selected; wasHovered = hovered;
             mod.y = rowHeight - MenuStyle.SMALL_SIZE - 13;
             severity.y = (rowHeight - severity.height) / 2 + 2;
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
@@ -34,7 +35,7 @@ package
             severity.textColor = selected ? MenuStyle.INK : MenuStyle.ACCENT;
             MenuStyle.fit(title, row.title); MenuStyle.fit(mod, row.modTitle);
             MenuStyle.fit(severity, row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning"));
-            graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : MenuStyle.ROW);
+            graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : hovered ? MenuStyle.HOVER : MenuStyle.ROW);
             graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, rowHeight); graphics.endFill();
             var x:Number = MenuStyle.LIST_WIDTH - 248; var y:Number = rowHeight / 2;
             graphics.lineStyle(2, severity.textColor);
