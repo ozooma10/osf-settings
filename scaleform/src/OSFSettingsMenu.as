@@ -46,6 +46,8 @@ package
         private var revision:String = "";
         private var launcher:LauncherPage;
         private var launcherAcceptHeld:Boolean = false;
+        // The launcher row whose destination is loading; Settings stays open until native reports.
+        private var launching:Object = null;
         private var nextRevisionPoll:int = 0;
         private var stringConfirmHeld:Boolean;
         private var searchExitFrame:int = -10;
@@ -767,7 +769,7 @@ package
             if (editingString()) { saveString(); return; }
             if (bindingBusy() || issuesPage() || searching() || frame <= searchExitFrame + 1) return;
             if (captureRow) { confirmBinding(); return; }
-            if (closing || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
+            if (closing || launching || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
             activationFrame = frame;
             if (nav.focused) { enterPage(); return; }
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
@@ -900,12 +902,46 @@ package
         }
         private function launch(row:Object):void
         {
-            if (BGSCodeObj.launch(row.mod, row.key)) {
+            // 0 rejected, 1 closing (handoff queued), 2 loading (the card shows LOADING until pollLaunch resolves).
+            var result:int = int(BGSCodeObj.launch(row.mod, row.key));
+            if (result == 2) {
+                launching = row;
+                launcher.loading = row;
+                launcher.mouseEnabled = launcher.mouseChildren = false;
+                MenuStyle.setText(status, tr("home.loadingStatus", {title:String(row.title)}));
+                status.textColor = MenuStyle.MUTED;
+            } else if (result == 1) {
                 closing = true; options.disableInput = true;
                 launcher.mouseEnabled = launcher.mouseChildren = false;
             } else {
                 MenuStyle.setText(status, "This menu is currently unavailable.");
             }
+        }
+        private function pollLaunch():void
+        {
+            var result:Object = BGSCodeObj.pollLaunch();
+            if (result.state == "pending") return;
+            var row:Object = launching;
+            endLaunch();
+            if (result.state == "closing") {
+                closing = true; options.disableInput = true;
+                launcher.mouseEnabled = launcher.mouseChildren = false;
+                return;
+            }
+            MenuStyle.setText(status, String(result.message) || tr("home.loadFailed", {title:String(row.title)}));
+            status.textColor = MenuStyle.ACCENT;
+        }
+        private function endLaunch():void
+        {
+            launching = null;
+            launcher.loading = null;
+            launcher.mouseEnabled = launcher.mouseChildren = launcher.visible;
+        }
+        private function cancelLaunch():void
+        {
+            BGSCodeObj.cancelLaunch();
+            endLaunch();
+            MenuStyle.setText(status, ""); status.textColor = MenuStyle.MUTED;
         }
         private function launcherAccept(pressed:Boolean):void
         {
@@ -923,6 +959,7 @@ package
             if (nativeHotkeys.saving) return;
             if (captureRow) { finishBinding(true); return; }
             if (frame <= searchExitFrame + 1) return;
+            if (launching) { cancelLaunch(); return; } // Back stops the loading destination; Settings stays open.
             if (closing || dragging() || requestedRefresh) return;
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             // Back leaves the page for the sidebar; from the sidebar it closes the menu.
@@ -1159,6 +1196,7 @@ package
         {
             ++frame;
             if (initialized && !closing) {
+                if (launching) pollLaunch();
                 keybindings.advance(allRows,bindingBusy());
                 options.disableInput = nav.focused || launcherPage() || bindingBusy() || searching() || Boolean(captureRow) || editingString() || confirmingAction();
                 if (captureRow) pollBinding();

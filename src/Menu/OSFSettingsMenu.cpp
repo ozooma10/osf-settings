@@ -20,8 +20,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization };
-
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, CancelLaunch };
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
             return index < params.argCount && params.args[index].IsString() ? params.args[index].GetString() : "";
@@ -96,6 +95,8 @@ namespace OSFSettings
         RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
         RegisterNativeFunction("revision", static_cast<std::uint64_t>(Function::Revision));
         RegisterNativeFunction("launch", static_cast<std::uint64_t>(Function::Launch));
+        RegisterNativeFunction("pollLaunch", static_cast<std::uint64_t>(Function::PollLaunch));
+        RegisterNativeFunction("cancelLaunch", static_cast<std::uint64_t>(Function::CancelLaunch));
         RegisterNativeFunction("requestBindings", static_cast<std::uint64_t>(Function::RequestBindings));
         RegisterNativeFunction("pollBindings", static_cast<std::uint64_t>(Function::PollBindings));
         RegisterNativeFunction("textInput", static_cast<std::uint64_t>(Function::TextInput));
@@ -133,24 +134,47 @@ namespace OSFSettings
         auto& runtime = Runtime::Get();
         switch (function) {
         case Function::Launch: {
-            bool accepted = false;
+            // 0 = rejected, 1 = closing (handoff queued), 2 = loading (pollLaunch reports the outcome).
+            double result = 0;
             auto* ui = RE::UI::GetSingleton();
-            auto* queue = RE::UIMessageQueue::GetSingleton();
-            if (!m_launch && ui && queue && params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString()) {
+            if (!m_launch && !m_waiting && ui && params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString()) {
                 auto destination = LauncherService::Get().Find(ArgString(params, 0), ArgString(params, 1));
                 if (destination && destination->available && (destination->open || ui->IsMenuRegistered(RE::BSFixedString(destination->menu.c_str())))) {
-                    m_launch = std::move(destination);
-                    // Dismiss Pause before Settings leaves the stack and hands off to the destination.
-                    if (ui->IsMenuOpen("PauseMenu")) {
-                        queue->AddMessage(RE::BSFixedString("PauseMenu"), RE::UI_MESSAGE_TYPE::kHide);
+                    if (destination->prepare) {
+                        LauncherService::Get().TakeReport(); // drop a report left by a canceled attempt
+                        m_waiting = destination;
+                        destination->prepare(destination->mod, destination->id);
+                        result = 2;
+                    } else {
+                        CommitLaunch(std::move(*destination));
+                        result = 1;
                     }
-                    Close();
-                    accepted = true;
                 }
             }
-            *params.ret = RE::Scaleform::GFx::Value(accepted);
+            *params.ret = RE::Scaleform::GFx::Value(result);
             break;
         }
+        case Function::PollLaunch: {
+            root->CreateObject(params.ret);
+            std::string state = m_waiting ? "pending" : "idle", message;
+            const auto report = LauncherService::Get().TakeReport();
+            if (m_waiting && report && report->mod == m_waiting->mod && report->id == m_waiting->id) {
+                auto destination = std::move(*std::exchange(m_waiting, std::nullopt));
+                if (report->ready) {
+                    CommitLaunch(std::move(destination));
+                    state = "closing";
+                } else {
+                    state = "failed";
+                    message = report->reason;
+                }
+            }
+            Text(*params.ret, "state", state);
+            Text(*params.ret, "message", message);
+            break;
+        }
+        case Function::CancelLaunch:
+            m_waiting.reset(); // the next launch discards any late report
+            break;
         case Function::GetLocalization: {
             root->CreateObject(params.ret);
             const auto catalog = Localization::Get();
@@ -525,6 +549,7 @@ namespace OSFSettings
         m_bindings->Invalidate();
         m_bindingEditor.End(true);
         m_capture.ResetForMenuClose();
+        m_waiting.reset(); // closed by another path while a destination was still loading: no handoff
         auto destination = std::exchange(m_launch, std::nullopt);
         RE::GameMenuBase::OnRemovedFromMenuStack();
         auto* ui = RE::UI::GetSingleton();
@@ -565,10 +590,23 @@ namespace OSFSettings
         }
     }
 
-    void OSFSettingsMenu::Close() 
-    { 
+    void OSFSettingsMenu::Close()
+    {
         if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
-            queue->AddMessage(RE::BSFixedString(MENU_NAME.data()), RE::UI_MESSAGE_TYPE::kHide); 
+            queue->AddMessage(RE::BSFixedString(MENU_NAME.data()), RE::UI_MESSAGE_TYPE::kHide);
         }
     }
+
+    void OSFSettingsMenu::CommitLaunch(LaunchDestination destination)
+    {
+        m_launch = std::move(destination);
+        // Dismiss Pause before Settings leaves the stack and hands off to the destination.
+        auto* ui = RE::UI::GetSingleton();
+        auto* queue = RE::UIMessageQueue::GetSingleton();
+        if (ui && queue && ui->IsMenuOpen("PauseMenu")) {
+            queue->AddMessage(RE::BSFixedString("PauseMenu"), RE::UI_MESSAGE_TYPE::kHide);
+        }
+        Close();
+    }
+
 }

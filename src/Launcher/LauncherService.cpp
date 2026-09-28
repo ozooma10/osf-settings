@@ -58,6 +58,30 @@ namespace OSFSettings
         }
         return LauncherError::NotFound;
     }
+    LauncherError LauncherService::SetPrepare(std::string_view mod, std::string_view id, std::function<void(const std::string&, const std::string&)> prepare)
+    {
+        std::lock_guard lock(m_mutex);
+        for (auto& entry : m_destinations) {
+            if (entry.mod != mod || entry.id != id) continue;
+            if (!entry.open) return LauncherError::InvalidArgument; // native menus open synchronously
+            entry.prepare = std::move(prepare);
+            return LauncherError::None;
+        }
+        return LauncherError::NotFound;
+    }
+    LauncherError LauncherService::ReportPrepared(std::string_view mod, std::string_view id, bool ready, std::string reason)
+    {
+        if (!IsValidString(reason, 4096)) return LauncherError::InvalidArgument;
+        std::lock_guard lock(m_mutex);
+        if (std::ranges::none_of(m_destinations, [&](const auto& entry) { return entry.mod == mod && entry.id == id; })) return LauncherError::NotFound;
+        m_report = PreparedReport{ std::string(mod), std::string(id), ready, std::move(reason) };
+        return LauncherError::None;
+    }
+    std::optional<PreparedReport> LauncherService::TakeReport()
+    {
+        std::lock_guard lock(m_mutex);
+        return std::exchange(m_report, std::nullopt);
+    }
     void LauncherService::LoadHistory(const std::filesystem::path& directory)
     {
         std::lock_guard lock(m_mutex);

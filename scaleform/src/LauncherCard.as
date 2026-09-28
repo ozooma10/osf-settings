@@ -38,11 +38,13 @@ package
             badge.x = 16; badge.y = (height - diameter) / 2; addChild(badge);
             var size:Number = MenuStyle.BODY_SIZE - 1;
             var left:Number = badge.x + diameter + 14;
-            var tagHeight:Number = row.editable ? 0 : size + 2;
+            var tagHeight:Number = row.editable && !row.loading ? 0 : size + 2;
             title = field(String(row.title), left, 0, height - 16 - tagHeight, size);
             title.height = title.textHeight + 4;
             title.y = (height - title.height - tagHeight) / 2;
+            // The loading tag shows while the destination prepares itself before Settings hands off.
             if (!row.editable) tag = field(tr("home.unavailable"), left, title.y + title.height + 4, tagHeight, size - 5);
+            else if (row.loading) tag = field(tr("home.loading"), left, title.y + title.height + 4, tagHeight, size - 5);
             select(false);
         }
         private function center(text:TextField):void
@@ -72,7 +74,7 @@ package
             graphics.drawRect(0, 0, cardWidth, cardHeight); graphics.endFill();
             if (badge) badge.paint(selected ? MenuStyle.INK : row.editable ? tint : MenuStyle.LINE);
             title.textColor = selected ? MenuStyle.INK : row.editable ? MenuStyle.WHITE : MenuStyle.MUTED;
-            if (tag) tag.textColor = selected ? 0x3D4F58 : MenuStyle.MUTED;
+            if (tag) tag.textColor = selected ? 0x3D4F58 : row.loading && row.editable ? MenuStyle.ACCENT : MenuStyle.MUTED;
         }
     }
 }

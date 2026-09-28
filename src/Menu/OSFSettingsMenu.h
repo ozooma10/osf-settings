@@ -37,8 +37,12 @@ namespace OSFSettings
         void Close();
         bool RequestTextInput(bool enabled);
         void OnStartupFailed(std::string_view message);
+        // Launcher handoff: commit closes Pause and Settings; the destination opens once Settings has left the stack.
+        void CommitLaunch(LaunchDestination destination);
         static RE::Scaleform::Ptr<RE::IMenu> Create();
         std::optional<LaunchDestination> m_launch;
+        // A destination loading while Settings stays open; pollLaunch resolves it.
+        std::optional<LaunchDestination> m_waiting;
         KeyCapture m_capture;
         NativeBindingEditor m_bindingEditor;
         std::shared_ptr<BindingSnapshot> m_bindings = std::make_shared<BindingSnapshot>();

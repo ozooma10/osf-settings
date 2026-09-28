@@ -24,6 +24,7 @@ package
         private var isExpanded:Boolean = false;
         private var isLocked:Boolean = false;
         private var hasFocus:Boolean = false;
+        private var loadingRow:Object = null;
         public function LauncherPage(onChanged:Function, onActivated:Function, onLayout:Function)
         {
             changed = onChanged; activated = onActivated; layoutChanged = onLayout;
@@ -83,6 +84,8 @@ package
             render();
         }
         public function toggleExpanded():void { if (isLocked) return; isExpanded = !isExpanded; hasFocus = true; layoutChanged(); }
+        // The destination loading before handoff, matched by identity so its tag survives refreshes.
+        public function set loading(row:Object):void { loadingRow = row; render(); }
         private function paintSelection():void
         {
             for (var i:int = 0; i < cards.numChildren; ++i) {
@@ -147,6 +150,7 @@ package
             // The grid runs from GRID_TOP to just above the footer divider.
             var height:Number = isExpanded ? (MenuStyle.LIST_BOTTOM - GRID_TOP - rowGap * (gridRows - 1)) / gridRows : shelfCardHeight;
             for (var i:int = first; i < Math.min(displayed.length, first + capacity); ++i) {
+                displayed[i].loading = Boolean(loadingRow) && displayed[i].mod == loadingRow.mod && displayed[i].key == loadingRow.key;
                 var card:LauncherCard = new LauncherCard(displayed[i], i, width, height);
                 card.x = (i - first) % across * (width + gap);
                 card.y = int((i - first) / across) * (height + rowGap);

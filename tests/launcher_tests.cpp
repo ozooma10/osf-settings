@@ -129,6 +129,27 @@ int main()
         callback->open(callback->mod, callback->id);
         check(context.called && context.result == API::Status::Ok, "copied callback forwards identity/context without registry lock");
         check(!LauncherService::Get().Find("api", "web/view")->available, "provider can update its own availability");
+
+        // Loading step: prepare runs while Settings stays open; reports wait in a mailbox for the menu's poll.
+        auto& live = LauncherService::Get();
+        check(api->SetPrepare("api", "menu", [](const char*, const char*, void*) noexcept {}, nullptr) == API::Status::InvalidArgument, "native menus cannot prepare");
+        check(api->SetPrepare("api", "missing", nullptr, nullptr) == API::Status::NotFound, "unknown prepare target rejected");
+        int prepared = 0;
+        check(api->SetPrepare("api", "web/view", [](const char* mod, const char* id, void* state) noexcept {
+            if (std::string_view(mod) == "api" && std::string_view(id) == "web/view") ++*static_cast<int*>(state);
+        }, &prepared) == API::Status::Ok, "SDK prepare registration");
+        const auto destination = live.Find("api", "web/view");
+        destination->prepare(destination->mod, destination->id);
+        check(prepared == 1, "copied prepare forwards identity/context");
+        check(!live.TakeReport(), "mailbox starts empty");
+        check(api->ReportPrepared("api", "missing", true, "") == API::Status::NotFound && !live.TakeReport(), "report for an unknown destination rejected");
+        check(api->ReportPrepared("api", "web/view", true, "") == API::Status::Ok &&
+            api->ReportPrepared("api", "web/view", false, "Page failed") == API::Status::Ok, "provider reports");
+        const auto report = live.TakeReport();
+        check(report && report->mod == "api" && report->id == "web/view" && !report->ready && report->reason == "Page failed", "latest report kept with its reason");
+        check(!live.TakeReport(), "taking a report empties the mailbox");
+        check(api->ReportPrepared("api", "web/view", true, std::string(4097, 'x').c_str()) == API::Status::InvalidArgument && !live.TakeReport(), "oversized reason rejected");
+        check(api->SetPrepare("api", "web/view", nullptr, nullptr) == API::Status::Ok && !live.Find("api", "web/view")->prepare, "null prepare removes the loading step");
         std::cout << checks << " launcher checks passed\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }
