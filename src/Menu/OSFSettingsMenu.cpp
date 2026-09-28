@@ -9,6 +9,7 @@
 #include "Actions/ActionService.h"
 #include "Settings/Localization.h"
 #include <charconv>
+#include <chrono>
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
 #include "RE/B/BSService.h"
@@ -21,6 +22,8 @@ namespace OSFSettings
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
             RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, CancelLaunch };
+        // How long a card stays LOADING before Settings releases it without a provider report.
+        constexpr auto kPrepareTimeout = std::chrono::seconds(30);
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
             return index < params.argCount && params.args[index].IsString() ? params.args[index].GetString() : "";
@@ -143,6 +146,7 @@ namespace OSFSettings
                     if (destination->prepare) {
                         LauncherService::Get().TakeReport(); // drop a report left by a canceled attempt
                         m_waiting = destination;
+                        m_waitDeadline = std::chrono::steady_clock::now() + kPrepareTimeout;
                         destination->prepare(destination->mod, destination->id);
                         result = 2;
                     } else {
@@ -167,6 +171,9 @@ namespace OSFSettings
                     state = "failed";
                     message = report->reason;
                 }
+            } else if (m_waiting && std::chrono::steady_clock::now() >= m_waitDeadline) {
+                m_waiting.reset(); // a provider that never reports; a late report is discarded by the next launch
+                state = "failed";
             }
             Text(*params.ret, "state", state);
             Text(*params.ret, "message", message);

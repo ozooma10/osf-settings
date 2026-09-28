@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include "RE/G/GameMenuBase.h"
 #include "Input/KeyCapture.h"
 #include "Input/NativeBindingEditor.h"
@@ -41,8 +42,9 @@ namespace OSFSettings
         void CommitLaunch(LaunchDestination destination);
         static RE::Scaleform::Ptr<RE::IMenu> Create();
         std::optional<LaunchDestination> m_launch;
-        // A destination loading while Settings stays open; pollLaunch resolves it.
+        // A destination loading while Settings stays open; pollLaunch resolves it or gives up at the deadline.
         std::optional<LaunchDestination> m_waiting;
+        std::chrono::steady_clock::time_point m_waitDeadline;
         KeyCapture m_capture;
         NativeBindingEditor m_bindingEditor;
         std::shared_ptr<BindingSnapshot> m_bindings = std::make_shared<BindingSnapshot>();
