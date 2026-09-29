@@ -108,7 +108,7 @@ int main()
 
         namespace API = OSFSettings::API::Launcher;
         std::uint32_t version = 9;
-        check(!OSFSettings_RequestLauncherAPI(0x10000, &version) && version == 0, "different major ABI rejected");
+        check(!OSFSettings_RequestLauncherAPI(0, &version) && version == 0, "unversioned ABI rejected");
         check(!OSFSettings_RequestLauncherAPI(0x20000, &version) && version == 0, "prepare/cancel ABI rejected");
         check(!OSFSettings_RequestLauncherAPI(API::kVersion + 1, &version) && version == 0, "future ABI rejected");
         auto* api = static_cast<API::ILauncher*>(OSFSettings_RequestLauncherAPI(API::kVersion, &version));
