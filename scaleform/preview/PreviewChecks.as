@@ -8,6 +8,7 @@ package
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.geom.Matrix;
+    import flash.geom.Rectangle;
     import flash.text.Font;
     import flash.text.TextField;
     import flash.ui.Keyboard;
@@ -542,6 +543,22 @@ package
         }
         private function capture(name:String):void
         {
+            var style:Object = menu.loaderInfo.applicationDomain.getDefinition("MenuStyle");
+            var status:TextField;
+            var buttons:DisplayObject;
+            for (var childIndex:int = 0; childIndex < menu.numChildren; ++childIndex) {
+                var child:DisplayObject = menu.getChildAt(childIndex);
+                if (child is TextField && child.x == style.LEFT && child.y > style.LIST_BOTTOM) status = child as TextField;
+                if ("RefreshButtons" in child) buttons = child;
+            }
+            require(status != null && buttons != null, "footer present: " + name);
+            if (status && status.text.length) {
+                var bounds:Rectangle = status.getBounds(menu);
+                require(status.textHeight + 4 <= status.height && bounds.bottom <= 1080,
+                    "footer status fits on screen: " + name);
+                require(!bounds.intersects(buttons.getBounds(menu)),
+                    "footer status does not overlap button hints: " + name);
+            }
             if (!captures) return;
             var bitmap:BitmapData = new BitmapData(1280, 720, false, 0x08151C);
             bitmap.draw(menu, new Matrix(2 / 3, 0, 0, 2 / 3));

@@ -28,7 +28,7 @@ package
         public static const SECTION_TOP:Number = 102;
         public static const SECTION_SIZE:Number = CONFIG::largeText ? 24 : 20;
         public static const LIST_TOP:Number = CONFIG::largeText ? 148 : 142;
-        public static const LIST_BOTTOM:Number = 990;
+        public static const LIST_BOTTOM:Number = CONFIG::largeText ? 940 : 990;
         public static const LIST_WIDTH:Number = 940;
         public static const LIST_HEIGHT:Number = LIST_BOTTOM - LIST_TOP;
         public static const ROW_HEIGHT:Number = CONFIG::largeText ? 56 : 44;
@@ -42,7 +42,7 @@ package
         public static const DETAIL_WIDTH:Number = RIGHT - DETAIL_X;
         public static const DETAIL_TITLE_SIZE:Number = CONFIG::largeText ? 32 : 27;
         public static const DETAIL_BODY_SIZE:Number = CONFIG::largeText ? 24 : 20;
-        public static const FOOTER_LINE:Number = 1004;
+        public static const FOOTER_LINE:Number = CONFIG::largeText ? 954 : 1004;
         public static const FOOTER_Y:Number = 1042;
 
         public static function field(text:String, x:Number, y:Number, width:Number, height:Number,

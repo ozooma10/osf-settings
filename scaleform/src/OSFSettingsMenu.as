@@ -213,7 +213,7 @@ package
                 if (!captureRow && !bindingBusy() && !requestedRefresh) openEntry({kind:"page", id:"bindings"});
             });
             addChild(homeEmpty);
-            // The footer is one line: status at the left, every button hint at the right.
+            // Large text reserves a status line above the wider native button hints.
             status = label(tr("menu.autoSave"), MenuStyle.LEFT, 0, 900, 52, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             status.multiline = true; status.wordWrap = true;
             // The changed marker only means something beside settings, so it closes the detail column.
@@ -700,9 +700,14 @@ package
                 resetButton.Visible = clearButton.Visible = false;
             }
             bar.RefreshButtons();
-            // Status wraps within whatever the button hints leave free.
-            status.width = Math.max(320, MenuStyle.RIGHT - MovieClip(bar).width - MenuStyle.LEFT - 48);
-            status.y = MenuStyle.FOOTER_Y - status.textHeight / 2 - 4;
+            layoutFooter();
+        }
+        private function layoutFooter():void
+        {
+            status.width = CONFIG::largeText ? MenuStyle.RIGHT - MenuStyle.LEFT :
+                Math.max(320, MenuStyle.RIGHT - MovieClip(bar).width - MenuStyle.LEFT - 48);
+            status.height = Math.ceil(status.textHeight) + 8;
+            status.y = CONFIG::largeText ? MenuStyle.FOOTER_LINE + 8 : MenuStyle.FOOTER_Y - status.height / 2;
         }
         // The selected enum's choices, with the current one filled and the default tagged.
         private function showOptions(row:Object, top:Number):void
@@ -1203,8 +1208,10 @@ package
                     }
                     if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
                     decorate();
-                    status.y = MenuStyle.FOOTER_Y - status.textHeight / 2 - 4;
                 }
+                // Captures and editors can change status without refreshing the list;
+                // native button widths can also settle after RefreshButtons returns.
+                layoutFooter();
             }
             CONFIG::testHarness { advanceTestObservations(); }
         }
