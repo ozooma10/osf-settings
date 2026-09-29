@@ -40,9 +40,9 @@ int main()
         const auto registerCallback = [&](const char* mod, const char* id, Receiver& receiver) {
             return input.Register(mod, id, Receiver::Fired, &receiver);
         };
-        const auto press = [&] { return input.ProcessButton(key, action, 1, 0); };
-        const auto repeat = [&] { return input.ProcessButton(key, action, 1, 1); };
-        const auto release = [&] { return input.ProcessButton(key, action, 0, 1); };
+        const auto press = [&] { return input.ProcessButton(0, key, action, 1, 0); };
+        const auto repeat = [&] { return input.ProcessButton(0, key, action, 1, 1); };
+        const auto release = [&] { return input.ProcessButton(0, key, action, 0, 1); };
         check(registerCallback("sample", "toggleFeature", one) == SettingsError::NotReady,
             "registration waits for native initialization");
         input.Initialize({});
@@ -85,22 +85,22 @@ int main()
 
         check(order == std::vector<int>{1, 2, 1, 2}, "each press invokes its callbacks in registration order");
         one.onCall = {}; two.onCall = {};
-        check(!input.ProcessButton(0, action, 1, 0) && !input.ProcessButton(255, action, 1, 0) &&
-            !input.ProcessButton(0xFFFFFFFFu, action, 1, 0) &&
-            !input.ProcessButton(key, action, 0, -1) &&
-            !input.ProcessButton(key, action, std::numeric_limits<float>::quiet_NaN(), 0),
+        check(!input.ProcessButton(0, 0, action, 1, 0) && !input.ProcessButton(0, 255, action, 1, 0) &&
+            !input.ProcessButton(0, 0xFFFFFFFFu, action, 1, 0) &&
+            !input.ProcessButton(0, key, action, 0, -1) &&
+            !input.ProcessButton(0, key, action, std::numeric_limits<float>::quiet_NaN(), 0),
             "invalid keys and non-press callback values never activate");
         check(registerCallback("sample", "second", another) == SettingsError::None &&
-            input.ProcessButton(key + 1, second, 1, 0), "register a different action");
+            input.ProcessButton(0, key + 1, second, 1, 0), "register a different action");
 
         check(another.events == std::vector<std::string>{"sample/second"} && one.events.size() == 3,
             "hotkey identity isolates delivery");
-        check(!input.ProcessButton(key + 2, menu, 1, 0) &&
-            !input.ProcessButton(key + 2, menu, 1, 1) &&
-            input.ProcessButton(key + 2, menu, 0, 1), "menu hotkeys still activate on paired release");
+        check(!input.ProcessButton(0, key + 2, menu, 1, 0) &&
+            !input.ProcessButton(0, key + 2, menu, 1, 1) &&
+            input.ProcessButton(0, key + 2, menu, 0, 1), "menu hotkeys still activate on paired release");
 
         press();
-        input.ProcessButton(key + 2, menu, 1, 0);
+        input.ProcessButton(0, key + 2, menu, 1, 0);
         const auto block = input.AcquireBlock();
         const auto nested = input.AcquireBlock();
         check(block && nested != block && !press(),
@@ -111,7 +111,7 @@ int main()
         check(!press(), "releasing one owner does not lift another owner's block");
         input.ReleaseBlock(nested);
         check(!repeat() && !release(), "held input during a block is not replayed");
-        check(!input.ProcessButton(key + 2, menu, 0, 1), "blocks still cancel held menu presses");
+        check(!input.ProcessButton(0, key + 2, menu, 0, 1), "blocks still cancel held menu presses");
         check(press(), "fresh presses resume after all owners release");
 
         one.onCall = [&] { const auto duringCallback = input.AcquireBlock(); input.ReleaseBlock(duringCallback); };
@@ -128,6 +128,27 @@ int main()
         one.onCall = [&] { order.push_back(1); };
         two.onCall = [&] { order.push_back(2); };
         check(press() && order == std::vector<int>{0, 1, 2}, "observers precede native listeners in the same call");
+        order.clear();
+        check(input.ProcessButton(2, 0x1000, action, 1, 0) && order == std::vector<int>{0, 1, 2},
+            "controller face buttons above the keyboard range invoke the same callbacks");
+        check(!input.ProcessButton(2, 0x1000, action, 1, 1) && !input.ProcessButton(2, 0x1000, action, 0, 1),
+            "controller repeats and releases do not invoke callbacks");
+        check(input.ProcessButton(2, 9, action, 1, 0) && input.ProcessButton(2, 10, action, 1, 0),
+            "native trigger button events invoke callbacks");
+        input.ProcessButton(0, 0x40, menu, 1, 0);
+        check(!input.ProcessButton(2, 0x40, menu, 0, 1) && input.ProcessButton(0, 0x40, menu, 0, 1),
+            "controller release cannot complete a keyboard press with the same numeric code");
+        input.ProcessButton(0, 0x40, menu, 1, 0);
+        input.ProcessButton(2, 0x40, menu, 1, 0);
+        check(input.ProcessButton(2, 0x40, menu, 0, 1) && input.ProcessButton(0, 0x40, menu, 0, 1),
+            "simultaneous device presses keep independent release ownership");
+        input.ProcessButton(2, 0x1000, menu, 1, 0);
+        const auto controllerBlock = input.AcquireBlock();
+        check(!input.ProcessButton(2, 0x1000, action, 1, 0), "capture blocks controller callbacks");
+        input.ReleaseBlock(controllerBlock);
+        check(!input.ProcessButton(2, 0x1000, menu, 0, 1), "capture clears held controller menu presses");
+        check(!input.ProcessButton(1, 1, action, 1, 0) && !input.ProcessButton(2, 255, action, 1, 0),
+            "unsupported device and unbound controller IDs cannot activate");
         std::cout << checks << '/' << checks << " hotkey callback checks passed\n";
     } catch (const std::exception& error) {
         std::cerr << "FAILED: " << error.what() << '\n';

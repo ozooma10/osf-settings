@@ -652,7 +652,7 @@ package
             if (row && row.type == "action" || enumRow) defaultLabel.visible = defaultValue.visible = false;
             if (row && row.type == "action") { detailDivider.visible = false; changedLegend.visible = false; }
             defaultLabel.y = cursor; defaultValue.y = cursor - 1;
-            MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
+            MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.binding.bGamepadEntry ? tr("values.unboundTitle") : row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
                 NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
             if (defaultLabel.visible) cursor += MenuStyle.VALUE_SIZE + 16;
             var range:String = settings && row && modID ? NumericSetting.range(row) : "";

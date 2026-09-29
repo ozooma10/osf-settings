@@ -516,6 +516,18 @@ package
             require(policy.filter(joined,"", "all",162).length == 1 && policy.filter(joined,"", "all",77).length == 0,"modifier identity is numeric, never inferred from localized strings");
             joined = policy.join([native],[],[],function(row:Object):String { return "Missing"; });
             require(!joined[0].available && !joined[0].editable,"missing numeric data is unavailable, not editable unbound");
+            var controller:Object = {sInputName:"same",uContextID:0,bGamepadEntry:true,bIsDivider:false,bReadOnly:false,bRequired:false,
+                MainBinding:{aPCKeyName:[],aButtonName:["A"]},AltBinding:{aPCKeyName:[],aButtonName:[]}};
+            joined = policy.join([native,controller],[],[
+                {action:"same",context:0,device:0,slot:0,key:64,modifier:255},
+                {action:"same",context:0,device:2,slot:0,key:4096,modifier:64}],function(row:Object):String { return "Same action"; });
+            require(joined.length == 2 && joined[0].identity != joined[1].identity && joined[0].records.length == 1 && joined[1].records.length == 1,
+                "keyboard and controller rows of one action retain separate numeric bindings");
+            require(joined[1].value == "A" && joined[1].editable && joined[1].binding.MainBinding.aButtonName[0] == "A",
+                "controller binding remains editable and preserves the native glyph");
+            require(policy.filter(joined,"", "all",64).length == 1 && policy.filter(joined,"", "all",64,true).length == 1 &&
+                policy.filter([joined[1]],"", "all",64).length == 0,"controller modifiers cannot appear as keyboard keys");
+            require(policy.filter([joined[1]],"", "all",4096,true).length == 1,"controller face button filter accepts native IDs above 255");
         }
         private function findInput(container:DisplayObjectContainer):TextField
         {

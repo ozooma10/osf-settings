@@ -37,7 +37,7 @@ namespace OSFSettings
         bool Blocked();
 
         // The native handler resolves the action before passing it here.
-        bool ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds);
+        bool ProcessButton(std::uint32_t device, std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds);
 
     private:
         struct Listener
@@ -62,6 +62,6 @@ namespace OSFSettings
         bool m_initialized{};
         std::set<Block> m_blocks;
         Block m_nextBlock{ 1 };
-        std::map<std::uint32_t, std::string> m_pressed;
+        std::map<std::pair<std::uint32_t, std::uint32_t>, std::string> m_pressed;
     };
 }

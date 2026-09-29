@@ -106,7 +106,7 @@ int main()
         std::memcpy(evaluator + 0x18A, "\x48\x83\xC4\x38\xC3", 5);
         const auto evaluate = reinterpret_cast<Validate>(evaluator);
         Fixture fixture;
-        check(!fixture.editor.Begin(), "capture unavailable before validation hook installation");
+        check(!fixture.editor.Begin(false), "capture unavailable before validation hook installation");
         check(!NativeBindingEditor::Install(), "reject unexpected validation opcode");
         // Install chains the existing call through THook; it does not validate a target ID.
         REL::WriteData(evaluator + 0x185, REL::ASM::CALL5{
@@ -148,11 +148,11 @@ int main()
         check(hotkeys.Register("test", "callback", +[](const char*, const char*, void* context) noexcept {
             ++*static_cast<unsigned*>(context);
         }, &callbacks) == SettingsError::None, "register capture callback fixture");
-        hotkeys.ProcessButton(0x75, callbackAction, 1, 0);
-        hotkeys.ProcessButton(0x79, menuAction, 1, 0);
-        check(fixture.editor.Begin(), "begin OSF capture");
+        hotkeys.ProcessButton(0, 0x75, callbackAction, 1, 0);
+        hotkeys.ProcessButton(0, 0x79, menuAction, 1, 0);
+        check(fixture.editor.Begin(false), "begin OSF capture");
 
-        check(callbacks == 1 && !hotkeys.ProcessButton(0x75, callbackAction, 1, 0),
+        check(callbacks == 1 && !hotkeys.ProcessButton(0, 0x75, callbackAction, 1, 0),
             "native capture blocks new callback presses after earlier inline delivery");
         check(candidate() == 2, "populated primary requires confirmation for another action's key");
         check(candidate(Slot::kAlternate) == 2, "secondary requires the same confirmation");
@@ -160,7 +160,7 @@ int main()
         check(candidate() == 2, "taking another action's alternate also requires confirmation");
         check(candidate(Slot::kMain, Context::kMainGameplay, Device::kMouse) == 2, "mouse binding conflicts also prompt");
         check(candidate(Slot::kMain, Context::kShipHUD) == 0, "unrelated contexts retain native behavior");
-        check(candidate(Slot::kMain, Context::kMainGameplay, Device::kGamepad) == 0, "controller remapping retains native behavior");
+        check(candidate(Slot::kMain, Context::kMainGameplay, Device::kGamepad) == 1, "PC capture rejects controller candidates");
         for (const auto result : { 1, 2, 3 }) {
             nativeResult = static_cast<std::uint8_t>(result);
             check(candidate() == result, "preserve native rejection or confirmation result");
@@ -179,27 +179,47 @@ int main()
         fixture.editor.End(true);
         check(cancellations == 1 && !NativeBindingEditor::IsActive() && candidate() == 0,
             "cancel delegates once and releases OSF's policy");
-        check(!hotkeys.ProcessButton(0x79, menuAction, 0, 1),
+        check(!hotkeys.ProcessButton(0, 0x79, menuAction, 0, 1),
             "ending capture does not revive the key held before capture began");
-        check(!hotkeys.ProcessButton(0x75, callbackAction, 1, 1) &&
-            !hotkeys.ProcessButton(0x75, callbackAction, 0, 1), "capture cancellation cannot replay held callback input");
+        check(!hotkeys.ProcessButton(0, 0x75, callbackAction, 1, 1) &&
+            !hotkeys.ProcessButton(0, 0x75, callbackAction, 0, 1), "capture cancellation cannot replay held callback input");
         const auto externalBlock = hotkeys.AcquireBlock();
-        check(fixture.editor.Begin() && candidate() == 2, "cancel then retry the same occupied key prompts again");
+        check(fixture.editor.Begin(false) && candidate() == 2, "cancel then retry the same occupied key prompts again");
         fixture.editor.End(false);
         check(cancellations == 1 && candidate() == 0, "completion releases ownership without cancelling");
-        hotkeys.ProcessButton(0x79, menuAction, 1, 0);
-        check(!hotkeys.ProcessButton(0x79, menuAction, 0, 1),
+        hotkeys.ProcessButton(0, 0x79, menuAction, 1, 0);
+        check(!hotkeys.ProcessButton(0, 0x79, menuAction, 0, 1),
             "ending native capture preserves an external consumer's block");
-        check(!hotkeys.ProcessButton(0x75, callbackAction, 1, 0), "external blocks still suppress callbacks after capture ends");
+        check(!hotkeys.ProcessButton(0, 0x75, callbackAction, 1, 0), "external blocks still suppress callbacks after capture ends");
         hotkeys.ReleaseBlock(externalBlock);
-        hotkeys.ProcessButton(0x79, menuAction, 1, 0);
-        check(hotkeys.ProcessButton(0x79, menuAction, 0, 1),
+        hotkeys.ProcessButton(0, 0x79, menuAction, 1, 0);
+        check(hotkeys.ProcessButton(0, 0x79, menuAction, 0, 1),
             "new presses work after native and external owners release");
-        check(hotkeys.ProcessButton(0x75, callbackAction, 1, 0), "fresh callback presses work after all owners release");
+        check(hotkeys.ProcessButton(0, 0x75, callbackAction, 1, 0), "fresh callback presses work after all owners release");
 
         check(callbacks == 2, "capture cleanup restores callback delivery");
         check(owners[0].keyCode == 0x20 && owners[1].keyCode == 0x79,
             "confirmation policy never mutates bindings before the native decision");
+        arrays[2] = { 2, 2, owners.data() };
+        check(fixture.editor.Begin(true), "begin controller capture");
+        check(candidate(Slot::kMain, Context::kMainGameplay, Device::kGamepad) == 2,
+            "occupied controller buttons require native confirmation");
+        check(candidate() == 1 && candidate(Slot::kMain, Context::kMainGameplay, Device::kMouse) == 1,
+            "controller capture cannot commit a PC binding through another native receiver");
+        RE::ButtonEvent wrongDevice;
+        wrongDevice.eventType = RE::InputEvent::EventType::kButton;
+        wrongDevice.deviceType = Device::kKeyboard;
+        wrongDevice.idCode = 0x45;
+        check(fixture.editor.ProcessInput(&wrongDevice) == NativeBindingEditor::InputResult::Handled &&
+            wrongDevice.status == RE::InputEvent::Status::kStop, "wrong-device input never reaches menu navigation");
+        RE::ButtonEvent cancelButton;
+        cancelButton.eventType = RE::InputEvent::EventType::kButton;
+        cancelButton.deviceType = Device::kGamepad;
+        cancelButton.idCode = 0x10;
+        cancelButton.value = 1;
+        check(fixture.editor.ProcessInput(&cancelButton) == NativeBindingEditor::InputResult::Cancelled &&
+            !NativeBindingEditor::IsActive() && !hotkeys.Blocked() && cancelButton.status == RE::InputEvent::Status::kStop,
+            "controller Menu cancels capture and releases its hotkey block");
         std::cout << checks << " native binding editor checks passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

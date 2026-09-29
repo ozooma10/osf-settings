@@ -31,7 +31,10 @@ package
         public var revision:uint = 0;
         public var ready:Boolean = false;
         public var fullPage:Boolean = false;
+        public var gamepad:Boolean = false;
         private var labelEntry:Object;
+
+        public function get hasAlternate():Boolean { return !gamepad && (showAlternate || fullPage); }
 
         public function get bindings():Array { return entries; }
         public function title(entry:Object):String
@@ -76,13 +79,13 @@ package
                 if (row.type != "hotkey") continue;
                 var native:Object = null;
                 for each (var entry:Object in entries) {
-                    if (!entry.bIsDivider && !entry.bGamepadEntry && entry.uContextID == 0 && entry.sInputName == row.action) {
+                    if (!entry.bIsDivider && entry.uContextID == 0 && entry.sInputName == row.action) {
                         native = entry; break;
                     }
                 }
-                row.editable = Boolean(native && !native.bReadOnly && !native.bGamepadEntry);
-                row.value = native ? native.MainBinding.aPCKeyName.join(" + ") : "";
-                row.alternate = native ? native.AltBinding.aPCKeyName.join(" + ") : "";
+                row.editable = Boolean(native && !native.bReadOnly);
+                row.value = native ? KeybindingsData.bindingText(native.MainBinding) : "";
+                row.alternate = native ? KeybindingsData.bindingText(native.AltBinding) : "";
                 if (!native) row.hint = tr("bindings.unavailableAction");
                 if (native) {
                     // Keep the data model's slot/glyph data intact.
@@ -91,7 +94,7 @@ package
                     row.binding = item;
                 } else {
                     row.binding = {sInputName:row.action, uContextID:0, sContextName:"MainGameplay",
-                        bReadOnly:true, bIsDivider:false, bRequired:false, bGamepadEntry:false,
+                        bReadOnly:true, bIsDivider:false, bRequired:false, bGamepadEntry:gamepad,
                         MainBinding:{aButtonName:[], aPCKeyName:[]}, AltBinding:{aButtonName:[], aPCKeyName:[]}};
                 }
             }
@@ -113,23 +116,23 @@ package
             }
             var clip:Object = view.clip;
             if (view.row != row) {
-                if (!view.row || view.row.action != row.action) clip.ClearActiveBinding();
+                if (!view.row || view.row.action != row.action || view.row.binding.bGamepadEntry != row.binding.bGamepadEntry) clip.ClearActiveBinding();
                 clip.SetEntryText(row.binding); view.row = row;
             }
             clip.itemIndex = Object(host).itemIndex;
             if (!busy) {
                 if (selected) {
                     if (!clip.selected) clip.onRollover();
-                    if (clip.activePriority == 2 || !(showAlternate || fullPage)) clip.SetActiveBinding(0);
+                    if (clip.activePriority == 2 || !hasAlternate) clip.SetActiveBinding(0);
                 } else if (clip.selected || clip.activePriority != 2) clip.onRollout();
             }
             // The outer SettingsRow supplies the label, background and row hit area.
             for (var i:int = 0; i < clip.numChildren; ++i) {
                 var child:DisplayObject = clip.getChildAt(i);
-                child.visible = child == clip.MainBinding_mc || (showAlternate || fullPage) && child == clip.AltBinding_mc;
+                child.visible = child == clip.MainBinding_mc || hasAlternate && child == clip.AltBinding_mc;
             }
             var right:Number = MenuStyle.LIST_WIDTH - 24;
-            for each (var cell:Object in showAlternate || fullPage ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
+            for each (var cell:Object in hasAlternate ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
                 CONFIG::preview { bridge.previewBindingCell(cell); }
                 cell.scaleX = cell.scaleY = 1;
                 var bounds:Rectangle = cell.getBounds(clip);
@@ -160,7 +163,7 @@ package
         public function navigate(event:KeyboardEvent):void
         {
             var clip:Object = currentClip;
-            if (!clip || busy || saving || !(showAlternate || fullPage)) return;
+            if (!clip || busy || saving || !hasAlternate) return;
             if (clip.activePriority == 2) clip.SetActiveBinding(0);
             else clip.onKeyDownHandler(event);
         }
@@ -168,10 +171,10 @@ package
         private function begin():Boolean
         {
             if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
-            if (!bridge.beginNativeBinding()) { changed(tr("errors.capture"), false); return false; }
+            if (!bridge.beginNativeBinding(Boolean(list.selectedEntry.row.binding.bGamepadEntry))) { changed(tr("errors.capture"), false); return false; }
             busy = true; seenRemapping = false; cancelled = false;
             list.disableInput = true; list.disableSelection = true;
-            changed(tr("bindings.capture"), false);
+            changed(tr(gamepad ? "bindings.captureGamepad" : "bindings.capture"), false);
             return true;
         }
 
@@ -250,6 +253,7 @@ package
         {
             var data:Object = Object(event).data;
             entries = data.aInputSettingsList as Array || [];
+            for each (var entry:Object in entries) if (!entry.bIsDivider) { gamepad = Boolean(entry.bGamepadEntry); break; }
             ready = true; ++revision;
             showAlternate = Boolean(data.bShowSecondaryBindings);
             if (busy && data.bRemappingControl) seenRemapping = true;

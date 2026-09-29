@@ -85,10 +85,13 @@ namespace OSFSettings
         return !m_blocks.empty();
     }
 
-    bool HotkeyInputState::ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds)
+    bool HotkeyInputState::ProcessButton(std::uint32_t device, std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds)
     {
         constexpr std::uint32_t kUnbound = 0xFF;
-        if (!key || key >= kUnbound) return false;
+        // Keyboard VKs and native gamepad button IDs occupy separate namespaces.
+        if ((device != 0 && device != 2) || !key || key == kUnbound || key == 0xFFFFFFFFu ||
+            (device == 0 && key >= kUnbound)) return false;
+        const auto button = std::pair{ device, key };
 
         std::unique_lock lock(m_mutex);
         if (!m_blocks.empty()) return false;
@@ -120,12 +123,12 @@ namespace OSFSettings
 
         if (value > 0) {
             if (heldSeconds == 0) {
-                m_pressed.insert_or_assign(key, action.event);
+                m_pressed.insert_or_assign(button, action.event);
             }
             return false;
         }
 
-        const auto press = m_pressed.find(key);
+        const auto press = m_pressed.find(button);
         if (press == m_pressed.end()) return false;
         const bool activate = value == 0 && heldSeconds >= 0 && press->second == action.event;
         m_pressed.erase(press);

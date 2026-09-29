@@ -22,6 +22,10 @@ package
         public var source:String = "all";
         public var search:TextField;
         private var keyboard:KeyboardMap;
+        private var controller:GamepadMap;
+        private var gamepad:Boolean;
+        private var primaryLabel:TextField;
+        private var alternateLabel:TextField;
         private var sourceLabel:TextField;
         private var placeholder:TextField;
         private var keyChip:Sprite;
@@ -47,6 +51,8 @@ package
         {
             bridge = code; editor = nativeEditor; changed = notify; leaveSearch = resultsFocus;
             keyboard = new KeyboardMap(selectKey); keyboard.x = MenuStyle.LEFT; keyboard.y = KEYBOARD_TOP; addChild(keyboard);
+            controller = new GamepadMap(selectKey); controller.x = MenuStyle.LEFT; controller.y = KEYBOARD_TOP; addChild(controller);
+            controller.visible = false;
             // Filters share the right column so the results list can start under the keyboard.
             var left:Number = MenuStyle.DETAIL_X, column:Number = MenuStyle.DETAIL_WIDTH, top:Number = LIST_TOP;
             var size:Number = MenuStyle.VALUE_SIZE + 2, line:Number = size + 12, inset:Number = (BOX - line) / 2 + 2;
@@ -69,8 +75,8 @@ package
             notice = field("",left,0,column,150,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
             notice.multiline = true; notice.wordWrap = true;
             // Labels sit over the native binding cells, which are anchored to the row's right edge.
-            field(tr("bindings.primary"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 450,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
-            field(tr("bindings.alternate"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 212,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
+            primaryLabel = field(tr("bindings.primary"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 450,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
+            alternateLabel = field(tr("bindings.alternate"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 212,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
             graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(left,top,column,BOX);
             graphics.drawRect(left,top + BOX + 12,column,BOX);
             visible = false;
@@ -96,6 +102,7 @@ package
         }
         private function request():void
         {
+            if (gamepad != editor.gamepad) { gamepad = editor.gamepad; selectedKey = -1; }
             revision = editor.revision; state = "loading"; rows = [];
             generation = bridge.requestBindings(); requestedAt = getTimer(); nextPoll = 0;
         }
@@ -127,7 +134,7 @@ package
             }
             if (source != "all" && source != "game" && !seen[source]) source = "all";
         }
-        public function filtered():Array { return KeybindingsData.filter(rows,search.text,source,selectedKey); }
+        public function filtered():Array { return KeybindingsData.filter(rows,search.text,source,selectedKey,gamepad); }
         public function get emptyText():String
         {
             return state == "loading" ? tr("bindings.loading") : state == "unavailable" ?
@@ -136,14 +143,18 @@ package
         public function showSelection(row:Object):void
         {
             selection = row;
-            keyboard.update(rows,filtered(),row,selectedKey);
+            keyboard.visible = !gamepad; controller.visible = gamepad;
+            alternateLabel.visible = !gamepad;
+            primaryLabel.x = MenuStyle.LEFT + MenuStyle.LIST_WIDTH - (gamepad ? 212 : 450);
+            if (gamepad) controller.update(rows,row,selectedKey);
+            else keyboard.update(rows,filtered(),row,selectedKey);
             var title:String = tr("bindings.allSources");
             for each (var choice:Object in sources) if (choice.id == source) title = choice.title;
             MenuStyle.fit(sourceLabel,tr("bindings.source", {source:title}));
             placeholder.visible = !search.text && !searching;
             keyChip.visible = selectedKey >= 0;
             if (keyChip.visible) {
-                keyLabel.width = 400; MenuStyle.fit(keyLabel,tr("bindings.keyFilter", {key:KeyboardMap.keyName(selectedKey,0)}));
+                keyLabel.width = 400; MenuStyle.fit(keyLabel,tr("bindings.keyFilter", {key:KeybindingsData.buttonName(selectedKey,gamepad ? 2 : 0)}));
                 keyLabel.width = Math.min(400,keyLabel.textWidth + 8);
                 keyChip.graphics.clear(); keyChip.graphics.lineStyle(2,MenuStyle.WHITE); keyChip.graphics.beginFill(MenuStyle.INK,0);
                 keyChip.graphics.drawRect(MenuStyle.DETAIL_X,LIST_TOP + (BOX + 12) * 2,keyLabel.width + 24,BOX); keyChip.graphics.endFill();

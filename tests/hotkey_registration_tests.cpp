@@ -61,8 +61,8 @@ namespace RE
         std::uint32_t controlMask, std::uint32_t groupMask, bool required)
     {
         formattedRows.push_back({ event, keyboard, mouse == 0xFF && gamepad == 0xFF && keyboardVisible &&
-            !mouseVisible && !gamepadVisible && controlMask == (std::string_view(event).ends_with("/openMenu") ? 0x08u : 0x401u) && groupMask == 0 && !required });
-        return std::format("{}\t{:#x}\t0xff\t0xff\t1\t0\t0\t{:#x}\t0\t0\n", event, keyboard, controlMask);
+            !mouseVisible && gamepadVisible && controlMask == (std::string_view(event).ends_with("/openMenu") ? 0x08u : 0x401u) && groupMask == 0 && !required });
+        return std::format("{}\t{:#x}\t0xff\t0xff\t1\t0\t1\t{:#x}\t0\t0\n", event, keyboard, controlMask);
     }
 }
 
@@ -151,7 +151,7 @@ int main()
             "registration publishes schema validation outcomes, including mods without hotkeys");
         check(input.Register("osfsettings", "unbound", fired, &calls) == SettingsError::None,
             "valid unbound native actions accept callbacks");
-        check(input.ProcessButton(0x75, *callback, 1, 0) && calls == 1,
+        check(input.ProcessButton(0, 0x75, *callback, 1, 0) && calls == 1,
             "production registration invokes the callback inline");
 
 

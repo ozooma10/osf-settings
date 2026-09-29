@@ -246,7 +246,7 @@ int main()
             check(!handler->ShouldHandleEvent(&settings), "disabled mapped actions are rejected");
             settings.disabled = false;
             settings.deviceType = RE::InputEvent::DeviceType::kGamepad;
-            check(!handler->ShouldHandleEvent(&settings), "menu declarations remain keyboard-only");
+            check(handler->ShouldHandleEvent(&settings), "menu declarations accept controller buttons");
             settings.deviceType = RE::InputEvent::DeviceType::kKeyboard;
             settings.eventType = RE::InputEvent::EventType::kChar;
             check(!handler->ShouldHandleEvent(&settings), "text events are not button activations");
@@ -343,9 +343,16 @@ int main()
             check(!handler->ShouldHandleEvent(&callback) && calls == 0, "disabled callback actions are filtered");
             callback.disabled = false;
             callback.deviceType = RE::InputEvent::DeviceType::kGamepad;
+            callback.idCode = 0x1000;
             callbackButton(1, 0);
-            check(!handler->ShouldHandleEvent(&callback) && calls == 0, "callback actions remain keyboard-only");
+            check(handler->ShouldHandleEvent(&callback) && calls == 1 && callback.status == RE::InputEvent::Status::kStop,
+                "controller callback actions fire and consume the original mapped event");
+            callbackButton(1, 1);
+            callbackButton(0, 1);
+            check(calls == 1, "controller held and release events do not replay the callback");
+            calls = 0;
             callback.deviceType = RE::InputEvent::DeviceType::kKeyboard;
+            callback.idCode = 0x75;
             callback.eventType = RE::InputEvent::EventType::kChar;
             callbackButton(1, 0);
             check(!handler->ShouldHandleEvent(&callback) && calls == 0, "text events cannot activate callbacks");
@@ -373,6 +380,14 @@ int main()
             callbackButton(1, 0);
 
             check(calls == 3, "a fresh callback press works after focus restoration");
+            queue = &queueStorage;
+            settings.deviceType = RE::InputEvent::DeviceType::kGamepad;
+            settings.idCode = 0x1000;
+            const auto beforeController = messages.size();
+            button(1, 0);
+            button(0, 0.1F);
+            check(messages.size() == beforeController + 1 && messages.back().first == "OSFSettingsMenu" &&
+                settings.status == RE::InputEvent::Status::kStop, "controller menu action opens through the native queue on release");
         }
         events.clear();
         HotkeyInput::Attach(&controls);

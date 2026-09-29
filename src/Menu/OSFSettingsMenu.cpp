@@ -304,7 +304,8 @@ namespace OSFSettings
             m_capture.EndCapture();
             break;
         case Function::BeginNativeBinding:
-            *params.ret = RE::Scaleform::GFx::Value(m_capture.GetSnapshot().state == KeyCapture::State::Idle && m_bindingEditor.Begin());
+            *params.ret = RE::Scaleform::GFx::Value(params.argCount == 1 && params.args[0].IsBoolean() &&
+                m_capture.GetSnapshot().state == KeyCapture::State::Idle && m_bindingEditor.Begin(params.args[0].GetBoolean()));
             break;
         case Function::EndNativeBinding:
             m_bindingEditor.End(params.argCount > 0 && params.args[0].IsBoolean() && params.args[0].GetBoolean());

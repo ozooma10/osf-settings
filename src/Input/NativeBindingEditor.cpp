@@ -23,8 +23,12 @@ namespace OSFSettings
         std::uint8_t ValidateCandidate(RE::ControlMap* map, const RE::BSFixedString* action, std::uint8_t device, const std::uint32_t* keys, Slot slot, Context context)
         {
             const auto result = (*g_validateHook)(map, action, device, keys, slot, context);
-            // Vanilla permits occupied-key swaps. Only OSF's active PC capture asks for confirmation as well; native rejection and commit rules remain intact.
-            if (result != kAllowed || !NativeBindingEditor::IsActive() || context != Context::kMainGameplay || device > static_cast<std::uint8_t>(Device::kMouse) || keys[0] == kUnbound) {
+            if (NativeBindingEditor::IsActive() &&
+                (device == static_cast<std::uint8_t>(Device::kGamepad)) != NativeBindingEditor::CapturesGamepad()) {
+                return 1; // Native rejection; never commit to a different device family.
+            }
+            // Vanilla permits occupied-button swaps. OSF capture asks for confirmation as well; native rejection and commit rules remain intact.
+            if (result != kAllowed || !NativeBindingEditor::IsActive() || context != Context::kMainGameplay || device > static_cast<std::uint8_t>(Device::kGamepad) || keys[0] == kUnbound) {
                 return result;
             }
             for (const auto& mapping : map->GetMappings(context, static_cast<Device>(device))) {
@@ -49,13 +53,14 @@ namespace OSFSettings
         return true;
     }
 
-    bool NativeBindingEditor::Begin()
+    bool NativeBindingEditor::Begin(bool gamepad)
     {
         std::lock_guard lock(m_mutex);
         if (m_input || !g_validateHook || !g_validateHook->GetEnabled()) return false;
         m_input = RE::SettingsDataModel::GetSingleton();
         if (!m_input) return false;
         m_hotkeyBlock = HotkeyInputState::Get().AcquireBlock();
+        s_gamepad = gamepad;
         s_active = true;
         return true;
     }
@@ -72,6 +77,20 @@ namespace OSFSettings
                 const_cast<RE::InputEvent*>(event)->status = RE::InputEvent::Status::kStop;
                 return InputResult::Cancelled;
             }
+        }
+        if (CapturesGamepad() && event->eventType == RE::InputEvent::EventType::kButton &&
+            event->deviceType == Device::kGamepad && static_cast<const RE::ButtonEvent*>(event)->idCode == 0x10) {
+            lock.unlock();
+            End(true);
+            const_cast<RE::InputEvent*>(event)->status = RE::InputEvent::Status::kStop;
+            return InputResult::Cancelled;
+        }
+        // The row being edited fixes the device family for this transaction.
+        // Swallow other buttons so menu navigation cannot turn a rejected key into Accept/Back.
+        if (event->eventType == RE::InputEvent::EventType::kButton &&
+            (event->deviceType == Device::kGamepad) != CapturesGamepad()) {
+            const_cast<RE::InputEvent*>(event)->status = RE::InputEvent::Status::kStop;
+            return InputResult::Handled;
         }
         // PauseMenu may already have delivered this event to the same native receiver.
         if (m_input->currInputTimeCount != -1 && event->timeCode < static_cast<std::uint32_t>(m_input->currInputTimeCount)) {

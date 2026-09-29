@@ -14,6 +14,10 @@ Add a top-level `hotkeys` object keyed by hotkey ID to your [schema](SETTINGS.md
 
 Players rebind these actions in OSF Settings or vanilla Controls. Starfield saves bindings in `ControlMap_Custom.txt`; they are separate from ordinary settings values. Schema changes require restarting the game.
 
+Hotkeys support keyboard and controller bindings independently. Controller bindings start unbound and invoke the same C++ or Papyrus callback, or open the same declared menu. OSF Settings follows Starfield's active input device: use the controller to display and edit controller bindings, or the keyboard/mouse to display PC bindings. The Keybindings page shows controller buttons and the native button glyphs in controller mode. Capture stays within the device family selected at its start; Menu/Start cancels controller capture, and Escape cancels either mode. Occupied bindings require confirmation before the native remapper can swap them. Controller bindings use the native primary slot.
+
+This applies to registered `hotkeys`. Ordinary `type: "key"` settings retain their existing keyboard VK contract (and optional mouse buttons); they do not store controller IDs. Analog stick movement and custom hold/combo gestures are not added by this integration; controller buttons and trigger button events use the game's native remapper.
+
 - Each object key is a nonempty hotkey ID; `label` is required. IDs use ASCII letters, digits, `_`, or `-` and must be unique within the mod, ignoring case. API calls use exact casing. Do not include an `id` field inside the declaration.
 - Hotkeys appear in authored order within their group. Omit `hotkeys` or use `{}` when there are none.
 - Omit `default` to start unbound. Defaults are keyboard key names, matched without case sensitivity.

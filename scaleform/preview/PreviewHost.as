@@ -186,7 +186,7 @@ package
                 requestBindings:function():uint { return ++nativeBindings.generation; },
                 pollBindings:nativeBindings.snapshot,
                 textInput:function(enabled:Boolean):Boolean { return true; },
-                beginNativeBinding:function():Boolean { return false; },
+                beginNativeBinding:function(gamepad:Boolean):Boolean { return false; },
                 endNativeBinding:function(cancel:Boolean):void {}};
             addChild(menu as MovieClip);
             menu.onCodeObjCreate();
