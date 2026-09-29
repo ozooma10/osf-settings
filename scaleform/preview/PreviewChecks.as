@@ -222,6 +222,11 @@ package
                     require(list.selectedEntry.row.action == "Jump","binding results start at the first native action");
                     require(!findNamed(menu,"clearBindingFilters").visible && !findNamed(menu,"bindingKeyFilter").visible,"filter controls stay hidden without a filter");
                     capture("keybindings");
+                    var firstSearch:TextField = searchField();
+                    menu.stage.focus = firstSearch;
+                    firstSearch.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN,true));
+                    require(menu.stage.focus == firstSearch,"first search click retains input focus when leaving the sidebar");
+                    firstSearch.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_UP,true,true,0,Keyboard.ENTER));
                     findNamed(menu,"key_77").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 36:
                     require(list.entryCount == 3,"key filter includes plain and chord bindings");

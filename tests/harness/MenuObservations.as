@@ -115,6 +115,7 @@ private function reportTestState():void
         conflictText:nativeHotkeys.popup.active ? String(nativeHotkeys.popup.ControlInfo_mc.Label_mc.Text_tf.text) : "",
         refreshing:refreshing || requestedRefresh, startupPhase:startupPhase,
         mod:modID, group:groupID, rootPage:rootPage, issueCount:issues.length,
+        navigation:{focused:nav.focused},
         home:{interfacesVisible:launcher.visible, expanded:launcher.expanded, interfacesFocused:launcher.focused},
         actionConfirmation:{active:confirmingAction()},
         bindings:{state:keybindings.state, count:keybindings.rows.length, requiredActions:requiredActions, selectedKey:keybindings.selectedKey,

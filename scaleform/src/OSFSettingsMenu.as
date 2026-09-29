@@ -1059,6 +1059,9 @@ package
                 // Pressing anywhere on the page moves focus there; the footer buttons act on either.
                 if (nav.contains(target)) { focusNav(true); return; }
                 if (nav.focused && !MovieClip(bar).contains(target)) focusNav(false);
+                // GFx can focus the input before this bubbling mouse-down arrives.
+                // Entering the page must not replace that focus with the results list.
+                if (bindingsPage() && target == keybindings.search) { menuStage.focus = keybindings.search; return; }
             }
             if (homePage() && target && launcher.contains(target)) { focusLauncher(true); return; }
             if (!target || !MovieClip(options).contains(target)) return;
