@@ -31,7 +31,9 @@ namespace OSFSettings
     LauncherError LauncherService::Register(LaunchDestination destination)
     {
         if (!IsValidModId(destination.mod) || destination.mod.size() > 128 || !ValidID(destination.id) || destination.title.empty() || !IsValidString(destination.title, 256) || !IsValidString(destination.modTitle, 256) ||
-            !IsValidString(destination.description, 4096) || !IsValidString(destination.reason, 4096) || (destination.menu.empty() == !destination.open) || !IsValidString(destination.menu, 256) || destination.menu == "OSFSettingsMenu") {
+            !IsValidString(destination.description, 4096) || !IsValidString(destination.reason, 4096) ||
+            (int(!destination.menu.empty()) + int(bool(destination.open)) != 1) ||
+            !IsValidString(destination.menu, 256) || destination.menu == "OSFSettingsMenu") {
                 return LauncherError::InvalidArgument;
         }
         if (destination.modTitle.empty()) {
@@ -58,29 +60,30 @@ namespace OSFSettings
         }
         return LauncherError::NotFound;
     }
-    LauncherError LauncherService::SetPrepare(std::string_view mod, std::string_view id, std::function<void(const std::string&, const std::string&)> prepare)
+    std::uint64_t LauncherService::BeginOpen(std::string_view mod, std::string_view id)
     {
         std::lock_guard lock(m_mutex);
-        for (auto& entry : m_destinations) {
-            if (entry.mod != mod || entry.id != id) continue;
-            if (!entry.open) return LauncherError::InvalidArgument; // native menus open synchronously
-            entry.prepare = std::move(prepare);
-            return LauncherError::None;
-        }
-        return LauncherError::NotFound;
+        const auto entry = std::ranges::find_if(m_destinations, [&](const auto& value) { return value.mod == mod && value.id == id; });
+        if (entry == m_destinations.end() || !entry->available || !entry->open) return 0;
+        m_opening = Opening{ ++m_nextRequestId, entry->mod, entry->id };
+        return m_opening->requestId;
     }
-    LauncherError LauncherService::ReportPrepared(std::string_view mod, std::string_view id, bool ready, std::string reason)
+    LauncherError LauncherService::ReportOpened(std::uint64_t requestId, bool opened, std::string reason)
     {
-        if (!IsValidString(reason, 4096)) return LauncherError::InvalidArgument;
+        if (!requestId || !IsValidString(reason, 4096)) return LauncherError::InvalidArgument;
         std::lock_guard lock(m_mutex);
-        if (std::ranges::none_of(m_destinations, [&](const auto& entry) { return entry.mod == mod && entry.id == id; })) return LauncherError::NotFound;
-        m_report = PreparedReport{ std::string(mod), std::string(id), ready, std::move(reason) };
+        if (!m_opening || m_opening->requestId != requestId || m_opening->completed) return LauncherError::None;
+        m_opening->completed = true;
+        m_opening->report = OpenedReport{ opened, std::move(reason) };
+        // The provider can finish after Settings has left the stack.
+        if (opened) RecordOpenedLocked(m_opening->mod, m_opening->id);
         return LauncherError::None;
     }
-    std::optional<PreparedReport> LauncherService::TakeReport()
+    std::optional<OpenedReport> LauncherService::TakeReport(std::uint64_t requestId)
     {
         std::lock_guard lock(m_mutex);
-        return std::exchange(m_report, std::nullopt);
+        if (!m_opening || m_opening->requestId != requestId) return std::nullopt;
+        return std::exchange(m_opening->report, std::nullopt);
     }
     void LauncherService::LoadHistory(const std::filesystem::path& directory)
     {
@@ -133,6 +136,11 @@ namespace OSFSettings
     bool LauncherService::RecordOpened(std::string_view mod, std::string_view id)
     {
         std::lock_guard lock(m_mutex);
+        return RecordOpenedLocked(mod, id);
+    }
+
+    bool LauncherService::RecordOpenedLocked(std::string_view mod, std::string_view id)
+    {
         const auto entry = std::ranges::find_if(m_destinations, [&](const auto& value) { return value.mod == mod && value.id == id; });
         if (entry == m_destinations.end() || !entry->available) return false;
         const auto identity = std::pair{ std::string(mod), std::string(id) };

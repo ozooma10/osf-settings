@@ -24,10 +24,10 @@ namespace OSFSettings::API::Launcher
             Status Register(const Destination& value) noexcept override
             {
                 if (!value.modId || !value.id || !value.title) return Status::InvalidArgument;
-                LaunchDestination entry{ value.modId, value.id, value.modTitle ? value.modTitle : "", value.title, value.description ? value.description : "", value.menu ? value.menu : "", {}, {} };
+                LaunchDestination entry{ value.modId, value.id, value.modTitle ? value.modTitle : "", value.title, value.description ? value.description : "", value.menu ? value.menu : "", {} };
                 if (value.open) {
-                    entry.open = [fn = value.open, context = value.context](const auto& mod, const auto& id) {
-                        fn(mod.c_str(), id.c_str(), context);
+                    entry.open = [fn = value.open, context = value.context](const auto& mod, const auto& id, std::uint64_t requestId) {
+                        fn(mod.c_str(), id.c_str(), requestId, context);
                     };
                 }
                 return Convert(LauncherService::Get().Register(std::move(entry)));
@@ -37,19 +37,9 @@ namespace OSFSettings::API::Launcher
                 if (!mod || !id) return Status::InvalidArgument;
                 return Convert(LauncherService::Get().SetAvailable(mod, id, available, reason ? reason : ""));
             }
-            Status SetPrepare(const char* mod, const char* id, PrepareFn prepare, void* context) noexcept override
+            Status ReportOpened(std::uint64_t requestId, bool opened, const char* reason) noexcept override
             {
-                if (!mod || !id) return Status::InvalidArgument;
-                std::function<void(const std::string&, const std::string&)> step;
-                if (prepare) {
-                    step = [prepare, context](const auto& mod, const auto& id) { prepare(mod.c_str(), id.c_str(), context); };
-                }
-                return Convert(LauncherService::Get().SetPrepare(mod, id, std::move(step)));
-            }
-            Status ReportPrepared(const char* mod, const char* id, bool ready, const char* reason) noexcept override
-            {
-                if (!mod || !id) return Status::InvalidArgument;
-                return Convert(LauncherService::Get().ReportPrepared(mod, id, ready, reason ? reason : ""));
+                return Convert(LauncherService::Get().ReportOpened(requestId, opened, reason ? reason : ""));
             }
         };
     }

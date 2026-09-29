@@ -90,11 +90,14 @@ namespace OSFSettings::TestHarness
             } catch (...) {}
         }
 
-        void OnLauncher(const char*, const char* id, void*) noexcept
+        void OnLauncher(const char*, const char* id, std::uint64_t requestId, void*) noexcept
         {
-            // Snapshot is a cached observation; no engine access on provider callbacks.
-            // The menu event is recorded independently to prove removal precedes handoff.
-            try { Record("launcher", "callback", id, "", true); } catch (...) {}
+            // This fixture completes immediately; Settings removes itself after the report.
+            try {
+                Record("launcher", "callback", id, "", true);
+                API::Launcher::Client launcher;
+                if (launcher.Init()) launcher.ReportOpened(requestId, true);
+            } catch (...) {}
         }
 
         Json Execute(const Json& args)

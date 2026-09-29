@@ -28,7 +28,7 @@ int main()
         check(service.Register(invalid) == LauncherError::InvalidArgument, "target required");
         invalid.menu = "OSFSettingsMenu";
         check(service.Register(invalid) == LauncherError::InvalidArgument, "recursive hub target rejected");
-        invalid.menu = "DemoMenu"; invalid.open = [](const auto&, const auto&) {};
+        invalid.menu = "DemoMenu"; invalid.open = [](const auto&, const auto&, std::uint64_t) {};
         check(service.Register(invalid) == LauncherError::InvalidArgument, "ambiguous target rejected");
         invalid = native; invalid.id = "bad"; invalid.title = std::string("a\0b", 3);
         check(service.Register(invalid) == LauncherError::InvalidArgument, "invalid display strings rejected");
@@ -118,38 +118,72 @@ int main()
         title = "changed";
         check(LauncherService::Get().Find("api", "menu")->title == "API menu", "SDK metadata copied at registration");
         check(api->SetAvailable("api", "menu", false, "Disabled") == API::Status::Ok, "SDK changes availability");
-        struct Context { API::ILauncher* api; bool called{}; API::Status result{}; } context{ api };
+        struct Context { API::ILauncher* api; bool called{}; std::uint64_t request{}; API::Status result{}; } context{ api };
         check(api->Register({ .modId = "api", .id = "web/view", .title = "View",
-            .open = [](const char* mod, const char* id, void* state) noexcept {
+            .open = [](const char* mod, const char* id, std::uint64_t request, void* state) noexcept {
                 auto& target = *static_cast<Context*>(state);
                 target.called = std::string_view(mod) == "api" && std::string_view(id) == "web/view";
+                target.request = request;
                 target.result = target.api->SetAvailable(mod, id, false, "Opening");
             }, .context = &context }) == API::Status::Ok, "SDK callback registration");
-        const auto callback = LauncherService::Get().Find("api", "web/view");
-        callback->open(callback->mod, callback->id);
-        check(context.called && context.result == API::Status::Ok, "copied callback forwards identity/context without registry lock");
-        check(!LauncherService::Get().Find("api", "web/view")->available, "provider can update its own availability");
-
-        // Loading step: prepare runs while Settings stays open; reports wait in a mailbox for the menu's poll.
         auto& live = LauncherService::Get();
-        check(api->SetPrepare("api", "menu", [](const char*, const char*, void*) noexcept {}, nullptr) == API::Status::InvalidArgument, "native menus cannot prepare");
-        check(api->SetPrepare("api", "missing", nullptr, nullptr) == API::Status::NotFound, "unknown prepare target rejected");
-        int prepared = 0;
-        check(api->SetPrepare("api", "web/view", [](const char* mod, const char* id, void* state) noexcept {
-            if (std::string_view(mod) == "api" && std::string_view(id) == "web/view") ++*static_cast<int*>(state);
-        }, &prepared) == API::Status::Ok, "SDK prepare registration");
-        const auto destination = live.Find("api", "web/view");
-        destination->prepare(destination->mod, destination->id);
-        check(prepared == 1, "copied prepare forwards identity/context");
-        check(!live.TakeReport(), "mailbox starts empty");
-        check(api->ReportPrepared("api", "missing", true, "") == API::Status::NotFound && !live.TakeReport(), "report for an unknown destination rejected");
-        check(api->ReportPrepared("api", "web/view", true, "") == API::Status::Ok &&
-            api->ReportPrepared("api", "web/view", false, "Page failed") == API::Status::Ok, "provider reports");
-        const auto report = live.TakeReport();
-        check(report && report->mod == "api" && report->id == "web/view" && !report->ready && report->reason == "Page failed", "latest report kept with its reason");
-        check(!live.TakeReport(), "taking a report empties the mailbox");
-        check(api->ReportPrepared("api", "web/view", true, std::string(4097, 'x').c_str()) == API::Status::InvalidArgument && !live.TakeReport(), "oversized reason rejected");
-        check(api->SetPrepare("api", "web/view", nullptr, nullptr) == API::Status::Ok && !live.Find("api", "web/view")->prepare, "null prepare removes the loading step");
+        const auto callback = live.Find("api", "web/view");
+        const auto deferred = live.BeginOpen(callback->mod, callback->id);
+        check(deferred != 0, "callback gets a request before it starts");
+        callback->open(callback->mod, callback->id, deferred);
+        check(context.called && context.request == deferred && context.result == API::Status::Ok, "copied callback forwards identity/request/context without registry lock");
+        check(!live.Find("api", "web/view")->available, "provider can update its own availability");
+        check(!live.TakeReport(deferred) && live.Find("api", "web/view")->recentOrder == 0, "returning from open does not complete the request or record history");
+        check(api->ReportOpened(deferred, false, "Deferred failure") == API::Status::Ok, "provider can report after its callback returns");
+        const auto deferredResult = live.TakeReport(deferred);
+        check(deferredResult && !deferredResult->opened && deferredResult->reason == "Deferred failure", "explicit report completes deferred callback");
+
+        // One asynchronous open, followed by an identified terminal result. The
+        // callback may report immediately without running under the registry lock.
+        struct AsyncContext { API::ILauncher* api; unsigned calls{}; std::uint64_t request{}; bool identity{}; API::Status result{}; } async{api};
+        API::Destination asyncDestination{ .modId = "api", .id = "async/view", .title = "Async view",
+            .open = [](const char* mod, const char* id, std::uint64_t request, void* state) noexcept {
+                auto& value = *static_cast<AsyncContext*>(state);
+                ++value.calls;
+                value.request = request;
+                value.identity = std::string_view(mod) == "api" && std::string_view(id) == "async/view";
+                value.result = value.api->ReportOpened(request, true, "");
+            }, .context = &async };
+        auto ambiguous = asyncDestination;
+        ambiguous.menu = "ApiMenu";
+        check(api->Register(ambiguous) == API::Status::InvalidArgument, "native and async targets are mutually exclusive");
+        check(api->Register(asyncDestination) == API::Status::Ok, "SDK asynchronous registration");
+        check(!live.BeginOpen("api", "menu") && !live.BeginOpen("api", "web/view") && !live.BeginOpen("api", "missing"), "only available asynchronous destinations start waits");
+        check(api->ReportOpened(0, true, "") == API::Status::InvalidArgument, "zero is not a request ID");
+        check(api->ReportOpened(999, true, "") == API::Status::Ok && !live.TakeReport(999), "unknown results cannot create a wait");
+        const auto first = live.BeginOpen("api", "async/view");
+        check(first && !live.TakeReport(first), "wait exists before invoking provider");
+        const auto destination = live.Find("api", "async/view");
+        destination->open(destination->mod, destination->id, first);
+        check(async.calls == 1 && async.identity && async.request == first && async.result == API::Status::Ok, "copied async callback forwards identity/request/context and can report synchronously");
+        check(std::ranges::any_of(live.Snapshot(), [](const auto& value) { return value.id == "async/view" && value.recentOrder > 0; }), "success records history without a waiting menu polling");
+        const auto successRevision = live.Revision();
+        check(api->ReportOpened(first, false, "Late failure") == API::Status::Ok, "duplicate result ignored");
+        const auto success = live.TakeReport(first);
+        check(success && success->opened && success->reason.empty(), "first terminal result wins");
+        check(!live.TakeReport(first) && async.calls == 1, "consuming success neither reopens nor repeats result");
+        api->ReportOpened(first, true, "");
+        check(!live.TakeReport(first) && live.Revision() == successRevision, "consumed completion remains terminal");
+        const auto second = live.BeginOpen("api", "async/view");
+        check(second > first, "same destination gets a fresh request ID");
+        api->ReportOpened(first, true, "");
+        check(!live.TakeReport(second), "stale success cannot complete a reopened menu's request");
+        check(api->ReportOpened(second, false, std::string(4097, 'x').c_str()) == API::Status::InvalidArgument && !live.TakeReport(second), "oversized reason leaves request pending");
+        check(api->ReportOpened(second, false, "Page failed") == API::Status::Ok, "provider reports failure");
+        check(!live.TakeReport(first), "an older menu cannot consume another request's result");
+        const auto failure = live.TakeReport(second);
+        check(failure && !failure->opened && failure->reason == "Page failed" && live.Revision() == successRevision, "failure keeps its reason without recording an opening");
+        const auto abandoned = live.BeginOpen("api", "async/view");
+        const auto replacement = live.BeginOpen("api", "async/view");
+        api->ReportOpened(abandoned, true, "");
+        check(!live.TakeReport(replacement), "superseded pending request cannot complete replacement");
+        api->SetAvailable("api", "async/view", false, "Disabled");
+        check(!live.BeginOpen("api", "async/view"), "unavailable asynchronous destination is rejected");
         std::cout << checks << " launcher checks passed\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

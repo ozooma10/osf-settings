@@ -16,17 +16,14 @@ namespace OSFSettings
     struct LaunchDestination
     {
         std::string mod, id, modTitle, title, description, menu;
-        std::function<void(const std::string&, const std::string&)> open;
-        // Optional loading step: Settings stays open until the provider reports ready.
-        std::function<void(const std::string&, const std::string&)> prepare;
+        std::function<void(const std::string&, const std::string&, std::uint64_t)> open;
         bool available{ true };
         std::string reason;
         std::uint32_t recentOrder{}; // Zero means never opened; larger values are more recent.
     };
-    struct PreparedReport
+    struct OpenedReport
     {
-        std::string mod, id;
-        bool ready{};
+        bool opened{};
         std::string reason;
     };
     class LauncherService
@@ -38,21 +35,31 @@ namespace OSFSettings
         bool RecordOpened(std::string_view mod, std::string_view id);
         LauncherError Register(LaunchDestination destination);
         LauncherError SetAvailable(std::string_view mod, std::string_view id, bool available, std::string reason);
-        LauncherError SetPrepare(std::string_view mod, std::string_view id, std::function<void(const std::string&, const std::string&)> prepare);
-        // One-slot mailbox: providers report from any thread; the open menu takes the latest on its poll.
-        LauncherError ReportPrepared(std::string_view mod, std::string_view id, bool ready, std::string reason);
-        std::optional<PreparedReport> TakeReport();
+        // Creates the wait before invoking the copied callback, outside the registry lock.
+        // Zero rejects a missing, unavailable, or native-menu destination.
+        std::uint64_t BeginOpen(std::string_view mod, std::string_view id);
+        LauncherError ReportOpened(std::uint64_t requestId, bool opened, std::string reason);
+        std::optional<OpenedReport> TakeReport(std::uint64_t requestId);
         std::vector<LaunchDestination> Snapshot() const;
         std::optional<LaunchDestination> Find(std::string_view mod, std::string_view id) const;
         std::uint64_t Revision() const { return m_revision.load(); }
     private:
         mutable std::mutex m_mutex;
         std::vector<LaunchDestination> m_destinations;
-        std::optional<PreparedReport> m_report;
+        struct Opening
+        {
+            std::uint64_t requestId{};
+            std::string mod, id;
+            bool completed{};
+            std::optional<OpenedReport> report;
+        };
+        std::optional<Opening> m_opening;
+        std::uint64_t m_nextRequestId{};
         std::filesystem::path m_dataPath;
         bool m_historyDirty{};
         std::vector<std::pair<std::string, std::string>> m_recent;
         void SaveHistory(); // Called with m_mutex held; writes cannot overtake one another.
+        bool RecordOpenedLocked(std::string_view mod, std::string_view id);
         std::atomic_uint64_t m_revision{};
     };
 }

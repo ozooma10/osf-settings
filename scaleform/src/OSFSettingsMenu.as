@@ -937,12 +937,6 @@ package
             launcher.loading = null;
             launcher.mouseEnabled = launcher.mouseChildren = launcher.visible;
         }
-        private function cancelLaunch():void
-        {
-            BGSCodeObj.cancelLaunch();
-            endLaunch();
-            MenuStyle.setText(status, ""); status.textColor = MenuStyle.MUTED;
-        }
         private function launcherAccept(pressed:Boolean):void
         {
             if (pressed) launcherAcceptHeld = true;
@@ -959,7 +953,9 @@ package
             if (nativeHotkeys.saving) return;
             if (captureRow) { finishBinding(true); return; }
             if (frame <= searchExitFrame + 1) return;
-            if (launching) { cancelLaunch(); return; } // Back stops the loading destination; Settings stays open.
+            if (launching) { // Leave both Settings and Pause; the provider keeps opening.
+                closing = true; options.disableInput = true; BGSCodeObj.close(); return;
+            }
             if (closing || dragging() || requestedRefresh) return;
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             // Back leaves the page for the sidebar; from the sidebar it closes the menu.
