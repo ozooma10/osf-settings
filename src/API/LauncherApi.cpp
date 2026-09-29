@@ -37,9 +37,15 @@ namespace OSFSettings::API::Launcher
                 if (!mod || !id) return Status::InvalidArgument;
                 return Convert(LauncherService::Get().SetAvailable(mod, id, available, reason ? reason : ""));
             }
-            Status ReportOpened(std::uint64_t requestId, bool opened, const char* reason) noexcept override
+            Status Complete(std::uint64_t requestId, OpenFn afterClose, void* context, const char* reason) noexcept override
             {
-                return Convert(LauncherService::Get().ReportOpened(requestId, opened, reason ? reason : ""));
+                LaunchCallback callback;
+                if (afterClose) {
+                    callback = [afterClose, context](const auto& mod, const auto& id, std::uint64_t request) {
+                        afterClose(mod.c_str(), id.c_str(), request, context);
+                    };
+                }
+                return Convert(LauncherService::Get().Complete(requestId, std::move(callback), reason ? reason : ""));
             }
         };
     }

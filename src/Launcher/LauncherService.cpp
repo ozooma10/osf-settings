@@ -64,26 +64,29 @@ namespace OSFSettings
     {
         std::lock_guard lock(m_mutex);
         const auto entry = std::ranges::find_if(m_destinations, [&](const auto& value) { return value.mod == mod && value.id == id; });
-        if (entry == m_destinations.end() || !entry->available || !entry->open) return 0;
-        m_opening = Opening{ ++m_nextRequestId, entry->mod, entry->id };
-        return m_opening->requestId;
+        if (entry == m_destinations.end() || !entry->available || !entry->open || m_request) return 0;
+        m_request = Request{ ++m_nextRequestId };
+        return m_request->requestId;
     }
-    LauncherError LauncherService::ReportOpened(std::uint64_t requestId, bool opened, std::string reason)
+    LauncherError LauncherService::Complete(std::uint64_t requestId, LaunchCallback afterClose, std::string reason)
     {
         if (!requestId || !IsValidString(reason, 4096)) return LauncherError::InvalidArgument;
         std::lock_guard lock(m_mutex);
-        if (!m_opening || m_opening->requestId != requestId || m_opening->completed) return LauncherError::None;
-        m_opening->completed = true;
-        m_opening->report = OpenedReport{ opened, std::move(reason) };
-        // The provider can finish after Settings has left the stack.
-        if (opened) RecordOpenedLocked(m_opening->mod, m_opening->id);
+        if (!m_request || m_request->requestId != requestId || m_request->completed) return LauncherError::NotFound;
+        m_request->completed = true;
+        m_request->result = LaunchResult{ std::move(afterClose), std::move(reason) };
         return LauncherError::None;
     }
-    std::optional<OpenedReport> LauncherService::TakeReport(std::uint64_t requestId)
+    std::optional<LaunchResult> LauncherService::TakeResult(std::uint64_t requestId)
     {
         std::lock_guard lock(m_mutex);
-        if (!m_opening || m_opening->requestId != requestId) return std::nullopt;
-        return std::exchange(m_opening->report, std::nullopt);
+        if (!m_request || m_request->requestId != requestId) return std::nullopt;
+        return std::exchange(m_request->result, std::nullopt);
+    }
+    void LauncherService::EndOpen(std::uint64_t requestId)
+    {
+        std::lock_guard lock(m_mutex);
+        if (m_request && m_request->requestId == requestId) m_request.reset();
     }
     void LauncherService::LoadHistory(const std::filesystem::path& directory)
     {

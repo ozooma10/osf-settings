@@ -22,7 +22,7 @@ namespace OSFSettings
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
             RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch };
-        // How long a card stays LOADING before Settings releases it without a provider report.
+        // Bound the loading card's wait; expiry invalidates the request.
         constexpr auto kOpenTimeout = std::chrono::seconds(30);
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
@@ -139,19 +139,21 @@ namespace OSFSettings
             // 0 = rejected, 1 = closing (handoff queued), 2 = loading (pollLaunch reports the outcome).
             double result = 0;
             auto* ui = RE::UI::GetSingleton();
-            if (!m_launch && !m_waiting && ui && params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString()) {
+            if (!m_launch && ui && params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString()) {
                 auto destination = LauncherService::Get().Find(ArgString(params, 0), ArgString(params, 1));
                 if (destination && destination->available && (destination->open || ui->IsMenuRegistered(RE::BSFixedString(destination->menu.c_str())))) {
                     if (destination->open) {
-                        m_waiting = LauncherService::Get().BeginOpen(destination->mod, destination->id);
-                        if (m_waiting) {
-                            m_waitDeadline = std::chrono::steady_clock::now() + kOpenTimeout;
-                            REX::INFO("LaunchTrace: asynchronous open requested request={} view='{}/{}'", m_waiting, destination->mod, destination->id);
-                            destination->open(destination->mod, destination->id, m_waiting);
+                        const auto request = LauncherService::Get().BeginOpen(destination->mod, destination->id);
+                        if (request) {
+                            m_launch = PendingLaunch{ std::move(*destination), request, std::chrono::steady_clock::now() + kOpenTimeout };
+                            const auto& target = m_launch->destination;
+                            REX::INFO("LaunchTrace: open requested request={} view='{}/{}'", request, target.mod, target.id);
+                            target.open(target.mod, target.id, request);
                             result = 2;
                         }
                     } else {
-                        CommitLaunch(std::move(*destination));
+                        m_launch = PendingLaunch{ std::move(*destination) };
+                        CommitLaunch();
                         result = 1;
                     }
                 }
@@ -161,21 +163,23 @@ namespace OSFSettings
         }
         case Function::PollLaunch: {
             root->CreateObject(params.ret);
-            std::string state = m_waiting ? "pending" : "idle", message;
-            const auto report = LauncherService::Get().TakeReport(m_waiting);
+            const bool waiting = m_launch && !m_launch->closing;
+            std::string state = waiting ? "pending" : m_launch ? "closing" : "idle", message;
+            auto report = waiting ? LauncherService::Get().TakeResult(m_launch->requestId) : std::nullopt;
             if (report) {
-                REX::INFO("LaunchTrace: open result request={} opened={} reason='{}'", m_waiting, report->opened, report->reason);
-                m_waiting = 0;
-                if (report->opened) {
-                    CloseWithPause();
+                REX::INFO("LaunchTrace: open result request={} ready={} reason='{}'", m_launch->requestId, bool(report->afterClose), report->reason);
+                if (report->afterClose) {
+                    m_launch->afterClose = std::move(report->afterClose);
+                    CommitLaunch();
                     state = "closing";
                 } else {
                     state = "failed";
                     message = report->reason;
+                    AbandonLaunch();
                 }
-            } else if (m_waiting && std::chrono::steady_clock::now() >= m_waitDeadline) {
-                REX::INFO("LaunchTrace: Settings stopped waiting for open request={}", m_waiting);
-                m_waiting = 0;
+            } else if (waiting && std::chrono::steady_clock::now() >= m_launch->deadline) {
+                REX::INFO("LaunchTrace: open timed out request={}", m_launch->requestId);
+                AbandonLaunch();
                 state = "failed";
             }
             Text(*params.ret, "state", state);
@@ -551,24 +555,30 @@ namespace OSFSettings
 
     void OSFSettingsMenu::OnRemovedFromMenuStack()
     {
-        REX::INFO("LaunchTrace: Settings removed from menu stack (request={}, handoff={})", m_waiting, m_launch.has_value());
+        REX::INFO("LaunchTrace: Settings removed from menu stack (request={}, handoff={})", m_launch ? m_launch->requestId : 0, m_launch && m_launch->closing);
         ++*m_textRequests;
         m_textInputActive = false;
         m_bindings->Invalidate();
         m_bindingEditor.End(true);
         m_capture.ResetForMenuClose();
-        m_waiting = 0;
-        auto destination = std::exchange(m_launch, std::nullopt);
         RE::GameMenuBase::OnRemovedFromMenuStack();
         auto* ui = RE::UI::GetSingleton();
-        if (!destination) return;
-        if (!ui || ui->IsMenuOpen("MainMenu") || ui->IsMenuOpen("LoadingMenu")) {
-            REX::INFO("LaunchTrace: handoff interrupted for '{}/{}'", destination->mod, destination->id);
+        if (!m_launch) return;
+        if (!m_launch->closing || !ui || ui->IsMenuOpen("MainMenu") || ui->IsMenuOpen("LoadingMenu")) {
+            AbandonLaunch();
             return;
         }
-        if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
-            queue->AddMessage(RE::BSFixedString(destination->menu.c_str()), RE::UI_MESSAGE_TYPE::kShow);
-            LauncherService::Get().RecordOpened(destination->mod, destination->id);
+        auto launch = std::exchange(m_launch, std::nullopt);
+        LauncherService::Get().EndOpen(launch->requestId);
+        const auto& destination = launch->destination;
+        if (launch->afterClose) {
+            // Queue only: the provider consumes this after the native message pump,
+            // including CursorMenu hides produced by Settings/Pause removal.
+            launch->afterClose(destination.mod, destination.id, launch->requestId);
+            LauncherService::Get().RecordOpened(destination.mod, destination.id);
+        } else if (auto* queue = RE::UIMessageQueue::GetSingleton()) {
+            queue->AddMessage(RE::BSFixedString(destination.menu.c_str()), RE::UI_MESSAGE_TYPE::kShow);
+            LauncherService::Get().RecordOpened(destination.mod, destination.id);
         }
     }
 
@@ -601,9 +611,8 @@ namespace OSFSettings
 
     void OSFSettingsMenu::Close()
     {
-        if (m_waiting) {
-            REX::INFO("LaunchTrace: leaving Settings while request={} continues opening", m_waiting);
-            m_waiting = 0;
+        if (m_launch && !m_launch->closing) {
+            AbandonLaunch();
             CloseWithPause();
             return;
         }
@@ -612,9 +621,18 @@ namespace OSFSettings
         }
     }
 
-    void OSFSettingsMenu::CommitLaunch(LaunchDestination destination)
+    void OSFSettingsMenu::AbandonLaunch()
     {
-        m_launch = std::move(destination);
+        auto launch = std::exchange(m_launch, std::nullopt);
+        if (!launch || !launch->requestId) return;
+        LauncherService::Get().EndOpen(launch->requestId);
+        const auto& target = launch->destination;
+        REX::INFO("LaunchTrace: open abandoned request={} view='{}/{}'", launch->requestId, target.mod, target.id);
+    }
+
+    void OSFSettingsMenu::CommitLaunch()
+    {
+        m_launch->closing = true;
         CloseWithPause();
     }
 

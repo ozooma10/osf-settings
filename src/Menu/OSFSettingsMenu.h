@@ -38,14 +38,19 @@ namespace OSFSettings
         void Close();
         bool RequestTextInput(bool enabled);
         void OnStartupFailed(std::string_view message);
-        // Native menu handoff: commit closes Pause and Settings; the destination opens once Settings has left the stack.
-        void CommitLaunch(LaunchDestination destination);
+        void CommitLaunch(); // Close Pause/Settings; dispatch afterClose from removal.
+        void AbandonLaunch();
         void CloseWithPause();
         static RE::Scaleform::Ptr<RE::IMenu> Create();
-        std::optional<LaunchDestination> m_launch;
-        // This menu instance observes only the request it started. Leaving does not cancel it.
-        std::uint64_t m_waiting{};
-        std::chrono::steady_clock::time_point m_waitDeadline;
+        struct PendingLaunch
+        {
+            LaunchDestination destination;
+            std::uint64_t requestId{};
+            std::chrono::steady_clock::time_point deadline;
+            bool closing{};
+            LaunchCallback afterClose;
+        };
+        std::optional<PendingLaunch> m_launch;
         KeyCapture m_capture;
         NativeBindingEditor m_bindingEditor;
         std::shared_ptr<BindingSnapshot> m_bindings = std::make_shared<BindingSnapshot>();

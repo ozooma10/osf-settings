@@ -13,17 +13,18 @@ namespace OSFSettings
 {
     struct ModSettings;
     enum class LauncherError { None, InvalidArgument, AlreadyRegistered, NotFound };
+    using LaunchCallback = std::function<void(const std::string&, const std::string&, std::uint64_t)>;
     struct LaunchDestination
     {
         std::string mod, id, modTitle, title, description, menu;
-        std::function<void(const std::string&, const std::string&, std::uint64_t)> open;
+        LaunchCallback open;
         bool available{ true };
         std::string reason;
         std::uint32_t recentOrder{}; // Zero means never opened; larger values are more recent.
     };
-    struct OpenedReport
+    struct LaunchResult
     {
-        bool opened{};
+        LaunchCallback afterClose;
         std::string reason;
     };
     class LauncherService
@@ -38,22 +39,22 @@ namespace OSFSettings
         // Creates the wait before invoking the copied callback, outside the registry lock.
         // Zero rejects a missing, unavailable, or native-menu destination.
         std::uint64_t BeginOpen(std::string_view mod, std::string_view id);
-        LauncherError ReportOpened(std::uint64_t requestId, bool opened, std::string reason);
-        std::optional<OpenedReport> TakeReport(std::uint64_t requestId);
+        LauncherError Complete(std::uint64_t requestId, LaunchCallback afterClose, std::string reason);
+        std::optional<LaunchResult> TakeResult(std::uint64_t requestId);
+        void EndOpen(std::uint64_t requestId);
         std::vector<LaunchDestination> Snapshot() const;
         std::optional<LaunchDestination> Find(std::string_view mod, std::string_view id) const;
         std::uint64_t Revision() const { return m_revision.load(); }
     private:
         mutable std::mutex m_mutex;
         std::vector<LaunchDestination> m_destinations;
-        struct Opening
+        struct Request
         {
             std::uint64_t requestId{};
-            std::string mod, id;
             bool completed{};
-            std::optional<OpenedReport> report;
+            std::optional<LaunchResult> result;
         };
-        std::optional<Opening> m_opening;
+        std::optional<Request> m_request;
         std::uint64_t m_nextRequestId{};
         std::filesystem::path m_dataPath;
         bool m_historyDirty{};

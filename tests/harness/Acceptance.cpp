@@ -90,13 +90,14 @@ namespace OSFSettings::TestHarness
             } catch (...) {}
         }
 
-        void OnLauncher(const char*, const char* id, std::uint64_t requestId, void*) noexcept
+        void OnLauncher(const char*, const char*, std::uint64_t request, void*) noexcept
         {
-            // This fixture completes immediately; Settings removes itself after the report.
             try {
-                Record("launcher", "callback", id, "", true);
                 API::Launcher::Client launcher;
-                if (launcher.Init()) launcher.ReportOpened(requestId, true);
+                if (!launcher.Init()) return;
+                launcher.Complete(request, [](const char*, const char* id, std::uint64_t, void*) noexcept {
+                    try { Record("launcher", "callback", id, "", true); } catch (...) {}
+                });
             } catch (...) {}
         }
 
