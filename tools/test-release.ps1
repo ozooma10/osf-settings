@@ -12,11 +12,13 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'packaging/ReleaseValidation.ps1')
-$stages = @('native', 'preview-normal', 'preview-large', 'package', 'package-integrity', 'reinstall-preservation', 'runtime', 'source-unchanged')
+. (Join-Path $PSScriptRoot 'SmokeBench.ps1')
+$stages = @('release-contracts', 'native', 'preview-normal', 'preview-large', 'preview-bindings-normal', 'preview-bindings-large', 'package', 'package-integrity', 'reinstall-preservation', 'runtime', 'source-unchanged')
 $suite = Join-Path $Harness 'Test-SettingsRelease.ps1'
 $suiteFound = Test-Path -LiteralPath $suite -PathType Leaf
 $scope = if ($RunGame) { 'offline+runtime' } else { 'offline' }
 $unverified = @('Physical controller input', 'Visual review of retained screenshots',
+    'In-game action buttons, launcher completion/failure/timeout, and runtime provider/key-observer behavior',
     'Unmodified production ZIP: clean mod-manager installation, real consumer, restart and upgrade in-game',
     'External OSF UI provider handoff')
 if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame)") + $unverified }
@@ -82,7 +84,7 @@ function Complete-ReleaseStage([string]$Message = '') {
 function Invoke-ReleaseProcess([string]$Program, [string[]]$Arguments) {
     $log = Join-Path $directory ($script:active.name + '.log')
     $script:active.log = $log
-    & $Program @Arguments 2>&1 | Tee-Object -FilePath $log | Out-Host
+    & $Program @Arguments 2>&1 | Tee-Object -FilePath $log -Append | Out-Host
     $code = $LASTEXITCODE
     if ($code -ne 0) {
         $script:exitCode = if ($code -eq 1) { 1 } else { 2 }
@@ -93,16 +95,24 @@ function Invoke-ReleaseProcess([string]$Program, [string[]]$Arguments) {
 Push-Location $repo
 try {
     $report.revision = Get-ReleaseRevision $repo
+    $source = Get-SmokeSourceIdentity $repo
+    Start-ReleaseStage 'release-contracts'
+    Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',(Join-Path $repo 'tests/smoke_bench_tests.ps1'))
+    Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',(Join-Path $repo 'tests/release_validation_tests.ps1'),'-Harness',$Harness)
+    Complete-ReleaseStage 'Package and runtime evidence contract checks'
     Start-ReleaseStage 'native'
-    Invoke-ReleaseProcess 'xmake' @('test','-j4')
+    Invoke-ReleaseProcess 'xmake' @('test','-j4','-v')
+    $expectedNative = @([regex]::Matches((Get-Content (Join-Path $repo 'tests/xmake.lua') -Raw), '"osfsettings-([a-z-]+)-tests"') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique).Count
+    Test-SmokeNativeSummary (Get-Content $script:active.log -Raw) $expectedNative
     Complete-ReleaseStage 'All native suites'
-    foreach ($large in @($false,$true)) {
-        Start-ReleaseStage $(if ($large) { 'preview-large' } else { 'preview-normal' })
-        $arguments = @('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture')
-        if ($large) { $arguments += '-LargeText' }
+    foreach ($variant in @(@{name='normal';args=@()}, @{name='large';args=@('-LargeText')},
+        @{name='bindings-normal';args=@('-Bindings')}, @{name='bindings-large';args=@('-Bindings','-LargeText')})) {
+        Start-ReleaseStage ('preview-' + $variant.name)
+        $previewStarted = [DateTime]::UtcNow
+        $arguments = @('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture') + $variant.args
         Invoke-ReleaseProcess 'pwsh' $arguments
-        $prefix = if ($large) { 'large' } else { 'normal' }
-        $captures = @(Get-ChildItem -LiteralPath (Join-Path $repo 'build/preview') -Filter "$prefix-*.png" -File | Where-Object LastWriteTimeUtc -ge ([DateTime]::Parse($report.startedUtc)))
+        $prefix = if ($variant.name -like '*large') { 'large' } else { 'normal' }
+        $captures = @(Get-ChildItem -LiteralPath (Join-Path $repo 'build/preview') -Filter "$prefix-*.png" -File | Where-Object LastWriteTimeUtc -ge $previewStarted)
         if (-not $captures.Count) { throw 'Preview passed without fresh screenshots.' }
         $captureDirectory = Join-Path $directory $script:active.name
         [IO.Directory]::CreateDirectory($captureDirectory) | Out-Null
@@ -124,17 +134,18 @@ try {
     Start-ReleaseStage 'reinstall-preservation'
     $sentinels = Test-ReleaseReinstall $report.package.archive (Join-Path $directory 'disposable-install')
     $sentinels | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'preserved-state.json')
-    Complete-ReleaseStage 'Settings values, launcher history and unrelated Controls sentinel preserved on disk'
+    Complete-ReleaseStage 'Archive overlay preserved simulated Documents state and another mod schema; game migration unverified'
     Start-ReleaseStage 'runtime'
     if ($RunGame) {
         # Contract with the harness suite: it writes its JSON summary to -ResultPath
         # with completeSuite, automatedPassed and the revision it built from.
         $receipt = Join-Path $directory 'runtime-result.json'
         $report.runtime = $receipt
-        Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-ResultPath',$receipt)
+        $runtimePlan = & pwsh -NoProfile -File $suite -Plan | ConvertFrom-Json
+        if ($LASTEXITCODE) { throw 'Cannot read runtime suite plan.' }
+        Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-ExpectedSettingsProject',$repo,'-ResultPath',$receipt)
         $runtime = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json -AsHashtable
-        if (-not $runtime.completeSuite) { throw "Runtime suite ran only: $($runtime.selectedCases -join ', ')" }
-        if (-not $runtime.automatedPassed) { $script:exitCode = 1; throw 'Runtime suite did not pass.' }
+        Test-SmokeRuntimeReceipt $runtime @($runtimePlan.cases) $source.sha256
         if ($runtime.revision -cne $report.revision) { throw 'Runtime suite tested a different commit than this candidate.' }
         Complete-ReleaseStage "$($runtime.runs.Count) fresh-session cases passed: $($runtime.cases -join ', ')"
     } else {

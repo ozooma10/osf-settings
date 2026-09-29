@@ -1,11 +1,12 @@
 [
   {"feature":"Schema, typed values, defaults, validation, persistence", "native":["schema","store","service","string"], "runtime":["smoke-normal","smoke-large","acceptance-normal","acceptance-large"]},
-  {"feature":"Public C++ SDK, registry, runtime providers", "native":["sdk","registry","providers"], "runtime":["acceptance-normal","acceptance-large"]},
+  {"feature":"Public C++ SDK and registry", "native":["sdk","registry"], "runtime":["acceptance-normal","acceptance-large"]},
+  {"feature":"Runtime providers and key observers (native coverage; game acceptance pending)", "native":["providers"], "runtime":[]},
   {"feature":"Hotkey registration, routing, lifecycle and suppression", "native":["key","registration","input","lifecycle","hotkey-block","hotkey-callback"], "runtime":["smoke-normal","smoke-large","acceptance-normal","acceptance-large"]},
   {"feature":"Native bindings, conflicts, capture, clear, reset and restart", "native":["binding","bindings-menu","binding-snapshot"], "runtime":["keybindings-normal","keybindings-large","translation-registration"]},
   {"feature":"Search, editing and focus recovery", "native":["input","binding"], "runtime":["search-input","keybindings-normal","keybindings-large"]},
-  {"feature":"Grouped actions, confirmation and completion", "native":["action"], "runtime":["acceptance-normal","acceptance-large"]},
-  {"feature":"Home, interface launchers, recency and availability", "native":["launcher"], "runtime":["acceptance-normal","acceptance-large"]},
+  {"feature":"Grouped actions, confirmation and completion (game acceptance pending)", "native":["action"], "runtime":[]},
+  {"feature":"Home, interface launchers, recency and availability (game acceptance pending)", "native":["launcher"], "runtime":[]},
   {"feature":"Mod Issues, details, replacement and clearing", "native":["issues","diagnostics-api"], "runtime":["acceptance-normal","acceptance-large"]},
   {"feature":"Localization, native labels and Unicode", "native":["localization"], "runtime":["translation-registration","acceptance-normal"]},
   {"feature":"Papyrus VM consumers, subscriptions and save lifecycle", "native":["papyrus"], "runtime":["acceptance-normal","acceptance-large","new-game","cancelled-load","failed-load"]}

@@ -27,8 +27,9 @@ function Get-ReleasePayloadPaths {
 
 function Test-ReleaseArchive([string]$ManifestPath, [string]$Repository = '') {
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json -AsHashtable
+    if ($manifest.revision -cnotmatch '^[0-9a-f]{40}$') { throw 'Candidate manifest lacks a valid commit revision.' }
     if ($manifest.configuration -cne 'windows/x64/releasedbg; test_harness=n') { throw 'Candidate is not a production configuration.' }
-    if ([IO.Path]::GetFileName($manifest.archive) -cne $manifest.archive -or $manifest.archive.Contains('\')) { throw 'Invalid archive filename in manifest.' }
+    if ($manifest.archive -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$') { throw 'Invalid archive filename in manifest.' }
     $archive = Join-Path (Split-Path ([IO.Path]::GetFullPath($ManifestPath)) -Parent) $manifest.archive
     $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
     if ($hash -cne $manifest.sha256) { throw 'Candidate archive checksum mismatch.' }
@@ -54,7 +55,7 @@ function Test-ReleaseArchive([string]$ManifestPath, [string]$Repository = '') {
             if ($name.EndsWith('.dll')) {
                 $text = [Text.Encoding]::ASCII.GetString($bytes)
                 if ($bytes.Length -lt 2 -or $text.Substring(0, 2) -cne 'MZ') { throw 'Invalid production DLL.' }
-                foreach ($symbol in @('OSFSettings_RequestAPI', 'OSFSettings_RequestLauncherAPI', 'OSFSettings_RequestDiagnosticsAPI')) {
+                foreach ($symbol in @('OSFSettings_RequestAPI', 'OSFSettings_RequestLauncherAPI', 'OSFSettings_RequestDiagnosticsAPI', 'OSFSettings_RequestProvidersAPI')) {
                     if (-not $text.Contains($symbol)) { throw "Missing public API export marker: $symbol" }
                 }
                 foreach ($symbol in @('OSFSettings_TestSnapshot', 'OSFSettings_TestCommand')) {
@@ -77,14 +78,16 @@ function Test-ReleaseArchive([string]$ManifestPath, [string]$Repository = '') {
 }
 
 function Test-ReleaseReinstall([string]$Archive, [string]$Directory) {
-    # A new disposable Data tree only. This checks archive overwrite behavior;
+    # A disposable Data + Documents tree. This checks archive overwrite behavior;
     # it is deliberately not reported as a game or mod-manager upgrade test.
     if (Test-Path -LiteralPath $Directory) { throw 'Reinstall test requires a new directory.' }
-    [IO.Compression.ZipFile]::ExtractToDirectory($Archive, $Directory)
+    $data = Join-Path $Directory 'Data'
+    [IO.Compression.ZipFile]::ExtractToDirectory($Archive, $data)
     $sentinels = @{
-        'SFSE/Plugins/OSF/Settings/values/osfreleaseprobe.json' = '{"values":{"enabled":true,"caption":"Preserve me"}}'
-        'SFSE/Plugins/OSF/Settings/internal.json' = '{"recentLaunchers":[{"mod":"probe","id":"editor"}]}'
-        'ControlMap_Custom.txt' = 'Unrelated Controls sentinel'
+        'Documents/My Games/Starfield/OSF/Settings/osfreleaseprobe.json' = '{"values":{"enabled":true,"caption":"Preserve me"}}'
+        'Documents/My Games/Starfield/OSF/Settings/internal.json' = '{"recentLaunchers":[{"mod":"probe","id":"editor"}]}'
+        'Documents/My Games/Starfield/ControlMap_Custom.txt' = 'Unrelated Controls sentinel'
+        'Data/SFSE/Plugins/OSF/Settings/schemas/othermod.json' = '{"groups":{}}'
     }
     foreach ($item in $sentinels.GetEnumerator()) {
         $path = Join-Path $Directory $item.Key
@@ -93,7 +96,7 @@ function Test-ReleaseReinstall([string]$Archive, [string]$Directory) {
     }
     $before = @{}
     foreach ($name in $sentinels.Keys) { $before[$name] = (Get-FileHash -LiteralPath (Join-Path $Directory $name)).Hash }
-    [IO.Compression.ZipFile]::ExtractToDirectory($Archive, $Directory, $true)
+    [IO.Compression.ZipFile]::ExtractToDirectory($Archive, $data, $true)
     foreach ($name in $sentinels.Keys) {
         if ((Get-FileHash -LiteralPath (Join-Path $Directory $name)).Hash -cne $before[$name]) { throw "Reinstall replaced player state: $name" }
     }

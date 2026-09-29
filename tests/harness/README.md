@@ -35,7 +35,7 @@ from real Flash text fields and native row clips. An additional private resource
 load during construction tests merging; it is not proof of an in-session translator
 reload. The extracted helpers have host coverage; the translation-registration
 runtime check passed in `20260921-004831-687-SettingsSmoke`. See
-[release acceptance](../../docs/RELEASE_ACCEPTANCE.md) for the full evidence index.
+[release validation](../../docs/RELEASE_VALIDATION.md) for current checks and acceptance gaps.
 
 ## Building and observations
 
@@ -108,12 +108,15 @@ restart persistence and Pause entry. Physical controller input remains separate.
 
 ## Release acceptance fixtures
 
-`SettingsSmoke -Acceptance -AcceptancePhase Features` adds real-input checks
-for actions, Papyrus issues and Home launchers. The fixture includes native
+The native fixture includes handlers for actions, Papyrus issues and Home
+launchers, including native
 success/failure/deferred handlers, instance/Global action callbacks, an unavailable
 action, a callback launcher, an unavailable launcher and native/missing menu targets.
 Observers expose confirmation visibility, action status and fixture recency;
-they do not invoke menu actions for the test. Production builds omit these helpers.
+they do not invoke menu actions for the test. The current game runner has no
+`Features` phase and does not exercise action buttons or launcher execution.
+Those remain acceptance gaps even when the suite passes. Production builds omit
+these helpers.
 
 The harness's `SettingsSmoke -Acceptance` mode uses `Acceptance.cpp` and the
 scripts under `papyrus/`. A generated, test-only ESM defines one start-enabled

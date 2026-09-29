@@ -21,6 +21,7 @@ if (Test-Path -LiteralPath $suite) {
 $names = @('coverage', 'native', 'preview-normal', 'preview-large', 'preview-bindings-normal', 'preview-bindings-large',
     'release-contracts', 'production-build', 'runtime', 'source-unchanged')
 $unverified = @('Physical controller input and visual review of retained screenshots.',
+    'In-game action buttons, launcher completion/failure/timeout, and runtime provider/key-observer behavior.',
     'External OSF UI provider handoff and caller-owned provider persistence in a real consumer.',
     'Production ZIP install, upgrade, and restart in game: use tools/test-release.ps1 -RunGame on a committed candidate.')
 if (-not $RunGame) { $unverified = @('All in-game cases were skipped; rerun with -RunGame.') + $unverified }

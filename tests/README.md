@@ -92,7 +92,7 @@ Preview, large-text and harness flags participate in movie fingerprints.
 
 For a single automated development entrypoint, including uncommitted changes,
 use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame`. The
-[smoke bench guide](../docs/SMOKE_TESTS.md) describes coverage, isolation, report
+[release validation guide](../docs/RELEASE_VALIDATION.md) describes coverage, isolation, report
 formats and remaining acceptance gaps. Omit `-RunGame` for an offline run.
 
 The [release runner](../tools/test-release.ps1) combines native and preview
@@ -109,14 +109,17 @@ Native assertions and Ruffle previews do not replace input, controller, lifecycl
 or menu-handoff acceptance in Starfield. Add `-RunGame` to run the harness suite
 as the `runtime` stage (`-Harness` points at a checkout other than the sibling
 `OSF Test Harness`). The suite receives `-ResultPath` and writes its JSON summary
-there; the stage passes only when that receipt reports `completeSuite`,
-`automatedPassed`, and a `revision` equal to the packaged candidate's commit.
+there; the stage requires a fresh build of the packaged commit and matching source
+content, every advertised case exactly once, and a fresh, hashed result per case.
+Missing, stale, changed or contradictory evidence blocks acceptance.
 Focused rechecks use the harness directly, `Test-SettingsRelease.ps1 -Cases ...`;
 a filtered summary is never a complete suite. Game orchestration and its results
 are owned by that project.
 
 `pwsh -NoProfile -File tests/release_validation_tests.ps1` checks malformed-archive
-rejection and player-state preservation with synthetic fixtures. When the sibling
-harness checkout is present it also runs the real `Test-SettingsRelease.ps1` in
-a disposable tree with a fake game runner to verify the receipt contract above
-and that `-Plan` advertises exactly the harness cases. No game is launched.
+rejection and archive overlay behavior with synthetic fixtures. It requires the
+sibling harness (or `-Harness`) and runs its real suite coordinator in a disposable
+tree with a fake game runner. A second fixture checks the real single-run
+entrypoint's result publication with simulated environment/game helpers.
+No game is launched. These checks and `tests/smoke_bench_tests.ps1` also run as the
+release runner's first validation stage. See the guide for the audit and limits.
