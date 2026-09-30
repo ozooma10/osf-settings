@@ -41,7 +41,6 @@ int main()
         schema["groups"]["General"].push_back({{"key", "wideInt"}, {"type", "int"}, {"default", INT64_MAX}});
         schema["groups"]["General"].push_back({{"key", "wideFloat"}, {"type", "float"}, {"default", 1e100}});
         schema["groups"]["General"].push_back({{"key", "CaseKey"}, {"type", "bool"}, {"default", false}});
-        schema["groups"]["General"].push_back({{"key", "casekey"}, {"type", "bool"}, {"default", false}});
         schema["hotkeys"]["menu"] = {{"label", "Menu"}, {"menu", "ExampleMenu"}};
         { std::ofstream file(schemas / "papyrusexample.json"); file << schema; }
 
@@ -92,7 +91,9 @@ int main()
         check(!api.Write("SetInt", Mod, "count", std::int64_t(11)), "bounds reject writes");
         check(api.Write("SetEnum", "PAPYRUSEXAMPLE", "MODE", EnumValue{"NORMAL"}), "Papyrus identifiers resolve regardless of pooled casing");
         check(api.Read("GetString", "PAPYRUSEXAMPLE", "CAPTION", std::string{}) == "Hello", "Papyrus getter resolves pooled casing");
-        check(!api.Write("SetBool", Mod, "CaseKey", true), "ambiguous case-only setting IDs are rejected");
+        check(api.Write("SetBool", Mod, "casekey", true) && api.Read("GetBool", Mod, "CASEKEY", false) &&
+            settings.GetValue(Mod, "CaseKey") == SettingValue{ true } && !settings.GetValue(Mod, "casekey"),
+            "Papyrus resolves mixed-case setting IDs while native keys retain authored spelling");
         check(!settings.GetValue("PAPYRUSEXAMPLE", "caption"), "native mod matching remains exact");
         check(settings.SetValue(Mod, "mode", EnumValue{"NORMAL"}) == SettingsError::InvalidValue, "native enum matching remains exact");
         check(!api.Write("SetString", Mod, "mode", std::string("quiet")), "writes preserve enum/string separation");

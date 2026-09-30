@@ -179,7 +179,7 @@ namespace OSFSettings::SettingsJson
                     SettingDefinition setting;
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(setting.key.find('\0') == std::string::npos, "setting key must not contain NUL");
-                    Require(settingKeys.insert(setting.key).second, "duplicate setting key: " + setting.key);
+                    Require(settingKeys.insert(FoldAscii(setting.key)).second, "duplicate setting key: " + setting.key);
                     Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key" || type == "string", "only types bool, int, float, enum, key, and string are supported: " + setting.key);
                     std::string defaultError = "default must be a boolean: ";
                     if (type == "string") {
@@ -236,7 +236,7 @@ namespace OSFSettings::SettingsJson
                             }
                             Require(!option.value.empty(), "each option must be a non-empty string: " + setting.key);
                             Require(option.value.find('\0') == std::string::npos, "option value must not contain NUL: " + setting.key);
-                            Require(optionValues.insert(option.value).second, "duplicate option: " + setting.key + " / " + option.value);
+                            Require(optionValues.insert(FoldAscii(option.value)).second, "duplicate option: " + setting.key + " / " + option.value);
                             if (option.label.empty()) option.label = option.value;
                             definition.options.push_back(std::move(option));
                         }

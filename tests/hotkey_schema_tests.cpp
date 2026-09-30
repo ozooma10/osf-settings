@@ -227,6 +227,38 @@ int main()
         result = parseText(R"({"schemaVersion":1,"groups":{"Panel":[{"key":"enabled","type":"bool","default":true}],
             "Other":[{"key":"enabled","type":"bool","default":false}]}})");
         check(!result && error == "duplicate setting key: enabled", "setting keys remain unique across groups");
+        for (const auto* source : {
+            R"({"groups":{"Panel":[{"key":"Enabled","type":"bool","default":true},
+                {"key":"enabled","type":"bool","default":false}]}})",
+            R"({"groups":{"Panel":[{"key":"Enabled","type":"bool","default":true}],
+                "Other":[{"key":"enabled","type":"int","default":1}]}})",
+            R"({"groups":{"Panel":[{"key":"ENABLED","type":"bool","default":true},
+                {"key":"\u0065nabled","type":"bool","default":false}]}})"
+        }) {
+            check(!parseText(source) && error == "duplicate setting key: enabled",
+                "source schemas reject case-only setting collisions within and across groups");
+            check(!SettingsJson::ParseSchema(Json::parse(source), "osfsettings", error) && error == "duplicate setting key: enabled",
+                "document schemas reject case-only setting collisions within and across groups");
+        }
+        for (const auto* source : {
+            R"({"groups":{"Panel":[{"key":"mode","type":"enum","default":"normal","options":["normal","Normal"]}]}})",
+            R"({"groups":{"Panel":[{"key":"mode","type":"enum","default":"normal","options":{"normal":"Normal","Normal":"Normal"}}]}})",
+            R"({"groups":{"Panel":[{"key":"mode","type":"enum","default":"normal","options":{"normal":"Normal","\u004eormal":"Normal"}}]}})"
+        }) {
+            check(!parseText(source) && error == "duplicate option: mode / Normal",
+                "source schemas reject case-only enum collisions in arrays and objects, including escaped values");
+            check(!SettingsJson::ParseSchema(Json::parse(source), "osfsettings", error) && error == "duplicate option: mode / Normal",
+                "document schemas reject case-only enum collisions in arrays and objects");
+        }
+        result = parseText(R"({"groups":{"Panel":[
+            {"key":"Mode","type":"enum","default":"Normal","options":{"Verbose":"Same label","Normal":"Same label"}},
+            {"key":"OtherMode","type":"enum","default":"normal","options":["normal","verbose"]}
+        ]}})");
+        const auto* mode = result ? result->FindSetting("Mode") : nullptr;
+        check(mode && error.empty() && !result->FindSetting("mode") && mode->DefaultValue() == SettingValue{EnumValue{"Normal"}} &&
+            std::get<EnumDefinition>(mode->definition).options[0].value == "Verbose" &&
+            std::get<EnumDefinition>(mode->definition).options[1].value == "Normal",
+            "authored spelling and order are preserved; separate enums may reuse values and labels may repeat");
 
         const auto menuDocument = Json::parse(R"({"schemaVersion":1,"title":"Sample Mod","groups":{},
             "menus":{"panel":{"title":"Sample Panel","description":"Open the panel.","menu":"SampleMenu"}}})");
