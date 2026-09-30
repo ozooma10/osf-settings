@@ -2,7 +2,7 @@
 
 A separate consumer of the production OSF Settings public SDK. Enable **OSF Settings Test Mod** in MO2 and **OSFSettingsTestMod.esm** in its Plugins pane, alongside the current OSF Settings build. No instrumented Settings DLL or automated harness is required. The optional web panel also needs the matching OSF UI build.
 
-Launch through SFSE, load a test save, open Settings with F10 or Pause → MOD SETTINGS, then select **OSF Settings Test Mod**. The second page, **OSF Test - Runtime provider**, is registered by the test DLL. Native hotkeys start unbound so the fixture does not replace your existing bindings: assign them in the test page or KEYBINDINGS.
+Launch through SFSE, load a test save, open Settings with Pause → MOD SETTINGS, then select **OSF Settings Test Mod**. The opening key defaults to unbound; assign it in KEYBINDINGS if needed. The second page, **OSF Test - Runtime provider**, is registered by the test DLL. Native hotkeys start unbound so the fixture does not replace your existing bindings: assign them in the test page or KEYBINDINGS.
 
 The ESM contains only a start-enabled quest with a player alias. For an existing save, run **Initialize / re-register Papyrus fixture**, close Settings, wait for the notification, and reopen. Both Papyrus status rows should report successful registration. The alias registers again after save loads. Do not manually initialize after each load when checking whether automatic registration works.
 
@@ -32,7 +32,7 @@ Repeat the normal menu checks with **Large text** off and on in OSF Settings. Se
 | Key values | Rebind Observed key to keyboard and mouse; clear it; try clearing Required key | Observer tracks new binding; clearing stops it; Required key cannot be cleared; these are keyboard/mouse values, not controller hotkeys |
 | Observer lifecycle | Toggle key observer off/on, press in gameplay | Counter stops while unsubscribed and resumes after resubscribe |
 | Suppression | Try hotkeys with Settings, console, inventory, loading, and optional web panel open | Gameplay callbacks suppressed in blocked/menu states; resume after close |
-| Explicit block | Start the 10-second block; close Settings immediately and press test hotkeys | No callbacks before the release HUD message; normal operation afterward. F10 is also blocked; Pause can reopen Settings |
+| Explicit block | Start the 10-second block; close Settings immediately and press test hotkeys | No callbacks before the release HUD message; normal operation afterward. The Settings opening hotkey, if assigned, is also blocked; Pause can reopen Settings |
 | Notifications | Edit values, disable native subscription, edit again, re-enable | Change counter stops while unsubscribed; script observers remain independent |
 | Native actions | Immediate success; cancel then accept confirmation; intentional failure | One invocation per activation; cancellation does not call handler; failure message shown |
 | Deferred actions | Run 3-second action with Settings open; repeat and close before completion | Completion works in both cases; reopen and inspect counters/log |

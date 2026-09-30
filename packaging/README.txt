@@ -6,8 +6,8 @@ not required by OSF Settings. Other game versions are not verified.
 
 Install this ZIP with MO2 or Vortex and enable it. Its root is the game's Data
 directory: SFSE, Interface, Scripts and Docs belong directly under Data.
-Launch through SFSE, load a save, then press F10 or choose MOD SETTINGS in Pause.
-Rebind the opening key on the OSF Settings page or the KEYBINDINGS tab.
+Launch through SFSE, load a save, then choose MOD SETTINGS in Pause.
+The opening key defaults to unbound. Assign it in the KEYBINDINGS tab.
 No ESM/ESP activation is required for the framework itself.
 
 OSF follows the game's language at startup. English and Japanese are included.

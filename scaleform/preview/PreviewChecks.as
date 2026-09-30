@@ -454,7 +454,7 @@ package
                     Object(menu).BGSCodeObj.getRows = function():Array {
                         // OSF Settings' own hotkey alone leaves Home with nothing to list.
                         return [{type:"hotkey", mod:"osfsettings", modTitle:"OSF Settings", modDescription:"", group:"general", groupTitle:"General",
-                            key:"openMenu", action:"osfsettings/openMenu", registered:true, title:"Open mod settings", hint:"", defaultName:"F10"}];
+                            key:"openMenu", action:"osfsettings/openMenu", registered:true, title:"Open mod settings", hint:"", defaultName:"Unbound"}];
                     };
                     Object(menu).BGSCodeObj.revision = function():String { return "empty"; }; break;
                 case 64: break;
