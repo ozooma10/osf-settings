@@ -319,7 +319,7 @@ int main()
         check(store.Mods()[0].values.size() == 1 && !store.GetValue("osfsettings", "openMenu"),
             "hotkeys do not create persisted setting values");
         check(store.Mods()[0].schema.FindSetting("enabled")->requiresRestart &&
-            store.Set("osfsettings", "enabled", false).ok && store.GetValue("osfsettings", "enabled") == SettingValue{false},
+            store.Set("osfsettings", "enabled", false).ok() && store.GetValue("osfsettings", "enabled") == SettingValue{false},
             "restart-required settings still save and publish the new value immediately");
         std::ifstream saved(root / "values/osfsettings.json");
         check(Json::parse(saved)["values"] == Json({{"enabled", false}}), "saving settings excludes hotkey and menu declarations");

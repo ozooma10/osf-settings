@@ -54,6 +54,7 @@ int main()
             {"hotkeys",{{"open",{{"label","Öffnen"}}}}},
             {"actions",{{"run",{{"label","Ausführen"},{"confirmation","Wirklich ausführen?"}}}}}});
         Localization::Catalog german(root, "DE", mods);
+        translated = mod.schema;
         german.Apply(translated);
         check(german.Errors().empty() && german.Language() == "de", "valid catalogs load cleanly");
         check(translated.title == "Deutsch" && translated.description == "Authored description", "selected and authored fallbacks");
@@ -65,7 +66,15 @@ int main()
         check(IsValidValue(current, EnumValue{"slow"}) && !IsValidValue(current, EnumValue{"Langsam"}), "setters still validate stored enum values");
         check(translated.hotkeys[0].label == "Öffnen" && translated.hotkeys[0].defaultKey == "F10" && translated.hotkeys[0].menu == "Menu", "hotkey localization does not change registration");
         check(translated.FindAction("run")->confirmation == "Wirklich ausführen?" && translated.FindAction("quick")->confirmation.empty(), "confirmation translation preserves enabled state");
+        auto registered = mod.schema;
+        registered.description = "Registered again";
+        registered.hotkeys[0].defaultKey = "F11";
+        registered.groups[0].controls.emplace_back(ActionDefinition{ "later", "Later", "", "" });
+        german.Apply(registered);
+        check(registered.title == "Deutsch" && registered.description == "Registered again" && registered.hotkeys[0].defaultKey == "F11"
+            && registered.FindAction("later") && registered.groups[0].label == "Allgemein", "catalogs overlay the live schema instead of replacing it");
         Localization::Catalog english(root, "fr", mods);
+        translated = mod.schema;
         english.Apply(translated);
         check(translated.title == "English title", "missing selected language uses English catalog");
 
@@ -73,6 +82,7 @@ int main()
             {"settings",{{setting.key,{{"hint","Mehrere\nZeilen"},{"label",std::string("bad\0label",9)},{"default","bad"}}},{"missing",{{"label","No"}}}}},
             {"actions",{{"run",{{"confirmation",""}}},{"quick",{{"confirmation","Must not add a dialog"}}}}}});
         Localization::Catalog invalid(root, "de", mods);
+        translated = mod.schema;
         invalid.Apply(translated);
         check(invalid.Errors().size() == 6, "bad entries and unknown fields report diagnostics");
         check(translated.title == "English title" && translated.description.empty(), "bad title falls back and optional text can be cleared");
@@ -80,18 +90,22 @@ int main()
         check(translated.FindAction("run")->confirmation == "Really run?" && translated.FindAction("quick")->confirmation.empty(), "catalog cannot remove or add confirmation requirement");
         std::ofstream(root / "de/example.json") << R"({"version":1,"title":"first","title":"second"})";
         Localization::Catalog duplicate(root, "de", mods);
+        translated = mod.schema;
         duplicate.Apply(translated);
         check(duplicate.Errors().size() == 1 && translated.title == "English title", "duplicate keys reject the file without partial changes");
         std::ofstream(root / "de/example.json") << "{broken";
         Localization::Catalog broken(root, "de", mods);
+        translated = mod.schema;
         broken.Apply(translated);
         check(broken.Errors().size() == 1 && translated.title == "English title", "malformed JSON falls back");
         write("de", "example", {{"version",2},{"title","Zwei"}});
         Localization::Catalog unsupported(root, "de", mods);
+        translated = mod.schema;
         unsupported.Apply(translated);
         check(unsupported.Errors().size() == 1 && translated.title == "English title", "unsupported version rejects the file");
         write("de", "example", {{"title","Ohne Version"}});
         Localization::Catalog unversioned(root, "de", mods);
+        translated = mod.schema;
         unversioned.Apply(translated);
         check(unversioned.Errors().empty() && translated.title == "Ohne Version", "missing version defaults to 1");
 

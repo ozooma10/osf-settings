@@ -13,7 +13,6 @@
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
 #include "RE/B/BSService.h"
-#include "REX/W32/KERNEL32.h"
 
 namespace OSFSettings
 {
@@ -285,7 +284,6 @@ namespace OSFSettings
             root->CreateObject(params.ret);
             Text(*params.ret, "state", state);
             Text(*params.ret, "name", KeyName(snapshot.selectedKeyCode));
-            params.ret->SetMember("keyCode", RE::Scaleform::GFx::Value(static_cast<double>(snapshot.selectedKeyCode)));
             params.ret->SetMember("released", RE::Scaleform::GFx::Value(snapshot.selectedKeyReleased));
             break;
         }
@@ -460,9 +458,6 @@ namespace OSFSettings
                 root->CreateObject(&row);
                 Text(row, "mod", destination.mod);
                 Text(row, "modTitle", destination.modTitle);
-                Text(row, "modDescription", "");
-                Text(row, "group", "@launcher");
-                Text(row, "groupTitle", "Launcher");
                 Text(row, "key", destination.id);
                 Text(row, "title", destination.title);
                 Text(row, "type", "launcher");

@@ -79,11 +79,11 @@ namespace OSFSettings
 
     SettingsError SettingsService::FinishWrite(std::string_view mod, std::optional<std::string_view> key, const SettingsStore::SetResult& result) noexcept
     {
-        if (result.ok) {
+        if (result.ok()) {
             if (result.changed) Notify(mod, key);
             return SettingsError::None;
         }
-        if (result.code == SettingsError::SaveFailed || result.code == SettingsError::InternalError) {
+        if (result.code == SettingsError::SaveFailed) {
             REX::ERROR("Settings: {}", result.error);
         }
         return result.code;

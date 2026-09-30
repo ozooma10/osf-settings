@@ -4,7 +4,6 @@
 #include "RE/C/ControlMap.h"
 #include "RE/U/UserEvents.h"
 #include "KeyNames.h"
-#include "SFSE/API.h"
 #include "REL/THook.h"
 
 #include <cstddef>

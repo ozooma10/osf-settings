@@ -16,7 +16,7 @@ namespace OSFSettings
 
         struct SetResult
         {
-            bool ok{};
+            bool ok() const { return code == Error::None; }
             std::string error;
             Error code{};
             bool changed{};

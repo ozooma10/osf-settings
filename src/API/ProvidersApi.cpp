@@ -40,17 +40,13 @@ namespace OSFSettings::API::Providers
                     }
                     const auto result = SettingsService::Get().RegisterProvider(std::move(record),
                         [id = std::string(mod), save, context](const SettingValues& values) {
-                            auto document = nlohmann::json::object();
-                            for (const auto& [key, value] : values) {
-                                std::visit([&](const auto& current) {
-                                    using T = std::decay_t<decltype(current)>;
-                                    if constexpr (std::is_same_v<T, KeyBinding>) document[key] = current.keyCode;
-                                    else if constexpr (std::is_same_v<T, EnumValue>) document[key] = current.value;
-                                    else document[key] = current;
-                                }, value);
+                            try {
+                                const auto encoded = SettingsJson::EncodeValues(values).dump();
+                                return save(id.c_str(), encoded.c_str(), context);
+                            } catch (const std::exception& error) {
+                                REX::WARN("Settings provider {}: {}", id, error.what());
+                                return false;
                             }
-                            const auto encoded = document.dump();
-                            return save(id.c_str(), encoded.c_str(), context);
                         }, *registration);
                     switch (result) {
                     case SettingsError::None: return Status::Ok;

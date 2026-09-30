@@ -79,17 +79,17 @@ namespace OSFSettings
 
     SettingsStore::SetResult SettingsStore::Commit(ModSettings& mod, SettingValues proposed)
     {
-        if (mod.values == proposed) return { true, {} };
+        if (mod.values == proposed) return {};
         std::string error;
         const auto provider = m_providers.find(mod.schema.id);
         const bool saved = provider != m_providers.end() ? provider->second.save(proposed) :
             SettingsJson::SaveValues(m_valuesDir / (mod.schema.id + ".json"), proposed, error);
         if (!saved) {
             if (error.empty()) error = "settings provider could not save " + mod.schema.id;
-            return { false, std::move(error), Error::SaveFailed };
+            return { std::move(error), Error::SaveFailed };
         }
         mod.values.swap(proposed);
-        return { true, {}, Error::None, true };
+        return { {}, Error::None, true };
     }
 
     SettingsStore::Error SettingsStore::RegisterProvider(ModSettings mod, Save save, std::uint64_t& registration)
@@ -131,16 +131,16 @@ namespace OSFSettings
             const auto current = stored.values.find(key);
             const auto* setting = stored.schema.FindSetting(key);
             if (current == stored.values.end() || !setting) {
-                return { false, "unknown setting key", Error::UnknownSetting };
+                return { "unknown setting key", Error::UnknownSetting };
             }
             if (current->second.index() != value.index()) {
-                return { false, "value does not match the setting's type", Error::TypeMismatch };
+                return { "value does not match the setting's type", Error::TypeMismatch };
             }
             if (!IsValidValue(*setting, value)) {
-                return { false, "value does not match the setting's type or validation rules", Error::InvalidValue };
+                return { "value does not match the setting's type or validation rules", Error::InvalidValue };
             }
             if (current->second == value) {
-                return { true, {} };
+                return {};
             }
 
             // Propose the edit in a copy. The live value changes only after saving.
@@ -148,15 +148,15 @@ namespace OSFSettings
             proposed.find(key)->second = value;
             return Commit(stored, std::move(proposed));
         }
-        return { false, "unknown mod id", Error::UnknownMod };
+        return { "unknown mod id", Error::UnknownMod };
     }
 
     SettingsStore::SetResult SettingsStore::Reset(std::string_view mod, std::string_view key)
     {
         const auto* stored = FindMod(mod);
-        if (!stored) return { false, "unknown mod id", Error::UnknownMod };
+        if (!stored) return { "unknown mod id", Error::UnknownMod };
         const auto* setting = stored->schema.FindSetting(key);
-        if (!setting) return { false, "unknown setting key", Error::UnknownSetting };
+        if (!setting) return { "unknown setting key", Error::UnknownSetting };
         return Set(mod, key, setting->DefaultValue());
     }
 
@@ -175,6 +175,6 @@ namespace OSFSettings
             }
             return Commit(stored, std::move(proposed));
         }
-        return { false, "unknown mod id", Error::UnknownMod };
+        return { "unknown mod id", Error::UnknownMod };
     }
 }

@@ -46,25 +46,30 @@ namespace OSFSettings::SettingsJson
         }
     }
 
+    nlohmann::json EncodeValues(const SettingValues& values)
+    {
+        auto encoded = nlohmann::json::object();
+        for (const auto& [key, value] : values) {
+            if (const auto* number = std::get_if<double>(&value); number && !std::isfinite(*number)) {
+                throw std::runtime_error("value must be finite: " + key);
+            }
+            std::visit([&](const auto& current) {
+                if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) {
+                    encoded[key] = current.keyCode;
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
+                    encoded[key] = current.value;
+                } else {
+                    encoded[key] = current;
+                }
+            }, value);
+        }
+        return encoded;
+    }
+
     bool SaveValues(const std::filesystem::path& path, const SettingValues& values, std::string& error)
     {
         try {
-            auto saved = nlohmann::json::object();
-            for (const auto& [key, value] : values) {
-                if (const auto* number = std::get_if<double>(&value); number && !std::isfinite(*number)) {
-                    throw std::runtime_error("value must be finite: " + key);
-                }
-                std::visit([&](const auto& current) {
-                    if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) {
-                        saved[key] = current.keyCode;
-                    } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
-                        saved[key] = current.value;
-                    } else {
-                        saved[key] = current;
-                    }
-                }, value);
-            }
-            const nlohmann::json document = {{"formatVersion", 1}, {"values", saved}};
+            const nlohmann::json document = {{"formatVersion", 1}, {"values", EncodeValues(values)}};
             return Persistence::WriteAtomic(path, document.dump(2) + '\n', error);
         } catch (const std::exception& exception) { error = path.string() + ": " + exception.what(); return false; }
     }

@@ -1,7 +1,6 @@
 #include "BindingSnapshot.h"
 #include "RE/B/BSService.h"
 #include "RE/C/ControlMap.h"
-#include "REX/W32/KERNEL32.h"
 
 namespace OSFSettings
 {

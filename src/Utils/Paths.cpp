@@ -8,7 +8,6 @@ namespace OSFSettings::Paths
 	{
 		std::filesystem::path g_dataDir;
 		std::filesystem::path g_userDataDir;
-		std::filesystem::path g_valuesDir;
 	}
 
 	bool Initialize()
@@ -30,7 +29,6 @@ namespace OSFSettings::Paths
 			}
 			g_dataDir = dataDir;
 			g_userDataDir = valuesDir;
-			g_valuesDir = valuesDir;
 			REX::INFO("Settings user data: {}", g_userDataDir.string());
 			return true;
 		} catch (const std::exception& error) {
@@ -41,6 +39,5 @@ namespace OSFSettings::Paths
 
 	std::filesystem::path SchemasDir() { return g_dataDir / "schemas"; }
 	std::filesystem::path UserDataDir() { return g_userDataDir; }
-	std::filesystem::path ValuesDir() { return g_valuesDir; }
 	std::filesystem::path LocalizationDir() { return g_dataDir / "translations"; }
 }

@@ -26,7 +26,8 @@ namespace OSFSettings::Localization
 
     private:
         Messages m_ui;
-        std::map<std::string, ModSchema, std::less<>> m_schemas;
+        struct Overlays;
+        std::shared_ptr<Overlays> m_overlays; // Validated catalog documents per mod, English first.
         std::string m_language{ "en" };
         std::vector<SettingsLoadError> m_errors;
     };

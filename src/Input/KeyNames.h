@@ -16,9 +16,6 @@ namespace OSFSettings
         return button < 5 ? keys[button] : 0;
     }
 
-    // Virtual-key to DirectInput scan code; returns 0 if unmappable.
-    std::uint32_t VirtualKeyToKeycode(std::uint32_t virtualKey);
-
     // Uses the baked keyboard table before device initialization; unknown names return 0xFFFFFFFF.
     std::uint32_t GetKeyboardVirtualKey(std::string_view keyName);
 

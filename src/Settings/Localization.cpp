@@ -43,9 +43,9 @@ namespace OSFSettings::Localization
         struct Overlay
         {
             std::filesystem::path file;
-            std::vector<SettingsLoadError>& errors;
+            std::vector<SettingsLoadError>* errors; // Null once the catalog has reported its load errors.
 
-            void Error(const std::string& field) { errors.push_back({ file, "invalid or unknown translation field: " + field }); }
+            void Error(const std::string& field) { if (errors) errors->push_back({ file, "invalid or unknown translation field: " + field }); }
 
             void Fields(const Json& object, std::initializer_list<std::string_view> names, const std::string& path)
             {
@@ -84,9 +84,8 @@ namespace OSFSettings::Localization
                 }
             }
 
-            void Apply(const Json& document, ModSchema& mod, Messages& ui)
+            void Apply(const Json& document, ModSchema& mod)
             {
-                Fields(document, { "version", "title", "description", "groups", "settings", "hotkeys", "actions", "ui" }, "");
                 Text(document, "title", mod.title, "");
                 Text(document, "description", mod.description, "", true, true);
                 Entries(document, "groups", "", [&](const auto& id, const auto& entry, const auto& field) {
@@ -141,8 +140,12 @@ namespace OSFSettings::Localization
                     }
                     return true;
                 });
+            }
+
+            void Interface(const Json& document, std::string_view mod, Messages& ui)
+            {
                 if (auto messages = document.find("ui"); messages != document.end()) {
-                    if (mod.id != "osfsettings" || !messages->is_object()) { Error("ui"); return; }
+                    if (mod != "osfsettings" || !messages->is_object()) { Error("ui"); return; }
                     for (const auto& [key, value] : messages->items()) {
                         auto target = ui.find(key);
                         if (target == ui.end() || !ValidText(value, true, false)) { 
@@ -206,18 +209,23 @@ namespace OSFSettings::Localization
         return result;
     }
 
+    struct Catalog::Overlays : std::map<std::string, std::vector<Json>, std::less<>> {};
+
     Catalog::Catalog() : m_ui(Json::parse(English).at("ui").get<Messages>()) {}
 
     Catalog::Catalog(const std::filesystem::path& directory, std::string_view language, std::span<const ModSettings> mods) : Catalog()
     {
         m_language = NormalizeLanguage(language);
+        m_overlays = std::make_shared<Overlays>();
+        // Validate against the schemas registered now; Apply re-resolves every entry against the live schema.
+        std::map<std::string, ModSchema, std::less<>> schemas;
         for (const auto& mod : mods) {
-            m_schemas.emplace(mod.schema.id, mod.schema);
+            schemas.emplace(mod.schema.id, mod.schema);
         }
         // Interface messages must work even when the OSF hotkey schema is absent.
-        const bool interfaceOnly = m_schemas.try_emplace("osfsettings", ModSchema{ .id = "osfsettings" }).second;
+        const bool interfaceOnly = schemas.try_emplace("osfsettings", ModSchema{ .id = "osfsettings" }).second;
         for (const auto& locale : m_language == "en" ? std::vector<std::string>{ "en" } : std::vector<std::string>{ "en", m_language }) {
-            for (auto& [id, schema] : m_schemas) {
+            for (auto& [id, schema] : schemas) {
                 const auto file = directory / locale / (id + ".json");
                 try {
                     if (!std::filesystem::exists(file)) continue;
@@ -237,12 +245,13 @@ namespace OSFSettings::Localization
                     if (document.contains("version") && (!document["version"].is_number_integer() || document["version"] != 1)) {
                         m_errors.push_back({ file, "translation version must be integer 1" }); continue;
                     }
-                    if (interfaceOnly && id == "osfsettings") {
-                        for (const auto* field : { "title", "description", "groups", "settings", "hotkeys", "actions" }) {
-                            document.erase(field);
-                        }
-                    }
-                    Overlay{ file, m_errors }.Apply(document, schema, m_ui);
+                    Overlay overlay{ file, &m_errors };
+                    overlay.Fields(document, { "version", "title", "description", "groups", "settings", "hotkeys", "actions", "ui" }, "");
+                    overlay.Interface(document, id, m_ui);
+                    if (interfaceOnly && id == "osfsettings") continue;
+                    document.erase("ui");
+                    overlay.Apply(document, schema);
+                    (*m_overlays)[id].push_back(std::move(document));
                 } catch (const std::exception& error) { m_errors.push_back({ file, error.what() }); }
             }
         }
@@ -250,8 +259,11 @@ namespace OSFSettings::Localization
 
     void Catalog::Apply(ModSchema& schema) const
     {
-        if (const auto found = m_schemas.find(schema.id); found != m_schemas.end()) {
-            schema = found->second;
+        if (!m_overlays) return;
+        if (const auto found = m_overlays->find(schema.id); found != m_overlays->end()) {
+            for (const auto& document : found->second) {
+                Overlay{ {}, nullptr }.Apply(document, schema);
+            }
         }
     }
 

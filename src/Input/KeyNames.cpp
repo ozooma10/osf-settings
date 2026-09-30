@@ -3,7 +3,6 @@
 #include "Settings/SettingValue.h"
 #include "SFSE/Impl/PCH.h"
 #include "RE/B/BSInputDeviceManager.h"
-#include "REX/W32/DINPUT.h"
 
 #include <cstring>
 #include <cwchar>
@@ -12,33 +11,6 @@
 
 namespace OSFSettings
 {
-    std::uint32_t VirtualKeyToKeycode(const std::uint32_t virtualKey)
-    {
-        if (virtualKey == 0xFF || virtualKey == 0x7FFFFFFF) {
-            return 0;
-        }
-
-        switch (virtualKey) {
-        case VK_PAUSE:
-            return REX::W32::DIK_PAUSE;
-        case VK_NUMLOCK:
-            return REX::W32::DIK_NUMLOCK;
-        case VK_SNAPSHOT:
-            return REX::W32::DIK_SYSRQ;
-        default:
-            break;
-        }
-
-        const auto scanCode = ::MapVirtualKeyExW(virtualKey, MAPVK_VK_TO_VSC_EX, ::GetKeyboardLayout(0));
-        if (scanCode == 0) {
-            return 0;
-        }
-
-        const auto prefix = (scanCode >> 8) & 0xFF;
-        const auto set1 = scanCode & 0xFF;
-        return prefix == 0xE0 || prefix == 0xE1 ? set1 | 0x80 : set1;
-    }
-
     std::uint32_t GetKeyboardVirtualKey(std::string_view keyName)
     {
         std::wstring name;
@@ -73,7 +45,6 @@ namespace OSFSettings
         }
         const auto* manager = RE::BSInputDeviceManager::GetSingleton();
         const auto* keyboard = manager ? manager->GetKeyboard() : nullptr;
-        REX::INFO("Attempting to get keyboard from input device manager {}", manager ? keyboard ? "succeeded" : "failed keyboard" : "failed manager");
         const auto keyCode = keyboard ? keyboard->GetKeyCodeFromName(std::string(name).c_str()) : GetKeyboardVirtualKey(name);
         if (keyCode == 0xFFFFFFFF) return std::nullopt;
         return keyCode;

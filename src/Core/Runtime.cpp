@@ -19,7 +19,7 @@ namespace OSFSettings
         const auto schemaDir = Paths::SchemasDir();
         REX::INFO("Loading schemas from {}", schemaDir.string());
         auto& settings = SettingsService::Get();
-        settings.Load(schemaDir, Paths::ValuesDir());
+        settings.Load(schemaDir, Paths::UserDataDir());
         const auto errors = settings.LoadErrors();
         const auto mods = settings.Snapshot();
 

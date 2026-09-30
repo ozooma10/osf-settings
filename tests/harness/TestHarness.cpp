@@ -199,7 +199,7 @@ namespace OSFSettings::TestHarness
             result["ready"] = service.IsReady();
             const auto catalog = Localization::Get();
             result["localization"] = {{"language", catalog->Language()}, {"errors", catalog->Errors().size()}};
-            result["valuesDirectory"] = Paths::ValuesDir().string();
+            result["valuesDirectory"] = Paths::UserDataDir().string();
             result["sampledAtMs"] = ::GetTickCount64();
             auto values = Json::object();
             for (const auto* key : {"notifications", "notificationLimit", "notificationVolume", "notificationMode", "notificationKey"}) {
