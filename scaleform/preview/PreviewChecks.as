@@ -497,13 +497,23 @@ package
                 require(localization.text("counts.mods", {count:3}) == "Mods: 3", "missing translation uses English with parameters");
             } finally { localization.initialize(null); }
         }
+        private function findText(container:DisplayObjectContainer, text:String):TextField
+        {
+            if (!container.visible) return null;
+            for (var i:int = 0; i < container.numChildren; ++i) {
+                var child:DisplayObject = container.getChildAt(i);
+                if (!child.visible) continue;
+                if (child is TextField && TextField(child).text == text) return child as TextField;
+                if (child is DisplayObjectContainer) {
+                    var result:TextField = findText(child as DisplayObjectContainer, text);
+                    if (result) return result;
+                }
+            }
+            return null;
+        }
         private function requireGlyphs(text:String):void
         {
-            var field:TextField;
-            for (var i:int = 0; i < menu.numChildren; ++i) {
-                var candidate:TextField = menu.getChildAt(i) as TextField;
-                if (candidate && candidate.text == text) { field = candidate; break; }
-            }
+            var field:TextField = findText(menu, text);
             require(field != null, "custom text present: " + text);
             var embedded:Boolean = false;
             for each (var font:Font in Font.enumerateFonts(false)) {
