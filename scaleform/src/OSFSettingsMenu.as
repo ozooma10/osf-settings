@@ -676,7 +676,8 @@ package
             var backText:String = editing || captureRow || nativeHotkeys.busy ? tr("buttons.cancel") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
             var acceptVisible:Boolean = !busy && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && ACCEPT_TYPES[row.type])));
             if (reporting) {
-                acceptVisible = false;
+                acceptVisible = Boolean(row && row.nexusModId);
+                acceptText = tr("buttons.openModPage");
                 resetVisible = clearVisible = issueDetails.scrollable;
             }
             if (bindingsPage()) {
@@ -746,13 +747,17 @@ package
         {
             if (confirmingAction() || launcherPage() && launcherAcceptHeld) return;
             if (editingString()) { saveString(); return; }
-            if (bindingBusy() || issuesPage() || searching() || frame <= searchExitFrame + 1) return;
+            if (bindingBusy() || searching() || frame <= searchExitFrame + 1) return;
             if (captureRow) { confirmBinding(); return; }
             if (closing || launching || refreshing || requestedRefresh || activationFrame == frame || settingsList.dragging) return;
             activationFrame = frame;
             if (nav.focused) { enterPage(); return; }
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
             var row:Object = current(); if (!row) return;
+            if (issuesPage()) {
+                if (row.nexusModId) setStatus(BGSCodeObj.openIssueModPage(row.mod, row.id) ? tr("issues.modPageOpened") : tr("errors.openModPage"));
+                return;
+            }
             if (launcherPage()) { if (row.more) launcher.toggleExpanded(); else if (row.editable) launch(row); }
             else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; focusNav(false); }
             else if (row.type == "bool") options.OnEntryPressed();

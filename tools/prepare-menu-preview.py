@@ -295,7 +295,8 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
         reports = json.loads(issues_path.read_text(encoding="utf-8"))
         for report in sorted(reports, key=lambda report: report["severity"] != "ERROR"):
             issue = ET.SubElement(issues, "issue", mod=report["modId"], id=report["id"],
-                                  modTitle=titles.get(report["modId"], report["modId"]), severity=report["severity"])
+                                  modTitle=titles.get(report["modId"], report["modId"]), severity=report["severity"],
+                                  nexusModId=str(report.get("nexusModId", 0)))
             for field in ("title", "impact", "nextSteps"):
                 ET.SubElement(issue, field).text = report.get(field, "")
     ET.indent(config)

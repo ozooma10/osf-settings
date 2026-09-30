@@ -2,6 +2,8 @@
 
 Report detected problems in the menu's **Mod Issues** tab. OSF Settings also lists schema files that failed to load there, under its own name.
 
+OSF Settings checks the active installation's `Data/SFSE/Plugins/OSFUI.dll` file version at startup. A version below 2.0 adds an update warning with an **Open mod page** action for [OSF UI on Nexus Mods](https://www.nexusmods.com/starfield/mods/17711). The action opens the system web browser only when selected. An absent DLL or unreadable version does not produce this warning. Restart Starfield after updating.
+
 ## Papyrus
 
 ```papyrus

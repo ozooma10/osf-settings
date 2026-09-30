@@ -1,4 +1,5 @@
 #include "Runtime.h"
+#include "Compatibility.h"
 #include "SettingsDispatcher.h"
 #include "Actions/ActionService.h"
 #include "Diagnostics/DiagnosticsService.h"
@@ -66,6 +67,7 @@ namespace OSFSettings
 
     void Runtime::ReportLoadIssues()
     {
+        ReportCompatibilityIssues();
         for (auto& issue : SchemaLoadIssues(SettingsService::Get().LoadErrors())) {
             if (!DiagnosticsService::Get().Report(std::move(issue))) {
                 REX::ERROR("Could not report a schema load failure in Mod Issues");

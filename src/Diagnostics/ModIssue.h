@@ -1,6 +1,7 @@
 #pragma once
 
 #include <span>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,7 @@ namespace OSFSettings
         std::string title;
         std::string impact;
         std::string nextSteps;
+        std::uint32_t nexusModId{}; // Optional Starfield Nexus page; zero means no link.
     };
 
     std::string IssueModName(const ModIssue& issue, std::span<const ModSettings> settings);

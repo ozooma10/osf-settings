@@ -1,5 +1,14 @@
 [
   {
+    "modId": "osfsettings",
+    "id": "osfui-update-required",
+    "severity": "WARNING",
+    "title": "OSF UI needs an update",
+    "impact": "OSF UI 1.6.0 is installed. Versions before 2.0 use the older settings menu and do not provide the OSF Settings compatibility bridge.",
+    "nextSteps": "Update OSF UI to version 2.0 or later, then restart Starfield. Select Open mod page to visit OSF UI on Nexus Mods in your web browser.",
+    "nexusModId": 17711
+  },
+  {
     "modId": "design-preview",
     "id": "playback-unavailable",
     "severity": "ERROR",

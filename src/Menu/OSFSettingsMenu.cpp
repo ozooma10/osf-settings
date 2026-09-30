@@ -10,6 +10,9 @@
 #include "Settings/Localization.h"
 #include <charconv>
 #include <chrono>
+#include <Windows.h>
+#include <shellapi.h>
+#undef ERROR
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
 #include "RE/B/BSService.h"
@@ -20,7 +23,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage };
         // Bound the loading card's wait; expiry invalidates the request.
         constexpr auto kOpenTimeout = std::chrono::seconds(30);
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
@@ -106,6 +109,7 @@ namespace OSFSettings
         RegisterNativeFunction("getLocalization", static_cast<std::uint64_t>(Function::GetLocalization));
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
+        RegisterNativeFunction("openIssueModPage", static_cast<std::uint64_t>(Function::OpenIssueModPage));
         RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
         RegisterNativeFunction("revision", static_cast<std::uint64_t>(Function::Revision));
         RegisterNativeFunction("launch", static_cast<std::uint64_t>(Function::Launch));
@@ -315,6 +319,18 @@ namespace OSFSettings
         case Function::EndNativeBinding:
             m_bindingEditor.End(params.argCount > 0 && params.args[0].IsBoolean() && params.args[0].GetBoolean());
             break;
+        case Function::OpenIssueModPage: {
+            const auto mod = ArgString(params, 0), id = ArgString(params, 1);
+            bool opened = false;
+            for (const auto& issue : DiagnosticsService::Get().Snapshot()) {
+                if (issue.modId != mod || issue.id != id || !issue.nexusModId) continue;
+                const auto url = std::format(L"https://www.nexusmods.com/starfield/mods/{}", issue.nexusModId);
+                opened = reinterpret_cast<std::intptr_t>(ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) > 32;
+                break;
+            }
+            *params.ret = RE::Scaleform::GFx::Value(opened);
+            break;
+        }
         case Function::GetIssues: {
             const auto issues = DiagnosticsService::Get().Snapshot();
             const auto settings = runtime.Settings();
@@ -331,6 +347,7 @@ namespace OSFSettings
                 Text(row, "title", issue.title);
                 Text(row, "impact", issue.impact);
                 Text(row, "nextSteps", issue.nextSteps);
+                row.SetMember("nexusModId", RE::Scaleform::GFx::Value(issue.nexusModId));
                 params.ret->PushBack(row);
             }
             break;
