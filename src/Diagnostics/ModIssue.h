@@ -4,11 +4,13 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace OSFSettings
 {
     struct ModSettings;
     struct SettingsLoadError;
+    struct SettingsVersion;
 
     enum class IssueSeverity
     {
@@ -32,4 +34,6 @@ namespace OSFSettings
 
     // OSF owns these reports so a mod's own ClearMod cannot hide a broken schema.
     std::vector<ModIssue> SchemaLoadIssues(std::span<const SettingsLoadError> errors);
+    std::optional<ModIssue> SettingsUpdateIssue(std::span<const ModSettings> settings,
+        std::span<const SettingsLoadError> errors, const SettingsVersion& installed);
 }

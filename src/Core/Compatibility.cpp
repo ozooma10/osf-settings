@@ -1,6 +1,7 @@
 #include "Compatibility.h"
 #include "Diagnostics/DiagnosticsService.h"
 #include "Settings/Localization.h"
+#include "Settings/SettingsService.h"
 
 #include <Windows.h>
 
@@ -28,6 +29,16 @@ namespace OSFSettings
 
     void ReportCompatibilityIssues()
     {
+        const auto installed = SFSE::GetPluginVersion();
+        const SettingsVersion settingsVersion{ { installed[0], installed[1], installed[2] } };
+        auto& diagnostics = DiagnosticsService::Get();
+        auto& settings = SettingsService::Get();
+        if (auto issue = SettingsUpdateIssue(settings.Snapshot(), settings.LoadErrors(), settingsVersion)) {
+            diagnostics.Report(std::move(*issue));
+        } else {
+            diagnostics.Clear("osfsettings", "settings-update-recommended");
+        }
+
         // Read the active game's virtual Data path once, without loading the plugin.
         static const auto version = InstalledOSFUIVersion();
         if (!version || *version >= REL::Version{ 2, 0, 0, 0 }) return;
