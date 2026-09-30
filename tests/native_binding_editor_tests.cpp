@@ -127,7 +127,7 @@ int main()
         owners[1].visibleInControls = true;
         // Borrowed native array views, backed by fixture-owned mapping records.
         struct ArrayView { std::uint32_t size, capacity; RE::ControlMap::UserEventMapping* data; };
-        std::array<ArrayView, 3> arrays{ ArrayView{ 2, 2, owners.data() }, ArrayView{ 2, 2, owners.data() }, ArrayView{} };
+        std::array<ArrayView, 3> arrays{ ArrayView{ 2, 2, owners.data() }, ArrayView{ 2, 2, owners.data() }, ArrayView{ 2, 2, owners.data() } };
         static_assert(sizeof(arrays) == sizeof(RE::ControlMap::InputContext));
         map.inputContexts[0] = reinterpret_cast<RE::ControlMap::InputContext*>(arrays.data());
         std::uint32_t keys[]{ 0x20, 0xFF };
@@ -160,7 +160,7 @@ int main()
         check(candidate() == 2, "taking another action's alternate also requires confirmation");
         check(candidate(Slot::kMain, Context::kMainGameplay, Device::kMouse) == 2, "mouse binding conflicts also prompt");
         check(candidate(Slot::kMain, Context::kShipHUD) == 0, "unrelated contexts retain native behavior");
-        check(candidate(Slot::kMain, Context::kMainGameplay, Device::kGamepad) == 0, "controller remapping retains native behavior");
+        check(candidate(Slot::kMain, Context::kMainGameplay, Device::kGamepad) == 2, "controller occupied bindings require confirmation during OSF capture");
         for (const auto result : { 1, 2, 3 }) {
             nativeResult = static_cast<std::uint8_t>(result);
             check(candidate() == result, "preserve native rejection or confirmation result");

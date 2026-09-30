@@ -7,6 +7,7 @@ package
         public var definitions:Array = [];
         public var labels:Object = {};
         public var generation:uint = 0;
+        public var controllerEntries:Array = [];
         public function PreviewBindings()
         {
             add("Jump","Jump",32,255,0,0,true);
@@ -24,6 +25,19 @@ package
             records.push({action:"preview/alternate",context:0,device:0,slot:1,key:118,modifier:255});
             entries[entries.length - 1].AltBinding = binding(118,255,0);
             for (var i:int = 0; i < 28; ++i) add("Fixture" + i,"Additional gameplay action " + (i + 1),i < 10 ? 48 + i : 255);
+            for each (var entry:Object in entries) {
+                var controller:Object = {};
+                for (var property:String in entry) controller[property] = entry[property];
+                controller.bGamepadEntry = true;
+                var code:uint = entry.sInputName == "Jump" || entry.sInputName == "preview/shared" ? 4096 :
+                    entry.sInputName == "Attack" ? 10 : entry.sInputName == "preview/chord" ? 32768 : 255;
+                var modifier:uint = entry.sInputName == "preview/chord" ? 256 : 255;
+                controller.MainBinding = {aPCKeyName:[], aButtonName:code == 4096 ? ["Xenon_A"] :
+                    code == 10 ? ["Xenon_R2"] : code == 32768 ? ["Xenon_L1", "Xenon_Y"] : []};
+                controller.AltBinding = {aPCKeyName:[], aButtonName:[]};
+                controllerEntries.push(controller);
+                records.push({action:entry.sInputName, context:0, device:2, slot:0, key:code, modifier:modifier});
+            }
         }
         private function binding(key:uint,modifier:uint,device:uint):Object
         {

@@ -36,6 +36,7 @@ package
         private var captureKey:String;
         private var held:Object = {};
         private var nativeBindings:PreviewBindings = new PreviewBindings();
+        private var allowNativeCapture:Boolean = false;
 
         public function PreviewHost()
         {
@@ -174,6 +175,14 @@ package
                 previewKey:captureButton,
                 previewBindingTitle:function(entry:Object):String { return nativeBindings.labels[entry.sInputName] || entry.sInputName; },
                 previewBindingCell:fitNativeBindingCell,
+                previewGamepad:publishGamepad,
+                previewAllowNativeCapture:function(enabled:Boolean):void { allowNativeCapture = enabled; },
+                previewControlsSaved:function():void {
+                    var manager:Object = domain.getDefinition("Shared.AS3.Data.BSUIDataManager");
+                    var data:Object = manager.GetDataFromClient("FireForgetEventData");
+                    data.data.aEvents = [{sEventName:"SettingsDataModel_ControlsSaved"}];
+                    data.SetReady(true); data.DispatchChange();
+                },
                 previewConstruct:function(name:String, clip:Object):void {
                     // Ruffle rejects the game's class-only placement in this popup.
                     // Restore that authored child from its real game symbol.
@@ -186,7 +195,7 @@ package
                 requestBindings:function():uint { return ++nativeBindings.generation; },
                 pollBindings:nativeBindings.snapshot,
                 textInput:function(enabled:Boolean):Boolean { return true; },
-                beginNativeBinding:function():Boolean { return false; },
+                beginNativeBinding:function():Boolean { return allowNativeCapture; },
                 endNativeBinding:function(cancel:Boolean):void {}};
             addChild(menu as MovieClip);
             menu.onCodeObjCreate();
@@ -209,6 +218,16 @@ package
                 result.push(copy);
             }
             return result.concat(nativeBindings.definitions, launcherRows());
+        }
+
+        private function publishGamepad(enabled:Boolean, remapping:Boolean = false):void
+        {
+            var manager:Object = domain.getDefinition("Shared.AS3.Data.BSUIDataManager");
+            var data:Object = manager.GetDataFromClient("ControlBindingsData");
+            data.data.aInputSettingsList = enabled ? nativeBindings.controllerEntries : nativeBindings.entries;
+            data.data.bShowSecondaryBindings = !enabled;
+            data.data.bRemappingControl = remapping;
+            data.DispatchChange();
         }
 
         private function launcherRows():Array

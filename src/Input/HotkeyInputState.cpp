@@ -86,9 +86,27 @@ namespace OSFSettings
         return !m_blocks.empty();
     }
 
-    bool HotkeyInputState::ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds)
+    void HotkeyInputState::ResetHeldButtons()
     {
-        if (!key || key >= KeyBinding::Unbound) return false;
+        std::lock_guard lock(m_mutex);
+        m_pressed.clear();
+    }
+
+    bool HotkeyInputState::ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds,
+        std::uint32_t device, std::uint32_t instance)
+    {
+        if (device == 0) {
+            if (!key || key >= KeyBinding::Unbound) return false;
+        } else if (device == 2) {
+            // Native controller masks, plus the engine's two trigger IDs.
+            switch (key) {
+            case 1: case 2: case 4: case 8: case 9: case 10:
+            case 0x10: case 0x20: case 0x40: case 0x80: case 0x100: case 0x200:
+            case 0x1000: case 0x2000: case 0x4000: case 0x8000: break;
+            default: return false;
+            }
+        } else return false;
+        const std::array identity{ device, instance, key };
 
         std::unique_lock lock(m_mutex);
         if (!m_blocks.empty()) return false;
@@ -120,12 +138,12 @@ namespace OSFSettings
 
         if (value > 0) {
             if (heldSeconds == 0) {
-                m_pressed.insert_or_assign(key, action.event);
+                m_pressed.insert_or_assign(identity, action.event);
             }
             return false;
         }
 
-        const auto press = m_pressed.find(key);
+        const auto press = m_pressed.find(identity);
         if (press == m_pressed.end()) return false;
         const bool activate = value == 0 && heldSeconds >= 0 && press->second == action.event;
         m_pressed.erase(press);

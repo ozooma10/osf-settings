@@ -327,8 +327,7 @@ package
                     require(list.entryCount == 40 && list.selectedEntry.row.action == "Jump", "controller publication preserves the selected action");
                     require(list.selectedEntry.row.records.length == 1 && list.selectedEntry.row.records[0].device == 2,
                         "controller rows exclude keyboard and mouse records from mixed snapshots");
-                    var pad:Object = findNamed(menu,"controllerMap");
-                    require(pad.visible && !findNamed(menu,"key_77").parent.visible, "controller diagram replaces the keyboard");
+                    require(!findNamed(menu,"key_77").parent.visible, "controller display hides the keyboard");
                     var nativeHost:DisplayObjectContainer = list.FindClipForEntry(list.selectedIndex) as DisplayObjectContainer;
                     var primary:DisplayObject = findNamed(nativeHost,"MainBinding_mc");
                     require(!findNamed(nativeHost,"AltBinding_mc").visible && Object(primary.parent).activePriority == 0,
@@ -336,34 +335,14 @@ package
                     require(Object(primary).Icon_mc.Icon_tf.text == "A" && Object(primary).Icon_mc.Icon_tf.visible,
                         "native controller row renders the A glyph");
                     capture("keybindings-controller");
-                    userEvent("YButton");
-                    require(pad.focused && list.disableInput && list.disableSelection, "Y focuses the controller diagram and freezes result input");
-                    userEvent("Accept"); break;
-                case 101:
-                    require(list.entryCount == 2 && list.selectedEntry.row.action == "Jump", "controller button filter includes game and mod actions");
-                    userEvent("XButton");
-                    require(list.entryCount == 40 && !findNamed(menu,"bindingKeyFilter").visible, "X clears only the diagram filter");
-                    var oldButton:int = Object(findNamed(menu,"controllerMap")).selectedCode;
-                    userEvent("Left");
-                    require(Object(findNamed(menu,"controllerMap")).selectedCode != oldButton, "directional input moves diagram focus");
-                    findNamed(menu,"pad_256").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
-                case 102:
-                    require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/chord", "controller modifier button finds native chord");
-                    require(Object(findNamed(menu,"pad_256")).getChildAt(0).Icon_tf.textColor == 0x08151C &&
-                        Object(findNamed(menu,"pad_32768")).getChildAt(0).Icon_tf.textColor == 0x08151C,
-                        "both controller chord buttons receive selection highlighting");
-                    capture("keybindings-controller-chord");
-                    userEvent("Cancel");
-                    require(!Object(findNamed(menu,"controllerMap")).focused && !navFocused() && !list.disableInput,
-                        "Back returns from the diagram to results without leaving the page");
                     searchField().text = "shoulder"; searchField().dispatchEvent(new Event(Event.CHANGE));
-                    Object(menu).BGSCodeObj.previewGamepad(false); break;
+                    Object(menu).BGSCodeObj.previewGamepad(false); step = 103; break;
                 case 103:
                     require(searchField().text == "shoulder" && !findNamed(menu,"bindingKeyFilter").visible,
                         "device switch retains search and clears controller button filter");
                     findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 104:
-                    require(list.entryCount == 40 && !findNamed(menu,"controllerMap").visible && findNamed(menu,"key_77").parent.visible,
+                    require(list.entryCount == 40 && findNamed(menu,"key_77").parent.visible,
                         "keyboard display and all rows return after switching devices");
                     require(findNamed(list.FindClipForEntry(list.selectedIndex),"AltBinding_mc").visible,
                         "keyboard publication restores Alternate");

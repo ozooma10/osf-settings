@@ -64,6 +64,7 @@ package
         public static function keyName(code:uint, device:uint):String
         {
             if (!KeybindingsData.bound(code)) return tr("values.unboundTitle");
+            if (device == 2) return ControllerButtons.keyName(code);
             if (device == 1) return tr("keys.mouse", {number:code + 1});
             if (code == 16) return tr("keys.shift"); if (code == 17) return tr("keys.ctrl"); if (code == 18) return tr("keys.alt");
             return names[code] || tr("keys.code", {code:code});
@@ -80,7 +81,7 @@ package
                 for each (var record:Object in row.records) {
                     if (!KeybindingsData.bound(record.key)) continue;
                     if (record.device == 0) mark(usage, record.key, flags);
-                    if (KeybindingsData.modified(record.modifier)) mark(usage, record.modifier, flags);
+                    if (record.device != 2 && KeybindingsData.modified(record.modifier)) mark(usage, record.modifier, flags);
                 }
             }
             for each (var key:Object in keys) {

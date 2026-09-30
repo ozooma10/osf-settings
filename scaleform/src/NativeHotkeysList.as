@@ -28,6 +28,9 @@ package
         private var clearing:Boolean = false;
         private var openRequested:Boolean = false;
         private var showAlternate:Boolean = false;
+        private var pending:Object;
+        public var gamepad:Boolean = false;
+        public function get secondary():Boolean { return showAlternate; }
         public var revision:uint = 0;
         public var ready:Boolean = false;
         public var fullPage:Boolean = false;
@@ -76,13 +79,13 @@ package
                 if (row.type != "hotkey") continue;
                 var native:Object = null;
                 for each (var entry:Object in entries) {
-                    if (!entry.bIsDivider && !entry.bGamepadEntry && entry.uContextID == 0 && entry.sInputName == row.action) {
+                    if (!entry.bIsDivider && entry.uContextID == 0 && entry.sInputName == row.action) {
                         native = entry; break;
                     }
                 }
-                row.editable = Boolean(native && !native.bReadOnly && !native.bGamepadEntry);
-                row.value = native ? native.MainBinding.aPCKeyName.join(" + ") : "";
-                row.alternate = native ? native.AltBinding.aPCKeyName.join(" + ") : "";
+                row.editable = Boolean(native && !native.bReadOnly);
+                row.value = native ? KeybindingsData.bindingText(native.MainBinding) : "";
+                row.alternate = native && showAlternate ? KeybindingsData.bindingText(native.AltBinding) : "";
                 if (!native) row.hint = tr("bindings.unavailableAction");
                 if (native) {
                     // Keep the data model's slot/glyph data intact.
@@ -114,17 +117,17 @@ package
             var clip:Object = view.clip;
             var bindingChanged:Boolean = view.row != row || view.binding != row.binding;
             if (bindingChanged) {
-                if (!view.row || view.row.action != row.action) clip.ClearActiveBinding();
+                if (!view.row || view.row.action != row.action || view.binding.bGamepadEntry != row.binding.bGamepadEntry) clip.ClearActiveBinding();
                 clip.SetEntryText(row.binding); view.row = row; view.binding = row.binding;
             }
             clip.itemIndex = Object(host).itemIndex;
             if (!busy) {
                 if (selected) {
                     if (!clip.selected) clip.onRollover();
-                    if (clip.activePriority == 2 || !(showAlternate || fullPage) && clip.activePriority != 0) clip.SetActiveBinding(0);
+                    if (clip.activePriority == 2 || !showAlternate && clip.activePriority != 0) clip.SetActiveBinding(0);
                 } else if (clip.selected || clip.activePriority != 2) clip.onRollout();
             }
-            var alternate:Boolean = showAlternate || fullPage;
+            var alternate:Boolean = showAlternate;
             // Native rollover/listening frames can change bounds; idle cells cannot.
             if (!bindingChanged && view.height == height && view.alternate == alternate && view.fullPage == fullPage &&
                 view.frame == clip.currentFrame && view.mainFrame == clip.MainBinding_mc.currentFrame && view.altFrame == clip.AltBinding_mc.currentFrame)
@@ -167,7 +170,7 @@ package
         public function navigate(event:KeyboardEvent):void
         {
             var clip:Object = currentClip;
-            if (!clip || busy || saving || !(showAlternate || fullPage)) return;
+            if (!clip || busy || saving || !showAlternate) return;
             if (clip.activePriority == 2) clip.SetActiveBinding(0);
             else clip.onKeyDownHandler(event);
         }
@@ -193,6 +196,7 @@ package
             var target:DisplayObject = event.target as DisplayObject;
             while (target && target != list) {
                 if (target.name == "MainBinding_mc" || target.name == "AltBinding_mc") {
+                    if (target.name == "AltBinding_mc" && !showAlternate) { event.stopImmediatePropagation(); return; }
                     var clip:Object = event.currentTarget;
                     // Select the clicked slot even if no rollover preceded the click.
                     list.selectedIndex = clip.itemIndex;
@@ -217,7 +221,7 @@ package
         {
             if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
             var binding:Object = currentClip.activePriority == 0 ? list.selectedEntry.row.binding.MainBinding :
-                currentClip.activePriority == 1 ? list.selectedEntry.row.binding.AltBinding : null;
+                showAlternate && currentClip.activePriority == 1 ? list.selectedEntry.row.binding.AltBinding : null;
             return Boolean(binding && (binding.aPCKeyName.length || binding.aButtonName.length));
         }
 
@@ -254,9 +258,7 @@ package
         private function bindingsChanged(event:Event):void
         {
             var data:Object = Object(event).data;
-            entries = data.aInputSettingsList as Array || [];
-            ready = true; ++revision;
-            showAlternate = Boolean(data.bShowSecondaryBindings);
+            pending = {entries:data.aInputSettingsList as Array || [], secondary:Boolean(data.bShowSecondaryBindings)};
             if (busy && data.bRemappingControl) seenRemapping = true;
             if (busy && seenRemapping && !data.bRemappingControl) {
                 finish();
@@ -265,7 +267,18 @@ package
             } else if (clearing) {
                 clearing = false; save();
             }
-            changed("", !busy);
+            advance();
+            changed("", !busy && !saving);
+        }
+
+        public function advance():void
+        {
+            if (!pending || busy || saving) return;
+            entries = pending.entries; showAlternate = pending.secondary; pending = null;
+            // Empty publications retain the last device family until rows arrive.
+            for each (var entry:Object in entries) if (!entry.bIsDivider) { gamepad = Boolean(entry.bGamepadEntry); break; }
+            ready = true; ++revision;
+            changed("", true);
         }
 
         private function remapConfirmed(event:Event):void

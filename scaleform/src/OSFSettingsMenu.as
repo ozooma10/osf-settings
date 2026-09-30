@@ -368,7 +368,6 @@ package
                 if (pressed && navigationFrame != frame) { navigationFrame = frame; openEntry(nav.move(name == "Up" ? -1 : 1)); }
                 return true;
             }
-            if (name == "LShoulder" || name == "RShoulder") { if (pressed) changePage(name == "LShoulder" ? -1 : 1); return true; }
             if (name == "Right") { if (pressed) enterPage(); return true; }
             if (name == "Accept") {
                 // Enter on release, like the interface shelf, so the press cannot also act on the page.
@@ -520,7 +519,7 @@ package
             homeCount.y = homeMods.y + 3;
             syncInput();
             // Mod pages start the list under the header; section headers name its parts.
-            options.y = issuesPage() ? IssueStyle.TOP : bindingsPage() ? KeybindingsPage.LIST_TOP : homeMods.visible ? homeMods.y + MenuStyle.SECTION_SIZE + 20 :
+            options.y = issuesPage() ? IssueStyle.TOP : bindingsPage() ? keybindings.listTop : homeMods.visible ? homeMods.y + MenuStyle.SECTION_SIZE + 20 :
                 modID ? MenuStyle.SECTION_TOP : MenuStyle.LIST_TOP;
             // Whole rows only, so the last visible row is never cut by the footer.
             var pitch:Number = rowHeight() + MenuStyle.ROW_GAP;
@@ -684,6 +683,7 @@ package
                 resetVisible = false;
                 acceptVisible = Boolean(!busy && !searching() && row && row.editable);
                 clearVisible = clearVisible && !searching();
+
             }
             if (launcherPage()) {
                 acceptText = row && row.more ? tr("home.expand") : tr("buttons.open");
@@ -892,9 +892,10 @@ package
         {
             var result:Object = BGSCodeObj.pollLaunch();
             if (result.state == "pending") return;
+            // Keep the loading caption until native's queued hide removes the menu.
+            if (result.state == "closing") { lockForClose(); return; }
             var row:Object = launching;
             endLaunch();
-            if (result.state == "closing") { lockForClose(); return; }
             setStatus(String(result.message) || tr("home.loadFailed", {title:String(row.title)}), true);
         }
         private function endLaunch():void
@@ -958,8 +959,6 @@ package
             if (routeNavigation(name, pressed)) return true;
             if (nav.focused) return false;
             if (bar.ProcessUserEvent(name, pressed)) return true;
-            // Hidden page buttons still swallow the shoulder events.
-            if (name == "LShoulder" || name == "RShoulder") return true;
             if (launcherPage()) return false;
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
             return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
@@ -1048,8 +1047,6 @@ package
             if (event.keyCode == Keyboard.B) reset();
             else if (event.keyCode == Keyboard.X && (issuesPage() || current() && (current().type == "key" || current().type == "hotkey"))) clearBinding();
             else if (issuesPage() && (input == "PageUp" || input == "PageDown")) issueDetails.scroll(input == "PageUp" ? -360 : 360);
-            // [ and ] walk the sidebar like the shoulder buttons.
-            else if (input == "LShoulder" || input == "RShoulder") changePage(input == "LShoulder" ? -1 : 1);
             else if (input == "Left" || input == "Right") {
                 var row:Object = current();
                 if (modID && row && row.editable) {
@@ -1094,6 +1091,12 @@ package
         }
         private function routeNavigation(name:String, pressed:Boolean):Boolean
         {
+            // Page navigation responds on press in either focus area. Consume the
+            // release too so the footer's button handler cannot navigate again.
+            if (name == "LShoulder" || name == "RShoulder") {
+                if (pressed) changePage(name == "LShoulder" ? -1 : 1);
+                return true;
+            }
             if (nav.focused) return navigate(name, pressed);
             if (launcherPage() && name == "Accept") { launcherAccept(pressed); return true; }
             if (launcherPage() && navigateLauncher(name, pressed)) return true;
@@ -1148,6 +1151,7 @@ package
             ++frame;
             if (initialized && !closing) {
                 if (launching) pollLaunch();
+                nativeHotkeys.advance();
                 keybindings.advance(allRows,bindingBusy());
                 syncInput();
                 if (footerDirty) updateFooter(current());

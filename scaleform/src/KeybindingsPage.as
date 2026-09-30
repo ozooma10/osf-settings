@@ -23,6 +23,10 @@ package
         public var source:String = "all";
         public var search:TextField;
         private var keyboard:KeyboardMap;
+        private var content:Sprite = new Sprite();
+        private var headings:Array = [];
+        public var gamepad:Boolean = false;
+        public function get listTop():Number { return LIST_TOP + content.y; }
         private var sourceLabel:TextField;
         private var placeholder:TextField;
         private var keyChip:Sprite;
@@ -51,8 +55,10 @@ package
 
         public function KeybindingsPage(code:Object, nativeEditor:NativeHotkeysList, notify:Function, resultsFocus:Function)
         {
+            name = "keybindingsPage";
             bridge = code; editor = nativeEditor; changed = notify; leaveSearch = resultsFocus;
             keyboard = new KeyboardMap(selectKey); keyboard.x = MenuStyle.LEFT; keyboard.y = KEYBOARD_TOP; addChild(keyboard);
+            content.name = "bindingContent"; addChild(content);
             // Filters share the right column so the results list can start under the keyboard.
             var left:Number = MenuStyle.DETAIL_X, column:Number = MenuStyle.DETAIL_WIDTH, top:Number = LIST_TOP;
             var size:Number = MenuStyle.VALUE_SIZE + 2, line:Number = size + 12, inset:Number = (BOX - line) / 2 + 2;
@@ -80,20 +86,21 @@ package
                 var heading:TextField = field(label,bindingX,COLUMNS_TOP,MenuStyle.BINDING_WIDTH,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
                 var format:TextFormat = heading.defaultTextFormat; format.align = "center";
                 heading.defaultTextFormat = format; MenuStyle.fit(heading,label);
+                headings.push(heading);
                 bindingX += MenuStyle.BINDING_WIDTH + MenuStyle.BINDING_GAP;
             }
-            graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(left,top,column,BOX);
-            graphics.drawRect(left,top + BOX + 12,column,BOX);
+            content.graphics.lineStyle(1,MenuStyle.LINE); content.graphics.drawRect(left,top,column,BOX);
+            content.graphics.drawRect(left,top + BOX + 12,column,BOX);
             visible = false;
         }
         private function field(text:String,x:Number,y:Number,w:Number,h:Number,size:Number,color:uint = 0xF1F2EC):TextField
         {
-            var result:TextField = MenuStyle.field(text,x,y,w,h,size,color,true); addChild(result); return result;
+            var result:TextField = MenuStyle.field(text,x,y,w,h,size,color,true); content.addChild(result); return result;
         }
         private function nameField(field:TextField,name:String):Sprite
         {
             var wrapper:Sprite = new Sprite(); wrapper.name = name;
-            addChild(wrapper); wrapper.addChild(field); return wrapper;
+            content.addChild(wrapper); wrapper.addChild(field); return wrapper;
         }
         public function get searching():Boolean { return visible && stage && stage.focus == search; }
         public function open(metadata:Array):void
@@ -124,6 +131,12 @@ package
             if (snapshot && snapshot.generation == generation && snapshot.state != "loading") {
                 if (snapshot.state == "ready" && editor.ready) {
                     rows = KeybindingsData.join(editor.bindings,definitions,snapshot.records,editor.title);
+                    if (gamepad != editor.gamepad) selectedKey = -1;
+                    gamepad = editor.gamepad;
+                    keyboard.visible = !gamepad;
+                    content.y = gamepad ? KEYBOARD_TOP - COLUMNS_TOP : 0;
+                    headings[0].width = editor.secondary ? MenuStyle.BINDING_WIDTH : MenuStyle.CONTROL_WIDTH;
+                    headings[1].visible = editor.secondary;
                     state = "ready"; updateSources(); changed(); return;
                 }
                 if (snapshot.state == "unavailable") { rows = []; state = "unavailable"; changed(); return; }
@@ -156,15 +169,16 @@ package
         public function showSelection(row:Object):void
         {
             selection = row;
-            keyboard.update(rows,filtered(),row,selectedKey);
+            if (!gamepad) keyboard.update(rows,filtered(),row,selectedKey);
             var title:String = tr("bindings.allSources");
             for each (var choice:Object in sources) if (choice.id == source) title = choice.title;
             MenuStyle.fit(sourceLabel,tr("bindings.source", {source:title}));
             placeholder.visible = !search.text && !searching;
             keyChip.visible = selectedKey >= 0;
             if (keyChip.visible) {
-                keyLabel.width = 400; MenuStyle.fit(keyLabel,tr("bindings.keyFilter", {key:KeyboardMap.keyName(selectedKey,0)}));
-                keyLabel.width = Math.min(400,keyLabel.textWidth + 8);
+                var chipWidth:Number = Math.min(400, clearLabel.x - MenuStyle.DETAIL_X - 36);
+                keyLabel.width = chipWidth; MenuStyle.fit(keyLabel,tr("bindings.keyFilter", {key:KeyboardMap.keyName(selectedKey,gamepad ? 2 : 0)}));
+                keyLabel.width = Math.min(chipWidth,keyLabel.textWidth + 8);
                 keyChip.graphics.clear(); keyChip.graphics.lineStyle(2,MenuStyle.WHITE); keyChip.graphics.beginFill(MenuStyle.INK,0);
                 keyChip.graphics.drawRect(MenuStyle.DETAIL_X,LIST_TOP + (BOX + 12) * 2,keyLabel.width + 24,BOX); keyChip.graphics.endFill();
             }

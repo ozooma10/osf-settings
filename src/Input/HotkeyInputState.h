@@ -4,6 +4,7 @@
 #include "NativeHotkeys.h"
 
 #include <cstdint>
+#include <array>
 #include <atomic>
 #include <functional>
 #include <memory>
@@ -37,7 +38,9 @@ namespace OSFSettings
         bool Blocked();
 
         // The native handler resolves the action before passing it here.
-        bool ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds);
+        bool ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds,
+            std::uint32_t device = 0, std::uint32_t instance = 0);
+        void ResetHeldButtons();
 
     private:
         struct Listener
@@ -62,6 +65,7 @@ namespace OSFSettings
         bool m_initialized{};
         std::set<Block> m_blocks;
         Block m_nextBlock{ 1 };
-        std::map<std::uint32_t, std::string> m_pressed;
+        // Native device type, device instance, and device-local button code.
+        std::map<std::array<std::uint32_t, 3>, std::string> m_pressed;
     };
 }

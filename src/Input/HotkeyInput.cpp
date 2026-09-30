@@ -29,8 +29,12 @@ namespace OSFSettings::HotkeyInput
         public:
             bool ShouldHandleEvent(const RE::InputEvent* event) override
             {
+                if (event && event->eventType == RE::InputEvent::EventType::kDeviceConnect) {
+                    HotkeyInputState::Get().ResetHeldButtons();
+                    return false;
+                }
                 if (NativeBindingEditor::IsActive() || !event || event->eventType != RE::InputEvent::EventType::kButton ||
-                    (event->deviceType != RE::InputEvent::DeviceType::kKeyboard && event->deviceType != RE::InputEvent::DeviceType::kMouse)) {
+                    (event->deviceType != RE::InputEvent::DeviceType::kKeyboard && event->deviceType != RE::InputEvent::DeviceType::kMouse && event->deviceType != RE::InputEvent::DeviceType::kGamepad)) {
                     return false;
                 }
                 const auto* button = static_cast<const RE::ButtonEvent*>(event);
@@ -41,7 +45,8 @@ namespace OSFSettings::HotkeyInput
             {
                 TestHarness::ObserveInput(button, true);
                 const auto* ui = RE::UI::GetSingleton();
-                if (button->value > 0 && button->heldDownSecs == 0 && ui && ui->pauseRequestCount == 0 &&
+                if (button->deviceType != RE::InputEvent::DeviceType::kGamepad &&
+                    button->value > 0 && button->heldDownSecs == 0 && ui && ui->pauseRequestCount == 0 &&
                     !ui->IsMenuOpen(RE::BSFixedString("MainMenu")) &&
                     !ui->IsMenuOpen(RE::BSFixedString("LoadingMenu")) &&
                     !ui->IsMenuOpen(RE::BSFixedString("Console")) &&
@@ -50,11 +55,11 @@ namespace OSFSettings::HotkeyInput
                     KeyActions::Get().Process(button->deviceType == RE::InputEvent::DeviceType::kMouse ?
                         MouseVirtualKey(static_cast<std::uint32_t>(button->idCode)) : static_cast<std::uint32_t>(button->idCode));
                 }
-                if (button->deviceType != RE::InputEvent::DeviceType::kKeyboard) return;
+                if (button->deviceType != RE::InputEvent::DeviceType::kKeyboard && button->deviceType != RE::InputEvent::DeviceType::kGamepad) return;
                 const auto* action = NativeHotkeys::FindAction(button->QUserEvent().c_str());
                 if (!action) return;
                 const auto key = static_cast<std::uint32_t>(button->idCode);
-                if (!HotkeyInputState::Get().ProcessButton(key, *action, button->value, button->heldDownSecs)) return;
+                if (!HotkeyInputState::Get().ProcessButton(key, *action, button->value, button->heldDownSecs, static_cast<std::uint32_t>(button->deviceType), button->deviceID)) return;
                 if (action->menu) {
                     auto* queue = RE::UIMessageQueue::GetSingleton();
                     if (!queue) return;

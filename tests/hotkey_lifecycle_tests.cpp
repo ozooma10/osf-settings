@@ -246,7 +246,13 @@ int main()
             check(!handler->ShouldHandleEvent(&settings), "disabled mapped actions are rejected");
             settings.disabled = false;
             settings.deviceType = RE::InputEvent::DeviceType::kGamepad;
-            check(!handler->ShouldHandleEvent(&settings), "menu declarations remain keyboard-only");
+            check(handler->ShouldHandleEvent(&settings), "menu declarations admit controller buttons");
+            input.ProcessButton(0x1000, *NativeHotkeys::FindAction("osfsettings/openMenu"), 1, 0, 2, 1);
+            RE::InputEvent deviceChange;
+            deviceChange.eventType = RE::InputEvent::EventType::kDeviceConnect;
+            check(!handler->ShouldHandleEvent(&deviceChange) &&
+                !input.ProcessButton(0x1000, *NativeHotkeys::FindAction("osfsettings/openMenu"), 0, 1, 2, 1),
+                "device change clears held presses without consuming the connection event");
             settings.deviceType = RE::InputEvent::DeviceType::kKeyboard;
             settings.eventType = RE::InputEvent::EventType::kChar;
             check(!handler->ShouldHandleEvent(&settings), "text events are not button activations");
@@ -343,8 +349,14 @@ int main()
             check(!handler->ShouldHandleEvent(&callback) && calls == 0, "disabled callback actions are filtered");
             callback.disabled = false;
             callback.deviceType = RE::InputEvent::DeviceType::kGamepad;
+            const auto keyboardCode = callback.idCode;
+            callback.idCode = 0x1000;
             callbackButton(1, 0);
-            check(!handler->ShouldHandleEvent(&callback) && calls == 0, "callback actions remain keyboard-only");
+            check(handler->ShouldHandleEvent(&callback) && calls == 1 && callback.status == RE::InputEvent::Status::kStop,
+                "controller callback actions execute and consume their native events");
+            callbackButton(1, 1); callbackButton(0, 1);
+            check(calls == 1, "controller repeats and releases do not duplicate callbacks");
+            calls = 0; callback.idCode = keyboardCode;
             callback.deviceType = RE::InputEvent::DeviceType::kKeyboard;
             callback.eventType = RE::InputEvent::EventType::kChar;
             callbackButton(1, 0);

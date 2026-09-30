@@ -35,6 +35,34 @@ int main()
         ++checks;
     };
     try {
+        {
+            HotkeyInputState controller;
+            Receiver receiver;
+            controller.Initialize({ { "sample", {{ "toggleFeature", Target::Callback }, { "openMenu", Target::Menu }} } });
+            check(controller.Register("sample", "toggleFeature", Receiver::Fired, &receiver) == SettingsError::None, "register controller fixture");
+            for (const auto button : { 1u, 2u, 4u, 8u, 9u, 10u, 0x10u, 0x20u, 0x40u, 0x80u, 0x100u, 0x200u, 0x1000u, 0x2000u, 0x4000u, 0x8000u }) {
+                check(controller.ProcessButton(button, action, 1, 0, 2) &&
+                    !controller.ProcessButton(button, action, 1, 1, 2) && !controller.ProcessButton(button, action, 0, 1, 2),
+                    "native controller buttons including triggers activate only on fresh press");
+            }
+            check(receiver.events.size() == 16, "each controller button delivers once");
+            for (const auto invalid : { 0u, 255u, 0x7FFFFFFFu, 0xFFFFFFFFu, 0x1001u })
+                check(!controller.ProcessButton(invalid, action, 1, 0, 2), "sentinels and non-button masks are rejected");
+            controller.ProcessButton(8, menu, 1, 0, 0, 0);
+            controller.ProcessButton(8, menu, 1, 0, 2, 0);
+            controller.ProcessButton(8, menu, 1, 0, 2, 1);
+            check(!controller.ProcessButton(8, menu, 0, 1, 2, 2), "another controller cannot release a held button");
+            check(controller.ProcessButton(8, menu, 0, 1, 0, 0) && controller.ProcessButton(8, menu, 0, 1, 2, 1) &&
+                controller.ProcessButton(8, menu, 0, 1, 2, 0), "equal device-local codes and separate controller instances release independently");
+            controller.ProcessButton(0x8000, menu, 1, 0, 2);
+            controller.ResetHeldButtons();
+            check(!controller.ProcessButton(0x8000, menu, 0, 1, 2), "disconnect discards pending menu activation");
+            controller.ProcessButton(9, menu, 1, 0, 2);
+            const auto block = controller.AcquireBlock();
+            check(!controller.ProcessButton(10, action, 1, 0, 2), "capture blocks controller callbacks");
+            controller.ReleaseBlock(block);
+            check(!controller.ProcessButton(9, menu, 0, 1, 2), "capture clears held controller menu actions");
+        }
         HotkeyInputState input;
         Receiver one, two, another;
         const auto registerCallback = [&](const char* mod, const char* id, Receiver& receiver) {

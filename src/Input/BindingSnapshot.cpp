@@ -17,7 +17,7 @@ namespace OSFSettings
                 return;
             }
             std::vector<BindingRecord> records;
-            for (const auto device : { RE::InputEvent::DeviceType::kKeyboard, RE::InputEvent::DeviceType::kMouse }) {
+            for (const auto device : { RE::InputEvent::DeviceType::kKeyboard, RE::InputEvent::DeviceType::kMouse, RE::InputEvent::DeviceType::kGamepad }) {
                 for (const auto& entry : map->GetMappings(context, device)) {
                     records.push_back({ std::string(entry.eventID.c_str()), static_cast<std::uint32_t>(context),
                         static_cast<std::uint32_t>(device), static_cast<std::uint32_t>(entry.bindingSlot),

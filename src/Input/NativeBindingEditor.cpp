@@ -23,8 +23,9 @@ namespace OSFSettings
         std::uint8_t ValidateCandidate(RE::ControlMap* map, const RE::BSFixedString* action, std::uint8_t device, const std::uint32_t* keys, Slot slot, Context context)
         {
             const auto result = (*g_validateHook)(map, action, device, keys, slot, context);
-            // Vanilla permits occupied-key swaps. Only OSF's active PC capture asks for confirmation as well; native rejection and commit rules remain intact.
-            if (result != kAllowed || !NativeBindingEditor::IsActive() || context != Context::kMainGameplay || device > static_cast<std::uint8_t>(Device::kMouse) || keys[0] == KeyBinding::Unbound) {
+            // OSF capture confirms occupied-key swaps on the candidate's device;
+            // native rejection and commit rules remain intact.
+            if (result != kAllowed || !NativeBindingEditor::IsActive() || context != Context::kMainGameplay || device > static_cast<std::uint8_t>(Device::kGamepad) || keys[0] == KeyBinding::Unbound) {
                 return result;
             }
             for (const auto& mapping : map->GetMappings(context, static_cast<Device>(device))) {

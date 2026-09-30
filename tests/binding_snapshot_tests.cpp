@@ -11,6 +11,20 @@ namespace
     RE::ControlMap* mapPointer{};
     std::vector<RE::BSService::QueuedDelegate*> tasks;
     bool inlineFallback{};
+    void GetString(RE::BSStringPool::Entry*& result, const char* text, bool)
+    {
+        const auto length = std::strlen(text);
+        auto* storage = new std::byte[sizeof(RE::BSStringPool::Entry) + length + 1]{};
+        result = std::construct_at(reinterpret_cast<RE::BSStringPool::Entry*>(storage));
+        result->_length = static_cast<std::uint32_t>(length);
+        result->_refCount = 1;
+        std::memcpy(result + 1, text, length + 1);
+    }
+    void ReleaseString(RE::BSStringPool::Entry*& entry)
+    {
+        if (entry && --entry->_refCount == 0) delete[] reinterpret_cast<std::byte*>(entry);
+        entry = nullptr;
+    }
     void Submit(RE::BSService::TaskQueue*, RE::BSService::QueuedDelegate** task)
     {
         if (inlineFallback) return;
@@ -33,6 +47,8 @@ namespace REL
         case 883606: address = reinterpret_cast<std::uintptr_t>(&queuePointer); break;
         case 100121: address = reinterpret_cast<std::uintptr_t>(&Submit); break;
         case 938003: address = reinterpret_cast<std::uintptr_t>(&mapPointer); break;
+        case 1186742: address = reinterpret_cast<std::uintptr_t>(&GetString); break;
+        case 139340: address = reinterpret_cast<std::uintptr_t>(&ReleaseString); break;
         default: throw std::runtime_error("Unexpected relocation " + std::to_string(id));
         }
         return address - REX::FModule::GetExecutingModule().GetBaseAddress();
@@ -81,6 +97,24 @@ int main()
         map.inputContexts[0] = &context;
         RequestBindingSnapshot(mailbox); Drain();
         check(mailbox->Read().status == BindingSnapshot::Status::Ready, "verified drain can publish an owned empty context");
+        {
+            std::array<RE::ControlMap::UserEventMapping, 3> mappings{};
+            for (auto& mapping : mappings) mapping.eventID = "same/action";
+            mappings[0].keyCode = 32;
+            mappings[1].keyCode = 0;
+            mappings[2].keyCode = 0x8000;
+            mappings[2].modifierKeyCode = 0x100;
+            struct ArrayView { std::uint32_t size, capacity; RE::ControlMap::UserEventMapping* data; };
+            std::array<ArrayView, 3> arrays{ ArrayView{1,1,&mappings[0]}, ArrayView{1,1,&mappings[1]}, ArrayView{1,1,&mappings[2]} };
+            static_assert(sizeof(arrays) == sizeof(RE::ControlMap::InputContext));
+            map.inputContexts[0] = reinterpret_cast<RE::ControlMap::InputContext*>(arrays.data());
+            RequestBindingSnapshot(mailbox); Drain();
+            const auto records = mailbox->Read().records;
+            check(records.size() == 3 && records[0].device == 0 && records[1].device == 1 && records[2].device == 2 &&
+                records[2].key == 0x8000 && records[2].modifier == 0x100,
+                "snapshot preserves all device namespaces and both controller chord members");
+            map.inputContexts[0] = &context;
+        }
         inlineFallback = true;
         RequestBindingSnapshot(mailbox);
         check(tasks.empty() && mailbox->Read().status == BindingSnapshot::Status::Ready, "inline callback publishes an owned snapshot");
