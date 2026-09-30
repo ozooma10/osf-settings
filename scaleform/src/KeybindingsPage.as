@@ -42,6 +42,11 @@ package
         private var requestedAt:int;
         private var nextPoll:int;
         private var frozen:Boolean;
+        private var filteredSource:Array;
+        private var filteredRows:Array;
+        private var filteredQuery:String;
+        private var filteredOwner:String;
+        private var filteredKey:int;
 
         public function KeybindingsPage(code:Object, nativeEditor:NativeHotkeysList, notify:Function, resultsFocus:Function)
         {
@@ -128,7 +133,15 @@ package
             }
             if (source != "all" && source != "game" && !seen[source]) source = "all";
         }
-        public function filtered():Array { return KeybindingsData.filter(rows,search.text,source,selectedKey); }
+        public function filtered():Array
+        {
+            // Published snapshots replace rows; selection changes do not invalidate a filter.
+            if (filteredSource != rows || filteredQuery != search.text || filteredOwner != source || filteredKey != selectedKey) {
+                filteredSource = rows; filteredQuery = search.text; filteredOwner = source; filteredKey = selectedKey;
+                filteredRows = KeybindingsData.filter(rows, filteredQuery, source, selectedKey);
+            }
+            return filteredRows;
+        }
         public function get emptyText():String
         {
             return state == "loading" ? tr("bindings.loading") : state == "unavailable" ?

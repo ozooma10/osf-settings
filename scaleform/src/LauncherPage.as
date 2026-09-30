@@ -26,6 +26,7 @@ package
         private var isLocked:Boolean = false;
         private var hasFocus:Boolean = false;
         private var loadingRow:Object = null;
+        private var pagerState:String = "";
         public function LauncherPage(onChanged:Function, onActivated:Function, onLayout:Function)
         {
             changed = onChanged; activated = onActivated; layoutChanged = onLayout;
@@ -134,11 +135,11 @@ package
         private function over(event:MouseEvent):void { select(LauncherCard(event.currentTarget).index); }
         private function press(event:MouseEvent):void { select(LauncherCard(event.currentTarget).index); activated(); }
         // Returns the button's left edge so header controls can be laid out right to left.
-        private function pageButton(text:String, right:Number, callback:Function, enabled:Boolean = true, buttonName:String = ""):Number
+        private function pageButton(text:String, right:Number, callback:Function, enabled:Boolean = true):Number
         {
             var label:TextField = MenuStyle.field(text, 4, 0, 300, MenuStyle.SMALL_SIZE + 14, MenuStyle.SMALL_SIZE + 2, MenuStyle.WHITE, true);
             label.width = Math.min(300, label.textWidth + 8); MenuStyle.fit(label, text);
-            var button:Sprite = new Sprite(); button.name = buttonName; button.x = right - label.width - 8; button.y = MenuStyle.SECTION_TOP - GRID_TOP + 2;
+            var button:Sprite = new Sprite(); button.x = right - label.width - 8; button.y = MenuStyle.SECTION_TOP - GRID_TOP + 2;
             button.mouseChildren = false; button.buttonMode = enabled; button.alpha = enabled ? 1 : 0.35;
             button.graphics.beginFill(0, 0); button.graphics.drawRect(0, 0, label.width + 8, MenuStyle.SMALL_SIZE + 14); button.graphics.endFill();
             button.addChild(label);
@@ -147,21 +148,30 @@ package
         }
         private function render():void
         {
-            while (cards.numChildren) cards.removeChildAt(0);
-            while (pager.numChildren) pager.removeChildAt(0);
             var gap:Number = 16, rowGap:Number = 14, across:int = columns;
             var width:Number = (MenuStyle.LIST_WIDTH - gap * (across - 1)) / across;
             // The grid runs from GRID_TOP to just above the footer divider.
             var height:Number = isExpanded ? (MenuStyle.LIST_BOTTOM - GRID_TOP - rowGap * (gridRows - 1)) / gridRows : shelfCardHeight;
-            for (var i:int = first; i < Math.min(displayed.length, first + capacity); ++i) {
+            var end:int = Math.min(displayed.length, first + capacity);
+            while (cards.numChildren > end - first) cards.removeChildAt(cards.numChildren - 1);
+            for (var i:int = first; i < end; ++i) {
                 displayed[i].loading = Boolean(loadingRow) && displayed[i].mod == loadingRow.mod && displayed[i].key == loadingRow.key;
-                var card:LauncherCard = new LauncherCard(displayed[i], i, width, height);
+                var slot:int = i - first;
+                var card:LauncherCard = slot < cards.numChildren ? cards.getChildAt(slot) as LauncherCard : null;
+                if (!card || !card.reuse(displayed[i], i, width, height)) {
+                    if (card) cards.removeChild(card);
+                    card = new LauncherCard(displayed[i], i, width, height);
+                    card.addEventListener(MouseEvent.ROLL_OVER, over);
+                    card.addEventListener(MouseEvent.CLICK, press); cards.addChildAt(card, slot);
+                }
                 card.x = (i - first) % across * (width + gap);
                 card.y = int((i - first) / across) * (height + rowGap);
                 card.select(hasFocus && i == selected);
-                card.addEventListener(MouseEvent.ROLL_OVER, over);
-                card.addEventListener(MouseEvent.CLICK, press); cards.addChild(card);
             }
+            var nextPager:String = isExpanded + ":" + isLocked + ":" + first + ":" + displayed.length;
+            if (pagerState == nextPager) return;
+            pagerState = nextPager;
+            while (pager.numChildren) pager.removeChildAt(0);
             if (!isExpanded) return;
             // Header row, right to left: SHOW LESS, then the pager when the grid has pages.
             var right:Number = isLocked ? MenuStyle.LIST_WIDTH : pageButton(tr("home.showLess"), MenuStyle.LIST_WIDTH, toggleExpanded) - 28;

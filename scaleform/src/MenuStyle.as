@@ -65,16 +65,24 @@ package
             var format:TextFormat = field.defaultTextFormat; format.color = field.textColor;
             field.text = text; field.defaultTextFormat = format; field.setTextFormat(format);
         }
-        public static function fit(field:TextField, text:String):void
+        // Fit a single line by width, or wrapped text by the supplied height.
+        public static function fit(field:TextField, text:String, maxHeight:Number = 0):void
         {
             setText(field, text);
-            if (field.textWidth <= field.width - 6) return;
-            while (text.length && field.textWidth > field.width - 6) {
-                text = text.substr(0, text.length - 1);
-                if (text.length && text.charCodeAt(text.length - 1) >= 0xD800 && text.charCodeAt(text.length - 1) <= 0xDBFF)
-                    text = text.substr(0, text.length - 1);
-                setText(field, text + "...");
+            if (!text.length || (maxHeight ? field.textHeight <= maxHeight : field.textWidth <= field.width - 6)) return;
+            var low:int = 0, high:int = text.length - 1;
+            var result:String = "...";
+            while (low <= high) {
+                var middle:int = (low + high) >>> 1;
+                var end:int = middle;
+                if (end && text.charCodeAt(end - 1) >= 0xD800 && text.charCodeAt(end - 1) <= 0xDBFF) --end;
+                var candidate:String = text.substr(0, end) + "...";
+                setText(field, candidate);
+                if (maxHeight ? field.textHeight <= maxHeight : field.textWidth <= field.width - 6) {
+                    result = candidate; low = middle + 1;
+                } else high = middle - 1;
             }
+            setText(field, result);
         }
         public static function diamond(graphics:Graphics, x:Number, y:Number, color:uint):void
         {

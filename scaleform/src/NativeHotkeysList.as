@@ -178,7 +178,6 @@ package
             if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
             if (!bridge.beginNativeBinding()) { changed(tr("errors.capture"), false); return false; }
             busy = true; seenRemapping = false; cancelled = false;
-            list.disableInput = true; list.disableSelection = true;
             changed(tr("bindings.capture"), false);
             return true;
         }
@@ -250,7 +249,6 @@ package
             busy = false; seenRemapping = false;
             popup.active = false;
             if (currentClip) currentClip.ClearListenState();
-            list.disableInput = false; list.disableSelection = false;
             bridge.endNativeBinding(false);
         }
 

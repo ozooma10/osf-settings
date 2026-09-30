@@ -51,12 +51,13 @@ package
         }
         public static function filter(rows:Array, query:String, source:String, key:int):Array
         {
-            var result:Array = [], terms:Array = query.toLowerCase().split(/\s+/);
+            var result:Array = [], terms:Array = query.toLowerCase().match(/\S+/g) || [];
             for each (var row:Object in rows) {
                 if (source != "all" && (source == "game" ? Boolean(row.mod) : row.mod != source)) continue;
                 var hit:Boolean = key < 0;
-                for each (var record:Object in row.records) if (includes(record, key)) hit = true;
+                if (!hit) for each (var record:Object in row.records) if (includes(record, key)) { hit = true; break; }
                 if (!hit) continue;
+                if (!terms.length) { result.push(row); continue; }
                 var text:String = (row.title + " " + row.source + " " + row.value + " " + row.alternate).toLowerCase();
                 for each (record in row.records) text += " " + KeyboardMap.keyName(record.key, record.device).toLowerCase() +
                     (modified(record.modifier) ? " " + KeyboardMap.keyName(record.modifier, 0).toLowerCase() : "");

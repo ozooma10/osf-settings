@@ -120,9 +120,11 @@ package
         {
             for (var i:int = 0; i < views.length; ++i) {
                 var view:Object = views[i], item:Object = view.item, row:Sprite = view.row;
+                var active:Boolean = i == cursor, inverted:Boolean = active && hasFocus, pointed:Boolean = row == hovered;
+                if (view.active === active && view.inverted === inverted && view.pointed === pointed) continue;
+                view.active = active; view.inverted = inverted; view.pointed = pointed;
                 row.graphics.clear();
                 if (item.kind == "heading") { view.label.textColor = view.count.textColor = MenuStyle.MUTED; continue; }
-                var active:Boolean = i == cursor, inverted:Boolean = active && hasFocus, pointed:Boolean = row == hovered;
                 // Idle rows fill with the panel color; the game's player skips fully transparent hit areas.
                 row.graphics.beginFill(inverted ? MenuStyle.WHITE : active ? (pointed ? MenuStyle.HOVER : MenuStyle.ROW) : pointed ? PANEL_HOVER : PANEL);
                 row.graphics.drawRect(0, 0, ITEM_WIDTH, view.span); row.graphics.endFill();

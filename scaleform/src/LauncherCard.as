@@ -17,10 +17,14 @@ package
         private var tag:TextField;
         private var isSelected:Boolean;
         private var isHovered:Boolean;
+        private var painted:Boolean;
+        private var paintedHover:Boolean;
+        private var wasLoading:Boolean;
 
         public function LauncherCard(data:Object, position:int, width:Number, height:Number)
         {
             row = data; index = position; cardWidth = width; cardHeight = height;
+            wasLoading = Boolean(row.loading);
             addEventListener(MouseEvent.ROLL_OVER, hover); addEventListener(MouseEvent.ROLL_OUT, hover);
             name = "launcher_" + position; mouseChildren = false; buttonMode = Boolean(row.editable);
             var large:Boolean = CONFIG::largeText;
@@ -40,20 +44,28 @@ package
             if (caption) tag = field(caption, left, title.y + title.height + 4, tagHeight, MenuStyle.SMALL_SIZE + 1);
             select(false);
         }
+        // Keep clips and listeners when only the backing snapshot changed.
+        public function reuse(data:Object, position:int, width:Number, height:Number):Boolean
+        {
+            if (cardWidth != width || cardHeight != height || row.mod != data.mod || row.key != data.key ||
+                row.title != data.title || row.modTitle != data.modTitle || row.editable != data.editable ||
+                row.more != data.more || wasLoading != Boolean(data.loading)) return false;
+            row = data; index = position; name = "launcher_" + position;
+            return true;
+        }
         private function field(value:String, left:Number, y:Number, height:Number, size:Number):TextField
         {
             var text:TextField = MenuStyle.field(value, left, y, cardWidth - left - 46, height, size);
             text.wordWrap = text.multiline = true;
             // Truncate at a fixed readable size; the detail card shows the full title.
-            while (value.length && text.textHeight > height - 4) {
-                value = value.substr(0, value.length - 1);
-                MenuStyle.setText(text, value + "...");
-            }
+            MenuStyle.fit(text, value, height - 4);
             addChild(text); return text;
         }
         private function hover(event:MouseEvent):void { isHovered = event.type == MouseEvent.ROLL_OVER; select(isSelected); }
         public function select(selected:Boolean):void
         {
+            if (painted && isSelected == selected && paintedHover == isHovered) return;
+            painted = true; paintedHover = isHovered;
             isSelected = selected;
             graphics.clear();
             graphics.lineStyle(1, selected ? MenuStyle.WHITE : isHovered ? MenuStyle.LINE : 0x34424B);

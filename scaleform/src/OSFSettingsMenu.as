@@ -5,6 +5,7 @@ package
     import flash.display.Sprite;
     import flash.display.Stage;
     import flash.events.Event;
+    import flash.events.FocusEvent;
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.geom.Rectangle;
@@ -71,29 +72,15 @@ package
         private var headerCount:TextField;
         private var homeDetails:HomeDetails;
         private var homeEmpty:HomeEmpty;
-        private var detailTitle:TextField;
-        private var detailLabel:TextField;
-        private var detailDivider:Sprite = new Sprite();
-        private var detailDecoration:Sprite = new Sprite();
+        private var settingsDetails:SettingsDetails;
         private var issueDetails:IssueDetails;
         private var issueSummary:IssueSummary;
-        private var changedLegend:Sprite = new Sprite();
-        private var detailHint:TextField;
-        private var defaultLabel:TextField;
-        private var defaultValue:TextField;
-        private var rangeLabel:TextField;
-        private var rangeValue:TextField;
-        private var detailOptions:Sprite = new Sprite();
-        private var optionsSignature:String = "";
         private var status:TextField;
         private var empty:TextField;
-        private var resetButton:Object;
-        private var acceptButton:Object;
-        private var backButton:Object;
-        private var buttonData:Object = {};
-        private var previousButton:Object;
-        private var nextButton:Object;
-        private var clearButton:Object;
+        private var buttons:Object = {};
+        private var footerText:String;
+        private var footerWidth:Number = NaN;
+        private var footerDirty:Boolean = false;
         // Keyboard and gamepad moves carry their direction past section headers.
         private var moveDirection:int = 0;
         private var moveFrame:int = -10;
@@ -161,10 +148,6 @@ package
             var chrome:Sprite = new Sprite(); chrome.mouseEnabled = false; addChild(chrome);
             MenuDecoration.rule(chrome.graphics, MenuStyle.LEFT, MenuStyle.RIGHT, MenuStyle.HEADER_LINE);
             MenuDecoration.rule(chrome.graphics, MenuStyle.LEFT, MenuStyle.RIGHT, MenuStyle.FOOTER_LINE);
-            detailDecoration.mouseEnabled = detailDecoration.mouseChildren = false; addChild(detailDecoration);
-            detailDivider.mouseEnabled = false; addChild(detailDivider);
-            detailDivider.graphics.lineStyle(1, MenuStyle.LINE);
-            detailDivider.graphics.moveTo(MenuStyle.DETAIL_X, 0); detailDivider.graphics.lineTo(MenuStyle.RIGHT, 0);
             // The sidebar replaces tabs: pages, mods and the open mod's sections.
             nav = new NavigationPane(navClicked); addChild(nav);
             // One header line: the open page's title, with a mod's summary at the right.
@@ -191,21 +174,7 @@ package
             options.addEventListener(MouseEvent.MOUSE_OUT, hoverEntry);
             options.addEventListener(MouseEvent.MOUSE_WHEEL, wheelList);
             options.addEventListener(MouseEvent.CLICK, clickStepper, true);
-            // The detail column flows top-down from the list top; describe() places each part.
-            var detailWidth:Number = MenuStyle.DETAIL_WIDTH;
-            detailLabel = label(tr("menu.selectedSetting"), MenuStyle.DETAIL_X, 0, detailWidth, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
-            detailTitle = label("", MenuStyle.DETAIL_X, 0, detailWidth, 80, MenuStyle.DETAIL_TITLE_SIZE);
-            detailTitle.multiline = true; detailTitle.wordWrap = true;
-            detailHint = label("", MenuStyle.DETAIL_X, 0, detailWidth, 120, MenuStyle.DETAIL_BODY_SIZE, MenuStyle.MUTED);
-            detailHint.multiline = true; detailHint.wordWrap = true; detailHint.mouseEnabled = true;
-            var descriptionFormat:TextFormat = detailHint.defaultTextFormat;
-            descriptionFormat.leading = CONFIG::largeText ? 8 : 6; detailHint.defaultTextFormat = descriptionFormat;
-            detailHint.addEventListener(MouseEvent.MOUSE_WHEEL, scrollDescription);
-            defaultLabel = label(tr("menu.default"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            defaultValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(defaultValue);
-            rangeLabel = label(tr("menu.range"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(rangeValue);
-            detailOptions.x = MenuStyle.DETAIL_X; detailOptions.mouseEnabled = detailOptions.mouseChildren = false; addChild(detailOptions);
+            settingsDetails = new SettingsDetails(); addChild(settingsDetails);
             issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
             issueSummary = new IssueSummary(); issueSummary.visible = false; addChild(issueSummary);
             homeDetails = new HomeDetails(); homeDetails.visible = false; addChild(homeDetails);
@@ -216,24 +185,17 @@ package
             // Large text reserves a status line above the wider native button hints.
             status = label(tr("menu.autoSave"), MenuStyle.LEFT, 0, 900, 52, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             status.multiline = true; status.wordWrap = true;
-            // The changed marker only means something beside settings, so it closes the detail column.
-            var legend:TextField = label(tr("menu.changed"), MenuStyle.DETAIL_X, MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 14, detailWidth,
-                MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
-            changedLegend.mouseEnabled = false; changedLegend.mouseChildren = false;
-            addChild(changedLegend); changedLegend.addChild(legend);
-            alignRight(legend);
-            MenuStyle.diamond(changedLegend.graphics, MenuStyle.RIGHT - legend.textWidth - 22, legend.y + legend.height / 2 - 1, MenuStyle.ACCENT);
             empty = label("", MenuStyle.LEFT + 16, MenuStyle.LIST_TOP + 16, MenuStyle.LIST_WIDTH - 40, 130, MenuStyle.BODY_SIZE, MenuStyle.MUTED);
             empty.multiline = true; empty.wordWrap = true;
             bar = create("Shared.Components.ButtonControls.ButtonBar.ButtonBar");
             // Native button scale; the _LRG movie's vanilla buttons are already larger.
             bar.x = MenuStyle.RIGHT; bar.y = MenuStyle.FOOTER_Y; addChild(bar as MovieClip); bar.Initialize(1, 30);
-            previousButton = button(tr("buttons.previousPage"), "LShoulder", function():void { changePage(-1); });
-            nextButton = button(tr("buttons.nextPage"), "RShoulder", function():void { changePage(1); });
-            acceptButton = button(tr("buttons.toggle"), "Accept", accept);
-            resetButton = button(tr("buttons.reset"), "YButton", reset);
-            clearButton = button(tr("buttons.clearBinding"), "XButton", clearBinding);
-            backButton = button(tr("menu.home"), "Cancel", back); bar.RefreshButtons();
+            button(tr("buttons.previousPage"), "LShoulder", function():void { changePage(-1); });
+            button(tr("buttons.nextPage"), "RShoulder", function():void { changePage(1); });
+            button(tr("buttons.toggle"), "Accept", accept);
+            button(tr("buttons.reset"), "YButton", reset);
+            button(tr("buttons.clearBinding"), "XButton", clearBinding);
+            button(tr("menu.home"), "Cancel", back); bar.RefreshButtons();
             captureBinding = create("Binding") as MovieClip;
             captureBinding.mouseEnabled = false; captureBinding.mouseChildren = false;
             captureBinding.visible = false;
@@ -241,6 +203,8 @@ package
             startupPhase = "build keybindings";
             keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
             addChild(keybindings);
+            keybindings.search.addEventListener(FocusEvent.FOCUS_IN, searchFocusChanged);
+            keybindings.search.addEventListener(FocusEvent.FOCUS_OUT, searchFocusChanged);
             startupPhase = "build Home launchers";
             // Hovering the shelf moves focus between it and the list, but never out of the sidebar.
             launcher = new LauncherPage(function():void { if (!refreshing && !nav.focused) focusLauncher(true); }, accept,
@@ -289,9 +253,7 @@ package
             if (message) MenuStyle.setText(status, message);
             // The bindings page publishes its rows when the numeric snapshot is ready.
             if (refreshRows && !bindingsPage()) requestedRefresh = true;
-            options.disableInput = bindingBusy() || Boolean(captureRow);
-            options.disableSelection = bindingBusy();
-            describe();
+            updateSelection();
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
@@ -304,11 +266,10 @@ package
             launcher.focused = value;
             if (value) nav.focused = false;
             launcherAcceptHeld = false;
-            options.disableInput = value;
-            options.disableSelection = value;
+            syncInput();
             menuStage.focus = value ? launcher : options as MovieClip;
             if (homePage()) { MenuStyle.setText(status, ""); status.textColor = MenuStyle.MUTED; }
-            describe(); decorate();
+            decorate(); updateSelection();
         }
         private function searching():Boolean { return keybindings && keybindings.searching; }
         private function editingString():Boolean { return stringEditor && stringEditor.visible; }
@@ -319,7 +280,11 @@ package
             nav.focused = false;
             searchExitFrame = frame;
             menuStage.focus = options as MovieClip;
-            options.disableInput = bindingBusy();
+            syncInput();
+        }
+        private function searchFocusChanged(event:FocusEvent):void
+        {
+            footerDirty = true; // Apply after the focus transition has finished.
         }
         private function issuesPage():Boolean { return !modID && rootPage == "issues"; }
         // Sidebar entries: pinned pages, a heading, every mod, and the open mod's sections.
@@ -363,7 +328,7 @@ package
             navSelection = NavigationPane.key(item);
             updateNav();
             if (reload) populate();
-            else { decorate(); describe(); }
+            else { decorate(); updateSelection(); }
         }
         private function navClicked(item:Object):void
         {
@@ -378,10 +343,9 @@ package
             nav.focused = value; navAcceptHeld = false;
             if (value) { launcher.focused = false; launcherAcceptHeld = false; }
             else if (homePage() && launcher.hasEntries && (!options.entryCount || expandedLauncher())) launcher.focused = true;
-            options.disableInput = value || launcherPage() || bindingBusy();
-            options.disableSelection = value || launcherPage() || bindingBusy();
+            syncInput();
             menuStage.focus = value ? nav : launcherPage() ? launcher : options as MovieClip;
-            describe(); decorate();
+            decorate(); updateSelection();
         }
         private function tabOf(row:Object):String { return groupTabs[row.group] ? groupTabs[row.group].id : row.group; }
         // Whether a row belongs on the open mod's page, narrowed to the open section if there is one.
@@ -436,13 +400,23 @@ package
             if (target >= 0 && target != index) options.selectedIndex = target;
             return true;
         }
-        private function button(text:String, eventName:String, callback:Function):Object
+        private function button(text:String, eventName:String, callback:Function):void
         {
             var eventClass:Class = definition("Shared.Components.ButtonControls.ButtonData.UserEventData");
             var dataClass:Class = definition("Shared.Components.ButtonControls.ButtonData.ButtonBaseData");
             var factory:Class = definition("Shared.Components.ButtonControls.ButtonFactory.ButtonFactory");
-            buttonData[eventName] = new dataClass(text, new eventClass(eventName, callback));
-            return Object(factory).AddToButtonBar("BasicButton", buttonData[eventName], bar);
+            var data:Object = new dataClass(text, new eventClass(eventName, callback));
+            buttons[eventName] = {data:data, clip:Object(factory).AddToButtonBar("BasicButton", data, bar)};
+        }
+        private function updateButton(name:String, text:String, visible:Boolean):Boolean
+        {
+            var button:Object = buttons[name];
+            var changed:Boolean = button.clip.Visible != visible || button.data.sButtonText != text;
+            if (button.data.sButtonText != text) {
+                button.data.sButtonText = text; button.clip.SetButtonData(button.data);
+            }
+            if (button.clip.Visible != visible) button.clip.Visible = visible;
+            return changed;
         }
         private function alignRight(field:TextField):void
         {
@@ -526,7 +500,7 @@ package
             homeMods.visible = homeCount.visible = launcher.visible && !expandedLauncher();
             homeMods.y = launcher.y + launcher.shelfHeight + 18;
             homeCount.y = homeMods.y + 3;
-            options.disableSelection = bindingBusy();
+            syncInput();
             // Mod pages start the list under the header; section headers name its parts.
             options.y = issuesPage() ? IssueStyle.TOP : bindingsPage() ? KeybindingsPage.LIST_TOP : homeMods.visible ? homeMods.y + MenuStyle.SECTION_SIZE + 20 :
                 modID ? MenuStyle.SECTION_TOP : MenuStyle.LIST_TOP;
@@ -601,8 +575,7 @@ package
                 options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             }
             if (homePage() && launcher.hasEntries && !data.length && !nav.focused) launcher.focused = true;
-            options.disableInput = bindingBusy() || searching() || launcherPage() || nav.focused;
-            options.disableSelection = bindingBusy() || launcherPage() || nav.focused;
+            syncInput();
             if (!searching()) menuStage.focus = nav.focused ? nav : launcherPage() ? launcher : options as MovieClip;
             empty.visible = !expandedLauncher() && !homeEmptyState();
             MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? tr("menu.noIssues") : tr("menu.noSettings"));
@@ -621,7 +594,7 @@ package
                 status.textColor = MenuStyle.MUTED;
             } else if (!preserve) MenuStyle.setText(status, tr("menu.autoSave"));
             decorate();
-            refreshing = false; describe();
+            refreshing = false; updateSelection();
         }
         // Previous and next walk the sidebar: the open mod's sections, then the next page or mod.
         private function changePage(direction:int):void
@@ -634,139 +607,100 @@ package
             if (inPage) { nav.focused = true; focusNav(false); }
         }
         private function current():Object { return launcherPage() ? launcher.current : options && options.selectedEntry ? options.selectedEntry.row : null; }
-        private function describe():void
+        private function syncInput():void
         {
+            var modal:Boolean = Boolean(captureRow) || editingString() || confirmingAction();
+            var disabled:Boolean = closing || modal || bindingBusy() || nav.focused || launcherPage();
+            options.disableInput = disabled || searching();
+            options.disableSelection = disabled;
+            MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = !modal;
+            nav.mouseChildren = !editingString() && !confirmingAction();
+            MovieClip(bar).visible = !confirmingAction();
+        }
+        private function updateSelection():void
+        {
+            syncInput();
             var row:Object = current();
-            var reporting:Boolean = issuesPage();
-            var settings:Boolean = !reporting && !bindingsPage() && !homePage();
-            detailLabel.visible = detailTitle.visible = detailHint.visible = defaultLabel.visible = defaultValue.visible = detailDivider.visible = settings;
-            MenuStyle.setText(detailLabel, row && row.type == "action" ? tr("menu.selectedAction") : tr("menu.selectedSetting"));
+            settingsDetails.visible = Boolean(modID);
+            if (settingsDetails.visible) {
+                settingsDetails.show(row, options.y, editingString());
+                stringEditor.y = settingsDetails.editorTop;
+            }
             homeDetails.visible = homePage() && !homeEmptyState();
             if (homeDetails.visible) homeDetails.show(homeDetail(row), launcher.visible ? launcher.y : MenuStyle.LIST_TOP);
-            changedLegend.visible = Boolean(modID);
-            issueDetails.visible = reporting; issueDetails.show(reporting ? row : null);
-            // The column flows top-down from the list top: title, hint, then the value facts.
-            detailLabel.y = options.y - 4;
-            detailTitle.y = detailLabel.y + MenuStyle.SMALL_SIZE + 12;
-            MenuStyle.setText(detailTitle, row ? row.title : tr("menu.nothingSelected"));
-            detailTitle.height = detailTitle.textHeight + 8;
-            var hint:String = row ? String(row.hint || "") : "";
-            if (row && row.type == "action" && row.message) hint += (hint ? "\n\n" : "") + row.message;
-            hint = (row && row.requiresRestart ? tr("menu.restart") + (hint ? "\n\n" : "") : "") + hint;
-            detailHint.y = detailTitle.y + detailTitle.height + 4;
-            MenuStyle.setText(detailHint, hint);
-            // Long hints scroll with the wheel rather than pushing the facts off the column.
-            detailHint.height = hint ? Math.min(detailHint.textHeight + 10, CONFIG::largeText ? 300 : 260) : 0;
-            detailHint.scrollV = 1;
-            var cursor:Number = detailHint.y + detailHint.height + (hint ? 16 : 8);
-            detailDivider.y = cursor; cursor += 14;
-            // Enum defaults are marked in the option list instead.
-            var enumRow:Boolean = Boolean(row && modID && row.type == "enum");
-            MenuStyle.setText(defaultLabel, tr("menu.default"));
-            if (row && row.type == "action" || enumRow) defaultLabel.visible = defaultValue.visible = false;
-            if (row && row.type == "action") { detailDivider.visible = false; changedLegend.visible = false; }
-            defaultLabel.y = cursor; defaultValue.y = cursor - 1;
-            MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? modID ? row.type == "enum" ? EnumSetting.text(row, row.defaultValue) :
-                NumericSetting.text(row, row.defaultValue) : String(row.count) : "");
-            if (defaultLabel.visible) cursor += MenuStyle.VALUE_SIZE + 16;
-            var range:String = settings && row && modID ? NumericSetting.range(row) : "";
-            rangeLabel.visible = rangeValue.visible = Boolean(range);
-            rangeLabel.y = cursor; rangeValue.y = cursor - 1; MenuStyle.fit(rangeValue, range);
-            if (range) cursor += MenuStyle.VALUE_SIZE + 16;
-            showOptions(settings && enumRow ? row : null, cursor);
-            stringEditor.y = cursor + 6;
-            detailDecoration.graphics.clear();
-            if (settings) {
-                var decorationBottom:Number = MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 26;
-                MenuDecoration.corners(detailDecoration.graphics, MenuStyle.DETAIL_X - 10, detailLabel.y - 2,
-                    MenuStyle.DETAIL_WIDTH + 20, decorationBottom - detailLabel.y + 2);
-                var contentBottom:Number = Math.max(cursor, detailOptions.visible ? detailOptions.y + detailOptions.height : cursor);
-                // Text editing occupies the detail column until the editor closes.
-                if (!editingString()) MenuDecoration.orbit(detailDecoration.graphics, MenuStyle.DETAIL_X,
-                    contentBottom + 24, MenuStyle.DETAIL_WIDTH, decorationBottom - 16);
+            issueDetails.visible = issuesPage();
+            issueDetails.show(issueDetails.visible ? row : null);
+            if (bindingsPage()) keybindings.showSelection(row);
+            updateFooter(row);
+        }
+        private function acceptLabel(row:Object):String
+        {
+            if (editingString()) return tr("buttons.save");
+            if (captureRow) return tr("buttons.confirmBinding");
+            if (bindingsPage()) return tr("buttons.changeBinding");
+            if (homeEmptyState()) return tr("menu.keybindings");
+            if (!modID) return tr("buttons.open");
+            if (row) switch (row.type) {
+                case "action": return tr("buttons.runAction");
+                case "string": return tr("buttons.editText");
+                case "key":
+                case "hotkey": return tr("buttons.changeBinding");
+                case "enum": return tr("buttons.nextChoice");
             }
-            buttonData.YButton.sButtonText = reporting ? tr("buttons.scrollUp") : tr("buttons.reset");
-            buttonData.XButton.sButtonText = reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding");
-            resetButton.SetButtonData(buttonData.YButton); clearButton.SetButtonData(buttonData.XButton);
-            resetButton.Visible = Boolean(!captureRow && !bindingBusy() && modID && row && row.editable && row.type != "hotkey" && row.type != "action");
-            clearButton.Visible = Boolean(!captureRow && !bindingBusy() && (modID || bindingsPage()) && row &&
+            return tr("buttons.toggle");
+        }
+        private function updateFooter(row:Object):void
+        {
+            footerDirty = false;
+            var busy:Boolean = bindingBusy(), editing:Boolean = editingString(), reporting:Boolean = issuesPage();
+            var resetVisible:Boolean = Boolean(!captureRow && !busy && modID && row && row.editable && row.type != "hotkey" && row.type != "action");
+            var clearVisible:Boolean = Boolean(!captureRow && !busy && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
-            buttonData.Accept.sButtonText = editingString() ? tr("buttons.save") : row && row.type == "action" ? tr("buttons.runAction") : row && row.type == "string" ? tr("buttons.editText") : captureRow ? tr("buttons.confirmBinding") : bindingsPage() ? tr("buttons.changeBinding") : homeEmptyState() ? tr("menu.keybindings") : !modID ? tr("buttons.open") : row && (row.type == "key" || row.type == "hotkey") ? tr("buttons.changeBinding") : row && row.type == "enum" ? tr("buttons.nextChoice") : tr("buttons.toggle");
-            buttonData.Cancel.sButtonText = editingString() || captureRow || nativeHotkeys && nativeHotkeys.busy ? tr("buttons.cancel") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
-            acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-            acceptButton.Visible = !bindingBusy() && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action"))));
-            backButton.Visible = !bindingBusy();
+            var acceptText:String = acceptLabel(row);
+            var backText:String = editing || captureRow || nativeHotkeys.busy ? tr("buttons.cancel") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
+            var acceptVisible:Boolean = !busy && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action"))));
             if (reporting) {
-                acceptButton.Visible = false;
-                resetButton.Visible = clearButton.Visible = issueDetails.scrollable;
+                acceptVisible = false;
+                resetVisible = clearVisible = issueDetails.scrollable;
             }
             if (bindingsPage()) {
-                resetButton.Visible = false;
-                keybindings.showSelection(row);
-                acceptButton.Visible = Boolean(!bindingBusy() && !searching() && row && row.editable);
-                clearButton.Visible = clearButton.Visible && !searching();
+                resetVisible = false;
+                acceptVisible = Boolean(!busy && !searching() && row && row.editable);
+                clearVisible = clearVisible && !searching();
             }
             if (launcherPage()) {
-                buttonData.Accept.sButtonText = row && row.more ? tr("home.expand") : tr("buttons.open");
-                acceptButton.SetButtonData(buttonData.Accept);
-                acceptButton.Visible = Boolean(row && row.editable);
-                resetButton.Visible = clearButton.Visible = changedLegend.visible = false;
+                acceptText = row && row.more ? tr("home.expand") : tr("buttons.open");
+                acceptVisible = Boolean(row && row.editable);
+                resetVisible = clearVisible = false;
             }
-            if (homeEmptyState()) acceptButton.Visible = !bindingBusy();
-            previousButton.Visible = nextButton.Visible = !captureRow && !bindingBusy() && !searching() && !editingString();
-            if (editingString()) resetButton.Visible = clearButton.Visible = false;
-            if (nav.focused && !captureRow && !bindingBusy()) {
-                // In the sidebar, Accept enters the open page and Back closes the menu.
-                buttonData.Accept.sButtonText = tr("buttons.open"); buttonData.Cancel.sButtonText = tr("buttons.back");
-                acceptButton.SetButtonData(buttonData.Accept); backButton.SetButtonData(buttonData.Cancel);
-                acceptButton.Visible = homeEmptyState() || options.entryCount > 0 || homePage() && launcher.hasEntries;
-                resetButton.Visible = clearButton.Visible = false;
+            if (homeEmptyState()) acceptVisible = !busy;
+            if (editing) resetVisible = clearVisible = false;
+            if (nav.focused && !captureRow && !busy) {
+                acceptText = tr("buttons.open"); backText = tr("buttons.back");
+                acceptVisible = homeEmptyState() || options.entryCount > 0 || homePage() && launcher.hasEntries;
+                resetVisible = clearVisible = false;
             }
-            bar.RefreshButtons();
+            // Compute final states first; each native button is updated at most once.
+            var changed:Boolean = updateButton("Accept", acceptText, acceptVisible);
+            changed = updateButton("Cancel", backText, !busy) || changed;
+            changed = updateButton("YButton", reporting ? tr("buttons.scrollUp") : tr("buttons.reset"), resetVisible) || changed;
+            changed = updateButton("XButton", reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding"), clearVisible) || changed;
+            var pages:Boolean = !captureRow && !busy && !searching() && !editing;
+            changed = updateButton("LShoulder", tr("buttons.previousPage"), pages) || changed;
+            changed = updateButton("RShoulder", tr("buttons.nextPage"), pages) || changed;
+            if (changed) bar.RefreshButtons();
             layoutFooter();
         }
         private function layoutFooter():void
         {
-            status.width = CONFIG::largeText ? MenuStyle.RIGHT - MenuStyle.LEFT :
+            // Native button widths can settle on a later frame.
+            var width:Number = CONFIG::largeText ? MenuStyle.RIGHT - MenuStyle.LEFT :
                 Math.max(320, MenuStyle.RIGHT - MovieClip(bar).width - MenuStyle.LEFT - 48);
+            if (footerWidth == width && footerText == status.text) return;
+            footerWidth = width; footerText = status.text;
+            status.width = width;
             status.height = Math.ceil(status.textHeight) + 8;
             status.y = CONFIG::largeText ? MenuStyle.FOOTER_LINE + 8 : MenuStyle.FOOTER_Y - status.height / 2;
-        }
-        // The selected enum's choices, with the current one filled and the default tagged.
-        private function showOptions(row:Object, top:Number):void
-        {
-            var labels:Array = row ? EnumSetting.labels(row) : [];
-            var signature:String = row ? [top, row.mod, row.key, row.value, row.defaultValue, labels.join("\n")].join("|") : "";
-            if (signature == optionsSignature) return;
-            optionsSignature = signature;
-            while (detailOptions.numChildren) detailOptions.removeChildAt(0);
-            detailOptions.graphics.clear();
-            detailOptions.visible = Boolean(row);
-            if (!row) return;
-            detailOptions.y = top;
-            var columnWidth:Number = MenuStyle.DETAIL_WIDTH;
-            detailOptions.addChild(MenuStyle.field(tr("menu.options"), 0, 0, columnWidth, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true));
-            var pitch:Number = MenuStyle.VALUE_SIZE + 14; var first:Number = MenuStyle.SMALL_SIZE + 16;
-            // Stop above the changed-from-default legend that closes the column.
-            var room:int = Math.max(1, Math.floor((MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 30 - top - first) / pitch));
-            var shown:int = labels.length > room ? room - 1 : labels.length;
-            for (var i:int = 0; i < shown; ++i) {
-                var line:Number = first + i * pitch;
-                var selected:Boolean = row.options[i].value === row.value;
-                detailOptions.graphics.lineStyle(2, selected ? MenuStyle.WHITE : MenuStyle.LINE);
-                if (selected) detailOptions.graphics.beginFill(MenuStyle.WHITE);
-                detailOptions.graphics.drawCircle(7, line + pitch / 2 - 3, 5);
-                if (selected) detailOptions.graphics.endFill();
-                var option:TextField = MenuStyle.field("", 26, line, columnWidth - 170, pitch, MenuStyle.VALUE_SIZE, selected ? MenuStyle.WHITE : MenuStyle.MUTED, true);
-                detailOptions.addChild(option); MenuStyle.fit(option, String(labels[i]));
-                if (row.options[i].value === row.defaultValue) {
-                    var tag:TextField = MenuStyle.field(tr("menu.default"), columnWidth - 160, line + 2, 160, pitch, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true);
-                    alignRight(tag); detailOptions.addChild(tag);
-                }
-            }
-            if (shown < labels.length)
-                detailOptions.addChild(MenuStyle.field(tr("menu.moreOptions", {count:labels.length - shown}), 26, first + shown * pitch,
-                    columnWidth - 26, pitch, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true));
         }
         // The card describes whichever Home item is selected: a mod, an interface or SHOW ALL.
         private function homeDetail(row:Object):Object
@@ -784,11 +718,12 @@ package
             return {title:row.title, badge:Badge.initials(String(row.title)), tint:Badge.color(String(row.mod)), subtitle:"",
                 description:row.hint, warning:"", chips:row.chips, hotkeys:hotkeys};
         }
-        private function scrollDescription(event:MouseEvent):void
+        private function selectionChanged(event:Event):void
         {
-            detailHint.scrollV -= event.delta; event.stopPropagation();
+            if (refreshing || skipSection()) return;
+            if (!nav.focused && homePage() && !expandedLauncher()) focusLauncher(false);
+            else updateSelection();
         }
-        private function selectionChanged(event:Event):void { if (!refreshing) { if (skipSection()) return; if (nav.focused) describe(); else if (homePage() && !expandedLauncher()) focusLauncher(false); else describe(); } }
         private function focusSound(event:Event):void { Object(definition("Shared.GlobalFunc")).PlayMenuSound("UIMenuGeneralFocus"); }
         private function itemPressed(event:Event):void { accept(); }
         private function accept():void
@@ -857,7 +792,7 @@ package
             else result = BGSCodeObj.setBool(row.mod, row.key, Boolean(value));
             if (result && result.ok) {
                 if (row.type == "key") row.valueName = NumericSetting.text(row, value);
-                row.value = value; describe();
+                row.value = value; updateSelection();
             }
             MenuStyle.setText(status, result && result.ok ? tr("menu.autoSave") : result ? result.error : tr("errors.save"));
             status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
@@ -866,17 +801,11 @@ package
         private function beginAction(row:Object):void
         {
             if (!row.confirmation) { invokeAction(row); return; }
-            options.disableInput = options.disableSelection = true;
-            MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = false;
-            nav.mouseChildren = false; MovieClip(bar).visible = false;
             menuStage.focus = null;
-            actionConfirmation.open(row, actionAcceptHeld);
+            actionConfirmation.open(row, actionAcceptHeld); syncInput();
         }
         private function finishActionConfirmation(row:Object, run:Boolean):void
         {
-            options.disableSelection = false;
-            MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = true;
-            nav.mouseChildren = true; MovieClip(bar).visible = true;
             searchExitFrame = activationFrame = frame;
             if (run) invokeAction(row);
             else { refresh(); MenuStyle.setText(status, tr("actions.cancelled")); status.textColor = MenuStyle.MUTED; }
@@ -893,10 +822,7 @@ package
         {
             if (!BGSCodeObj.textInput(true)) return;
             stringConfirmHeld = false;
-            options.disableInput = options.disableSelection = true;
-            MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = false;
-            nav.mouseChildren = false;
-            stringEditor.open(row); describe();
+            stringEditor.open(row); updateSelection();
             MenuStyle.setText(status, tr("strings.hint"));
             status.textColor = MenuStyle.MUTED;
         }
@@ -920,9 +846,6 @@ package
         {
             stringEditor.close(); stringConfirmHeld = false;
             BGSCodeObj.textInput(false);
-            options.disableSelection = false;
-            MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = true;
-            nav.mouseChildren = true;
             searchExitFrame = activationFrame = frame;
             refresh();
             MenuStyle.setText(status, cancel ? tr("strings.unchanged") : tr("menu.autoSave"));
@@ -939,7 +862,7 @@ package
                 MenuStyle.setText(status, tr("home.loadingStatus", {title:String(row.title)}));
                 status.textColor = MenuStyle.MUTED;
             } else if (result == 1) {
-                closing = true; options.disableInput = true;
+                closing = true; syncInput();
                 launcher.mouseEnabled = launcher.mouseChildren = false;
             } else {
                 MenuStyle.setText(status, "This menu is currently unavailable.");
@@ -952,7 +875,7 @@ package
             var row:Object = launching;
             endLaunch();
             if (result.state == "closing") {
-                closing = true; options.disableInput = true;
+                closing = true; syncInput();
                 launcher.mouseEnabled = launcher.mouseChildren = false;
                 return;
             }
@@ -982,13 +905,13 @@ package
             if (captureRow) { finishBinding(true); return; }
             if (frame <= searchExitFrame + 1) return;
             if (launching) { // Leave both Settings and Pause; the provider keeps opening.
-                closing = true; options.disableInput = true; BGSCodeObj.close(); return;
+                closing = true; syncInput(); BGSCodeObj.close(); return;
             }
             if (closing || settingsList.dragging || requestedRefresh) return;
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             // Back leaves the page for the sidebar; from the sidebar it closes the menu.
             if (!nav.focused) { focusNav(true); return; }
-            closing = true; options.disableInput = true; BGSCodeObj.close();
+            closing = true; syncInput(); BGSCodeObj.close();
         }
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
@@ -1017,14 +940,8 @@ package
                 return false;
             }
             if (frame <= searchExitFrame + 1) return true;
-            if (nav.focused) return navigate(name, pressed);
-            if (launcherPage() && name == "Accept") { launcherAccept(pressed); return true; }
-            if (launcherPage() && navigateLauncher(name, pressed)) return true;
-            if (homePage() && launcher.hasEntries && name == "Up" && options.selectedIndex <= 0) {
-                if (pressed && navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }
-                return true;
-            }
-            if (bindingsPage() && navigateBindings(name, pressed)) return true;
+            if (routeNavigation(name, pressed)) return true;
+            if (nav.focused) return false;
             if (bar.ProcessUserEvent(name, pressed)) return true;
             // Hidden page buttons still swallow the shoulder events.
             if (name == "LShoulder" || name == "RShoulder") return true;
@@ -1089,7 +1006,7 @@ package
             if (homePage() && target && launcher.contains(target)) { focusLauncher(true); return; }
             if (!target || !MovieClip(options).contains(target)) return;
             if (homePage()) focusLauncher(false);
-            menuStage.focus = options as MovieClip; options.disableInput = false;
+            menuStage.focus = options as MovieClip; syncInput();
             while (target && target != options) {
                 if ("itemIndex" in target) { options.selectedIndex = Object(target).itemIndex; break; }
                 target = target.parent;
@@ -1106,34 +1023,16 @@ package
                 }
                 return;
             }
-            if (bindingBusy()) { event.stopImmediatePropagation(); event.preventDefault(); return; }
-            if (captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
+            if (bindingBusy() || captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (keybindings && keybindings.searchKey(event)) return;
             if (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.PAGE_UP) noteMove(-1);
             else if (event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.PAGE_DOWN) noteMove(1);
             if (!initialized || closing || refreshing || requestedRefresh || settingsList.dragging) return;
-            if (nav.focused) {
-                var code:uint = event.keyCode;
-                var input:String = code == Keyboard.UP ? "Up" : code == Keyboard.DOWN ? "Down" : code == Keyboard.RIGHT ? "Right" :
-                    code == Keyboard.ENTER ? "Accept" : code == 219 ? "LShoulder" : code == 221 ? "RShoulder" : "";
-                if (!input) return;
-                navigate(input, true); event.stopImmediatePropagation(); event.preventDefault(); return;
-            }
-            if (homePage() && launcher.hasEntries && !launcherPage() && event.keyCode == Keyboard.UP && options.selectedIndex <= 0) {
-                if (navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }
+            var input:String = keyboardName(event.keyCode);
+            if (input && input != "Cancel" && routeNavigation(input, true)) {
                 event.stopImmediatePropagation(); event.preventDefault(); return;
             }
-            if (launcherPage() && event.keyCode == Keyboard.ENTER) {
-                launcherAccept(true); event.stopImmediatePropagation(); event.preventDefault(); return;
-            }
-            if (launcherPage() && (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT || event.keyCode == Keyboard.PAGE_UP || event.keyCode == Keyboard.PAGE_DOWN)) {
-                navigateLauncher(event.keyCode == Keyboard.UP ? "Up" : event.keyCode == Keyboard.DOWN ? "Down" : event.keyCode == Keyboard.LEFT ? "Left" : event.keyCode == Keyboard.RIGHT ? "Right" : event.keyCode == Keyboard.PAGE_UP ? "PageUp" : "PageDown", true);
-                event.stopImmediatePropagation(); event.preventDefault(); return;
-            }
-            if (bindingsPage() && (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT)) {
-                navigateBindings(event.keyCode == Keyboard.UP ? "Up" : event.keyCode == Keyboard.DOWN ? "Down" : event.keyCode == Keyboard.LEFT ? "Left" : "Right", true);
-                event.stopImmediatePropagation(); event.preventDefault(); return;
-            }
+            if (nav.focused) return;
             if (event.keyCode == Keyboard.B) reset();
             else if (event.keyCode == Keyboard.X && (issuesPage() || current() && (current().type == "key" || current().type == "hotkey"))) clearBinding();
             else if (issuesPage() && (event.keyCode == Keyboard.PAGE_UP || event.keyCode == Keyboard.PAGE_DOWN)) issueDetails.scroll(event.keyCode == Keyboard.PAGE_UP ? -360 : 360);
@@ -1170,21 +1069,44 @@ package
                 return;
             }
             if (keybindings && keybindings.searchKey(event)) return;
-            if (nav.focused && event.keyCode == Keyboard.ENTER) {
-                navigate("Accept", false); event.stopImmediatePropagation(); event.preventDefault(); return;
-            }
-            if (launcherPage() && event.keyCode == Keyboard.ENTER) {
-                launcherAccept(false); event.stopImmediatePropagation(); event.preventDefault(); return;
+            if (event.keyCode == Keyboard.ENTER && (nav.focused || launcherPage())) {
+                routeNavigation("Accept", false); event.stopImmediatePropagation(); event.preventDefault(); return;
             }
             if (frame <= searchExitFrame + 1 || captureRow || bindingBusy() || event.keyCode == Keyboard.ENTER) event.stopImmediatePropagation();
         }
         private function confirmationKey(event:KeyboardEvent, pressed:Boolean):void
         {
-            var name:String = event.keyCode == Keyboard.ENTER ? "Accept" : event.keyCode == Keyboard.ESCAPE ? "Cancel" :
-                event.keyCode == Keyboard.LEFT ? "Left" : event.keyCode == Keyboard.RIGHT ? "Right" :
-                event.keyCode == Keyboard.UP ? "Up" : event.keyCode == Keyboard.DOWN ? "Down" : "";
+            var name:String = keyboardName(event.keyCode);
             event.stopImmediatePropagation(); event.preventDefault();
             if (name) actionConfirmation.userEvent(name, pressed);
+        }
+        private function routeNavigation(name:String, pressed:Boolean):Boolean
+        {
+            if (nav.focused) return navigate(name, pressed);
+            if (launcherPage() && name == "Accept") { launcherAccept(pressed); return true; }
+            if (launcherPage() && navigateLauncher(name, pressed)) return true;
+            if (homePage() && launcher.hasEntries && name == "Up" && options.selectedIndex <= 0) {
+                if (pressed && navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }
+                return true;
+            }
+            if (bindingsPage() && navigateBindings(name, pressed)) return true;
+            return false;
+        }
+        private function keyboardName(code:uint):String
+        {
+            switch (code) {
+                case Keyboard.UP: return "Up";
+                case Keyboard.DOWN: return "Down";
+                case Keyboard.LEFT: return "Left";
+                case Keyboard.RIGHT: return "Right";
+                case Keyboard.PAGE_UP: return "PageUp";
+                case Keyboard.PAGE_DOWN: return "PageDown";
+                case Keyboard.ENTER: return "Accept";
+                case Keyboard.ESCAPE: return "Cancel";
+                case 219: return "LShoulder";
+                case 221: return "RShoulder";
+            }
+            return "";
         }
         private function navigateBindings(name:String, pressed:Boolean):Boolean
         {
@@ -1215,7 +1137,8 @@ package
             if (initialized && !closing) {
                 if (launching) pollLaunch();
                 keybindings.advance(allRows,bindingBusy());
-                options.disableInput = nav.focused || launcherPage() || bindingBusy() || searching() || Boolean(captureRow) || editingString() || confirmingAction();
+                syncInput();
+                if (footerDirty) updateFooter(current());
                 if (captureRow) pollBinding();
                 else if (!editingString() && !confirmingAction()) {
                     if (getTimer() >= nextRevisionPoll && !bindingBusy() && !settingsList.dragging && !searching()) {
@@ -1245,8 +1168,7 @@ package
             if (!result || !result.ok) { MenuStyle.setText(status, tr("errors.capture")); return; }
             captureRow = row; captureRow.capturing = true; captureReady = false;
             CONFIG::testHarness { testCaptureState = "waiting"; }
-            options.disableInput = true;
-            MovieClip(options).mouseEnabled = false; MovieClip(options).mouseChildren = false;
+            syncInput();
             menuStage.focus = null;
             decorate();
             var clip:MovieClip = options.FindClipForEntry(options.selectedIndex) as MovieClip;
@@ -1256,7 +1178,7 @@ package
             Object(captureBinding).SetState("listening"); captureBinding.visible = true;
             MenuStyle.setText(status, tr("bindings.capture"));
             status.textColor = MenuStyle.MUTED;
-            describe();
+            updateSelection();
         }
         private function pollBinding():void
         {
@@ -1266,7 +1188,7 @@ package
             if (state.state == "candidate" || state.state == "confirmed") {
                 Object(captureBinding).SetBinding({aButtonName:[], aPCKeyName:[state.name]});
                 if (!captureReady && state.released) {
-                    captureReady = true; describe(); confirmBinding();
+                    captureReady = true; updateSelection(); confirmBinding();
                 } else if (state.state == "confirmed") confirmBinding();
             }
         }
@@ -1298,8 +1220,6 @@ package
             captureRow = null; captureReady = false; captureBinding.visible = false;
             if (captureBinding.parent) captureBinding.parent.removeChild(captureBinding);
             CONFIG::testHarness { testCaptureState = "idle"; }
-            MovieClip(bar).visible = true;
-            MovieClip(options).mouseEnabled = true; MovieClip(options).mouseChildren = true;
             activationFrame = frame;
             MenuStyle.setText(status, cancel ? tr("bindings.unchanged") : tr("menu.autoSave"));
             status.textColor = MenuStyle.MUTED;

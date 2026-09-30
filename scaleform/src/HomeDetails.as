@@ -94,12 +94,8 @@ package
             field.multiline = field.wordWrap = lines != 1;
             var format:TextFormat = field.defaultTextFormat; format.leading = label ? 2 : 8;
             field.defaultTextFormat = format;
-            if (lines == 1) MenuStyle.fit(field, value); else MenuStyle.setText(field, value);
             var limit:Number = lines > 1 ? lines * (size * 1.2 + 8) : maxHeight;
-            while (limit && value.length && field.textHeight > limit) {
-                value = value.substr(0, value.length - 1);
-                MenuStyle.setText(field, value + "...");
-            }
+            if (lines == 1 || limit) MenuStyle.fit(field, value, limit); else MenuStyle.setText(field, value);
             field.height = field.textHeight + 8; content.addChild(field);
             return field;
         }

@@ -109,7 +109,7 @@ private function reportTestState():void
     var visible:Rectangle = Object(extensions).visibleRect as Rectangle;
     BGSCodeObj.testSnapshot(frame, {initialized:initialized, closing:closing,
         menuHeading:heading ? heading.text : "", sectionHeading:section ? section.text : "", countText:count ? count.text : "",
-        largeText:CONFIG::largeText, emptyText:empty ? empty.text : "", detailHint:detailHint ? detailHint.text : "",
+        largeText:CONFIG::largeText, emptyText:empty ? empty.text : "", detailHint:settingsDetails ? settingsDetails.hintText : "",
         stringEditor:stringEditor.testState(), issueDetails:issueDetails.testState(),
         translations:testTranslationState(),
         conflictText:nativeHotkeys.popup.active ? String(nativeHotkeys.popup.ControlInfo_mc.Label_mc.Text_tf.text) : "",

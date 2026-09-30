@@ -3,6 +3,7 @@ package
     import flash.display.Sprite;
     import flash.events.MouseEvent;
     import flash.text.TextField;
+    import flash.utils.Dictionary;
 
     public final class KeyboardMap extends Sprite
     {
@@ -14,7 +15,10 @@ package
         private static const LABEL_SIZE:Number = CONFIG::largeText ? 18 : 15;
         private var keys:Array = [];
         private var choose:Function;
-        private var previous:String = "";
+        private var previousRows:Array;
+        private var previousVisible:Array;
+        private var previousSelection:Object;
+        private var previousFilter:int;
         private static var names:Object = {};
         public function KeyboardMap(select:Function)
         {
@@ -66,23 +70,25 @@ package
         }
         public function update(rows:Array, visibleRows:Array, selected:Object, filter:int):void
         {
-            var signature:String = filter + ":" + (selected ? selected.identity : "") + ":";
-            for each (var row:Object in rows) for each (var record:Object in row.records)
-                signature += row.identity + "," + record.device + "," + record.slot + "," + record.key + "," + record.modifier + ";";
-            for each (row in visibleRows) signature += row.identity + "|";
-            if (signature == previous) return;
-            previous = signature;
-            for each (var key:Object in keys) {
-                var owned:Boolean = false, mod:Boolean = false, shown:Boolean = false, active:Boolean = false;
-                for each (row in rows) {
-                    for each (record in row.records) if (KeybindingsData.includes(record,key.code)) {
-                        owned = true;
-                        if (row.mod) mod = true;
-                        if (selected && row.identity == selected.identity) active = true;
-                        if (visibleRows.indexOf(row) >= 0) shown = true;
-                    }
+            if (previousRows == rows && previousVisible == visibleRows && previousSelection == selected && previousFilter == filter) return;
+            previousRows = rows; previousVisible = visibleRows; previousSelection = selected; previousFilter = filter;
+            var visibleSet:Dictionary = new Dictionary(), usage:Object = {};
+            for each (var row:Object in visibleRows) visibleSet[row] = true;
+            // Accumulate usage once instead of scanning every binding for every key.
+            for each (row in rows) {
+                var flags:uint = 1 | (row.mod ? 2 : 0) | (visibleSet[row] ? 4 : 0) | (row == selected ? 8 : 0);
+                for each (var record:Object in row.records) {
+                    if (!KeybindingsData.bound(record.key)) continue;
+                    if (record.device == 0) mark(usage, record.key, flags);
+                    if (KeybindingsData.modified(record.modifier)) mark(usage, record.modifier, flags);
                 }
-                var filtered:Boolean = filter == key.code;
+            }
+            for each (var key:Object in keys) {
+                flags = uint(usage[key.code]) | (filter == key.code ? 16 : 0);
+                if (key.state === flags) continue;
+                key.state = flags;
+                var owned:Boolean = Boolean(flags & 1), mod:Boolean = Boolean(flags & 2), shown:Boolean = Boolean(flags & 4);
+                var active:Boolean = Boolean(flags & 8), filtered:Boolean = Boolean(flags & 16);
                 var clip:Sprite = key.clip;
                 // Keys used by the visible results stay bright; free and filtered-out keys recede.
                 clip.alpha = shown || active || filtered ? 1 : .45;
@@ -96,6 +102,16 @@ package
                     clip.graphics.lineStyle(); clip.graphics.beginFill(mod ? MenuStyle.ACCENT : MenuStyle.MUTED);
                     clip.graphics.drawRect(4,key.height - 5,key.width - 8,3); clip.graphics.endFill();
                 }
+            }
+        }
+        private function mark(usage:Object, code:uint, flags:uint):void
+        {
+            usage[code] = uint(usage[code]) | flags;
+            // Generic modifier records light both physical keys, like includes().
+            if (code >= 16 && code <= 18) {
+                var left:uint = 160 + (code - 16) * 2;
+                usage[left] = uint(usage[left]) | flags;
+                usage[left + 1] = uint(usage[left + 1]) | flags;
             }
         }
     }
