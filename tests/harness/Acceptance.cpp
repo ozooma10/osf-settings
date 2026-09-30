@@ -162,9 +162,9 @@ namespace OSFSettings::TestHarness
                     for (const auto* id : {"callback", "unavailable"}) {
                         const auto result = launcher.Register({.modId = Mod, .id = id, .modTitle = "Settings Acceptance",
                             .title = id, .open = OnLauncher});
-                        if (result != API::Launcher::Status::Ok) throw std::runtime_error("launcher-registration-failed");
+                        if (result != API::Status::Ok) throw std::runtime_error("launcher-registration-failed");
                     }
-                    if (launcher.SetAvailable(Mod, "unavailable", false, "Unavailable fixture") != API::Launcher::Status::Ok)
+                    if (launcher.SetAvailable(Mod, "unavailable", false, "Unavailable fixture") != API::Status::Ok)
                         throw std::runtime_error("launcher-availability-failed");
                     featuresRegistered = true;
                 }

@@ -1,8 +1,8 @@
 # Runtime settings providers
 
-Include [OSFSettings_Providers.h](../sdk/OSFSettings_Providers.h) and acquire providers ABI 1.0 at SFSE `kPostLoad` or later. This optional service registers runtime definitions with caller-owned persistence while keeping editing, validation, notifications, and typed reads in OSF Settings.
+Include [OSFSettings_Providers.h](../sdk/OSFSettings_Providers.h) and initialize an `OSFSettings::API::Providers::Client` (providers ABI 1.0) at SFSE `kPostLoad` or later. This optional service registers runtime definitions with caller-owned persistence while keeping editing, validation, notifications, and typed reads in OSF Settings.
 
-`Register(mod, schemaJson, valuesJson, save, context, &registration)` accepts the normal schema and a flat initial value object. Missing values use defaults. Keys are VK integers. Only value settings belong in a provider; use the existing APIs for actions, launchers, and ControlMap hotkeys.
+`Register(mod, schemaJson, valuesJson, save, context, &registration)` accepts the normal schema and a flat initial value object. Missing values use defaults. Key setting values are VK integers. Only value settings belong in a provider; use the existing APIs for actions, launchers, and ControlMap hotkeys.
 
 Start with a zero registration token. Successful registration copies the schema and values, retains the save callback/context, publishes the provider in the menu, and notifies subscribers. Reuse the returned token to replace a definition for the same mod; still-valid current values survive. A different owner or a static schema returns `AlreadyRegistered`. Failed registration leaves ownership unchanged. `Unregister` removes only the provider with that token, waits for any save under the transaction lock, and makes its callback context safe to release.
 

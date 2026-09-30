@@ -12,7 +12,7 @@
 namespace OSFSettings
 {
     struct ModSettings;
-    enum class LauncherError { None, InvalidArgument, AlreadyRegistered, NotFound };
+    enum class LauncherError { None, InvalidArgument, AlreadyRegistered, UnknownLauncher, UnknownRequest };
     using LaunchCallback = std::function<void(const std::string&, const std::string&, std::uint64_t)>;
     struct LaunchDestination
     {

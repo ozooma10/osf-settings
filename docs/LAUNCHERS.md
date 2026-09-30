@@ -24,18 +24,25 @@ Add a `menus` object keyed by ID to `Data/SFSE/Plugins/OSF/Settings/schemas/mymo
 
 ## C++
 
-Copy [`sdk/OSFSettings_Launcher.h`](../sdk/OSFSettings_Launcher.h). There is nothing to link.
+Include [`sdk/OSFSettings_Launcher.h`](../sdk/OSFSettings_Launcher.h) alongside [`OSFSettings.h`](../sdk/OSFSettings.h)
 
 ```cpp
 #include "OSFSettings_Launcher.h"
-using namespace OSFSettings::API::Launcher;
+using namespace OSFSettings::API;
 
-void Open(const char* modId, const char* id, void* context) noexcept
+Launcher::Client launcher;
+
+void AfterClose(const char* modId, const char* id, std::uint64_t requestId, void* context) noexcept
 {
-    // Queue your normal open request and return. Copy any strings you need later.
+    // Settings has closed. Queue your interface's open on your usual UI or runtime thread.
 }
 
-Client launcher;
+void Open(const char* modId, const char* id, std::uint64_t requestId, void* context) noexcept
+{
+    // Settings is still open. Accept now or later; Complete may be called from another thread.
+    launcher.Complete(requestId, AfterClose);
+    // Or keep Settings open and show why: launcher.Complete(requestId, nullptr, nullptr, "Editor is busy.");
+}
 
 // During SFSE kPostLoad:
 if (launcher.Init()) {
@@ -51,6 +58,7 @@ launcher.SetAvailable("mymod", "editor", false, "Requires My Mod Assets.");
 ```
 
 - Set exactly one of `menu` (a native menu name) or `open` (a callback). `modTitle` defaults to `modId`. `description` is optional.
+- Each request completes once. A late, abandoned, or repeated `Complete` returns `UnknownLaunchRequest`; `SetAvailable` on an unregistered card returns `UnknownLauncher`. A client that failed `Init` returns `NotReady`.
 - `modId` follows the [schema ID rules](SETTINGS.md#schema-fields-and-types) and is limited to 128 bytes. `id` must be nonempty, single-line UTF-8, up to 256 bytes. Titles and menu names are limited to 256 bytes; descriptions and reasons to 4096.
 
 ## Opening

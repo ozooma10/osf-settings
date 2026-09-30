@@ -1,4 +1,6 @@
 #include "../../sdk/OSFSettings_Providers.h"
+#include "Negotiate.h"
+#include "SettingsApi.h"
 #include "Settings/SettingsService.h"
 #include "Settings/SettingsJson.h"
 #include "Input/KeyActions.h"
@@ -38,7 +40,7 @@ namespace OSFSettings::API::Providers
                             record.values.emplace(setting->key, std::move(value));
                         }
                     }
-                    const auto result = SettingsService::Get().RegisterProvider(std::move(record),
+                    return ToStatus(SettingsService::Get().RegisterProvider(std::move(record),
                         [id = std::string(mod), save, context](const SettingValues& values) {
                             try {
                                 const auto encoded = SettingsJson::EncodeValues(values).dump();
@@ -47,13 +49,7 @@ namespace OSFSettings::API::Providers
                                 REX::WARN("Settings provider {}: {}", id, error.what());
                                 return false;
                             }
-                        }, *registration);
-                    switch (result) {
-                    case SettingsError::None: return Status::Ok;
-                    case SettingsError::AlreadyRegistered: return Status::AlreadyRegistered;
-                    case SettingsError::NotReady: return Status::NotReady;
-                    default: return Status::InvalidArgument;
-                    }
+                        }, *registration));
                 } catch (const nlohmann::json::exception& error) {
                     REX::WARN("Settings provider {}: {}", mod, error.what());
                     return Status::InvalidValue;
@@ -61,7 +57,7 @@ namespace OSFSettings::API::Providers
             }
             Status Unregister(Registration registration) noexcept override
             {
-                return SettingsService::Get().UnregisterProvider(registration) == SettingsError::None ? Status::Ok : Status::InvalidArgument;
+                return ToStatus(SettingsService::Get().UnregisterProvider(registration));
             }
             Status SubscribeKey(const char* mod, const char* key, HotkeyFn callback, void* context, Subscription* out) noexcept override
             {
@@ -85,8 +81,5 @@ namespace OSFSettings::API::Providers
 extern "C" __declspec(dllexport) void* OSFSettings_RequestProvidersAPI(std::uint32_t version, std::uint32_t* outVersion) noexcept
 {
     using namespace OSFSettings::API;
-    if (outVersion) *outVersion = 0;
-    if (!Supports(Providers::kVersion, version)) return nullptr;
-    if (outVersion) *outVersion = Providers::kVersion;
-    return Providers::GetProvidersApi();
+    return Negotiate(Providers::kVersion, version, outVersion, Providers::GetProvidersApi());
 }

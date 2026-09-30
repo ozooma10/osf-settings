@@ -11,27 +11,27 @@
 
 namespace OSFSettings::API
 {
+    Status ToStatus(SettingsError error) noexcept
+    {
+        switch (error) {
+        case SettingsError::None: return Status::Ok;
+        case SettingsError::NotReady: return Status::NotReady;
+        case SettingsError::InvalidArgument: return Status::InvalidArgument;
+        case SettingsError::UnknownMod: return Status::UnknownMod;
+        case SettingsError::UnknownSetting: return Status::UnknownSetting;
+        case SettingsError::TypeMismatch: return Status::TypeMismatch;
+        case SettingsError::InvalidValue: return Status::InvalidValue;
+        case SettingsError::SaveFailed: return Status::SaveFailed;
+        case SettingsError::UnknownSubscription: return Status::UnknownSubscription;
+        case SettingsError::InternalError: return Status::InternalError;
+        case SettingsError::UnknownHotkey: return Status::UnknownHotkey;
+        case SettingsError::AlreadyRegistered: return Status::AlreadyRegistered;
+        }
+        return Status::InternalError;
+    }
+
     namespace
     {
-        Status ToStatus(SettingsError error) noexcept
-        {
-            switch (error) {
-            case SettingsError::None: return Status::Ok;
-            case SettingsError::NotReady: return Status::NotReady;
-            case SettingsError::InvalidArgument: return Status::InvalidArgument;
-            case SettingsError::UnknownMod: return Status::UnknownMod;
-            case SettingsError::UnknownSetting: return Status::UnknownSetting;
-            case SettingsError::TypeMismatch: return Status::TypeMismatch;
-            case SettingsError::InvalidValue: return Status::InvalidValue;
-            case SettingsError::SaveFailed: return Status::SaveFailed;
-            case SettingsError::UnknownSubscription: return Status::UnknownSubscription;
-            case SettingsError::InternalError: return Status::InternalError;
-            case SettingsError::UnknownHotkey: return Status::UnknownHotkey;
-            case SettingsError::AlreadyRegistered: return Status::AlreadyRegistered;
-            }
-            return Status::InternalError;
-        }
-
         // Schema validation bounds every projected size; exceeding the ABI's 32-bit counts is a contract violation, not a runtime error.
         std::uint32_t Count(std::size_t size) noexcept
         {

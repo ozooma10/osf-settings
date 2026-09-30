@@ -44,7 +44,7 @@ int main()
         const auto disabled = service.Find("demo", "native");
         check(disabled && !disabled->available && disabled->reason == "Disabled", "disabled entries retain reason");
         check(service.Revision() > revision, "availability refreshes menu revision");
-        check(service.SetAvailable("demo", "missing", true, "") == LauncherError::NotFound, "unknown availability rejected");
+        check(service.SetAvailable("demo", "missing", true, "") == LauncherError::UnknownLauncher, "unknown availability rejected");
         check(service.SetAvailable("demo", "native", true, std::string("a\0b", 3)) == LauncherError::InvalidArgument, "invalid availability reason rejected");
         check(!service.Find("demo", "native")->available, "invalid update preserves availability");
 
@@ -107,24 +107,25 @@ int main()
         check(restored.RecordOpened("demo", "native") && rank(restored, "demo") > 0, "history write failure preserves in-memory recency and does not reject opening");
 
         namespace API = OSFSettings::API::Launcher;
+        using OSFSettings::API::Status;
         std::uint32_t version = 9;
         check(!OSFSettings_RequestLauncherAPI(0, &version) && version == 0, "unversioned ABI rejected");
-        check(!OSFSettings_RequestLauncherAPI(0x20000, &version) && version == 0, "prepare/cancel ABI rejected");
+        check(!OSFSettings_RequestLauncherAPI(0x20000, &version) && version == 0, "next major ABI rejected");
         check(!OSFSettings_RequestLauncherAPI(API::kVersion + 1, &version) && version == 0, "future ABI rejected");
         auto* api = static_cast<API::ILauncher*>(OSFSettings_RequestLauncherAPI(API::kVersion, &version));
         check(api && version == API::kVersion, "independent service export");
-        check(api->Register({}) == API::Status::InvalidArgument, "SDK validates null metadata");
+        check(api->Register({}) == Status::InvalidArgument, "SDK validates null metadata");
         std::string title = "API menu";
-        check(api->Register({ .modId = "api", .id = "menu", .title = title.c_str(), .menu = "ApiMenu" }) == API::Status::Ok, "SDK native registration");
+        check(api->Register({ .modId = "api", .id = "menu", .title = title.c_str(), .menu = "ApiMenu" }) == Status::Ok, "SDK native registration");
         title = "changed";
         check(LauncherService::Get().Find("api", "menu")->title == "API menu", "SDK metadata copied at registration");
-        check(api->SetAvailable("api", "menu", false, "Disabled") == API::Status::Ok, "SDK changes availability");
+        check(api->SetAvailable("api", "menu", false, "Disabled") == Status::Ok, "SDK changes availability");
         struct Context {
             API::ILauncher* api;
             int requested{}, opened{};
             std::uint64_t request{};
             bool identity{};
-            API::Status result{};
+            Status result{};
         } context{api};
         const API::OpenFn afterClose = [](const char* mod, const char* id, std::uint64_t request, void* state) noexcept {
             auto& value = *static_cast<Context*>(state);
@@ -144,54 +145,54 @@ int main()
             }, .context = &context
         };
         auto invalidTarget = target; invalidTarget.menu = "ApiMenu";
-        check(api->Register(invalidTarget) == API::Status::InvalidArgument, "native and callback targets are mutually exclusive");
-        check(api->Register(target) == API::Status::Ok, "one open callback registers a destination");
+        check(api->Register(invalidTarget) == Status::InvalidArgument, "native and callback targets are mutually exclusive");
+        check(api->Register(target) == Status::Ok, "one open callback registers a destination");
         auto& live = LauncherService::Get();
         const auto callback = live.Find("api", "web/view");
         check(!live.BeginOpen("api", "menu") && !live.BeginOpen("api", "missing"), "only available callback destinations get a request");
-        check(api->Complete(0, afterClose, &context, "") == API::Status::InvalidArgument, "zero is not a request ID");
-        check(api->Complete(999, afterClose, &context, "") == API::Status::NotFound && !live.TakeResult(999), "unknown completion is rejected");
+        check(api->Complete(0, afterClose, &context, "") == Status::InvalidArgument, "zero is not a request ID");
+        check(api->Complete(999, afterClose, &context, "") == Status::UnknownLaunchRequest && !live.TakeResult(999), "unknown completion is rejected");
         const auto first = live.BeginOpen(callback->mod, callback->id);
         check(first && !live.BeginOpen(callback->mod, callback->id), "one owned request; cannot silently replace it");
         callback->open(callback->mod, callback->id, first);
-        check(context.requested == 1 && context.identity && context.request == first && context.result == API::Status::Ok,
+        check(context.requested == 1 && context.identity && context.request == first && context.result == Status::Ok,
             "open forwards identity and can call the API outside registry lock");
         check(!context.opened && !live.TakeResult(first), "returning from open does not imply readiness");
         const auto beforeReady = live.Revision();
-        check(api->Complete(first, afterClose, &context, "") == API::Status::Ok, "provider completes with after-close callback");
-        check(api->Complete(first, nullptr, nullptr, "duplicate") == API::Status::NotFound, "duplicate completion rejected");
+        check(api->Complete(first, afterClose, &context, "") == Status::Ok, "provider completes with after-close callback");
+        check(api->Complete(first, nullptr, nullptr, "duplicate") == Status::UnknownLaunchRequest, "duplicate completion rejected");
         const auto completed = live.TakeResult(first);
         check(completed && completed->afterClose && completed->reason.empty(), "first completion wins");
         check(!live.TakeResult(first) && live.Revision() == beforeReady && !context.opened,
             "completion neither activates nor records recent history");
-        check(api->Complete(first, afterClose, &context, "duplicate after poll") == API::Status::NotFound, "consuming result cannot admit another completion");
+        check(api->Complete(first, afterClose, &context, "duplicate after poll") == Status::UnknownLaunchRequest, "consuming result cannot admit another completion");
         live.EndOpen(first); // Settings removal invalidates the request before dispatch.
         completed->afterClose(callback->mod, callback->id, first);
-        check(context.opened == 1 && context.identity && context.request == first && context.result == API::Status::Ok,
+        check(context.opened == 1 && context.identity && context.request == first && context.result == Status::Ok,
             "after-close callback gets its own context and request, outside registry lock");
         check(live.RecordOpened(callback->mod, callback->id) && std::ranges::any_of(live.Snapshot(), [](const auto& value) { return value.id == "web/view" && value.recentOrder > 0; }), "history records the handoff");
         const auto afterOpen = live.Revision();
-        check(api->Complete(first, afterClose, &context, "") == API::Status::NotFound && !live.TakeResult(first) && live.Revision() == afterOpen,
+        check(api->Complete(first, afterClose, &context, "") == Status::UnknownLaunchRequest && !live.TakeResult(first) && live.Revision() == afterOpen,
             "late completion after handoff is rejected without changing history");
 
         const auto failed = live.BeginOpen(callback->mod, callback->id);
-        check(api->Complete(failed, nullptr, nullptr, std::string(4097, 'x').c_str()) == API::Status::InvalidArgument && !live.TakeResult(failed),
+        check(api->Complete(failed, nullptr, nullptr, std::string(4097, 'x').c_str()) == Status::InvalidArgument && !live.TakeResult(failed),
             "oversized reason leaves request pending");
-        check(api->Complete(failed, nullptr, nullptr, "Page failed") == API::Status::Ok, "null callback reports failure");
+        check(api->Complete(failed, nullptr, nullptr, "Page failed") == Status::Ok, "null callback reports failure");
         const auto failure = live.TakeResult(failed);
         check(failure && !failure->afterClose && failure->reason == "Page failed", "failure stays in Settings");
         live.EndOpen(failed);
 
         for (bool alreadyReady : {false, true}) {
             const auto abandoned = live.BeginOpen(callback->mod, callback->id);
-            if (alreadyReady) check(api->Complete(abandoned, afterClose, &context, "") == API::Status::Ok, "completion may precede Back");
+            if (alreadyReady) check(api->Complete(abandoned, afterClose, &context, "") == Status::Ok, "completion may precede Back");
             live.EndOpen(abandoned); // Back/timeout invalidates without a provider cancellation callback.
-            check(api->Complete(abandoned, afterClose, &context, "late") == API::Status::NotFound && !live.TakeResult(abandoned) && context.opened == 1,
+            check(api->Complete(abandoned, afterClose, &context, "late") == Status::UnknownLaunchRequest && !live.TakeResult(abandoned) && context.opened == 1,
                 "Back discards both loading and unconsumed completion without activation");
             const auto next = live.BeginOpen(callback->mod, callback->id);
             check(next > abandoned, "reopening has a fresh identity");
             live.EndOpen(abandoned);
-            check(api->Complete(abandoned, afterClose, &context, "stale") == API::Status::NotFound && !live.TakeResult(next) && !live.BeginOpen(callback->mod, callback->id),
+            check(api->Complete(abandoned, afterClose, &context, "stale") == Status::UnknownLaunchRequest && !live.TakeResult(next) && !live.BeginOpen(callback->mod, callback->id),
                 "old completion or abandonment cannot affect new wait");
             api->Complete(next, nullptr, nullptr, "new failure");
             check(live.TakeResult(next)->reason == "new failure", "new request receives its own result");
@@ -205,11 +206,11 @@ int main()
             value.result = value.api->Complete(request,
                 [](const char*, const char*, std::uint64_t, void* context) noexcept { ++static_cast<Context*>(context)->opened; }, state, "");
         };
-        check(api->Register(immediate) == API::Status::Ok, "immediate provider uses the same contract");
+        check(api->Register(immediate) == Status::Ok, "immediate provider uses the same contract");
         const auto immediateRequest = live.BeginOpen("api", "immediate");
         live.Find("api", "immediate")->open("api", "immediate", immediateRequest);
         const auto immediateResult = live.TakeResult(immediateRequest);
-        check(context.result == API::Status::Ok && immediateResult && immediateResult->afterClose && context.opened == 1,
+        check(context.result == Status::Ok && immediateResult && immediateResult->afterClose && context.opened == 1,
             "synchronous completion is safe and still defers activation");
         live.EndOpen(immediateRequest);
         immediateResult->afterClose("api", "immediate", immediateRequest);

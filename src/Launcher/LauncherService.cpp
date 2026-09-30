@@ -58,7 +58,7 @@ namespace OSFSettings
             ++m_revision;
             return LauncherError::None;
         }
-        return LauncherError::NotFound;
+        return LauncherError::UnknownLauncher;
     }
     std::uint64_t LauncherService::BeginOpen(std::string_view mod, std::string_view id)
     {
@@ -72,7 +72,7 @@ namespace OSFSettings
     {
         if (!requestId || !IsValidString(reason, 4096)) return LauncherError::InvalidArgument;
         std::lock_guard lock(m_mutex);
-        if (!m_request || m_request->requestId != requestId || m_request->completed) return LauncherError::NotFound;
+        if (!m_request || m_request->requestId != requestId || m_request->completed) return LauncherError::UnknownRequest;
         m_request->completed = true;
         m_request->result = LaunchResult{ std::move(afterClose), std::move(reason) };
         return LauncherError::None;

@@ -1,4 +1,5 @@
 #include "../../sdk/OSFSettings_Launcher.h"
+#include "Negotiate.h"
 #include "Launcher/LauncherService.h"
 
 namespace OSFSettings::API::Launcher
@@ -14,8 +15,10 @@ namespace OSFSettings::API::Launcher
                     return Status::InvalidArgument;
                 case LauncherError::AlreadyRegistered:
                     return Status::AlreadyRegistered;
-                case LauncherError::NotFound:
-                    return Status::NotFound;
+                case LauncherError::UnknownLauncher:
+                    return Status::UnknownLauncher;
+                case LauncherError::UnknownRequest:
+                    return Status::UnknownLaunchRequest;
             }
             return Status::InternalError;
         }
@@ -53,12 +56,6 @@ namespace OSFSettings::API::Launcher
 }
 extern "C" __declspec(dllexport) void* OSFSettings_RequestLauncherAPI(std::uint32_t version, std::uint32_t* outVersion) noexcept
 {
-    using namespace OSFSettings::API::Launcher;
-    if (outVersion) *outVersion = 0;
-    if ((version >> 16) != (kVersion >> 16) || version > kVersion) return nullptr;
-    auto* api = GetLauncherApi();
-    if (outVersion) {
-        *outVersion = kVersion;
-    }
-    return api;
+    using namespace OSFSettings::API;
+    return Negotiate(Launcher::kVersion, version, outVersion, Launcher::GetLauncherApi());
 }

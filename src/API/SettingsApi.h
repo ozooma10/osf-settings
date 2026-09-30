@@ -1,11 +1,15 @@
 #pragma once
 
 #include "../../sdk/OSFSettings.h"
+#include "Settings/SettingsError.h"
 
 namespace OSFSettings { class SettingsService; class HotkeyInputState; }
 
 namespace OSFSettings::API
 {
+    // Shared by every service that reports settings errors through the ABI.
+    Status ToStatus(SettingsError error) noexcept;
+
     class SettingsApi final : public ISettings
     {
     public:
