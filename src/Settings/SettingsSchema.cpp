@@ -41,6 +41,22 @@ namespace OSFSettings
         });
     }
 
+    bool IsValidIdentifier(std::string_view id)
+    {
+        return !id.empty() && std::ranges::all_of(id, [](char c) {
+            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
+        });
+    }
+
+    std::string FoldAscii(std::string_view text)
+    {
+        std::string result(text);
+        for (auto& c : result) {
+            if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+        }
+        return result;
+    }
+
     SettingValue SettingDefinition::DefaultValue() const
     {
         return std::visit([](const auto& data) -> SettingValue { return data.defaultValue; }, definition);
@@ -67,23 +83,28 @@ namespace OSFSettings
         if (const auto* definition = std::get_if<KeyDefinition>(&setting.definition)) {
             const auto* key = std::get_if<KeyBinding>(&value);
             return key && (key->keyCode == KeyBinding::Unbound ? definition->allowUnbound :
-                IsBindableKey(key->keyCode) || (definition->allowMouse && (key->keyCode == 1 || key->keyCode == 2 || key->keyCode == 4 || key->keyCode == 5 || key->keyCode == 6)));
+                IsBindableKey(key->keyCode) || (definition->allowMouse && IsMouseKey(key->keyCode)));
         }
         return std::holds_alternative<BoolDefinition>(setting.definition) && std::holds_alternative<bool>(value);
     }
 
-    const SettingDefinition* ModSchema::FindSetting(std::string_view key) const
+    namespace
     {
-        for(const auto& group : groups)
+        template <class T, class Id>
+        const T* FindControl(const std::vector<SettingsGroup>& groups, Id id, std::string_view wanted)
         {
-            for(const auto& control : group.controls)
-            {
-                if (const auto* setting = std::get_if<SettingDefinition>(&control); setting && setting->key == key) {
-                    return setting;
+            for (const auto& group : groups) {
+                for (const auto& control : group.controls) {
+                    if (const auto* found = std::get_if<T>(&control); found && found->*id == wanted) return found;
                 }
             }
+            return nullptr;
         }
-        return nullptr;
+    }
+
+    const SettingDefinition* ModSchema::FindSetting(std::string_view key) const
+    {
+        return FindControl<SettingDefinition>(groups, &SettingDefinition::key, key);
     }
 
     SettingDefinition* ModSchema::FindSetting(std::string_view key)
@@ -93,14 +114,18 @@ namespace OSFSettings
 
     const ActionDefinition* ModSchema::FindAction(std::string_view actionId) const
     {
+        return FindControl<ActionDefinition>(groups, &ActionDefinition::id, actionId);
+    }
+
+    SettingValues ModSchema::DefaultValues() const
+    {
+        SettingValues values;
         for (const auto& group : groups) {
             for (const auto& control : group.controls) {
-                if (const auto* action = std::get_if<ActionDefinition>(&control); action && action->id == actionId) {
-                    return action;
-                }
+                if (const auto* setting = std::get_if<SettingDefinition>(&control)) values.emplace(setting->key, setting->DefaultValue());
             }
         }
-        return nullptr;
+        return values;
     }
 
     ActionDefinition* ModSchema::FindAction(std::string_view actionId)

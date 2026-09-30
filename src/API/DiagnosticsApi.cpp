@@ -28,7 +28,7 @@ namespace OSFSettings::API
 
     Status DiagnosticsApi::Clear(const char* modId, const char* id) noexcept
     {
-        if (!modId || !id || !IsValidModId(modId) || std::string_view(id).find_first_not_of(" \t\r\n\f\v") == std::string_view::npos) {
+        if (!modId || !id || !IsValidModId(modId) || !IsValidIssueText(id)) {
             return Status::InvalidArgument;
         }
         m_service.Clear(modId, id);

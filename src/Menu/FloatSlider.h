@@ -4,6 +4,8 @@
 
 namespace OSFSettings
 {
+    constexpr std::int64_t kMaxSafeInteger = 9007199254740991LL; // Largest integer an AS3 Number holds exactly (2^53 - 1).
+
     struct FloatSlider
     {
         std::int64_t minimum{};

@@ -87,7 +87,7 @@ package
         public function get searching():Boolean { return visible && stage && stage.focus == search; }
         public function open(metadata:Array):void
         {
-            definitions = metadata; visible = true; textUnavailable = false; editor.open(); request();
+            definitions = metadata; visible = true; textUnavailable = false; rows = []; editor.open(); request();
         }
         public function close():void
         {
@@ -96,7 +96,8 @@ package
         }
         private function request():void
         {
-            revision = editor.revision; state = "loading"; rows = [];
+            // Keep the published rows visible until their replacement is ready.
+            revision = editor.revision; state = "loading";
             generation = bridge.requestBindings(); requestedAt = getTimer(); nextPoll = 0;
         }
         public function advance(metadata:Array, busy:Boolean):void
@@ -105,7 +106,7 @@ package
             frozen = busy; mouseChildren = !busy;
             if (busy) return;
             definitions = metadata;
-            if (revision != editor.revision) { request(); changed(); }
+            if (revision != editor.revision) request();
             if (state != "loading" || getTimer() < nextPoll) return;
             nextPoll = getTimer() + 100;
             var snapshot:Object = bridge.pollBindings();
@@ -114,9 +115,9 @@ package
                     rows = KeybindingsData.join(editor.bindings,definitions,snapshot.records,editor.title);
                     state = "ready"; updateSources(); changed(); return;
                 }
-                if (snapshot.state == "unavailable") { state = "unavailable"; changed(); return; }
+                if (snapshot.state == "unavailable") { rows = []; state = "unavailable"; changed(); return; }
             }
-            if (getTimer() - requestedAt > 5000) { state = "unavailable"; changed(); }
+            if (getTimer() - requestedAt > 5000) { rows = []; state = "unavailable"; changed(); }
         }
         private function updateSources():void
         {

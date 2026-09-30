@@ -180,14 +180,8 @@ namespace OSFSettings::Localization
 
     std::string NormalizeLanguage(std::string_view language)
     {
-        if (language.empty() || language.size() > 32 || language.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != language.npos) return "en";
-        std::string result(language);
-        for (auto& c : result) {
-            if (c >= 'A' && c <= 'Z') {
-                c += 'a' - 'A';
-            }
-        }
-        return result;
+        if (language.size() > 32 || !IsValidIdentifier(language)) return "en";
+        return FoldAscii(language);
     }
 
     std::string Format(std::string_view text, std::initializer_list<std::pair<std::string_view, std::string_view>> arguments)

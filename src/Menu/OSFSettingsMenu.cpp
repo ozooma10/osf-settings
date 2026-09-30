@@ -39,6 +39,18 @@ namespace OSFSettings
         {
             object.SetMember(name, RE::Scaleform::GFx::Value(value.c_str()));
         }
+
+        using Context = RE::ControlMap::InputContextID;
+        // Text editing temporarily replaces these contexts.
+        constexpr Context kNavigationContexts[]{ Context::kBasicMenuNav, Context::kLeftThumbstick, Context::kVirtualController };
+
+        // Callback destinations open in place; native destinations need their menu registered.
+        bool MenuRegistered(const LaunchDestination& destination)
+        {
+            if (destination.menu.empty()) return true;
+            const auto* ui = RE::UI::GetSingleton();
+            return ui && ui->IsMenuRegistered(RE::BSFixedString(destination.menu.c_str()));
+        }
     }
 
     OSFSettingsMenu::OSFSettingsMenu()
@@ -52,7 +64,7 @@ namespace OSFSettings
     {
         // Dynamic context updates apply only below priority 0x0C. Match PauseMenu; the newly opened menu is stacked above it.
         depthPriority = 0x0B;
-        for (const auto context : { InputContextID::kBasicMenuNav, InputContextID::kLeftThumbstick, InputContextID::kVirtualController }) {
+        for (const auto context : kNavigationContexts) {
             AddInputContext(context);
         }
     }
@@ -80,7 +92,7 @@ namespace OSFSettings
             if (enabled) {
                 menu->AddInputContext(InputContextID::kTextInput);
             } else {
-                for (const auto context : { InputContextID::kBasicMenuNav, InputContextID::kLeftThumbstick, InputContextID::kVirtualController }) {
+                for (const auto context : kNavigationContexts) {
                     menu->AddInputContext(context);
                 }
             }
@@ -140,7 +152,7 @@ namespace OSFSettings
             auto* ui = RE::UI::GetSingleton();
             if (!m_launch && ui && params.argCount == 2 && params.args[0].IsString() && params.args[1].IsString()) {
                 auto destination = LauncherService::Get().Find(ArgString(params, 0), ArgString(params, 1));
-                if (destination && destination->available && (destination->open || ui->IsMenuRegistered(RE::BSFixedString(destination->menu.c_str())))) {
+                if (destination && destination->available && MenuRegistered(*destination)) {
                     if (destination->open) {
                         const auto request = LauncherService::Get().BeginOpen(destination->mod, destination->id);
                         if (request) {
@@ -253,19 +265,15 @@ namespace OSFSettings
         case Function::BeginKeyCapture: {
             const auto mod = ArgString(params, 0);
             const auto key = ArgString(params, 1);
-            const auto value = SettingsService::Get().GetValue(mod, key);
-            const bool ok = m_capture.GetSnapshot().state == KeyCapture::State::Idle && value && std::holds_alternative<KeyBinding>(*value);
+            const auto& settings = SettingsService::Get();
+            const auto record = settings.IsReady() ? settings.FindMod(mod) : std::nullopt;
+            const auto* setting = record ? record->schema.FindSetting(key) : nullptr;
+            const auto* binding = setting ? std::get_if<KeyDefinition>(&setting->definition) : nullptr;
+            const bool ok = m_capture.GetSnapshot().state == KeyCapture::State::Idle && binding;
             if (ok) {
                 m_captureMod = mod;
                 m_captureKey = key;
-                bool allowMouse = false;
-                for (const auto& record : SettingsService::Get().Snapshot()) {
-                    if (record.schema.id != mod) continue;
-                    const auto* setting = record.schema.FindSetting(key);
-                    const auto* binding = setting ? std::get_if<KeyDefinition>(&setting->definition) : nullptr;
-                    allowMouse = binding && binding->allowMouse;
-                }
-                m_capture.BeginCapture(allowMouse);
+                m_capture.BeginCapture(binding->allowMouse);
             }
             root->CreateObject(params.ret);
             params.ret->SetMember("ok", RE::Scaleform::GFx::Value(ok));
@@ -327,22 +335,27 @@ namespace OSFSettings
             }
             break;
         }
-        case Function::GetRows:
+        case Function::GetRows: {
             root->CreateArray(params.ret);
+            // Fields shared by setting, action, and hotkey rows.
+            const auto modRow = [root](const ModSettings& mod, const SettingsGroup& group, const std::string& key, const std::string& title) {
+                RE::Scaleform::GFx::Value row;
+                root->CreateObject(&row);
+                Text(row, "mod", mod.schema.id);
+                Text(row, "modTitle", mod.schema.title);
+                Text(row, "modDescription", mod.schema.description);
+                Text(row, "group", group.id);
+                Text(row, "groupTitle", group.label);
+                Text(row, "key", key);
+                Text(row, "title", title);
+                return row;
+            };
             for (const auto& mod : runtime.Settings()) {
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& control : group.controls) {
                         if (const auto* action = std::get_if<ActionDefinition>(&control)) {
                             const auto state = ActionService::Get().Status(mod.schema.id, action->id);
-                            RE::Scaleform::GFx::Value row;
-                            root->CreateObject(&row);
-                            Text(row, "mod", mod.schema.id);
-                            Text(row, "modTitle", mod.schema.title);
-                            Text(row, "modDescription", mod.schema.description);
-                            Text(row, "group", group.id);
-                            Text(row, "groupTitle", group.label);
-                            Text(row, "key", action->id);
-                            Text(row, "title", action->label);
+                            auto row = modRow(mod, group, action->id, action->label);
                             Text(row, "type", "action");
                             Text(row, "hint", action->hint);
                             Text(row, "confirmation", action->confirmation);
@@ -356,15 +369,7 @@ namespace OSFSettings
                         const auto& setting = std::get<SettingDefinition>(control);
                         const auto value = mod.values.find(setting.key);
                         if (value == mod.values.end()) continue;
-                        RE::Scaleform::GFx::Value row;
-                        root->CreateObject(&row);
-                        Text(row, "mod", mod.schema.id);
-                        Text(row, "modTitle", mod.schema.title);
-                        Text(row, "modDescription", mod.schema.description);
-                        Text(row, "group", group.id);
-                        Text(row, "groupTitle", group.label);
-                        Text(row, "key", setting.key);
-                        Text(row, "title", setting.label);
+                        auto row = modRow(mod, group, setting.key, setting.label);
                         Text(row, "hint", setting.hint);
                         row.SetMember("requiresRestart", RE::Scaleform::GFx::Value(setting.requiresRestart));
                         if (const auto* definition = std::get_if<BoolDefinition>(&setting.definition)) {
@@ -380,9 +385,8 @@ namespace OSFSettings
                             if (integer.minimum) Text(row, "minimum", std::to_string(*integer.minimum));
                             if (integer.maximum) Text(row, "maximum", std::to_string(*integer.maximum));
                             // AS3 Number must preserve both bounds; BSSlider stores its range as uint32.
-                            constexpr std::int64_t safeInteger = 9007199254740991LL;
                             const bool editable = integer.minimum && integer.maximum && *integer.minimum < *integer.maximum &&
-                                *integer.minimum >= -safeInteger && *integer.maximum <= safeInteger &&
+                                *integer.minimum >= -kMaxSafeInteger && *integer.maximum <= kMaxSafeInteger &&
                                 *integer.maximum - *integer.minimum <= 4294967295LL;
                             row.SetMember("editable", RE::Scaleform::GFx::Value(editable));
                         } else if (const auto* floating = std::get_if<FloatDefinition>(&setting.definition)) {
@@ -434,17 +438,10 @@ namespace OSFSettings
                     }
                     for (const auto& hotkey : mod.schema.hotkeys) {
                         if (hotkey.group != group.id) continue;
-                        RE::Scaleform::GFx::Value row;
-                        root->CreateObject(&row);
-                        Text(row, "mod", mod.schema.id);
-                        Text(row, "modTitle", mod.schema.title);
-                        Text(row, "modDescription", mod.schema.description);
-                        Text(row, "group", group.id);
-                        Text(row, "groupTitle", group.label);
-                        Text(row, "key", hotkey.id);
-                        Text(row, "action", mod.schema.id + "/" + hotkey.id);
-                        row.SetMember("registered", RE::Scaleform::GFx::Value(NativeHotkeys::FindAction(mod.schema.id + "/" + hotkey.id) != nullptr));
-                        Text(row, "title", hotkey.label);
+                        const auto event = NativeHotkeys::EventName(mod.schema.id, hotkey.id);
+                        auto row = modRow(mod, group, hotkey.id, hotkey.label);
+                        Text(row, "action", event);
+                        row.SetMember("registered", RE::Scaleform::GFx::Value(NativeHotkeys::FindAction(event) != nullptr));
                         Text(row, "type", "hotkey");
                         Text(row, "hint", tr("bindings.editHint"));
                         Text(row, "defaultName", hotkey.defaultKey.value_or(tr("values.unboundTitle")));
@@ -462,8 +459,7 @@ namespace OSFSettings
                 Text(row, "title", destination.title);
                 Text(row, "type", "launcher");
                 row.SetMember("recentOrder", RE::Scaleform::GFx::Value(static_cast<double>(destination.recentOrder)));
-                const auto* ui = RE::UI::GetSingleton();
-                const bool registered = destination.menu.empty() || (ui && ui->IsMenuRegistered(RE::BSFixedString(destination.menu)));
+                const bool registered = MenuRegistered(destination);
                 const bool available = destination.available && registered;
                 Text(row, "hint", destination.description);
                 Text(row, "message", !registered ? "The owning mod has not registered this menu." : destination.reason);
@@ -471,6 +467,7 @@ namespace OSFSettings
                 params.ret->PushBack(row);
             }
             break;
+        }
         case Function::SetBool:
         case Function::SetInt:
         case Function::SetFloat:

@@ -16,8 +16,7 @@ namespace OSFSettings::NativeHotkeys
     namespace
     {
         constexpr std::ptrdiff_t kParseMappingsCallOffset = 0x45; // Parser call inside LoadMappings.
-        constexpr std::uint32_t kUnbound = 0xFFu;
-        constexpr std::uint32_t kUnknownKey = 0xFFFFFFFFu;
+        constexpr std::uint32_t kUnbound = KeyBinding::Unbound;
 
         using ParseHook = REL::THook<void(RE::ControlMap*, const char*)>;
         std::optional<ParseHook> g_parseHook;
@@ -38,7 +37,7 @@ namespace OSFSettings::NativeHotkeys
         for (const auto& mod : SettingsService::Get().Snapshot()) {
             auto& targets = declarations[mod.schema.id];
             for (const auto& hotkey : mod.schema.hotkeys) {
-                const auto event = mod.schema.id + "/" + hotkey.id;
+                const auto event = EventName(mod.schema.id, hotkey.id);
                 auto& target = targets[hotkey.id];
                 target = hotkey.menu ? HotkeyInputState::Target::Menu : HotkeyInputState::Target::Invalid;
                 const auto key = hotkey.defaultKey ? GetKeyboardVirtualKey(*hotkey.defaultKey) : kUnbound;

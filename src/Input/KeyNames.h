@@ -16,7 +16,9 @@ namespace OSFSettings
         return button < 5 ? keys[button] : 0;
     }
 
-    // Uses the baked keyboard table before device initialization; unknown names return 0xFFFFFFFF.
+    constexpr std::uint32_t kUnknownKey = 0xFFFFFFFF; // Native name lookups return this for unknown names.
+
+    // Uses the baked keyboard table before device initialization; unknown names return kUnknownKey.
     std::uint32_t GetKeyboardVirtualKey(std::string_view keyName);
 
     std::string KeyName(std::uint32_t keyCode);

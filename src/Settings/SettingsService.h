@@ -30,6 +30,7 @@ namespace OSFSettings
         bool Start(); // After the notification dispatcher is installed. False when Load has not run.
         void Localize(const std::filesystem::path& directory, std::string_view language);
         std::vector<ModSettings> Snapshot() const;
+        std::optional<ModSettings> FindMod(std::string_view mod) const; // Localized copy of one mod.
         std::vector<SettingsLoadError> LoadErrors() const;
         bool HasPendingChanges() const noexcept;
         void DispatchChanges() noexcept;

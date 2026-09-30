@@ -1,5 +1,6 @@
 #include "NativeBindingEditor.h"
 #include "HotkeyInputState.h"
+#include "Settings/SettingValue.h"
 #include "RE/C/ControlMap.h"
 #include "RE/S/SettingsDataModel.h"
 #include "REL/THook.h"
@@ -13,7 +14,6 @@ namespace OSFSettings
         constexpr std::ptrdiff_t kValidateCandidateCall = 0x185;
         constexpr std::uint8_t kAllowed = 0;
         constexpr std::uint8_t kConfirmConflict = 2;
-        constexpr std::uint32_t kUnbound = 0xFF;
         using Context = RE::ControlMap::InputContextID;
         using Slot = RE::ControlMap::BindingSlot;
         using Device = RE::InputEvent::DeviceType;
@@ -24,7 +24,7 @@ namespace OSFSettings
         {
             const auto result = (*g_validateHook)(map, action, device, keys, slot, context);
             // Vanilla permits occupied-key swaps. Only OSF's active PC capture asks for confirmation as well; native rejection and commit rules remain intact.
-            if (result != kAllowed || !NativeBindingEditor::IsActive() || context != Context::kMainGameplay || device > static_cast<std::uint8_t>(Device::kMouse) || keys[0] == kUnbound) {
+            if (result != kAllowed || !NativeBindingEditor::IsActive() || context != Context::kMainGameplay || device > static_cast<std::uint8_t>(Device::kMouse) || keys[0] == KeyBinding::Unbound) {
                 return result;
             }
             for (const auto& mapping : map->GetMappings(context, static_cast<Device>(device))) {

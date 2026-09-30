@@ -14,6 +14,15 @@ namespace OSFSettings::NativeHotkeys
         std::optional<std::string> menu;
     };
 
+    // Native ControlMap event name for a schema hotkey.
+    inline std::string EventName(std::string_view mod, std::string_view id)
+    {
+        std::string event(mod);
+        event += '/';
+        event += id;
+        return event;
+    }
+
     bool Install(); // Called once from Plugin::OnLoad, after settings load.
     const Action* FindAction(std::string_view action);
 }

@@ -7,6 +7,9 @@
 
 namespace OSFSettings
 {
+    // Issue ids and titles need a visible character and no embedded NUL.
+    bool IsValidIssueText(std::string_view text);
+
     class IssueRegistry
     {
     public:

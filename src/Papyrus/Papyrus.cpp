@@ -32,36 +32,32 @@ namespace OSFSettings::Papyrus
         Values Access() { return Values(SettingsService::Get()); }
         Issues IssueAccess() { return Issues(API::DiagnosticsApi::Get()); }
 
-        bool DispatchAction(const Receiver& receiver, ActionService::Invocation invocation, const std::string& mod, const std::string& id)
+        // Queues a string-argument event on a bound instance, or on a global script when the handle is empty.
+        bool Call(const Receiver& receiver, const char* function, std::vector<std::string> arguments)
         {
             auto* game = RE::GameVM::GetSingleton();
             auto* vm = game ? game->GetVM() : nullptr;
             if (!vm) return false;
-            const auto args = [mod, id, token = std::to_string(invocation)](RE::BSScrapArray<RE::BSScript::Variable>& out) {
-                out.resize(3);
-                out[0] = String(mod); 
-                out[1] = String(id); 
-                out[2] = String(token);
+            const auto args = [arguments = std::move(arguments)](RE::BSScrapArray<RE::BSScript::Variable>& out) {
+                out.resize(static_cast<std::uint32_t>(arguments.size()));
+                for (std::uint32_t i = 0; i < arguments.size(); ++i) out[i] = String(arguments[i]);
                 return true;
             };
-            const RE::BSFixedString function("OnOSFAction");
+            const RE::BSFixedString name(function);
             const RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> noCallback;
             return receiver.handle ?
-                vm->DispatchMethodCall(receiver.handle, RE::BSFixedString(receiver.script), function, args, noCallback, 0) :
-                vm->DispatchStaticCall(RE::BSFixedString(receiver.script), function, args, noCallback, 0);
+                vm->DispatchMethodCall(receiver.handle, RE::BSFixedString(receiver.script), name, args, noCallback, 0) :
+                vm->DispatchStaticCall(RE::BSFixedString(receiver.script), name, args, noCallback, 0);
+        }
+
+        bool DispatchAction(const Receiver& receiver, ActionService::Invocation invocation, const std::string& mod, const std::string& id)
+        {
+            return Call(receiver, "OnOSFAction", { mod, id, std::to_string(invocation) });
         }
         Actions& ActionHandlers()
         {
             static auto* handlers = new Actions(ActionService::Get(), DispatchAction);
             return *handlers;
-        }
-
-        std::string FoldScript(std::string text)
-        {
-            for (auto& c : text) {
-                if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
-            }
-            return text;
         }
 
         bool IsScriptName(std::string_view text)
@@ -129,7 +125,7 @@ namespace OSFSettings::Papyrus
             if (!handle || handle == policy.EmptyHandle() || !policy.IsHandleObjectAvailable(handle)) return std::nullopt;
             Object bound;
             if (!vm.FindBoundObject(handle, object->type->name.c_str(), false, bound, true) || bound.get() != object.get()) return std::nullopt;
-            return Receiver{ handle, FoldScript(object->type->name.c_str()) };
+            return Receiver{ handle, FoldAscii(object->type->name.c_str()) };
         }
 
         std::optional<Receiver> Global(VM& vm, String script)
@@ -137,7 +133,7 @@ namespace OSFSettings::Papyrus
             if (!IsScriptName(script.c_str())) return std::nullopt;
             RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> type;
             if (!vm.GetScriptObjectType(RE::BSFixedString(script), type) || !type) return std::nullopt;
-            return Receiver{ 0, FoldScript(script.c_str()) };
+            return Receiver{ 0, FoldAscii(script.c_str()) };
         }
 
         bool RegisterTarget(std::string_view function, std::optional<Receiver> receiver, Subscriptions::Kind kind, String mod, String key = {})
@@ -233,24 +229,10 @@ namespace OSFSettings::Papyrus
 
         void Dispatch(const Receiver& receiver, Subscriptions::Kind kind, const std::string& mod, const std::string& key)
         {
-            auto* game = RE::GameVM::GetSingleton();
-            auto* vm = game ? game->GetVM() : nullptr;
-            if (!vm) return;
-            const auto args = [mod, key](RE::BSScrapArray<RE::BSScript::Variable>& out) {
-                out.resize(2);
-                out[0] = String(mod);
-                out[1] = String(key);
-                return true;
-            };
-            const RE::BSFixedString function(kind == Subscriptions::Kind::Changes ? "OnOSFSettingChanged" : "OnOSFHotkey");
-            const RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> noCallback;
-            bool accepted{};
-            if (receiver.handle) {
-                accepted = vm->DispatchMethodCall(receiver.handle, RE::BSFixedString(receiver.script), function, args, noCallback, 0);
-            } else {
-                accepted = vm->DispatchStaticCall(RE::BSFixedString(receiver.script), function, args, noCallback, 0);
+            const auto* function = kind == Subscriptions::Kind::Changes ? "OnOSFSettingChanged" : "OnOSFHotkey";
+            if (!Call(receiver, function, { mod, key })) {
+                REX::WARN("Papyrus {}.{}({}/{}): receiver unavailable or VM rejected callback", receiver.script, function, mod, key);
             }
-            if (!accepted) REX::WARN("Papyrus {}.{}({}/{}): receiver unavailable or VM rejected callback", receiver.script, function.c_str(), mod, key);
         }
 
         class SessionEvents final : public RE::BSTEventSink<RE::TESLoadGameEvent>, public RE::BSTEventSink<RE::MenuOpenCloseEvent>

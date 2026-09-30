@@ -18,12 +18,11 @@ namespace OSFSettings
         const auto resolution = std::nextafter(magnitude, std::numeric_limits<double>::infinity()) - magnitude;
         if (definition.step < resolution) return std::nullopt;
 
-        constexpr std::int64_t safeInteger = 9007199254740991LL; //YOLO?
         std::int64_t scale = 1;
         for (int decimals = 0; decimals <= 9; decimals++, scale *= 10) {
             const auto scaled = [scale](double value) -> std::optional<std::int64_t> {
                 const double integer = std::round(value * static_cast<double>(scale));
-                if (!std::isfinite(integer) || std::abs(integer) > static_cast<double>(safeInteger) || integer / static_cast<double>(scale) != value){
+                if (!std::isfinite(integer) || std::abs(integer) > static_cast<double>(kMaxSafeInteger) || integer / static_cast<double>(scale) != value){
                     return std::nullopt;
                 }
                 return static_cast<std::int64_t>(integer);
@@ -33,7 +32,7 @@ namespace OSFSettings
             const auto step = scaled(definition.step);
             if (!minimum || !maximum || !step || *step <= 0) continue;
             const auto span = *maximum - *minimum;
-            if (span > safeInteger) return std::nullopt;
+            if (span > kMaxSafeInteger) return std::nullopt;
             const auto steps = (span - 1) / *step + 1; // Include a shorter final step to max.
             if (steps > std::numeric_limits<std::uint32_t>::max()) return std::nullopt;
             return FloatSlider{ *minimum, *maximum, *step, scale, static_cast<std::uint32_t>(steps), decimals };

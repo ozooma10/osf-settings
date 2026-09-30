@@ -15,7 +15,7 @@ namespace OSFSettings
     {
         std::wstring name;
         if (keyName.empty() || !REX::UTF8_TO_UTF16(keyName, name))
-            return 0xFFFFFFFF;
+            return kUnknownKey;
         static REL::Relocation<const wchar_t*> table{ RE::ID::BSWin32KeyboardDevice::KeyNameTable };
         std::wstring_view rows{ table.get() };
         while (!rows.empty()) {
@@ -29,7 +29,7 @@ namespace OSFSettings
                 break;
             rows.remove_prefix(end + 1);
         }
-        return 0xFFFFFFFF;
+        return kUnknownKey;
     }
 
     std::optional<std::uint32_t> KeyCodeFromName(std::string_view name)
@@ -46,24 +46,13 @@ namespace OSFSettings
         const auto* manager = RE::BSInputDeviceManager::GetSingleton();
         const auto* keyboard = manager ? manager->GetKeyboard() : nullptr;
         const auto keyCode = keyboard ? keyboard->GetKeyCodeFromName(std::string(name).c_str()) : GetKeyboardVirtualKey(name);
-        if (keyCode == 0xFFFFFFFF) return std::nullopt;
+        if (keyCode == kUnknownKey) return std::nullopt;
         return keyCode;
     }
 
     bool IsBindableKey(std::uint32_t keyCode)
     {
-        if (keyCode == 0 || keyCode >= KeyBinding::Unbound) return false;
-        switch (keyCode) {
-        case VK_LBUTTON:
-        case VK_RBUTTON:
-        case VK_MBUTTON:
-        case VK_XBUTTON1:
-        case VK_XBUTTON2:
-        case VK_ESCAPE:
-            return false;
-        default:
-            return true;
-        }
+        return keyCode != 0 && keyCode < KeyBinding::Unbound && !IsMouseKey(keyCode) && keyCode != VK_ESCAPE;
     }
 
     std::string KeyName(std::uint32_t keyCode)

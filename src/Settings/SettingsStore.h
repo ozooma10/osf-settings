@@ -28,6 +28,7 @@ namespace OSFSettings
         SetResult Reset(std::string_view mod, std::string_view key);
         SetResult ResetMod(std::string_view mod);
         const ModSettings* FindMod(std::string_view mod) const;
+        ModSettings* FindMod(std::string_view mod);
         using Save = std::function<bool(const SettingValues&)>;
         Error RegisterProvider(ModSettings mod, Save save, std::uint64_t& registration);
         std::optional<std::string> UnregisterProvider(std::uint64_t registration);

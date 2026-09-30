@@ -94,6 +94,10 @@ namespace OSFSettings
     };
 
     bool IsValidModId(std::string_view id);
+    // Non-empty ASCII letters, digits, underscores, or hyphens (action, hotkey, and language ids).
+    bool IsValidIdentifier(std::string_view id);
+    // Lowercases ASCII letters only, for case-insensitive identifier comparison.
+    std::string FoldAscii(std::string_view text);
     bool IsValidString(std::string_view text, std::uint32_t maxLength);
     bool IsValidValue(const SettingDefinition& setting, const SettingValue& value);
 
@@ -116,6 +120,7 @@ namespace OSFSettings
         const SettingDefinition* FindSetting(std::string_view key) const;
         ActionDefinition* FindAction(std::string_view actionId);
         const ActionDefinition* FindAction(std::string_view actionId) const;
+        SettingValues DefaultValues() const;
     };
 
     struct ModSettings

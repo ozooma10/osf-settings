@@ -14,6 +14,11 @@ namespace OSFSettings
         {
             return !id.empty() && IsValidString(id, 256);
         }
+
+        bool ValidMod(std::string_view mod)
+        {
+            return IsValidModId(mod) && mod.size() <= 128;
+        }
     }
     LauncherService& LauncherService::Get() { static auto* service = new LauncherService; return *service; }
 
@@ -30,7 +35,7 @@ namespace OSFSettings
 
     LauncherError LauncherService::Register(LaunchDestination destination)
     {
-        if (!IsValidModId(destination.mod) || destination.mod.size() > 128 || !ValidID(destination.id) || destination.title.empty() || !IsValidString(destination.title, 256) || !IsValidString(destination.modTitle, 256) ||
+        if (!ValidMod(destination.mod) || !ValidID(destination.id) || destination.title.empty() || !IsValidString(destination.title, 256) || !IsValidString(destination.modTitle, 256) ||
             !IsValidString(destination.description, 4096) || !IsValidString(destination.reason, 4096) ||
             (int(!destination.menu.empty()) + int(bool(destination.open)) != 1) ||
             !IsValidString(destination.menu, 256) || destination.menu == "OSFSettingsMenu") {
@@ -112,7 +117,7 @@ namespace OSFSettings
             const auto id = item.find("id");
             if (mod == item.end() || id == item.end() || !mod->is_string() || !id->is_string()) return warn("invalid destination identity");
             auto identity = std::pair{ mod->get<std::string>(), id->get<std::string>() };
-            if (!IsValidModId(identity.first) || identity.first.size() > 128 || !ValidID(identity.second)) return warn("invalid destination identity");
+            if (!ValidMod(identity.first) || !ValidID(identity.second)) return warn("invalid destination identity");
             if (std::ranges::find(recent, identity) == recent.end()) {
                 recent.push_back(std::move(identity));
             }

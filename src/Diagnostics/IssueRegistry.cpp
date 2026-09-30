@@ -12,16 +12,16 @@ namespace OSFSettings
         {
             return text.find('\0') != std::string_view::npos;
         }
+    }
 
-        bool ValidText(std::string_view text)
-        {
-            return !HasEmbeddedNull(text) && text.find_first_not_of(" \t\r\n\f\v") != std::string_view::npos;
-        }
+    bool IsValidIssueText(std::string_view text)
+    {
+        return !HasEmbeddedNull(text) && text.find_first_not_of(" \t\r\n\f\v") != std::string_view::npos;
     }
 
     bool IssueRegistry::Report(ModIssue issue)
     {
-        if (!IsValidModId(issue.modId) || !ValidText(issue.id) || !ValidText(issue.title) || HasEmbeddedNull(issue.impact) || HasEmbeddedNull(issue.nextSteps)) {
+        if (!IsValidModId(issue.modId) || !IsValidIssueText(issue.id) || !IsValidIssueText(issue.title) || HasEmbeddedNull(issue.impact) || HasEmbeddedNull(issue.nextSteps)) {
             return false;
         }
         

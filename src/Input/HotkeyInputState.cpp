@@ -1,4 +1,5 @@
 #include "HotkeyInputState.h"
+#include "Settings/SettingValue.h"
 
 #include <utility>
 
@@ -23,7 +24,7 @@ namespace OSFSettings
         std::lock_guard lock(m_mutex);
         const auto result = Validate(mod, id);
         if (result != SettingsError::None) return result;
-        m_callbacks[std::string(mod) + "/" + std::string(id)].push_back({ callback, context });
+        m_callbacks[NativeHotkeys::EventName(mod, id)].push_back({ callback, context });
         return SettingsError::None;
     }
 
@@ -47,7 +48,7 @@ namespace OSFSettings
         if (result != SettingsError::None) return result;
         if (!m_nextSubscription) return SettingsError::InternalError;
         auto observer = std::make_shared<Observer>();
-        observer->action = std::string(mod) + "/" + std::string(id);
+        observer->action = NativeHotkeys::EventName(mod, id);
         observer->callback = std::move(callback);
         m_observers.emplace(m_nextSubscription, std::move(observer));
         out = m_nextSubscription++;
@@ -87,8 +88,7 @@ namespace OSFSettings
 
     bool HotkeyInputState::ProcessButton(std::uint32_t key, const NativeHotkeys::Action& action, float value, float heldSeconds)
     {
-        constexpr std::uint32_t kUnbound = 0xFF;
-        if (!key || key >= kUnbound) return false;
+        if (!key || key >= KeyBinding::Unbound) return false;
 
         std::unique_lock lock(m_mutex);
         if (!m_blocks.empty()) return false;

@@ -50,6 +50,16 @@ namespace OSFSettings
         return mods;
     }
 
+    std::optional<ModSettings> SettingsService::FindMod(std::string_view mod) const
+    {
+        std::lock_guard lock(m_mutex);
+        const auto* stored = m_store.FindMod(mod);
+        if (!stored) return std::nullopt;
+        auto copy = *stored;
+        Localization::Get()->Apply(copy.schema);
+        return copy;
+    }
+
     void SettingsService::Localize(const std::filesystem::path& directory, std::string_view language)
     {
         std::lock_guard lock(m_mutex);

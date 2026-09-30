@@ -44,6 +44,16 @@ namespace OSFSettings::API
         template <class T>
         const T* Elements(const std::vector<T>& items) { return items.empty() ? nullptr : items.data(); }
 
+        // Reports the NUL-terminated size and copies only when the caller's buffer holds it.
+        Status CopyOut(const std::string& text, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept
+        {
+            if (text.size() >= std::numeric_limits<std::uint32_t>::max()) return Status::InternalError;
+            *required = static_cast<std::uint32_t>(text.size() + 1);
+            if (capacity < *required) return Status::BufferTooSmall;
+            std::memcpy(out, text.c_str(), *required);
+            return Status::Ok;
+        }
+
         template <class T>
         RegistryValue Value(const T& value)
         {
@@ -156,22 +166,20 @@ namespace OSFSettings::API
     {
         if (!required || (!out && capacity)) return Status::InvalidArgument;
         if (!Localization::Initialized()) return Status::NotReady;
-        const auto catalog = Localization::Get();
-        const auto& text = catalog->Language();
-        if (text.size() >= std::numeric_limits<std::uint32_t>::max()) return Status::InternalError;
-        *required = static_cast<std::uint32_t>(text.size() + 1);
-        if (capacity < *required) return Status::BufferTooSmall;
-        std::memcpy(out, text.c_str(), *required);
-        return Status::Ok;
+        return CopyOut(Localization::Get()->Language(), out, capacity, required);
     }
 
     Status SettingsApi::ReadRegistry(const char* mod, RegistryFn callback, void* context) noexcept
     {
         if (!callback || (mod && !IsValidModId(mod))) return Status::InvalidArgument;
         if (!m_service.IsReady()) return Status::NotReady;
-        const auto snapshot = m_service.Snapshot();
-        if (mod && std::ranges::none_of(snapshot, [&](const auto& entry) { return entry.schema.id == mod; })) {
-            return Status::UnknownMod;
+        std::vector<ModSettings> snapshot;
+        if (mod) {
+            auto found = m_service.FindMod(mod);
+            if (!found) return Status::UnknownMod;
+            snapshot.push_back(std::move(*found));
+        } else {
+            snapshot = m_service.Snapshot();
         }
         const RegistryProjection projection(snapshot, mod);
         const RegistryView view{ Elements(projection.views), Count(projection.views.size()) };
@@ -208,26 +216,11 @@ namespace OSFSettings::API
     template <class T>
     Status SettingsApi::ReadText(const char* mod, const char* key, char* out, std::uint32_t capacity, std::uint32_t* required) noexcept
     {
-        if (!mod || !key || !required || (!out && capacity)) return Status::InvalidArgument;
-        const auto result = m_service.GetValue(mod, key);
-        if (!result) {
-            return ToStatus(result.error());
-        }
-        const auto* value = std::get_if<T>(&*result);
-        if (!value) {
-            return Status::TypeMismatch;
-        }
-        const std::string* text;
-        if constexpr (std::is_same_v<T, EnumValue>) {
-            text = &value->value;
-        } else {
-            text = value;
-        }
-        if (text->size() >= std::numeric_limits<std::uint32_t>::max()) return Status::InternalError;
-        *required = static_cast<std::uint32_t>(text->size() + 1);
-        if (capacity < *required) return Status::BufferTooSmall;
-        std::memcpy(out, text->c_str(), *required);
-        return Status::Ok;
+        if (!required || (!out && capacity)) return Status::InvalidArgument;
+        T value;
+        if (const auto status = Read(mod, key, &value); status != Status::Ok) return status;
+        if constexpr (std::is_same_v<T, EnumValue>) return CopyOut(value.value, out, capacity, required);
+        else return CopyOut(value, out, capacity, required);
     }
 
     Status SettingsApi::GetKey(const char* mod, const char* key, std::uint32_t* out) noexcept
@@ -295,8 +288,7 @@ namespace OSFSettings::API
     Status SettingsApi::RegisterHotkey(const char* mod, const char* id, HotkeyFn callback, void* context) noexcept
     {
         if (!mod || !id || !callback || !IsValidModId(mod)) return Status::InvalidArgument;
-        const std::string_view hotkeyId(id);
-        if (hotkeyId.empty() || hotkeyId.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") != std::string_view::npos) return Status::InvalidArgument;
+        if (!IsValidIdentifier(id)) return Status::InvalidArgument;
         if (!m_service.IsReady()) return Status::NotReady;
         return ToStatus(m_input.Register(mod, id, callback, context));
     }

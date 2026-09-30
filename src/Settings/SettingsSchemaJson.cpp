@@ -147,11 +147,9 @@ namespace OSFSettings::SettingsJson
                     if (type == "action") {
                         ActionDefinition action;
                         action.id = RequiredText(sourceSetting, "id");
-                        Require(action.id.size() <= 128 && action.id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos,
+                        Require(action.id.size() <= 128 && IsValidIdentifier(action.id),
                             "action id must use 1-128 ASCII letters, digits, underscores, or hyphens");
-                        auto folded = action.id;
-                        for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';
-                        Require(actionIds.insert(folded).second, "duplicate action id: " + action.id);
+                        Require(actionIds.insert(FoldAscii(action.id)).second, "duplicate action id: " + action.id);
                         action.label = RequiredText(sourceSetting, "label");
                         action.hint = OptionalText(sourceSetting, "hint");
                         action.confirmation = OptionalText(sourceSetting, "confirmation");
@@ -256,10 +254,8 @@ namespace OSFSettings::SettingsJson
                     HotkeyDefinition hotkey;
                     hotkey.id = id;
                     Require(!hotkey.id.empty(), "hotkey id must not be empty");
-                    Require(hotkey.id.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos, "hotkey id must use ASCII letters, digits, underscores, or hyphens");
-                    auto folded = hotkey.id;
-                    for (auto& ch : folded) if (ch >= 'A' && ch <= 'Z') ch += 'a' - 'A';
-                    Require(ids.insert(folded).second, "duplicate hotkey id: " + hotkey.id);
+                    Require(IsValidIdentifier(hotkey.id), "hotkey id must use ASCII letters, digits, underscores, or hyphens");
+                    Require(ids.insert(FoldAscii(hotkey.id)).second, "duplicate hotkey id: " + hotkey.id);
                     hotkey.label = RequiredText(source, "label");
                     Require(hotkey.label.find('\0') == std::string::npos, "hotkey label must not contain NUL");
                     if (source.contains("default")) {

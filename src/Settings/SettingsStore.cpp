@@ -46,14 +46,7 @@ namespace OSFSettings
 
             ModSettings mod;
             mod.schema = std::move(*schema);
-            for (const auto& group : mod.schema.groups) {
-                for (const auto& control : group.controls) {
-                    const auto* valueSetting = std::get_if<SettingDefinition>(&control);
-                    if (!valueSetting) continue;
-                    const auto& setting = *valueSetting;
-                    mod.values.emplace(setting.key, setting.DefaultValue());
-                }
-            }
+            mod.values = mod.schema.DefaultValues();
             SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
             m_mods.push_back(std::move(mod));
 
@@ -62,19 +55,22 @@ namespace OSFSettings
 
     std::optional<SettingValue> SettingsStore::GetValue(std::string_view mod, std::string_view key) const
     {
-        for (const auto& stored : m_mods) {
-            if (stored.schema.id != mod) continue;
-            const auto value = stored.values.find(key);
-            if (value != stored.values.end()) return value->second;
-            return std::nullopt;
-        }
-        return std::nullopt;
+        const auto* stored = FindMod(mod);
+        if (!stored) return std::nullopt;
+        const auto value = stored->values.find(key);
+        if (value == stored->values.end()) return std::nullopt;
+        return value->second;
     }
 
     const ModSettings* SettingsStore::FindMod(std::string_view mod) const
     {
         const auto found = std::ranges::find(m_mods, mod, [](const auto& stored) { return std::string_view(stored.schema.id); });
         return found != m_mods.end() ? &*found : nullptr;
+    }
+
+    ModSettings* SettingsStore::FindMod(std::string_view mod)
+    {
+        return const_cast<ModSettings*>(static_cast<const SettingsStore&>(*this).FindMod(mod));
     }
 
     SettingsStore::SetResult SettingsStore::Commit(ModSettings& mod, SettingValues proposed)
@@ -94,9 +90,9 @@ namespace OSFSettings
 
     SettingsStore::Error SettingsStore::RegisterProvider(ModSettings mod, Save save, std::uint64_t& registration)
     {
-        const auto existing = std::ranges::find(m_mods, mod.schema.id, [](const auto& entry) { return entry.schema.id; });
+        auto* existing = FindMod(mod.schema.id);
         const auto owner = m_providers.find(mod.schema.id);
-        if (existing != m_mods.end()) {
+        if (existing) {
             if (owner == m_providers.end() || !registration || owner->second.token != registration) return Error::AlreadyRegistered;
             for (auto& [key, value] : mod.values) {
                 const auto old = existing->values.find(key);
@@ -126,29 +122,27 @@ namespace OSFSettings
 
     SettingsStore::SetResult SettingsStore::Set(std::string_view mod, std::string_view key, SettingValue value)
     {
-        for (auto& stored : m_mods) {
-            if (stored.schema.id != mod) continue;
-            const auto current = stored.values.find(key);
-            const auto* setting = stored.schema.FindSetting(key);
-            if (current == stored.values.end() || !setting) {
-                return { "unknown setting key", Error::UnknownSetting };
-            }
-            if (current->second.index() != value.index()) {
-                return { "value does not match the setting's type", Error::TypeMismatch };
-            }
-            if (!IsValidValue(*setting, value)) {
-                return { "value does not match the setting's type or validation rules", Error::InvalidValue };
-            }
-            if (current->second == value) {
-                return {};
-            }
-
-            // Propose the edit in a copy. The live value changes only after saving.
-            auto proposed = stored.values;
-            proposed.find(key)->second = value;
-            return Commit(stored, std::move(proposed));
+        auto* stored = FindMod(mod);
+        if (!stored) return { "unknown mod id", Error::UnknownMod };
+        const auto current = stored->values.find(key);
+        const auto* setting = stored->schema.FindSetting(key);
+        if (current == stored->values.end() || !setting) {
+            return { "unknown setting key", Error::UnknownSetting };
         }
-        return { "unknown mod id", Error::UnknownMod };
+        if (current->second.index() != value.index()) {
+            return { "value does not match the setting's type", Error::TypeMismatch };
+        }
+        if (!IsValidValue(*setting, value)) {
+            return { "value does not match the setting's type or validation rules", Error::InvalidValue };
+        }
+        if (current->second == value) {
+            return {};
+        }
+
+        // Propose the edit in a copy. The live value changes only after saving.
+        auto proposed = stored->values;
+        proposed.find(key)->second = std::move(value);
+        return Commit(*stored, std::move(proposed));
     }
 
     SettingsStore::SetResult SettingsStore::Reset(std::string_view mod, std::string_view key)
@@ -162,19 +156,8 @@ namespace OSFSettings
 
     SettingsStore::SetResult SettingsStore::ResetMod(std::string_view mod)
     {
-        for (auto& stored : m_mods) {
-            if (stored.schema.id != mod) continue;
-            SettingValues proposed;
-            for (const auto& group : stored.schema.groups) {
-                for (const auto& control : group.controls) {
-                    const auto* valueSetting = std::get_if<SettingDefinition>(&control);
-                    if (!valueSetting) continue;
-                    const auto& setting = *valueSetting;
-                    proposed.emplace(setting.key, setting.DefaultValue());
-                }
-            }
-            return Commit(stored, std::move(proposed));
-        }
-        return { "unknown mod id", Error::UnknownMod };
+        auto* stored = FindMod(mod);
+        if (!stored) return { "unknown mod id", Error::UnknownMod };
+        return Commit(*stored, stored->schema.DefaultValues());
     }
 }

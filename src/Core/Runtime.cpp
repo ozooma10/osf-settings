@@ -7,6 +7,19 @@
 
 namespace OSFSettings
 {
+    namespace
+    {
+        std::string LogText(const SettingValue& value)
+        {
+            return std::visit([](const auto& current) -> std::string {
+                using T = std::decay_t<decltype(current)>;
+                if constexpr (std::is_same_v<T, KeyBinding>) return std::to_string(current.keyCode);
+                else if constexpr (std::is_same_v<T, EnumValue>) return current.value;
+                else return std::format("{}", current);
+            }, value);
+        }
+    }
+
     Runtime &Runtime::Get()
     {
         static Runtime instance;
@@ -32,15 +45,7 @@ namespace OSFSettings
         std::size_t settingCount = 0;
         for (const auto& mod : mods) {
             for (const auto& [key, value] : mod.values) {
-                std::visit([&](const auto& current) {
-                    if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) {
-                        REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current.keyCode);
-                    } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
-                        REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current.value);
-                    } else {
-                        REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, current);
-                    }
-                }, value);
+                REX::INFO("Loaded {} / {} = {} (current value)", mod.schema.id, key, LogText(value));
                 settingCount++;
             }
         }
@@ -72,15 +77,7 @@ namespace OSFSettings
     {
         const auto result = SettingsService::Get().SetValue(mod, key, value);
         if (result == SettingsError::None) {
-            std::visit([&](const auto& current) {
-                if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) {
-                    REX::INFO("OSF Settings saved {} / {} = {}", mod, key, current.keyCode);
-                } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
-                    REX::INFO("OSF Settings saved {} / {} = {}", mod, key, current.value);
-                } else {
-                    REX::INFO("OSF Settings saved {} / {} = {}", mod, key, current);
-                }
-            }, value);
+            REX::INFO("OSF Settings saved {} / {} = {}", mod, key, LogText(value));
         } else {
             REX::ERROR("OSF Settings could not save {} / {}: status {}", mod, key, static_cast<std::uint32_t>(result));
         }

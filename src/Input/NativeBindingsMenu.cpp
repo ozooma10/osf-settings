@@ -22,6 +22,7 @@ namespace OSFSettings::NativeBindingsMenu
         constexpr std::ptrdiff_t kContextNameCall = 0xCE;
         constexpr std::ptrdiff_t kLoadTranslationsCall = 0x4C6;
         constexpr const char* kModContextName = "OSFModBindings";
+        constexpr const wchar_t* kModContextLabel = L"OSFModBindings"; // Translator tokens are UTF-16.
         using Context = RE::ControlMap::InputContextID;
         using BindingDefinition = RE::SettingsDataModel::BindingDefinition;
         using Translator = RE::BSScaleformTranslator;
@@ -58,13 +59,13 @@ namespace OSFSettings::NativeBindingsMenu
             g_labels.clear();
             for (const auto& mod : mods) {
                 for (const auto& hotkey : mod.schema.hotkeys) {
-                    const auto event = mod.schema.id + "/" + hotkey.id;
+                    const auto event = NativeHotkeys::EventName(mod.schema.id, hotkey.id);
                     if (!NativeHotkeys::FindAction(event)) continue;
                     std::wstring name, label;
                     if (!REX::UTF8_TO_UTF16(event, name) || !REX::UTF8_TO_UTF16(tr("bindings.actionLabel", {{"mod", mod.schema.title}, {"action", hotkey.label}}), label)) continue;
                     g_order.emplace(event, g_order.size());
                     // Original context tokens also occur in native conflict text.
-                    for (const auto* context : { L"MainGameplay", L"OSFModBindings" }) {
+                    for (const auto* context : { L"MainGameplay", kModContextLabel }) {
                         const auto token = std::wstring(L"$") + context + L"_" + name;
                         g_labels.emplace(token, label);
                         g_labels.emplace(token + L"_KBM", label);
@@ -74,7 +75,7 @@ namespace OSFSettings::NativeBindingsMenu
             }
             std::wstring heading;
             REX::UTF8_TO_UTF16(tr("bindings.heading"), heading);
-            g_labels.emplace(L"$OSFModBindings", std::move(heading));
+            g_labels.emplace(std::wstring(L"$") + kModContextLabel, std::move(heading));
             for (const auto& [key, value] : g_labels) {
                 g_translations.push_back({ key.c_str(), value.c_str() });
             }

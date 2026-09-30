@@ -52,7 +52,6 @@ package
         private var stringConfirmHeld:Boolean;
         private var searchExitFrame:int = -10;
         private var navigationFrame:int = -1;
-        private var bindingSelection:String = "";
         private var types:Class;
         private var bar:Object;
         private var background:MovieClip;
@@ -241,7 +240,7 @@ package
             captureBinding.visible = false;
             nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
             startupPhase = "build keybindings";
-            keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
+            keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, updateBindings, focusResults);
             addChild(keybindings);
             startupPhase = "build Home launchers";
             // Hovering the shelf moves focus between it and the list, but never out of the sidebar.
@@ -289,12 +288,28 @@ package
         {
             if (!initialized || closing) return;
             if (message) MenuStyle.setText(status, message);
-            if (refreshRows) requestedRefresh = true;
+            // The bindings page publishes its rows when the numeric snapshot is ready.
+            if (refreshRows && !bindingsPage()) requestedRefresh = true;
             options.disableInput = bindingBusy() || Boolean(captureRow);
             options.disableSelection = bindingBusy();
             describe();
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
+        private function updateBindings():void
+        {
+            if (refreshing || !bindingsPage()) return;
+            var rows:Array = keybindings.filtered();
+            // Only changed membership/order needs vanilla to rebuild its scrolling list.
+            if (rows.length != listData.length) { populate(true); return; }
+            for (var i:int = 0; i < rows.length; ++i)
+                if (rows[i].identity != listData[i].row.identity) { populate(true); return; }
+            for (i = 0; i < rows.length; ++i) {
+                var entry:Object = options.GetDataForEntry(i);
+                entry.row = rows[i]; entry.sText = html(String(rows[i].title));
+            }
+            MenuStyle.setText(empty, rows.length ? "" : keybindings.emptyText);
+            decorate(); describe();
+        }
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
         private function homePage():Boolean { return !modID && rootPage == "mods"; }
         private function launcherPage():Boolean { return homePage() && launcher && launcher.hasEntries && launcher.focused; }
@@ -550,7 +565,6 @@ package
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
             var selectedIssue:Object = preserve && (issuesPage() || bindingsPage()) ? current() : null;
-            if (preserve && bindingsPage() && !selectedIssue && bindingSelection) selectedIssue = {identity:bindingSelection};
             var data:Array = []; var source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
             // A page with more than one group heads each group; a single group needs no header.
             var headed:Boolean = false, lastGroup:String = null, firstGroup:String = null;
@@ -697,7 +711,6 @@ package
             }
             if (bindingsPage()) {
                 resetButton.Visible = false;
-                if (row) bindingSelection = row.identity;
                 keybindings.showSelection(row);
                 acceptButton.Visible = Boolean(!bindingBusy() && !searching() && row && row.editable);
                 clearButton.Visible = clearButton.Visible && !searching();

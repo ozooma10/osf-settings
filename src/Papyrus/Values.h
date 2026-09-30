@@ -11,7 +11,6 @@ namespace OSFSettings::Papyrus
 {
     const char* ErrorName(SettingsError error) noexcept;
     bool Report(std::string_view function, std::string_view mod, std::string_view key, SettingsError error);
-    std::string FoldIdentifier(std::string_view value);
 
     // Check narrowing before CommonLib's native return-value marshaler runs.
     template <class T>
@@ -60,7 +59,7 @@ namespace OSFSettings::Papyrus
         }
         bool ResetMod(std::string_view mod)
         {
-            return Report("ResetMod", mod, {}, m_service.ResetMod(FoldIdentifier(mod)));
+            return Report("ResetMod", mod, {}, m_service.ResetMod(FoldAscii(mod)));
         }
 
     private:
