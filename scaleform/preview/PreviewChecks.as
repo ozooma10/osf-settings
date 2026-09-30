@@ -31,6 +31,7 @@ package
         private var readyFrames:int = 0;
         private var launcher:Object;
         private var originalRows:Function;
+        private var launchState:String = "pending";
 
         public function PreviewChecks(movie:MovieClip, bindings:Boolean = false, screenshots:Boolean = false)
         {
@@ -112,6 +113,7 @@ package
                     findNamed(menu, "Camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 3:
                     require(list.selectedEntry.row.key == "freeCamera" && list.entryCount == 2 && navFocused(), "a sidebar section lists only its own settings");
+                    checkShoulderNavigation();
                     key(221); break;
                 case 4:
                     require(list.selectedEntry.row.key == "hotkeys" && list.entryCount == 3, "next page walks to the next section");
@@ -154,6 +156,8 @@ package
                     require(list.selectedEntry.row.value == 115, "held candidate cannot be confirmed");
                     findNamed(menu, "Camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
                     require(list.selectedEntry.row.key == "toggleKey", "capture blocks tab changes");
+                    userEvent("RShoulder"); userEvent("LShoulder");
+                    require(list.selectedEntry.row.key == "toggleKey" && list.disableInput, "capture blocks shoulder page changes");
                     Object(menu).BGSCodeObj.previewKey(116, false); break;
                 case 15:
                     capture("key-saved"); break;
@@ -315,10 +319,77 @@ package
                 case 52:
                     require(list.entryCount == 1 && list.selectedEntry.row.records[0].key == 179,"unsupported diagram key remains searchable and editable");
                     capture("keybindings-unsupported");
-                    findNamed(menu,"issues").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    list.selectedIndex = indexOf("Jump");
+                    userEvent("Right");
+                    Object(menu).BGSCodeObj.previewGamepad(true); step = 100; break;
+                case 100:
+                    require(list.entryCount == 40 && list.selectedEntry.row.action == "Jump", "controller publication preserves the selected action");
+                    require(list.selectedEntry.row.records.length == 1 && list.selectedEntry.row.records[0].device == 2,
+                        "controller rows exclude keyboard and mouse records from mixed snapshots");
+                    var pad:Object = findNamed(menu,"controllerMap");
+                    require(pad.visible && !findNamed(menu,"key_77").parent.visible, "controller diagram replaces the keyboard");
+                    var nativeHost:DisplayObjectContainer = list.FindClipForEntry(list.selectedIndex) as DisplayObjectContainer;
+                    var primary:DisplayObject = findNamed(nativeHost,"MainBinding_mc");
+                    require(!findNamed(nativeHost,"AltBinding_mc").visible && Object(primary.parent).activePriority == 0,
+                        "controller display hides Alternate and selects Primary");
+                    require(Object(primary).Icon_mc.Icon_tf.text == "A" && Object(primary).Icon_mc.Icon_tf.visible,
+                        "native controller row renders the A glyph");
+                    capture("keybindings-controller");
+                    userEvent("YButton");
+                    require(pad.focused && list.disableInput && list.disableSelection, "Y focuses the controller diagram and freezes result input");
+                    userEvent("Accept"); break;
+                case 101:
+                    require(list.entryCount == 2 && list.selectedEntry.row.action == "Jump", "controller button filter includes game and mod actions");
+                    userEvent("XButton");
+                    require(list.entryCount == 40 && !findNamed(menu,"bindingKeyFilter").visible, "X clears only the diagram filter");
+                    var oldButton:int = Object(findNamed(menu,"controllerMap")).selectedCode;
+                    userEvent("Left");
+                    require(Object(findNamed(menu,"controllerMap")).selectedCode != oldButton, "directional input moves diagram focus");
+                    findNamed(menu,"pad_256").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 102:
+                    require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/chord", "controller modifier button finds native chord");
+                    require(Object(findNamed(menu,"pad_256")).getChildAt(0).Icon_tf.textColor == 0x08151C &&
+                        Object(findNamed(menu,"pad_32768")).getChildAt(0).Icon_tf.textColor == 0x08151C,
+                        "both controller chord buttons receive selection highlighting");
+                    capture("keybindings-controller-chord");
+                    userEvent("Cancel");
+                    require(!Object(findNamed(menu,"controllerMap")).focused && !navFocused() && !list.disableInput,
+                        "Back returns from the diagram to results without leaving the page");
+                    searchField().text = "shoulder"; searchField().dispatchEvent(new Event(Event.CHANGE));
+                    Object(menu).BGSCodeObj.previewGamepad(false); break;
+                case 103:
+                    require(searchField().text == "shoulder" && !findNamed(menu,"bindingKeyFilter").visible,
+                        "device switch retains search and clears controller button filter");
+                    findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 104:
+                    require(list.entryCount == 40 && !findNamed(menu,"controllerMap").visible && findNamed(menu,"key_77").parent.visible,
+                        "keyboard display and all rows return after switching devices");
+                    require(findNamed(list.FindClipForEntry(list.selectedIndex),"AltBinding_mc").visible,
+                        "keyboard publication restores Alternate");
+                    Object(menu).BGSCodeObj.previewGamepad(true); break;
+                case 105:
+                    list.selectedIndex = indexOf("Jump");
+                    Object(menu).BGSCodeObj.previewAllowNativeCapture(true);
+                    userEvent("Accept");
+                    Object(menu).BGSCodeObj.previewGamepad(false, true); break;
+                case 106:
+                    require(Object(findNamed(menu,"keybindingsPage")).gamepad && list.disableInput,
+                        "device publication is deferred while native capture owns input");
+                    Object(menu).BGSCodeObj.previewGamepad(false); break;
+                case 107:
+                    require(Object(findNamed(menu,"keybindingsPage")).gamepad && list.disableInput,
+                        "device publication remains deferred until native save completes");
+                    Object(menu).BGSCodeObj.previewControlsSaved(); break;
+                case 108:
+                    require(!list.disableInput && !Object(findNamed(menu,"keybindingsPage")).gamepad,
+                        "save completion applies the pending device publication");
+                    Object(menu).BGSCodeObj.previewAllowNativeCapture(false);
+                    findNamed(menu,"issues").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); step = 53; break;
                 case 53:
-                    require(list.entryCount == 4, "issues fixture has four reports");
-                    requireGlyphs("Issues: 4");
+                    var issueCount:int = Object(menu).BGSCodeObj.getIssues().length;
+                    require(issueCount > 0 && list.entryCount == issueCount, "all fixture reports appear on the issues page");
+                    requireGlyphs("Issues: " + issueCount);
                     userEvent("Right");
                     capture("issues");
                     for (var issueIndex:int = 0; issueIndex < list.entryCount; ++issueIndex)
@@ -461,6 +532,28 @@ package
                     list.selectedIndex = indexOf("language");
                     require(list.selectedEntry.row.type == "string", "setting after actions remains reachable");
                     capture("mixed-controls");
+                    step = 79;
+                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    userEvent("Right"); break;
+                case 79:
+                    Object(menu).BGSCodeObj.launch = function(mod:String, id:String):int { return 2; };
+                    Object(menu).BGSCodeObj.pollLaunch = function():Object { return {state:launchState, message:"Preview launch failed"}; };
+                    findNamed(menu,"launcher_0").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 80:
+                    require(loadingCaptionVisible() && !launcher.mouseChildren, "pending launch shows Loading and blocks card input");
+                    launchState = "failed"; break;
+                case 81:
+                    require(!loadingCaptionVisible() && launcher.mouseChildren, "failed launch restores the caption and card input");
+                    launchState = "pending";
+                    findNamed(menu,"launcher_0").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 82:
+                    require(loadingCaptionVisible(), "failed launch can be retried");
+                    launchState = "closing"; break;
+                case 83:
+                    require(loadingCaptionVisible() && !launcher.mouseChildren, "successful handoff keeps Loading while hide is queued");
+                    break;
+                case 84:
+                    require(loadingCaptionVisible() && !launcher.mouseChildren, "Loading remains visible across closing frames");
                     menu.removeEventListener(Event.ENTER_FRAME, advance);
                     trace("[verify] PASS"); break;
                 }
@@ -472,6 +565,8 @@ package
         {
             if (step == -1) return Object(menu).startupPhase == "ready" && list != null;
             if (step == 35 || step == 48) return list.entryCount == 40;
+            if (step == 100 || step == 105) return Object(findNamed(menu,"keybindingsPage")).gamepad;
+            if (step == 103 || step == 108) return !Object(findNamed(menu,"keybindingsPage")).gamepad;
             if (step == 61) {
                 var first:Object = findNamed(menu,"launcher_0");
                 return first && first.row.title == "Ship Planner";
@@ -482,6 +577,29 @@ package
             if (step == 68) return launcher.locked && launcher.visible;
             if (step == 70) return launcher.visible && !launcher.locked;
             return true;
+        }
+        private function loadingCaptionVisible():Boolean
+        {
+            var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+            return findText(DisplayObjectContainer(findNamed(menu,"launcher_0")), localization.text("home.loading")) != null;
+        }
+        private function checkShoulderNavigation():void
+        {
+            for each (var sidebar:Boolean in [true, false]) {
+                if (!sidebar) userEvent("Right");
+                // Alternate quick taps without waiting for footer animations or a frame.
+                for (var i:int = 0; i < 4; ++i) {
+                    var name:String = i % 2 == 0 ? "RShoulder" : "LShoulder";
+                    var expected:String = i % 2 == 0 ? "hotkeys" : "freeCamera";
+                    var context:String = sidebar ? "sidebar" : "page";
+                    Object(menu).ProcessUserEvent(name, true);
+                    require(list.selectedEntry.row.key == expected, context + " shoulder tap " + i + " changes page on press");
+                    Object(menu).ProcessUserEvent(name, false);
+                    require(list.selectedEntry.row.key == expected && navFocused() == sidebar,
+                        context + " shoulder release keeps the page and focus");
+                }
+            }
+            userEvent("Cancel");
         }
         private function checkLocalization():void
         {
@@ -548,6 +666,15 @@ package
             require(policy.filter(joined,"", "all",162).length == 1 && policy.filter(joined,"", "all",77).length == 0,"modifier identity is numeric, never inferred from localized strings");
             joined = policy.join([native],[],[],function(row:Object):String { return "Missing"; });
             require(!joined[0].available && !joined[0].editable,"missing numeric data is unavailable, not editable unbound");
+            native.bGamepadEntry = true;
+            native.MainBinding = {aPCKeyName:[],aButtonName:["Xenon_L1","Xenon_Y"]};
+            joined = policy.join([native],[],[
+                {action:"same",context:0,device:0,slot:0,key:256,modifier:255},
+                {action:"same",context:0,device:2,slot:0,key:32768,modifier:256}],function(row:Object):String { return "Controller"; });
+            require(joined[0].records.length == 1 && joined[0].gamepad && joined[0].editable, "controller action joins only its own device family");
+            require(policy.filter(joined,"shoulder", "all",256).length == 1 && policy.filter(joined,"triangle", "all",32768).length == 1,
+                "controller names and both chord members are searchable");
+            require(!policy.includes(joined[0].records[0],256), "controller modifier cannot match a keyboard filter");
         }
         private function findInput(container:DisplayObjectContainer):TextField
         {
