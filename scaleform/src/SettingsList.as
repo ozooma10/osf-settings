@@ -102,9 +102,9 @@ package
                     clip.transform.colorTransform = NORMAL;
                     clip.mouseChildren = showSlider || showStepper || binding != null;
                     clip.mouseEnabled = row.type != "section";
-                    var controlX:Number = MenuStyle.LIST_WIDTH - 476;
                     if (showSlider) {
-                        slider.x = controlX; slider.y = (height - slider.height) / 2; slider.width = 330;
+                        slider.width = MenuStyle.SLIDER_WIDTH;
+                        MenuStyle.centerControl(slider as DisplayObject, MenuStyle.CONTROL_X, MenuStyle.SLIDER_WIDTH, height);
                         slider.maxValue = NumericSetting.steps(row);
                         slider.disableRounding = false; slider.mouseWheelValueChange = 1;
                         if (!sliderDragging) slider.value = NumericSetting.position(row);
@@ -112,8 +112,8 @@ package
                     }
                     if (showStepper) {
                         stepper.textField.visible = false;
-                        stepper.x = controlX; stepper.width = 450;
-                        stepper.y = (height - stepper.height) / 2;
+                        stepper.width = MenuStyle.CONTROL_WIDTH;
+                        MenuStyle.centerControl(stepper as DisplayObject, MenuStyle.CONTROL_X, MenuStyle.CONTROL_WIDTH, height);
                         stepper.transform.colorTransform = selected ? SELECTED : NORMAL;
                     }
                     var border:MovieClip = Object(clip).Border_mc;

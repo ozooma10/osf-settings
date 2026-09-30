@@ -1,7 +1,9 @@
 package
 {
+    import flash.display.DisplayObject;
     import flash.display.Graphics;
     import flash.display.MovieClip;
+    import flash.geom.Rectangle;
     import flash.text.TextField;
     import flash.text.TextFormat;
 
@@ -30,6 +32,15 @@ package
         public static const LIST_TOP:Number = CONFIG::largeText ? 148 : 142;
         public static const LIST_BOTTOM:Number = CONFIG::largeText ? 940 : 990;
         public static const LIST_WIDTH:Number = 940;
+        // Every setting uses this control column, including native binding cells.
+        public static const CONTROL_WIDTH:Number = 450;
+        public static const CONTROL_X:Number = LIST_WIDTH - 26 - CONTROL_WIDTH;
+        public static const VALUE_INSET:Number = 40;
+        public static const VALUE_WIDTH:Number = CONTROL_WIDTH - 2 * VALUE_INSET;
+        public static const SLIDER_WIDTH:Number = 330;
+        public static const SLIDER_VALUE_WIDTH:Number = 100;
+        public static const BINDING_GAP:Number = 24;
+        public static const BINDING_WIDTH:Number = (CONTROL_WIDTH - BINDING_GAP) / 2;
         public static const LIST_HEIGHT:Number = LIST_BOTTOM - LIST_TOP;
         public static const ROW_HEIGHT:Number = CONFIG::largeText ? 56 : 44;
         // Keybinding and issue rows carry a second line under the title.
@@ -45,6 +56,13 @@ package
         public static const FOOTER_LINE:Number = CONFIG::largeText ? 954 : 1004;
         public static const FOOTER_Y:Number = 1042;
 
+        public static function centerControl(control:DisplayObject, x:Number, width:Number, rowHeight:Number):void
+        {
+            // Native clips need not have their registration point at the top left.
+            var bounds:Rectangle = control.getBounds(control.parent);
+            control.x += x + (width - bounds.width) / 2 - bounds.x;
+            control.y += (rowHeight - bounds.height) / 2 - bounds.y;
+        }
         public static function field(text:String, x:Number, y:Number, width:Number, height:Number,
                                      size:Number, color:uint = WHITE, label:Boolean = false):TextField
         {

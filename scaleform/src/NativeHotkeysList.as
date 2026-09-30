@@ -136,16 +136,15 @@ package
                 var child:DisplayObject = clip.getChildAt(i);
                 child.visible = child == clip.MainBinding_mc || alternate && child == clip.AltBinding_mc;
             }
-            var right:Number = MenuStyle.LIST_WIDTH - 24;
-            for each (var cell:Object in alternate ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
+            var left:Number = MenuStyle.CONTROL_X;
+            var width:Number = alternate ? MenuStyle.BINDING_WIDTH : MenuStyle.CONTROL_WIDTH;
+            for each (var cell:Object in alternate ? [clip.MainBinding_mc, clip.AltBinding_mc] : [clip.MainBinding_mc]) {
                 CONFIG::preview { bridge.previewBindingCell(cell); }
                 cell.scaleX = cell.scaleY = 1;
                 var bounds:Rectangle = cell.getBounds(clip);
-                cell.scaleX = cell.scaleY = Math.min(1, 224 / bounds.width, (height - 12) / bounds.height);
-                bounds = cell.getBounds(clip);
-                cell.x += right - bounds.right;
-                cell.y += (height - bounds.height) / 2 - bounds.top;
-                right -= fullPage ? 238 : bounds.width + 24;
+                cell.scaleX = cell.scaleY = Math.min(1, Math.min(224, width) / bounds.width, (height - 12) / bounds.height);
+                MenuStyle.centerControl(cell as DisplayObject, left, width, height);
+                left += width + MenuStyle.BINDING_GAP;
             }
             return clip as DisplayObject;
         }

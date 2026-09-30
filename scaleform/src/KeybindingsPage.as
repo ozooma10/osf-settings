@@ -6,6 +6,7 @@ package
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.text.TextField;
+    import flash.text.TextFormat;
     import flash.ui.Keyboard;
     import flash.utils.getTimer;
 
@@ -73,9 +74,14 @@ package
             clearLabel.mouseEnabled = true;
             notice = field("",left,0,column,150,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
             notice.multiline = true; notice.wordWrap = true;
-            // Labels sit over the native binding cells, which are anchored to the row's right edge.
-            field(tr("bindings.primary"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 450,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
-            field(tr("bindings.alternate"),MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 212,COLUMNS_TOP,210,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
+            // Headings and native cells share the same two centered columns.
+            var bindingX:Number = MenuStyle.LEFT + MenuStyle.CONTROL_X;
+            for each (var label:String in [tr("bindings.primary"), tr("bindings.alternate")]) {
+                var heading:TextField = field(label,bindingX,COLUMNS_TOP,MenuStyle.BINDING_WIDTH,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
+                var format:TextFormat = heading.defaultTextFormat; format.align = "center";
+                heading.defaultTextFormat = format; MenuStyle.fit(heading,label);
+                bindingX += MenuStyle.BINDING_WIDTH + MenuStyle.BINDING_GAP;
+            }
             graphics.lineStyle(1,MenuStyle.LINE); graphics.drawRect(left,top,column,BOX);
             graphics.drawRect(left,top + BOX + 12,column,BOX);
             visible = false;

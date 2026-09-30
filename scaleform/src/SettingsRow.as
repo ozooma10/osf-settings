@@ -30,7 +30,6 @@ package
             var section:Boolean = row.type == "section";
             var changed:Boolean = !modList && !section && row.type != "hotkey" && row.type != "action" && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
-            var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action");
             var displayValue:String = section ? "" : modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
             graphics.clear();
             heading.visible = section;
@@ -53,6 +52,7 @@ package
                 // Orange matches the keyboard's mod-owned key marker.
                 source.y = rowHeight - MenuStyle.SMALL_SIZE - 13;
                 source.textColor = selected ? MenuStyle.INK : row.mod ? MenuStyle.ACCENT : MenuStyle.MUTED;
+                source.width = MenuStyle.CONTROL_X - 70;
                 MenuStyle.fit(source,row.source);
             }
             value.visible = !row.capturing && row.type != "hotkey";
@@ -60,23 +60,27 @@ package
             graphics.beginFill(selected ? MenuStyle.WHITE : hovered ? MenuStyle.HOVER : MenuStyle.ROW);
             graphics.drawRect(0, 0, rowWidth, rowHeight); graphics.endFill();
             title.textColor = color; value.textColor = modList ? (selected ? 0x3D4F58 : MenuStyle.MUTED) : color;
-            title.width = modList ? rowWidth - 576 : slider || choice ? rowWidth - 546 : rowWidth - 366;
+            title.width = modList ? rowWidth - 576 : MenuStyle.CONTROL_X - 70;
             // Mod rows summarize what each mod adds, right-aligned before the chevron.
             var format:TextFormat = value.defaultTextFormat; format.align = modList ? "right" : "center";
             format.size = modList ? MenuStyle.SMALL_SIZE + 1 : MenuStyle.VALUE_SIZE; value.defaultTextFormat = format;
-            value.x = rowWidth - (modList ? 546 : choice ? 436 : slider ? 128 : NumericSetting.isNumeric(row) ? 322 : 240);
-            value.y = lineTop + (modList ? 2 : 1);
-            value.width = modList ? 500 : choice ? 370 : slider ? 100 : NumericSetting.isNumeric(row) ? 300 : 150;
+            value.x = modList ? rowWidth - 546 : MenuStyle.CONTROL_X +
+                (slider ? MenuStyle.CONTROL_WIDTH - MenuStyle.SLIDER_VALUE_WIDTH : MenuStyle.VALUE_INSET);
+            value.y = (rowHeight - Number(format.size)) / 2 - 3;
+            value.width = modList ? 500 : slider ? MenuStyle.SLIDER_VALUE_WIDTH : MenuStyle.VALUE_WIDTH;
             MenuStyle.fit(title, String(row.title));
             MenuStyle.fit(value, displayValue);
             var center:Number = rowHeight / 2;
             graphics.lineStyle(2, selected ? 0x52636C : 0xA0B0B8);
             if (!modList && row.type == "bool") {
-                graphics.moveTo(rowWidth - 302, center - 5); graphics.lineTo(rowWidth - 306, center); graphics.lineTo(rowWidth - 302, center + 5);
+                var leftArrow:Number = MenuStyle.CONTROL_X + 22;
+                var rightArrow:Number = MenuStyle.CONTROL_X + MenuStyle.CONTROL_WIDTH - 22;
+                graphics.moveTo(leftArrow + 2, center - 5); graphics.lineTo(leftArrow - 2, center); graphics.lineTo(leftArrow + 2, center + 5);
+                graphics.moveTo(rightArrow - 2, center - 5); graphics.lineTo(rightArrow + 2, center); graphics.lineTo(rightArrow - 2, center + 5);
             }
-            if (modList || row.type == "bool") { graphics.moveTo(rowWidth - 27, center - 5); graphics.lineTo(rowWidth - 23, center); graphics.lineTo(rowWidth - 27, center + 5); }
+            if (modList) { graphics.moveTo(rowWidth - 27, center - 5); graphics.lineTo(rowWidth - 23, center); graphics.lineTo(rowWidth - 27, center + 5); }
             graphics.lineStyle();
-            if (changed) MenuStyle.diamond(graphics, Math.min(title.x + title.textWidth + 18, rowWidth - (slider || choice ? 508 : 333)), center, MenuStyle.ACCENT);
+            if (changed) MenuStyle.diamond(graphics, Math.min(title.x + title.textWidth + 18, MenuStyle.CONTROL_X - 32), center, MenuStyle.ACCENT);
         }
     }
 }
