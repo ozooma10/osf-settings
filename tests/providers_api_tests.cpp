@@ -59,6 +59,8 @@ int main()
         check(api->Register("provider.mod", schema, "{}", save, &persistence, &intruder) == Status::AlreadyRegistered && !intruder);
         check(settings.SetBool("provider.mod", "enabled", true) == Status::Ok);
         check(nlohmann::json::parse(persistence.values)["count"] == 5 && persistence.writes == 1);
+        check(settings.SetBool("provider.mod", "enabled", true) == Status::Ok &&
+            settings.Reset("provider.mod", "enabled") == Status::Ok && persistence.writes == 1);
         persistence.accept = false;
         check(settings.SetBool("provider.mod", "enabled", false) == Status::SaveFailed);
         check(settings.GetBool("provider.mod", "enabled", &enabled) == Status::Ok && enabled);
@@ -90,6 +92,11 @@ int main()
         KeyActions::Get().Process(5);
         KeyActions::Get().Process(5);
         check(self.fired == 1);
+        check(settings.ResetMod("provider.mod") == Status::Ok);
+        const auto resetValues = nlohmann::json::parse(persistence.values);
+        check(resetValues.size() == 5 && resetValues["enabled"] == true && resetValues["count"] == 2 && resetValues["binding"] == 4);
+        const auto resetWrites = persistence.writes;
+        check(settings.ResetMod("provider.mod") == Status::Ok && persistence.writes == resetWrites);
         check(api->Unregister(token) == Status::Ok);
         check(settings.GetBool("provider.mod", "enabled", &enabled) == Status::UnknownMod);
         check(api->Unregister(token) == Status::InvalidArgument);

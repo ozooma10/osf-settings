@@ -37,7 +37,7 @@ namespace
             std::string value;
             if (std::filesystem::exists(self.saved)) {
                 self.savedBeforePublish &= self.client->GetString(mod, "language", value) == Status::Ok &&
-                    TestJson::parse(Read(self.saved))["values"]["language"] == value;
+                    TestJson::parse(Read(self.saved))["values"].value("language", std::string("auto")) == value;
             }
         }
     };
@@ -150,8 +150,37 @@ int main()
         check(client.SetEnum("osfui", "mode", "pt-BR") == Status::InvalidValue, "enum remains limited to authored options");
         check(client.SetString("osfui", "language", nullptr, 0) == Status::InvalidArgument &&
             client.SetString("osfui", "language", nullptr) == Status::InvalidArgument, "null text is not empty text");
-        check(client.SetString("osfui", "language", "auto") == Status::Ok && !backend.HasPendingChanges() && !std::filesystem::exists(saved),
-            "unchanged string does not save or notify");
+        check(client.SetString("osfui", "language", "auto") == Status::Ok && !backend.HasPendingChanges() &&
+            !std::filesystem::exists(saved), "unchanged string does not create a saved entry or notify");
+        check(client.SetString("osfui", "language", "en") == Status::Ok && client.SetString("osfui", "language", "auto") == Status::Ok &&
+            TestJson::parse(Read(saved))["values"] == TestJson{{"language", "auto"}},
+            "changing back to the default string records an explicit choice");
+        backend.DispatchChanges(); events.keys.clear();
+        {
+            OSFSettings::Test::FileLock intentLock(saved);
+            check(client.Reset("osfui", "language") == Status::SaveFailed && client.ResetMod("osfui") == Status::SaveFailed &&
+                !backend.HasPendingChanges(), "equal-value resets must persist their override removal before succeeding");
+            check(client.SetString("osfui", "language", "auto") == Status::Ok &&
+                TestJson::parse(Read(saved))["values"] == TestJson{{"language", "auto"}},
+                "failed resets retain override intent in memory and on disk");
+        }
+        check(client.Reset("osfui", "language") == Status::Ok && !backend.HasPendingChanges() &&
+            TestJson::parse(Read(saved))["values"] == TestJson::object(), "equal-value reset removes the override without notifying");
+        {
+            OSFSettings::Test::FileLock intentLock(saved);
+            check(client.SetString("osfui", "language", "auto") == Status::Ok && !backend.HasPendingChanges() &&
+                client.GetString("osfui", "language", owned) == Status::Ok && owned == "auto",
+                "unchanged default bypasses unavailable storage without notifying");
+            check(client.SetString("osfui", "language", "en") == Status::SaveFailed && !backend.HasPendingChanges() &&
+                TestJson::parse(Read(saved))["values"] == TestJson::object(), "failed edit preserves inherited values");
+        }
+        check(client.SetString("osfui", "language", "en") == Status::Ok && client.SetString("osfui", "language", "auto") == Status::Ok &&
+            TestJson::parse(Read(saved))["values"] == TestJson{{"language", "auto"}},
+            "failed edit can be retried after storage recovers");
+        backend.DispatchChanges(); events.keys.clear();
+        check(client.ResetMod("osfui") == Status::Ok &&
+            !backend.HasPendingChanges() && TestJson::parse(Read(saved))["values"] == TestJson::object(),
+            "equal-value mod reset removes overrides without notifying");
 
         for (const auto& text : {std::string("pt-BR"), std::string("zz-Latn-ZZ-x-custom"), std::string("  PT_br  "), unicode, std::string(32, 'z'), std::string()}) {
             check(client.SetString("osfui", "language", std::string_view(text)) == Status::Ok, "arbitrary locales and valid free-form strings save");
@@ -190,14 +219,16 @@ int main()
             Read(saved) == persisted && !backend.HasPendingChanges(), "failed save preserves published string, disk and notifications");
         check(client.SetString("osfui", "language", owned) == Status::Ok && !backend.HasPendingChanges(), "equal string bypasses unavailable storage");
         writeLock.Release();
-        check(client.Reset("osfui", "language") == Status::Ok && TestJson::parse(Read(saved))["values"]["language"] == "auto", "single reset persists authored string default");
+        check(client.Reset("osfui", "language") == Status::Ok && !TestJson::parse(Read(saved))["values"].contains("language") &&
+            client.GetString("osfui", "language", owned) == Status::Ok && owned == "auto", "single reset removes override and restores authored string default");
         backend.DispatchChanges();
         check(events.keys == std::vector<std::string>{"language"}, "single reset notifies string key");
         events.keys.clear();
         check(client.Reset("osfui", "language") == Status::Ok && !backend.HasPendingChanges(), "unchanged reset is silent");
         client.SetString("osfui", "language", "de"); client.SetEnum("osfui", "mode", "en");
-        check(client.ResetMod("osfui") == Status::Ok && TestJson::parse(Read(saved))["values"]["language"] == "auto" &&
-            TestJson::parse(Read(saved))["values"]["mode"] == "auto", "mod reset restores strings and enums atomically");
+        check(client.ResetMod("osfui") == Status::Ok && TestJson::parse(Read(saved))["values"] == TestJson::object() &&
+            backend.FindMod("osfui")->values == backend.FindMod("osfui")->schema.DefaultValues(),
+            "mod reset restores strings and enums atomically and removes their overrides");
         backend.DispatchChanges();
         check(events.keys == std::vector<std::string>{"*"} && events.savedBeforePublish, "mod reset publishes full invalidation after save");
         client.Unsubscribe(token);

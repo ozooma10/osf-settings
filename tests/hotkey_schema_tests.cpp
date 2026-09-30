@@ -351,8 +351,8 @@ int main()
             store.Mods()[0].schema.groups[1].id == "A second page" &&
             store.Mods()[0].schema.hotkeys[0].group == "Z first page / détails",
             "file loading preserves declaration order and the default hotkey group");
-        check(store.Mods()[0].values.size() == 1 && !store.GetValue("osfsettings", "openMenu"),
-            "hotkeys do not create persisted setting values");
+        check(store.Mods()[0].values.empty() && store.GetValue("osfsettings", "enabled") == SettingValue{true} &&
+            !store.GetValue("osfsettings", "openMenu"), "defaults resolve without saved entries and hotkeys are not setting values");
         check(store.Mods()[0].schema.FindSetting("enabled")->requiresRestart &&
             store.Set("osfsettings", "enabled", false).ok() && store.GetValue("osfsettings", "enabled") == SettingValue{false},
             "restart-required settings still save and publish the new value immediately");

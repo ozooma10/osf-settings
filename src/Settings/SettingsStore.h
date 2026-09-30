@@ -19,7 +19,7 @@ namespace OSFSettings
             bool ok() const { return code == Error::None; }
             std::string error;
             Error code{};
-            bool changed{};
+            bool changed{}; // Effective value changed; removing an equal saved default is silent.
         };
 
         void LoadAll(const std::filesystem::path& schemaDir, const std::filesystem::path& valuesDir);
@@ -33,13 +33,14 @@ namespace OSFSettings
         Error RegisterProvider(ModSettings mod, Save save, std::uint64_t& registration);
         std::optional<std::string> UnregisterProvider(std::uint64_t registration);
 
-        // Borrowed views for startup logging; valid until the next LoadAll.
+        // Borrowed records with sparse file-backed values; use GetValue for defaults.
+        // Valid until the next LoadAll or provider registration change.
         // Set replaces a values map, so do not retain references to its entries.
         const std::vector<ModSettings>& Mods() const { return m_mods; }
         const std::vector<SettingsLoadError>& LoadErrors() const { return m_loadErrors; }
 
     private:
-        SetResult Commit(ModSettings& mod, SettingValues proposed);
+        SetResult Commit(ModSettings& mod, SettingValues proposed, bool changed);
         std::vector<ModSettings> m_mods;
         std::vector<SettingsLoadError> m_loadErrors;
         std::filesystem::path m_valuesDir;

@@ -18,6 +18,7 @@ namespace OSFSettings::SettingsJson
     std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error, std::optional<SettingsVersion>* expectedSettingsVersion = nullptr);
     // Keys store their key code and enums their value. Throws when a float is not finite.
     nlohmann::json EncodeValues(const SettingValues& values);
-    void LoadValues(const std::filesystem::path& path, const ModSchema& schema, SettingValues& values, std::vector<SettingsLoadError>& errors);
+    // Return only valid saved entries; missing settings inherit schema defaults.
+    SettingValues LoadValues(const std::filesystem::path& path, const ModSchema& schema, std::vector<SettingsLoadError>& errors);
     bool SaveValues(const std::filesystem::path& path, const SettingValues& values, std::string& error);
 }

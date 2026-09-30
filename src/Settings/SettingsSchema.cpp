@@ -132,6 +132,20 @@ namespace OSFSettings
         return values;
     }
 
+    std::optional<SettingValue> ModSettings::GetValue(std::string_view key) const
+    {
+        if (const auto saved = values.find(key); saved != values.end()) return saved->second;
+        if (const auto* setting = schema.FindSetting(key)) return setting->DefaultValue();
+        return std::nullopt;
+    }
+
+    SettingValues ModSettings::ResolvedValues() const
+    {
+        auto resolved = schema.DefaultValues();
+        for (const auto& [key, value] : values) resolved.insert_or_assign(key, value);
+        return resolved;
+    }
+
     ActionDefinition* ModSchema::FindAction(std::string_view actionId)
     {
         return const_cast<ActionDefinition*>(static_cast<const ModSchema&>(*this).FindAction(actionId));

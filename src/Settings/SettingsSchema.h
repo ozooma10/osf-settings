@@ -128,7 +128,10 @@ namespace OSFSettings
     struct ModSettings
     {
         ModSchema schema;
+        // File-backed records contain only saved choices. Service snapshots and runtime providers contain complete effective values.
         SettingValues values;
+        std::optional<SettingValue> GetValue(std::string_view key) const;
+        SettingValues ResolvedValues() const;
     };
 
     struct SettingsLoadError

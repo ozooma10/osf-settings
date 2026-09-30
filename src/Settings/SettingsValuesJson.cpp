@@ -8,14 +8,15 @@
 
 namespace OSFSettings::SettingsJson
 {
-    void LoadValues(const std::filesystem::path& path, const ModSchema& schema, SettingValues& values, std::vector<SettingsLoadError>& errors)
+    SettingValues LoadValues(const std::filesystem::path& path, const ModSchema& schema, std::vector<SettingsLoadError>& errors)
     {
+        SettingValues values;
         try {
-            // No saved file is normal on the first launch. Keep the defaults.
+            // No saved file is normal on the first launch. All values inherit defaults.
             std::error_code error;
             const bool exists = std::filesystem::exists(path, error);
             if (error) throw std::runtime_error(error.message());
-            if (!exists) return;
+            if (!exists) return values;
 
             std::ifstream input(path);
             if (!input) throw std::runtime_error("cannot open values file");
@@ -29,9 +30,8 @@ namespace OSFSettings::SettingsJson
             if (saved == document.end() || !saved->is_object()) throw std::runtime_error("values must be an object");
 
             for (const auto& [key, value] : saved->items()) {
-                const auto current = values.find(key);
                 const auto* setting = schema.FindSetting(key);
-                if (current == values.end() || !setting) {
+                if (!setting) {
                     continue; // Removed or unknown settings are ignored.
                 }
                 const auto decoded = DecodeValue(value, *setting);
@@ -39,11 +39,13 @@ namespace OSFSettings::SettingsJson
                     errors.push_back({ path, "saved value does not match the setting's type or validation rules: " + key });
                     continue;
                 }
-                current->second = *decoded;
+                // Legacy snapshots cannot reveal intent: retain every valid entry, including values equal to the current schema default.
+                values.emplace(key, *decoded);
             }
         } catch (const std::exception& error) {
             errors.push_back({ path, error.what() });
         }
+        return values;
     }
 
     nlohmann::json EncodeValues(const SettingValues& values)

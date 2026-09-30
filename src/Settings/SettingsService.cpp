@@ -45,6 +45,7 @@ namespace OSFSettings
         auto mods = m_store.Mods();
         const auto catalog = Localization::Get();
         for (auto& mod : mods) {
+            mod.values = mod.ResolvedValues();
             catalog->Apply(mod.schema);
         }
         return mods;
@@ -56,6 +57,7 @@ namespace OSFSettings
         const auto* stored = m_store.FindMod(mod);
         if (!stored) return std::nullopt;
         auto copy = *stored;
+        copy.values = copy.ResolvedValues();
         Localization::Get()->Apply(copy.schema);
         return copy;
     }
@@ -82,9 +84,9 @@ namespace OSFSettings
         if (!IsReady()) return std::unexpected(SettingsError::NotReady);
         const auto* stored = m_store.FindMod(mod);
         if (!stored) return std::unexpected(SettingsError::UnknownMod);
-        const auto value = stored->values.find(key);
-        if (value == stored->values.end()) return std::unexpected(SettingsError::UnknownSetting);
-        return value->second;
+        const auto value = stored->GetValue(key);
+        if (!value) return std::unexpected(SettingsError::UnknownSetting);
+        return *value;
     }
 
     SettingsError SettingsService::FinishWrite(std::string_view mod, std::optional<std::string_view> key, const SettingsStore::SetResult& result) noexcept

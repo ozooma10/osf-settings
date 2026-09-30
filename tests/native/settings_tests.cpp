@@ -147,9 +147,8 @@ namespace
         Check(!store.Set("learning", "notificationLimit", false).ok() &&
             !store.Set("learning", "notifications", std::int64_t{1}).ok() && !fs::exists(values),
             "boolean and integer settings reject each other's value types without writing");
-        Check(store.Set("learning", "notificationLimit", std::int64_t{3}).ok() &&
-            Json::parse(Read(valuesFile))["values"] == Json{{"notificationLimit", 3}},
-            "setting the current integer persists only that explicit choice");
+        Check(store.Set("learning", "notificationLimit", std::int64_t{3}).ok() && !fs::exists(values),
+            "setting the current integer does not write a file");
 
         OSFSettings::SettingsStore restarted;
         for (const std::int64_t value : { 1, 10, 7 }) {
@@ -331,8 +330,7 @@ namespace
         Check(!store.Set("learning", "gain", true).ok() && !store.Set("learning", "gain", std::int64_t{1}).ok() &&
             !store.Set("learning", "notifications", 1.0).ok() && !store.Set("learning", "notificationLimit", 3.0).ok() && !fs::exists(values),
             "native edits require the declared variant type, even for integral doubles");
-        Check(store.Set("learning", "gain", 0.75).ok() && Json::parse(Read(valuesFile))["values"] == Json{{"gain", 0.75}},
-            "setting the current float persists only that explicit choice");
+        Check(store.Set("learning", "gain", 0.75).ok() && !fs::exists(values), "setting the current float does not write a file");
 
         OSFSettings::SettingsStore restarted;
         for (const double value : { 0.0, 1.0, 0.1, std::nextafter(0.1, 1.0), 0.625 }) {
@@ -525,9 +523,8 @@ namespace
             !store.Set("learning", "notificationLimit", std::string{"3"}).ok() &&
             !store.Set("learning", "notificationVolume", std::string{"0.75"}).ok() && !fs::exists(values),
             "text values do not enable string coercion for other types");
-        Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{"normal"}).ok() &&
-            Json::parse(Read(valuesFile))["values"] == Json{{"notificationMode", "normal"}},
-            "setting the current enum persists only that explicit choice");
+        Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{"normal"}).ok() && !fs::exists(values),
+            "setting the current enum value does not write a file");
 
         OSFSettings::SettingsStore restarted;
         for (const auto* value : { "quiet", "normal", "verbose" }) {
@@ -677,9 +674,9 @@ namespace
         Check(!missingMod.ok() && !missingMod.error.empty() && !missingKey.ok() && !missingKey.error.empty(),
             "setting an unknown mod or key reports an error");
         Check(!fs::exists(values), "rejected edits do not write any files");
-        const auto pinned = store.Set("learning", "notifications", true);
-        Check(pinned.ok() && !pinned.changed && Json::parse(Read(valuesFile))["values"]["notifications"] == true,
-            "setting the current default saves an explicit choice without a value change");
+        const auto unchanged = store.Set("learning", "notifications", true);
+        Check(unchanged.ok() && !unchanged.changed && !fs::exists(values),
+            "setting the current default does not create a saved entry or file");
 
         const auto disabled = store.Set("learning", "notifications", false);
         Check(disabled.ok() && disabled.error.empty() && store.GetValue("learning", "notifications") == SettingValue{ false },

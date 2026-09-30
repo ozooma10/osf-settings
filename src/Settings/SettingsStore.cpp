@@ -47,8 +47,7 @@ namespace OSFSettings
 
             ModSettings mod;
             mod.schema = std::move(*schema);
-            mod.values = mod.schema.DefaultValues();
-            SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, mod.values, m_loadErrors);
+            mod.values = SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, m_loadErrors);
             m_mods.push_back(std::move(mod));
 
         }
@@ -58,9 +57,7 @@ namespace OSFSettings
     {
         const auto* stored = FindMod(mod);
         if (!stored) return std::nullopt;
-        const auto value = stored->values.find(key);
-        if (value == stored->values.end()) return std::nullopt;
-        return value->second;
+        return stored->GetValue(key);
     }
 
     const ModSettings* SettingsStore::FindMod(std::string_view mod) const
@@ -74,11 +71,11 @@ namespace OSFSettings
         return const_cast<ModSettings*>(static_cast<const SettingsStore&>(*this).FindMod(mod));
     }
 
-    SettingsStore::SetResult SettingsStore::Commit(ModSettings& mod, SettingValues proposed)
+    SettingsStore::SetResult SettingsStore::Commit(ModSettings& mod, SettingValues proposed, bool changed)
     {
         if (mod.values == proposed) return {};
-        std::string error;
         const auto provider = m_providers.find(mod.schema.id);
+        std::string error;
         const bool saved = provider != m_providers.end() ? provider->second.save(proposed) :
             SettingsJson::SaveValues(m_valuesDir / (mod.schema.id + ".json"), proposed, error);
         if (!saved) {
@@ -86,7 +83,7 @@ namespace OSFSettings
             return { std::move(error), Error::SaveFailed };
         }
         mod.values.swap(proposed);
-        return { {}, Error::None, true };
+        return { {}, Error::None, changed };
     }
 
     SettingsStore::Error SettingsStore::RegisterProvider(ModSettings mod, Save save, std::uint64_t& registration)
@@ -125,40 +122,47 @@ namespace OSFSettings
     {
         auto* stored = FindMod(mod);
         if (!stored) return { "unknown mod id", Error::UnknownMod };
-        const auto current = stored->values.find(key);
         const auto* setting = stored->schema.FindSetting(key);
-        if (current == stored->values.end() || !setting) {
+        if (!setting) {
             return { "unknown setting key", Error::UnknownSetting };
         }
-        if (current->second.index() != value.index()) {
+        const auto current = stored->GetValue(key);
+        if (current->index() != value.index()) {
             return { "value does not match the setting's type", Error::TypeMismatch };
         }
         if (!IsValidValue(*setting, value)) {
             return { "value does not match the setting's type or validation rules", Error::InvalidValue };
         }
-        if (current->second == value) {
-            return {};
-        }
+        if (*current == value) return {};
 
-        // Propose the edit in a copy. The live value changes only after saving.
+        // Publish an explicit edit only after saving the sparse values succeeds.
         auto proposed = stored->values;
-        proposed.find(key)->second = std::move(value);
-        return Commit(*stored, std::move(proposed));
+        proposed.insert_or_assign(std::string(key), std::move(value));
+        return Commit(*stored, std::move(proposed), true);
     }
 
     SettingsStore::SetResult SettingsStore::Reset(std::string_view mod, std::string_view key)
     {
-        const auto* stored = FindMod(mod);
+        auto* stored = FindMod(mod);
         if (!stored) return { "unknown mod id", Error::UnknownMod };
         const auto* setting = stored->schema.FindSetting(key);
         if (!setting) return { "unknown setting key", Error::UnknownSetting };
-        return Set(mod, key, setting->DefaultValue());
+        const auto defaultValue = setting->DefaultValue();
+        if (m_providers.contains(stored->schema.id)) return Set(mod, key, defaultValue);
+
+        auto proposed = stored->values;
+        proposed.erase(std::string(key));
+        return Commit(*stored, std::move(proposed), stored->GetValue(key) != defaultValue);
     }
 
     SettingsStore::SetResult SettingsStore::ResetMod(std::string_view mod)
     {
         auto* stored = FindMod(mod);
         if (!stored) return { "unknown mod id", Error::UnknownMod };
-        return Commit(*stored, stored->schema.DefaultValues());
+        auto defaults = stored->schema.DefaultValues();
+        const bool changed = std::ranges::any_of(stored->values, [&](const auto& saved) {
+            return saved.second != defaults.at(saved.first);
+        });
+        return Commit(*stored, m_providers.contains(stored->schema.id) ? std::move(defaults) : SettingValues{}, changed);
     }
 }

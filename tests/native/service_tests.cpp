@@ -121,6 +121,9 @@ int TestSettingsService()
     check(service.GetBool("sample", "enabled", &enabled) == Status::Ok && !enabled &&
         service.GetInt("sample", "count", &count) == Status::Ok && count == 3 &&
         service.GetFloat("sample", "scale", &scale) == Status::Ok && scale == 0.15, "exact typed defaults");
+    check(backend.Snapshot()[0].values == backend.FindMod("sample")->schema.DefaultValues() &&
+        backend.FindMod("sample")->values == backend.FindMod("sample")->schema.DefaultValues() && !std::filesystem::exists(saved),
+        "list and single-mod snapshots resolve all defaults without saving them");
     check(service.SetInt("sample", "enabled", 1) == Status::TypeMismatch &&
         service.SetFloat("sample", "count", 3) == Status::TypeMismatch &&
         service.SetEnum("sample", "enabled", "quiet") == Status::TypeMismatch, "setters never coerce types");
@@ -168,6 +171,8 @@ int TestSettingsService()
     check(events.keys == std::vector<std::string>{ "mode" }, "changed keys notify");
     events.keys.clear();
     const auto before = backend.Snapshot();
+    check(Json::parse(ReadFile(saved))["values"] == Json{{"mode", "verbose-mode"}},
+        "reading complete snapshots does not persist untouched defaults");
     check(service.SetBool("sample", "enabled", true) == Status::Ok && service.SetBool("sample", "enabled", false) == Status::Ok &&
         service.SetBool("sample", "enabled", true) == Status::Ok && service.SetInt("sample", "count", 8) == Status::Ok &&
         service.SetFloat("sample", "scale", 0.27) == Status::Ok, "valid writes commit without snapping floats");
@@ -187,9 +192,9 @@ int TestSettingsService()
     check(service.SetInt("sample", "count", 8) == Status::Ok && !backend.HasPendingChanges(), "unchanged writes skip failed storage");
     writeLock.Release();
     check(service.ResetMod("sample") == Status::Ok, "mod reset commits");
-    const auto defaults = Json::parse(ReadFile(saved))["values"];
-    check(defaults["enabled"] == false && defaults["count"] == 3 && defaults["scale"] == 0.15 && defaults["mode"] == "quiet",
-        "mod reset saves all defaults in one transaction");
+    check(Json::parse(ReadFile(saved))["values"] == Json::object() &&
+        backend.FindMod("sample")->values == backend.FindMod("sample")->schema.DefaultValues(),
+        "mod reset removes all overrides and publishes defaults in one transaction");
     backend.DispatchChanges();
     check(events.keys == std::vector<std::string>{ "*" }, "mod reset requests one full refresh");
     events.keys.clear();
