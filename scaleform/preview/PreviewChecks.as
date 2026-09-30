@@ -319,7 +319,19 @@ package
                 case 53:
                     require(list.entryCount == 4, "issues fixture has four reports");
                     requireGlyphs("Issues: 4");
+                    userEvent("Right");
                     capture("issues");
+                    for (var issueIndex:int = 0; issueIndex < list.entryCount; ++issueIndex)
+                        if (list.GetDataForEntry(issueIndex).row.id == "long-description") list.selectedIndex = issueIndex;
+                    step = 78; break;
+                case 78:
+                    // Let the selected row repaint before capturing the scrolled report.
+                    var issuePane:Object = findNamed(menu,"issueDetails");
+                    require(issuePane.scrollable, "long reports scroll within the wider details pane");
+                    issuePane.scroll(10000);
+                    require(list.selectedEntry.row.id == "long-description", "scrolling report details preserves issue selection");
+                    capture("issues-long");
+                    step = 54;
                     findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 54:
                     for (var childIndex:int = 0; childIndex < menu.numChildren; ++childIndex) {

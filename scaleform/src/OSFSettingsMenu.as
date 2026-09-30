@@ -77,6 +77,7 @@ package
         private var detailDivider:Sprite = new Sprite();
         private var detailDecoration:Sprite = new Sprite();
         private var issueDetails:IssueDetails;
+        private var issueSummary:IssueSummary;
         private var changedLegend:Sprite = new Sprite();
         private var detailHint:TextField;
         private var defaultLabel:TextField;
@@ -208,6 +209,7 @@ package
             rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(rangeValue);
             detailOptions.x = MenuStyle.DETAIL_X; detailOptions.mouseEnabled = detailOptions.mouseChildren = false; addChild(detailOptions);
             issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
+            issueSummary = new IssueSummary(); issueSummary.visible = false; addChild(issueSummary);
             homeDetails = new HomeDetails(); homeDetails.visible = false; addChild(homeDetails);
             homeEmpty = new HomeEmpty(function():void {
                 if (!captureRow && !bindingBusy() && !requestedRefresh) openEntry({kind:"page", id:"bindings"});
@@ -413,7 +415,7 @@ package
             if (options.entryCount || homePage() && launcher.hasEntries) focusNav(false);
         }
         // Keybinding and issue rows show a second line; everything else is one line.
-        private function rowHeight():Number { return bindingsPage() || issuesPage() ? MenuStyle.TALL_ROW_HEIGHT : MenuStyle.ROW_HEIGHT; }
+        private function rowHeight():Number { return issuesPage() ? IssueStyle.ROW_HEIGHT : bindingsPage() ? MenuStyle.TALL_ROW_HEIGHT : MenuStyle.ROW_HEIGHT; }
         // The nearest non-header entry from index, trying step first and then fallback.
         private function settingFrom(index:int, step:int, fallback:int):int
         {
@@ -526,15 +528,22 @@ package
             homeCount.y = homeMods.y + 3;
             options.disableSelection = bindingBusy();
             // Mod pages start the list under the header; section headers name its parts.
-            options.y = bindingsPage() ? KeybindingsPage.LIST_TOP : homeMods.visible ? homeMods.y + MenuStyle.SECTION_SIZE + 20 :
+            options.y = issuesPage() ? IssueStyle.TOP : bindingsPage() ? KeybindingsPage.LIST_TOP : homeMods.visible ? homeMods.y + MenuStyle.SECTION_SIZE + 20 :
                 modID ? MenuStyle.SECTION_TOP : MenuStyle.LIST_TOP;
             // Whole rows only, so the last visible row is never cut by the footer.
             var pitch:Number = rowHeight() + MenuStyle.ROW_GAP;
             var listHeight:Number = Math.max(1, Math.floor((MenuStyle.LIST_BOTTOM - options.y + MenuStyle.ROW_GAP) / pitch)) * pitch - MenuStyle.ROW_GAP;
             options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
-            MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,MenuStyle.LIST_WIDTH,listHeight);
-            section.visible = !bindingsPage() && !homeEmptyState() && !modID;
+            var listWidth:Number = issuesPage() ? IssueStyle.LIST_WIDTH : MenuStyle.LIST_WIDTH;
+            options.Border_mc.width = listWidth;
+            if (options.ScrollBar) options.ScrollBar.x = listWidth + 14;
+            MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,listWidth,listHeight);
+            empty.width = listWidth - 40;
+            section.visible = !bindingsPage() && !issuesPage() && !homeEmptyState() && !modID;
             count.visible = issuesPage();
+            count.x = MenuStyle.RIGHT - count.width;
+            issueSummary.visible = issuesPage();
+            if (issueSummary.visible) issueSummary.update(issues);
             headerCount.visible = section.visible && homePage();
             empty.y = options.y + 16;
             var hasHotkeys:Boolean = false;
@@ -1353,7 +1362,7 @@ package
                         new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
                 }
                 var border:MovieClip = Object(clip).Border_mc;
-                border.x = 0; border.y = 0; border.width = MenuStyle.LIST_WIDTH;
+                border.x = 0; border.y = 0; border.width = issue ? IssueStyle.LIST_WIDTH : MenuStyle.LIST_WIDTH;
                 if (border.height != entryHeight) { border.height = entryHeight; needsLayout = true; }
                 clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (entryHeight + MenuStyle.ROW_GAP);
                 view.update(item.row, chosen, modID == "" && !bindingsPage(), entryHeight, Object(clip).itemIndex == hoverIndex && !chosen);

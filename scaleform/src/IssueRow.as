@@ -16,10 +16,10 @@ package
         public function IssueRow()
         {
             mouseEnabled = false; mouseChildren = false;
-            var rowWidth:Number = MenuStyle.LIST_WIDTH;
-            title = MenuStyle.field("", 16, 4, rowWidth - 326, MenuStyle.BODY_SIZE + 14, MenuStyle.BODY_SIZE);
-            mod = MenuStyle.field("", 16, 0, rowWidth - 326, MenuStyle.SMALL_SIZE + 10, MenuStyle.SMALL_SIZE, MenuStyle.MUTED);
-            severity = MenuStyle.field("", rowWidth - 210, 0, 190, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true);
+            var rowWidth:Number = IssueStyle.LIST_WIDTH;
+            title = MenuStyle.field("", 82, 18, rowWidth - 246, MenuStyle.BODY_SIZE + 14, MenuStyle.BODY_SIZE);
+            mod = MenuStyle.field("", 82, 0, rowWidth - 246, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED);
+            severity = MenuStyle.field("", rowWidth - 140, 0, 126, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true);
             addChild(title); addChild(mod); addChild(severity);
         }
 
@@ -27,26 +27,23 @@ package
         {
             if (previous == row && wasSelected == selected && wasHovered == hovered) return;
             previous = row; wasSelected = selected; wasHovered = hovered;
-            mod.y = rowHeight - MenuStyle.SMALL_SIZE - 13;
-            severity.y = (rowHeight - severity.height) / 2 + 2;
-            var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
-            title.textColor = color;
-            mod.textColor = selected ? MenuStyle.LINE : MenuStyle.MUTED;
-            severity.textColor = selected ? MenuStyle.INK : MenuStyle.ACCENT;
+            var boxHeight:Number = rowHeight - 10;
+            var textHeight:Number = MenuStyle.BODY_SIZE + MenuStyle.SMALL_SIZE + 18;
+            title.y = (boxHeight - textHeight) / 2;
+            mod.y = title.y + MenuStyle.BODY_SIZE + 12;
+            severity.y = (boxHeight - severity.height) / 2 + 2;
+            title.textColor = MenuStyle.WHITE;
+            mod.textColor = MenuStyle.MUTED;
+            severity.textColor = IssueStyle.color(row.severity);
             MenuStyle.fit(title, row.title); MenuStyle.fit(mod, row.modTitle);
             MenuStyle.fit(severity, row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning"));
-            graphics.clear(); graphics.beginFill(selected ? MenuStyle.WHITE : hovered ? MenuStyle.HOVER : MenuStyle.ROW);
-            graphics.drawRect(0, 0, MenuStyle.LIST_WIDTH, rowHeight); graphics.endFill();
-            var x:Number = MenuStyle.LIST_WIDTH - 248; var y:Number = rowHeight / 2;
-            graphics.lineStyle(2, severity.textColor);
-            if (row.severity == "ERROR") graphics.drawCircle(x, y, 14);
-            else {
-                graphics.moveTo(x, y - 15); graphics.lineTo(x + 16, y + 13);
-                graphics.lineTo(x - 16, y + 13); graphics.lineTo(x, y - 15);
+            graphics.clear(); graphics.beginFill(selected ? MenuStyle.ROW : hovered ? 0x182A33 : 0x0E1B23);
+            graphics.drawRect(0, 0, IssueStyle.LIST_WIDTH, boxHeight); graphics.endFill();
+            if (selected) {
+                graphics.beginFill(severity.textColor); graphics.drawRect(1, 1, 5, boxHeight - 2); graphics.endFill();
+                MenuDecoration.corners(graphics, 1, 1, IssueStyle.LIST_WIDTH - 2, boxHeight - 2, MenuStyle.WHITE);
             }
-            graphics.moveTo(x, y - 6); graphics.lineTo(x, y + 3);
-            graphics.moveTo(x, y + 7); graphics.lineTo(x, y + 8);
-            graphics.lineStyle();
+            IssueStyle.icon(graphics, 42, boxHeight / 2, row.severity == "ERROR", 22);
         }
     }
 }

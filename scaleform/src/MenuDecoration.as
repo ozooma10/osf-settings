@@ -34,10 +34,10 @@ package
             }
         }
 
-        public static function corners(g:Graphics, left:Number, top:Number, width:Number, height:Number):void
+        public static function corners(g:Graphics, left:Number, top:Number, width:Number, height:Number, color:uint = GOLD):void
         {
             g.lineStyle(1, MenuStyle.LINE, 0.35); g.drawRect(left, top, width, height);
-            g.lineStyle(2, GOLD, 0.75);
+            g.lineStyle(2, color, 0.75);
             for (var i:int = 0; i < 4; ++i) {
                 var x:Number = left + (i % 2 ? width : 0), y:Number = top + (i < 2 ? 0 : height);
                 var dx:Number = i % 2 ? -1 : 1, dy:Number = i < 2 ? 1 : -1;
