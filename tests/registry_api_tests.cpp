@@ -1,3 +1,4 @@
+#include "FileLock.h"
 #include "API/SettingsApi.h"
 #include "OSFSettingsRegistry.h"
 #include "Settings/SettingsService.h"
@@ -283,12 +284,12 @@ int main()
             notifications.latest.mods[0]["groups"][0]["settings"][5]["value"] == "latest", "keyed changes coalesce and refresh current values");
         check(std::get<std::string>(consumer.Snapshot().at("alpha").at("text").value) == "latest", "example refreshes keyed notifications");
 
-        std::filesystem::create_directory(values / "alpha.json.tmp");
+        OSFSettings::Test::FileLock writeLock(values / "alpha.json");
         check(client.SetString("alpha", "text", "failed") == Status::SaveFailed && client.ResetMod("alpha") == Status::SaveFailed && !backend.HasPendingChanges(), "failed persistence creates no invalidation");
         check(Read(client, "alpha").mods[0]["groups"][0]["settings"][5]["value"] == "latest", "failed persistence never enters registry");
         backend.DispatchChanges();
         check(notifications.calls == 2, "no callbacks after failed persistence");
-        std::filesystem::remove(values / "alpha.json.tmp");
+        writeLock.Release();
         check(client.ResetMod("alpha") == Status::Ok, "whole mod reset");
         backend.DispatchChanges();
         check(notifications.calls == 3 && notifications.full == 2 && notifications.latest.mods[0]["groups"][0]["settings"][5]["value"] == "Original text" &&

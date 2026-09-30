@@ -4,7 +4,7 @@ Run from the repository root with the existing XMake configuration. XMake builds
 selected tests before running them, so a separate build command is unnecessary.
 
 ```powershell
-# All 22 native suites, including SDK, service and key coverage.
+# All 23 native suites, including SDK, service, security and key coverage.
 xmake test -j4
 
 # One area, or several related suites in one invocation.
@@ -15,7 +15,7 @@ xmake test -j4 'osfsettings-launcher-tests/*'
 
 | Group | Coverage |
 | --- | --- |
-| `tests/settings` | Localization, schema, store, service, SDK, strings, registry |
+| `tests/settings` | Localization, schema, store, service, SDK, strings, registry, filename validation and file-link regression checks |
 | `tests/input` | Keys, registration, input routing, lifecycle, binding editor/menu/snapshots, blocks, callbacks |
 | `tests/launcher` | Launcher registry and recency |
 | `tests/actions` | Action registration, dispatch and completion |

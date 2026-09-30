@@ -1,3 +1,4 @@
+#include "../FileLock.h"
 #include "API/SettingsApi.h"
 #include "Input/HotkeyInputState.h"
 #include "Input/KeyCapture.h"
@@ -220,9 +221,10 @@ int TestKeySettings()
     api.SetKey("keys", "required", 0x09);
     check(api.ResetMod("keys") == Status::Ok && client.GetKey("keys", "required", &keyCode) == Status::Ok && keyCode == 0xA3, "reset mod includes key defaults");
     backend.DispatchChanges(); changes.clear();
-    std::filesystem::create_directory(values / "keys.json.tmp");
+    OSFSettings::Test::FileLock writeLock(values / "keys.json");
     check(api.SetKey("keys", "toggle", 0x75) == Status::SaveFailed && client.GetKey("keys", "toggle", &keyCode) == Status::Ok && keyCode == 0x73 &&
         !backend.HasPendingChanges(), "failed save preserves live binding and emits no notification");
+    writeLock.Release();
     { std::ofstream file(values / "keys.json"); file << R"({"formatVersion":1,"values":{"toggle":118,"required":"F5"}})"; }
     reloaded.LoadAll(schemas, values);
     check(std::get<KeyBinding>(*reloaded.GetValue("keys", "toggle")).keyCode == 0x76 &&
@@ -261,7 +263,6 @@ int TestKeySettings()
     capture.HandleKeyEvent(0x1B, true, false);
     capture.ResetForMenuClose();
     check(!capture.ShouldConsumeKey(0x1B) && capture.GetSnapshot().state == State::Idle, "closed menu drops stale held keys");
-    std::filesystem::remove(values / "keys.json.tmp");
     for (const std::uint32_t nativeCode : { 0x20u, 0x44u, 0x41u, 0xA3u, 0xB3u, 0xE2u, 0x07u }) {
         capture.BeginCapture();
         capture.HandleKeyEvent(nativeCode, true, false);

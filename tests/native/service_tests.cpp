@@ -1,3 +1,4 @@
+#include "../FileLock.h"
 #include "API/SettingsApi.h"
 #include "Input/HotkeyInputState.h"
 #include "Settings/SettingsService.h"
@@ -177,14 +178,14 @@ int TestSettingsService()
     events.keys.clear();
     const auto persisted = ReadFile(saved);
     check(Json::parse(persisted)["values"]["count"] == 8, "successful writes reach disk before returning");
-    std::filesystem::create_directory(values / "sample.json.tmp");
+    OSFSettings::Test::FileLock writeLock(saved);
     check(service.SetInt("sample", "count", 9) == Status::SaveFailed && service.ResetMod("sample") == Status::SaveFailed &&
         service.Reset("sample", "enabled") == Status::SaveFailed, "save failures propagate through setters and resets");
     check(service.GetBool("sample", "enabled", &enabled) == Status::Ok && enabled &&
         service.GetInt("sample", "count", &count) == Status::Ok && count == 8 && ReadFile(saved) == persisted &&
         !backend.HasPendingChanges(), "failed atomic reset preserves all live values, disk, and notifications");
     check(service.SetInt("sample", "count", 8) == Status::Ok && !backend.HasPendingChanges(), "unchanged writes skip failed storage");
-    std::filesystem::remove(values / "sample.json.tmp");
+    writeLock.Release();
     check(service.ResetMod("sample") == Status::Ok, "mod reset commits");
     const auto defaults = Json::parse(ReadFile(saved))["values"];
     check(defaults["enabled"] == false && defaults["count"] == 3 && defaults["scale"] == 0.15 && defaults["mode"] == "quiet",

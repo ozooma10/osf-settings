@@ -1,3 +1,4 @@
+#include "FileLock.h"
 #include "Launcher/LauncherService.h"
 #include "OSFSettings_Launcher.h"
 #include "Settings/SettingsSchema.h"
@@ -90,14 +91,14 @@ int main()
         restored.LoadHistory(directory); // Providers may register after history is loaded.
         restored.Register(native); restored.Initialize({mod});
         check(rank(restored, "absolute-control") == 2 && rank(restored, "demo") == 1, "recent ordering survives a new service and late provider registration");
-        std::filesystem::create_directory(directory / "internal.json.tmp");
+        OSFSettings::Test::FileLock writeLock(history);
         const auto restoredRevision = restored.Revision();
         check(restored.RecordOpened("absolute-control", "panel") && restored.Revision() == restoredRevision,
             "opening the front destination leaves unchanged history alone");
         check(restored.RecordOpened("demo", "native") && rank(restored, "demo") == 2 &&
             read(history)["recentLaunchers"][0]["mod"] == "absolute-control",
             "failed save preserves disk history and updates session recency");
-        std::filesystem::remove(directory / "internal.json.tmp");
+        writeLock.Release();
         check(restored.RecordOpened("demo", "native") && read(history)["recentLaunchers"][0]["mod"] == "demo",
             "reopening the front destination retries a failed save");
         { std::ofstream broken(history); broken << "{broken"; }

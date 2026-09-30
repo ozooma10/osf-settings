@@ -39,7 +39,7 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 
 - The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present.
 - The mod ID comes from the schema filename without `.json`.
-- Mod IDs use lowercase ASCII letters, digits, `.`, `_`, or `-`; empty IDs, `.` and `..` are invalid.
+- Mod IDs use 1–128 lowercase ASCII letters, digits, `.`, `_`, or `-`; `.` and `..` are invalid. Windows device names such as `con`, `nul`, `com1`, and `lpt1` are rejected, including names followed by an extension such as `nul.extra`.
 - Group names become headings. Groups and their controls appear in authored order.
 - Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod. API lookups use exact, case-sensitive keys.
 - Optional `label` defaults to the key. `hint` adds help text.

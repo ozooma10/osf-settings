@@ -46,6 +46,8 @@ int main()
             return saved.accept;
         };
         API::Providers::Registration token{};
+        check(api->Register("nul.extra", schema, "{}", save, &persistence, &token) == Status::InvalidValue && !token);
+        check(persistence.writes == 0 && !backend.FindMod("provider.mod"));
         check(api->Register("static.mod", schema, "{}", save, &persistence, &token) == Status::AlreadyRegistered && token == 0);
         const auto revision = backend.Revision();
         check(api->Register("provider.mod", schema, R"({"enabled":false,"count":5})", save, &persistence, &token) == Status::Ok && token);

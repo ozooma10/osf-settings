@@ -62,9 +62,12 @@ namespace OSFSettings::SettingsJson
         }
     }
 
-    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error)
+    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error, std::optional<SettingsVersion>* expectedSettingsVersion)
     {
         error.clear();
+        if (expectedSettingsVersion) {
+            expectedSettingsVersion->reset();
+        }
         try {
             std::set<std::string> groupNames;
             std::set<std::string> hotkeyIds;
@@ -102,25 +105,35 @@ namespace OSFSettings::SettingsJson
                     }
                     return true;
                 });
-            return ParseSchema(document, modId, error);
+            return ParseSchema(document, modId, error, expectedSettingsVersion);
         } catch (const std::exception& exception) {
             error = exception.what();
             return std::nullopt;
         }
     }
 
-    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error)
+    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error,
+        std::optional<SettingsVersion>* expectedSettingsVersion)
     {
         error.clear();
+        if (expectedSettingsVersion) expectedSettingsVersion->reset();
         try {
             Require(document.is_object(), "schema must be an object");
+            ModSchema mod;
+            if (const auto expected = document.find("expectedSettingsVersion"); expected != document.end()) {
+                Require(expected->is_string(), "expectedSettingsVersion must be a major.minor.patch string");
+                mod.expectedSettingsVersion = SettingsVersion::Parse(expected->get_ref<const std::string&>());
+                Require(mod.expectedSettingsVersion.has_value(), "expectedSettingsVersion must be major.minor.patch (each component 0-65535, no leading zeros or suffixes)");
+                if (expectedSettingsVersion) {
+                    *expectedSettingsVersion = mod.expectedSettingsVersion;
+                }
+            }
             Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
             const auto version = document.find("schemaVersion");
             Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
 
-            ModSchema mod;
             mod.id = modId;
-            Require(IsValidModId(mod.id), "mod id must use lowercase ASCII letters, digits, dots, underscores, or hyphens");
+            Require(IsValidModId(mod.id), "mod id must use 1-128 lowercase ASCII letters, digits, dots, underscores, or hyphens and must not be a Windows device name");
             // Values share a folder with OSF Settings' internal.json.
             Require(mod.id != "internal", "mod id 'internal' is reserved");
             if (document.contains("id")) {

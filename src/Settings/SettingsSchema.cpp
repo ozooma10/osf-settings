@@ -36,7 +36,11 @@ namespace OSFSettings
 
     bool IsValidModId(std::string_view id)
     {
-        return !id.empty() && id != "." && id != ".." && std::ranges::all_of(id, [](char c) {
+        if (id.empty() || id.size() > 128 || id == "." || id == "..") return false;
+        const auto base = id.substr(0, id.find('.'));
+        if (base == "con" || base == "prn" || base == "aux" || base == "nul" ||
+            (base.size() == 4 && (base.starts_with("com") || base.starts_with("lpt")) && base[3] >= '0' && base[3] <= '9')) return false;
+        return std::ranges::all_of(id, [](char c) {
             return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
         });
     }

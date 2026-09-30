@@ -1,3 +1,4 @@
+#include "FileLock.h"
 #include "API/SettingsApi.h"
 #include "Input/HotkeyInputState.h"
 #include "Settings/SettingsJson.h"
@@ -182,13 +183,13 @@ int main()
         }
         check(client.SetString("osfui", "language", "", 4097) == Status::InvalidValue, "global cap rejects before copying caller bytes");
         check(Read(saved) == persisted && !backend.HasPendingChanges(), "invalid writes leave storage and notifications unchanged");
-        std::filesystem::create_directory(values / "osfui.json.tmp");
+        OSFSettings::Test::FileLock writeLock(saved);
         check(client.SetString("osfui", "language", "en") == Status::SaveFailed &&
             client.Reset("osfui", "language") == Status::SaveFailed && client.ResetMod("osfui") == Status::SaveFailed, "save failures propagate through strings and resets");
         check(client.GetString("osfui", "language", owned) == Status::Ok && owned == "zh-Hant-TW" &&
             Read(saved) == persisted && !backend.HasPendingChanges(), "failed save preserves published string, disk and notifications");
         check(client.SetString("osfui", "language", owned) == Status::Ok && !backend.HasPendingChanges(), "equal string bypasses unavailable storage");
-        std::filesystem::remove(values / "osfui.json.tmp");
+        writeLock.Release();
         check(client.Reset("osfui", "language") == Status::Ok && TestJson::parse(Read(saved))["values"]["language"] == "auto", "single reset persists authored string default");
         backend.DispatchChanges();
         check(events.keys == std::vector<std::string>{"language"}, "single reset notifies string key");

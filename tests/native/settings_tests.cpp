@@ -1,3 +1,4 @@
+#include "../FileLock.h"
 #include "Settings/SettingsJson.h"
 #include "Menu/FloatSlider.h"
 #include "Settings/SettingsStore.h"
@@ -163,11 +164,11 @@ namespace
                 store.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} },
                 "invalid integer edits preserve both the live value and saved file");
         }
-        fs::create_directory(temporary);
+        OSFSettings::Test::FileLock writeLock(valuesFile);
         Check(!store.Set("learning", "notificationLimit", std::int64_t{4}).ok() && Read(valuesFile) == committed &&
             store.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} },
             "a failed integer save preserves both the live value and saved file");
-        fs::remove(temporary); // Only the empty directory created by this test.
+        writeLock.Release();
 
         for (const auto value : exactValues) {
             Check(store.Set("learning", "counter", value).ok(), "the native store accepts the full signed 64-bit range");
@@ -351,10 +352,10 @@ namespace
                 error.find("value must be finite: gain") != std::string::npos && Read(valuesFile) == committed && !fs::exists(temporary),
                 "serialization rejects non-finite doubles before JSON can replace them with null");
         }
-        fs::create_directory(temporary);
+        OSFSettings::Test::FileLock writeLock(valuesFile);
         Check(!store.Set("learning", "gain", 0.25).ok() && Read(valuesFile) == committed &&
             store.GetValue("learning", "gain") == SettingValue{0.625}, "a failed float save preserves the live value and saved file");
-        fs::remove(temporary); // Only the empty directory created by this test.
+        writeLock.Release();
 
         for (const double value : { -std::numeric_limits<double>::max(), std::numeric_limits<double>::max(),
             std::numeric_limits<double>::min(), std::numeric_limits<double>::denorm_min(), -std::numeric_limits<double>::denorm_min(),
@@ -542,11 +543,11 @@ namespace
                 store.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} },
                 "wrong types, display labels, and unknown enum values preserve the live value and saved file");
         }
-        fs::create_directory(temporary);
+        OSFSettings::Test::FileLock writeLock(valuesFile);
         Check(!store.Set("learning", "notificationMode", OSFSettings::EnumValue{"quiet"}).ok() && Read(valuesFile) == committed &&
             store.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} },
             "a failed enum save preserves the live value and saved file");
-        fs::remove(temporary); // Only the empty directory created by this test.
+        writeLock.Release();
         Check(store.Set("learning", "notificationMode", mode->DefaultValue()).ok(), "an enum resets through the normal save path");
         restarted.LoadAll(schemas, values);
         Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == mode->DefaultValue(),
@@ -710,17 +711,11 @@ namespace
         restarted.LoadAll(schemas, values);
         Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notifications") == SettingValue{ true },
             "reload uses the committed file and ignores a leftover temporary file");
-        Check(store.Set("learning", "notifications", false).ok() && !fs::exists(temporary),
-            "the next successful edit replaces a stale temporary file");
+        Check(store.Set("learning", "notifications", false).ok() && Read(temporary) == "incomplete write",
+            "successful edits leave unrelated stale temporary files untouched");
+        fs::remove(temporary); // Only the stale file created by this fixture.
 
         const auto committed = Read(valuesFile);
-        fs::create_directory(temporary); // Force failure before the temporary file can be opened.
-        const auto failedOpen = store.Set("learning", "notifications", true);
-        Check(!failedOpen.ok() && !failedOpen.error.empty() && store.GetValue("learning", "notifications") == SettingValue{ false },
-            "failure to open the temporary file rejects the edit");
-        Check(Read(valuesFile) == committed && fs::is_directory(temporary), "failed open preserves the saved file and the pre-existing blocker");
-        fs::remove(temporary); // Only the empty directory created by this test.
-
 #ifdef _WIN32
         // Denying delete sharing makes the actual Windows replacement fail.
         const auto locked = ::CreateFileW(valuesFile.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
