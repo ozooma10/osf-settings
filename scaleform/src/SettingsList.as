@@ -9,7 +9,9 @@ package
     public final class SettingsList
     {
         private static const NORMAL:ColorTransform = new ColorTransform();
-        private static const SELECTED:ColorTransform = new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0);
+        // Selected controls draw in ink on the highlighted row.
+        private static const SELECTED:ColorTransform = new ColorTransform(0, 0, 0, 1,
+            MenuStyle.INK >> 16 & 0xFF, MenuStyle.INK >> 8 & 0xFF, MenuStyle.INK & 0xFF, 0);
         private var list:Object;
         private var views:Dictionary = new Dictionary(true);
 

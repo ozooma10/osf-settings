@@ -19,6 +19,10 @@ package
     [SWF(width="1920", height="1080", frameRate="60", backgroundColor="#08151C")]
     public final class OSFSettingsMenu extends MovieClip
     {
+        private static const LEFT_BRACKET:uint = 219;
+        private static const RIGHT_BRACKET:uint = 221;
+        // Row types Accept acts on; numbers step with Left and Right instead.
+        private static const ACCEPT_TYPES:Object = {bool:true, "enum":true, key:true, hotkey:true, string:true, action:true};
         public var BGSCodeObj:Object = {};
         public var startupPhase:String = "document constructed";
         private var bridgeReady:Boolean = false;
@@ -268,12 +272,16 @@ package
             launcherAcceptHeld = false;
             syncInput();
             menuStage.focus = value ? launcher : options as MovieClip;
-            if (homePage()) { MenuStyle.setText(status, ""); status.textColor = MenuStyle.MUTED; }
+            if (homePage()) setStatus("");
             decorate(); updateSelection();
         }
         private function searching():Boolean { return keybindings && keybindings.searching; }
         private function editingString():Boolean { return stringEditor && stringEditor.visible; }
         private function confirmingAction():Boolean { return actionConfirmation && actionConfirmation.visible; }
+        // A key capture, native rebind, text editor or confirmation owns input until it finishes.
+        private function modalBusy():Boolean { return Boolean(captureRow) || bindingBusy() || editingString() || confirmingAction(); }
+        // Changing page also waits for search, a pending refresh and any drag.
+        private function pageLocked():Boolean { return modalBusy() || searching() || requestedRefresh || settingsList.dragging; }
         private function focusResults():void
         {
             // Leaving the search field lands in the results, never back in the sidebar.
@@ -332,7 +340,7 @@ package
         }
         private function navClicked(item:Object):void
         {
-            if (captureRow || bindingBusy() || searching() || editingString() || confirmingAction() || requestedRefresh || settingsList.dragging) return;
+            if (pageLocked()) return;
             openEntry(item); focusNav(true);
         }
         // The sidebar and the page share input: one of them has focus.
@@ -389,7 +397,11 @@ package
             }
             return -1;
         }
-        private function noteMove(direction:int):void { moveDirection = direction; moveFrame = frame; }
+        private function noteMove(name:String):void
+        {
+            var direction:int = name == "Up" || name == "PageUp" ? -1 : name == "Down" || name == "PageDown" ? 1 : 0;
+            if (direction) { moveDirection = direction; moveFrame = frame; }
+        }
         // Vanilla selection can land on a header; carry keyboard and gamepad moves past it.
         private function skipSection():Boolean
         {
@@ -417,6 +429,12 @@ package
             }
             if (button.clip.Visible != visible) button.clip.Visible = visible;
             return changed;
+        }
+        // Errors draw in the accent color; everything else is muted.
+        private function setStatus(text:String, error:Boolean = false):void
+        {
+            MenuStyle.setText(status, text);
+            status.textColor = error ? MenuStyle.ACCENT : MenuStyle.MUTED;
         }
         private function alignRight(field:TextField):void
         {
@@ -589,17 +607,15 @@ package
             headerCount.x = section.x + section.textWidth + 18;
             MenuStyle.setText(homeCount, String(data.length));
             homeCount.x = homeMods.x + homeMods.textWidth + 18;
-            if (!modID && (!bindingsPage() || !preserve)) {
-                MenuStyle.setText(status, issuesPage() ? tr("menu.issuesHint") : "");
-                status.textColor = MenuStyle.MUTED;
-            } else if (!preserve) MenuStyle.setText(status, tr("menu.autoSave"));
+            if (!modID && (!bindingsPage() || !preserve)) setStatus(issuesPage() ? tr("menu.issuesHint") : "");
+            else if (!preserve) setStatus(tr("menu.autoSave"));
             decorate();
             refreshing = false; updateSelection();
         }
         // Previous and next walk the sidebar: the open mod's sections, then the next page or mod.
         private function changePage(direction:int):void
         {
-            if (captureRow || bindingBusy() || searching() || editingString() || confirmingAction() || requestedRefresh || settingsList.dragging) return;
+            if (pageLocked()) return;
             var item:Object = nav.move(direction);
             if (!item) return;
             var inPage:Boolean = !nav.focused;
@@ -658,7 +674,7 @@ package
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
             var acceptText:String = acceptLabel(row);
             var backText:String = editing || captureRow || nativeHotkeys.busy ? tr("buttons.cancel") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
-            var acceptVisible:Boolean = !busy && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (row.type == "bool" || row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action"))));
+            var acceptVisible:Boolean = !busy && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && ACCEPT_TYPES[row.type])));
             if (reporting) {
                 acceptVisible = false;
                 resetVisible = clearVisible = issueDetails.scrollable;
@@ -760,7 +776,7 @@ package
         private function valueChanged(event:Event):void
         {
             event.stopPropagation();
-            if (refreshing || captureRow || bindingBusy() || editingString() || confirmingAction()) return;
+            if (refreshing || modalBusy()) return;
             var data:Object = Object(event).params;
             var item:Object = options.GetDataForEntry(int(data.id));
             if (!modID || !item || !item.row.editable) return;
@@ -794,8 +810,8 @@ package
                 if (row.type == "key") row.valueName = NumericSetting.text(row, value);
                 row.value = value; updateSelection();
             }
-            MenuStyle.setText(status, result && result.ok ? tr("menu.autoSave") : result ? result.error : tr("errors.save"));
-            status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
+            if (result && result.ok) setStatus(tr("menu.autoSave"));
+            else setStatus(result ? result.error : tr("errors.save"), true);
             requestedRefresh = true;
         }
         private function beginAction(row:Object):void
@@ -808,23 +824,22 @@ package
         {
             searchExitFrame = activationFrame = frame;
             if (run) invokeAction(row);
-            else { refresh(); MenuStyle.setText(status, tr("actions.cancelled")); status.textColor = MenuStyle.MUTED; }
+            else { refresh(); setStatus(tr("actions.cancelled")); }
         }
         private function invokeAction(row:Object):void
         {
             var result:Object = BGSCodeObj.invokeAction(row.mod, row.key);
             // Refresh from the service, including handlers which completed immediately.
             refresh();
-            MenuStyle.setText(status, result && result.ok ? tr("actions.submitted") : result && result.error ? result.error : tr("errors.submitAction"));
-            status.textColor = result && result.ok ? MenuStyle.MUTED : MenuStyle.ACCENT;
+            if (result && result.ok) setStatus(tr("actions.submitted"));
+            else setStatus(result && result.error ? result.error : tr("errors.submitAction"), true);
         }
         private function beginString(row:Object):void
         {
             if (!BGSCodeObj.textInput(true)) return;
             stringConfirmHeld = false;
             stringEditor.open(row); updateSelection();
-            MenuStyle.setText(status, tr("strings.hint"));
-            status.textColor = MenuStyle.MUTED;
+            setStatus(tr("strings.hint"));
         }
         private function saveString():void
         {
@@ -848,8 +863,7 @@ package
             BGSCodeObj.textInput(false);
             searchExitFrame = activationFrame = frame;
             refresh();
-            MenuStyle.setText(status, cancel ? tr("strings.unchanged") : tr("menu.autoSave"));
-            status.textColor = MenuStyle.MUTED;
+            setStatus(cancel ? tr("strings.unchanged") : tr("menu.autoSave"));
         }
         private function launch(row:Object):void
         {
@@ -859,14 +873,15 @@ package
                 launching = row;
                 launcher.loading = row;
                 launcher.mouseEnabled = launcher.mouseChildren = false;
-                MenuStyle.setText(status, tr("home.loadingStatus", {title:String(row.title)}));
-                status.textColor = MenuStyle.MUTED;
-            } else if (result == 1) {
-                closing = true; syncInput();
-                launcher.mouseEnabled = launcher.mouseChildren = false;
-            } else {
-                MenuStyle.setText(status, "This menu is currently unavailable.");
-            }
+                setStatus(tr("home.loadingStatus", {title:String(row.title)}));
+            } else if (result == 1) lockForClose();
+            else setStatus(tr("home.loadFailed", {title:String(row.title)}), true);
+        }
+        // Native is closing the menu (or handing off to a launched one); take no more input.
+        private function lockForClose():void
+        {
+            closing = true; syncInput();
+            launcher.mouseEnabled = launcher.mouseChildren = false;
         }
         private function pollLaunch():void
         {
@@ -874,13 +889,8 @@ package
             if (result.state == "pending") return;
             var row:Object = launching;
             endLaunch();
-            if (result.state == "closing") {
-                closing = true; syncInput();
-                launcher.mouseEnabled = launcher.mouseChildren = false;
-                return;
-            }
-            MenuStyle.setText(status, String(result.message) || tr("home.loadFailed", {title:String(row.title)}));
-            status.textColor = MenuStyle.ACCENT;
+            if (result.state == "closing") { lockForClose(); return; }
+            setStatus(String(result.message) || tr("home.loadFailed", {title:String(row.title)}), true);
         }
         private function endLaunch():void
         {
@@ -905,19 +915,19 @@ package
             if (captureRow) { finishBinding(true); return; }
             if (frame <= searchExitFrame + 1) return;
             if (launching) { // Leave both Settings and Pause; the provider keeps opening.
-                closing = true; syncInput(); BGSCodeObj.close(); return;
+                lockForClose(); BGSCodeObj.close(); return;
             }
             if (closing || settingsList.dragging || requestedRefresh) return;
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             // Back leaves the page for the sidebar; from the sidebar it closes the menu.
             if (!nav.focused) { focusNav(true); return; }
-            closing = true; syncInput(); BGSCodeObj.close();
+            lockForClose(); BGSCodeObj.close();
         }
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (name == "Accept") actionAcceptHeld = pressed;
             if (!initialized || closing) return false;
-            if (pressed && (name == "Up" || name == "Down")) noteMove(name == "Up" ? -1 : 1);
+            if (pressed) noteMove(name);
             if (confirmingAction()) return actionConfirmation.userEvent(name, pressed);
             if (editingString()) {
                 if (name == "Cancel") { if (!pressed) finishString(true); return true; }
@@ -962,7 +972,7 @@ package
         private function wheelList(event:MouseEvent):void
         {
             if (!nav.focused || !event.delta || !initialized || closing || refreshing) return;
-            if (captureRow || bindingBusy() || editingString() || confirmingAction() || settingsList.dragging) return;
+            if (modalBusy() || settingsList.dragging) return;
             var next:int = Math.max(0, Math.min(options.scrollPosition + (event.delta < 0 ? 1 : -1), options.maxScrollPosition));
             if (next != options.scrollPosition) { options.scrollPosition = next; decorate(); }
             event.stopPropagation();
@@ -971,8 +981,7 @@ package
         // advances. Resolve the arrow columns by position so either side steps its own way.
         private function clickStepper(event:MouseEvent):void
         {
-            if (!modID || !initialized || closing || refreshing || requestedRefresh || settingsList.dragging) return;
-            if (captureRow || bindingBusy() || editingString() || confirmingAction()) return;
+            if (!modID || !initialized || closing || refreshing || requestedRefresh || settingsList.dragging || modalBusy()) return;
             var entry:DisplayObject = event.target as DisplayObject;
             while (entry && entry != options && !("itemIndex" in entry)) entry = entry.parent;
             if (!entry || entry == options) return;
@@ -992,8 +1001,7 @@ package
         {
             if (event.type == MouseEvent.MOUSE_OVER && (!launcherPage() || expandedLauncher())) return;
             CONFIG::testHarness { if (event.type == MouseEvent.MOUSE_DOWN) testMouseDown = testMouseEvent(event, testMouseDown); }
-            if (captureRow || bindingBusy() || editingString() || confirmingAction()) return;
-            if (!initialized || closing) return;
+            if (modalBusy() || !initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
             if (event.type == MouseEvent.MOUSE_DOWN && target) {
                 // Pressing anywhere on the page moves focus there; the footer buttons act on either.
@@ -1025,20 +1033,19 @@ package
             }
             if (bindingBusy() || captureRow) { event.stopImmediatePropagation(); event.preventDefault(); return; }
             if (keybindings && keybindings.searchKey(event)) return;
-            if (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.PAGE_UP) noteMove(-1);
-            else if (event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.PAGE_DOWN) noteMove(1);
-            if (!initialized || closing || refreshing || requestedRefresh || settingsList.dragging) return;
             var input:String = keyboardName(event.keyCode);
+            noteMove(input);
+            if (!initialized || closing || refreshing || requestedRefresh || settingsList.dragging) return;
             if (input && input != "Cancel" && routeNavigation(input, true)) {
                 event.stopImmediatePropagation(); event.preventDefault(); return;
             }
             if (nav.focused) return;
             if (event.keyCode == Keyboard.B) reset();
             else if (event.keyCode == Keyboard.X && (issuesPage() || current() && (current().type == "key" || current().type == "hotkey"))) clearBinding();
-            else if (issuesPage() && (event.keyCode == Keyboard.PAGE_UP || event.keyCode == Keyboard.PAGE_DOWN)) issueDetails.scroll(event.keyCode == Keyboard.PAGE_UP ? -360 : 360);
-            else if (event.keyCode == 219) changePage(-1); // [ and ] also expose tabs without a mouse.
-            else if (event.keyCode == 221) changePage(1);
-            else if (event.keyCode == Keyboard.LEFT || event.keyCode == Keyboard.RIGHT) {
+            else if (issuesPage() && (input == "PageUp" || input == "PageDown")) issueDetails.scroll(input == "PageUp" ? -360 : 360);
+            // [ and ] walk the sidebar like the shoulder buttons.
+            else if (input == "LShoulder" || input == "RShoulder") changePage(input == "LShoulder" ? -1 : 1);
+            else if (input == "Left" || input == "Right") {
                 var row:Object = current();
                 if (modID && row && row.editable) {
                     if (row.type == "hotkey") nativeHotkeys.navigate(event);
@@ -1103,8 +1110,8 @@ package
                 case Keyboard.PAGE_DOWN: return "PageDown";
                 case Keyboard.ENTER: return "Accept";
                 case Keyboard.ESCAPE: return "Cancel";
-                case 219: return "LShoulder";
-                case 221: return "RShoulder";
+                case LEFT_BRACKET: return "LShoulder";
+                case RIGHT_BRACKET: return "RShoulder";
             }
             return "";
         }
@@ -1165,7 +1172,7 @@ package
         private function beginBinding(row:Object):void
         {
             var result:Object = BGSCodeObj.beginKeyCapture(row.mod, row.key);
-            if (!result || !result.ok) { MenuStyle.setText(status, tr("errors.capture")); return; }
+            if (!result || !result.ok) { setStatus(tr("errors.capture"), true); return; }
             captureRow = row; captureRow.capturing = true; captureReady = false;
             CONFIG::testHarness { testCaptureState = "waiting"; }
             syncInput();
@@ -1176,8 +1183,7 @@ package
             captureBinding.x = MenuStyle.LIST_WIDTH - 296; captureBinding.y = (MenuStyle.ROW_HEIGHT - captureBinding.height) / 2;
             Object(captureBinding).SetBinding({aButtonName:[], aPCKeyName:[]});
             Object(captureBinding).SetState("listening"); captureBinding.visible = true;
-            MenuStyle.setText(status, tr("bindings.capture"));
-            status.textColor = MenuStyle.MUTED;
+            setStatus(tr("bindings.capture"));
             updateSelection();
         }
         private function pollBinding():void
@@ -1197,8 +1203,7 @@ package
             if (!captureRow || !captureReady) return;
             var result:Object = BGSCodeObj.commitKeyCapture();
             if (result && result.ok) { finishBinding(false); return; }
-            MenuStyle.setText(status, result && result.error ? result.error : tr("errors.save"));
-            status.textColor = MenuStyle.ACCENT;
+            setStatus(result && result.error ? result.error : tr("errors.save"), true);
         }
         private function focusLost(event:Event):void
         {
@@ -1221,8 +1226,7 @@ package
             if (captureBinding.parent) captureBinding.parent.removeChild(captureBinding);
             CONFIG::testHarness { testCaptureState = "idle"; }
             activationFrame = frame;
-            MenuStyle.setText(status, cancel ? tr("bindings.unchanged") : tr("menu.autoSave"));
-            status.textColor = MenuStyle.MUTED;
+            setStatus(cancel ? tr("bindings.unchanged") : tr("menu.autoSave"));
             refresh();
         }
         private function decorate():void
