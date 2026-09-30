@@ -57,8 +57,9 @@ int main()
         check(schemaIssues[0].modId == "osfsettings" && schemaIssues[0].id == "schema:broken.json" &&
             schemaIssues[0].severity == IssueSeverity::Error, "OSF owns schema failures as errors keyed by filename");
         check(schemaIssues[0].title.find("broken.json") != std::string::npos &&
-            schemaIssues[0].impact.find("unexpected end of input") != std::string::npos && !schemaIssues[0].nextSteps.empty(),
-            "a schema issue names the file, gives the reason, and says what to do");
+            schemaIssues[0].reason == loadErrors[0].message && !schemaIssues[0].nextSteps.empty() &&
+            schemaIssues[0].impact.find(loadErrors[0].message) == std::string::npos,
+            "a schema issue names the file, separates the exact reason from impact, and says what to do");
         check(schemaIssues[1].id == "schema:Not A Mod ID.json", "files whose names are not valid mod IDs are still reported");
         IssueRegistry schemaRegistry;
         check(schemaRegistry.Report(schemaIssues[0]) && schemaRegistry.Report(schemaIssues[1]) && schemaRegistry.Report(schemaIssues[0]) &&
@@ -170,7 +171,7 @@ int main()
                 check(!registry.Report(invalid), "blank or NUL-containing required fields are rejected");
             }
         }
-        for (auto field : { &ModIssue::impact, &ModIssue::nextSteps }) {
+        for (auto field : { &ModIssue::impact, &ModIssue::nextSteps, &ModIssue::reason }) {
             auto invalid = warning;
             invalid.*field = std::string("bad\0text", 8);
             check(!registry.Report(invalid), "optional text must still be NUL-free in internal reports");

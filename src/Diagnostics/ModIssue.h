@@ -25,6 +25,7 @@ namespace OSFSettings
         std::string impact;
         std::string nextSteps;
         std::uint32_t nexusModId{}; // Optional Starfield Nexus page; zero means no link.
+        std::string reason; // Exact cause for built-in settings-file failures.
     };
 
     std::string IssueModName(const ModIssue& issue, std::span<const ModSettings> settings);

@@ -21,7 +21,8 @@ namespace OSFSettings
 
     bool IssueRegistry::Report(ModIssue issue)
     {
-        if (!IsValidModId(issue.modId) || !IsValidIssueText(issue.id) || !IsValidIssueText(issue.title) || HasEmbeddedNull(issue.impact) || HasEmbeddedNull(issue.nextSteps)) {
+        if (!IsValidModId(issue.modId) || !IsValidIssueText(issue.id) || !IsValidIssueText(issue.title) ||
+            HasEmbeddedNull(issue.impact) || HasEmbeddedNull(issue.nextSteps) || HasEmbeddedNull(issue.reason)) {
             return false;
         }
         

@@ -1,6 +1,15 @@
 [
   {
     "modId": "osfsettings",
+    "id": "schema:osfsettings.json",
+    "severity": "ERROR",
+    "title": "Settings file osfsettings.json could not be loaded",
+    "reason": "default must not be empty",
+    "impact": "The mod that provides this file has no settings page, hotkeys or menu cards in OSF Settings.",
+    "nextSteps": "Update or reinstall the mod that provides this file, then restart Starfield. The file's full path is in OSF Settings.log."
+  },
+  {
+    "modId": "osfsettings",
     "id": "osfui-update-required",
     "severity": "WARNING",
     "title": "OSF UI needs an update",

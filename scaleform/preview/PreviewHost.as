@@ -78,7 +78,7 @@ package
             var config:XML = new XML(URLLoader(event.target).data);
             for each (var issue:XML in config.issues.issue) {
                 issues.push({type:"issue", mod:String(issue.@mod), id:String(issue.@id), modTitle:String(issue.@modTitle),
-                    severity:String(issue.@severity), title:String(issue.title), impact:String(issue.impact), nextSteps:String(issue.nextSteps), nexusModId:uint(issue.@nexusModId)});
+                    severity:String(issue.@severity), title:String(issue.title), reason:String(issue.reason), impact:String(issue.impact), nextSteps:String(issue.nextSteps), nexusModId:uint(issue.@nexusModId)});
             }
             for each (var library:XML in config.libraries.library) libraries.push(String(library.@url));
             for each (var font:XML in config.fonts.font) fontNames.push(String(font.@name));

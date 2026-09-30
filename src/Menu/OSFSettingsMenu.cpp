@@ -345,6 +345,7 @@ namespace OSFSettings
                 Text(row, "severity", issue.severity == IssueSeverity::Error ? "ERROR" : "WARNING");
                 Text(row, "severityLabel", tr(issue.severity == IssueSeverity::Error ? "issues.error" : "issues.warning"));
                 Text(row, "title", issue.title);
+                Text(row, "reason", issue.reason);
                 Text(row, "impact", issue.impact);
                 Text(row, "nextSteps", issue.nextSteps);
                 row.SetMember("nexusModId", RE::Scaleform::GFx::Value(issue.nexusModId));

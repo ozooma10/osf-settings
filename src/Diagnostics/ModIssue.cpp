@@ -26,8 +26,9 @@ namespace OSFSettings
                 .id = "schema:" + file,
                 .severity = IssueSeverity::Error,
                 .title = tr("issues.schemaFailed", {{ "file", file }}),
-                .impact = tr("issues.schemaFailedImpact", {{ "reason", error.message }}),
-                .nextSteps = tr("issues.schemaFailedNextSteps")
+                .impact = tr("issues.schemaFailedImpact"),
+                .nextSteps = tr("issues.schemaFailedNextSteps"),
+                .reason = error.message
             });
         }
         return issues;

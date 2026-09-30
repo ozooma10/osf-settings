@@ -297,7 +297,7 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
             issue = ET.SubElement(issues, "issue", mod=report["modId"], id=report["id"],
                                   modTitle=titles.get(report["modId"], report["modId"]), severity=report["severity"],
                                   nexusModId=str(report.get("nexusModId", 0)))
-            for field in ("title", "impact", "nextSteps"):
+            for field in ("title", "reason", "impact", "nextSteps"):
                 ET.SubElement(issue, field).text = report.get(field, "")
     ET.indent(config)
     ET.ElementTree(config).write(output / "preview.xml", encoding="utf-8", xml_declaration=True)
