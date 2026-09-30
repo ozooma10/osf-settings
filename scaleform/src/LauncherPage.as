@@ -11,7 +11,8 @@ package
     {
         // The expanded grid starts where the shelf does; its pager shares the section label's row.
         public static const GRID_TOP:Number = MenuStyle.LIST_TOP;
-        private static const GRID_COLUMNS:int = 3;
+        private static const COLUMNS:int = 2;
+        private static const SHELF_ROWS:int = 3;
         private var entries:Array = [];
         private var displayed:Array = [];
         private var cards:Sprite = new Sprite();
@@ -32,13 +33,16 @@ package
             addChild(cards); addChild(pager);
             addEventListener(MouseEvent.MOUSE_WHEEL, wheel);
         }
-        public function get columns():int { return 3; }
-        private function get gridColumns():int { return isExpanded ? GRID_COLUMNS : columns; }
+        public function get columns():int { return COLUMNS; }
         // As many shelf-height rows as fit between the grid top and the list bottom.
         private function get gridRows():int { return Math.max(1, int((MenuStyle.LIST_BOTTOM - GRID_TOP + 14) / (shelfCardHeight + 14))); }
-        public function get capacity():int { return isExpanded ? GRID_COLUMNS * gridRows : columns * 2; }
-        private function get shelfCardHeight():Number { return CONFIG::largeText ? 86 : 72; }
-        public function get shelfHeight():Number { return entries.length > columns ? shelfCardHeight * 2 + 14 : shelfCardHeight; }
+        public function get capacity():int { return columns * (isExpanded ? gridRows : SHELF_ROWS); }
+        private function get shelfCardHeight():Number { return CONFIG::largeText ? 138 : 116; }
+        public function get shelfHeight():Number {
+            var rows:int = Math.ceil(displayed.length / columns);
+            return rows * shelfCardHeight + Math.max(0, rows - 1) * 14;
+        }
+        public function get onLastRow():Boolean { return selected >= int((displayed.length - 1) / columns) * columns; }
         public function get expanded():Boolean { return isExpanded; }
         // With no mod settings to show, the grid is the whole page and cannot collapse.
         public function get locked():Boolean { return isLocked; }
@@ -70,11 +74,11 @@ package
             if (!preserve || isLocked && !lock) { isExpanded = false; hasFocus = false; }
             isLocked = lock;
             if (isLocked) isExpanded = true;
-            else if (entries.length <= columns * 2) isExpanded = false;
+            else if (entries.length <= columns * SHELF_ROWS) isExpanded = false;
             displayed = isExpanded ? entries.concat() : entries.slice(0, entries.length > capacity ? capacity - 1 : capacity);
             if (!isExpanded && entries.length > capacity) {
                 displayed.push({type:"launcherMore", more:true, editable:true, mod:"", key:"@more",
-                    title:tr("home.more"), hint:tr("home.browseAll", {count:entries.length}),
+                    title:tr("home.showAll") + " " + entries.length, hint:tr("home.browseAll", {count:entries.length}),
                     badge:"+" + (entries.length - displayed.length)});
             }
             selected = displayed.length ? 0 : -1;
@@ -108,7 +112,7 @@ package
             }
             if (!displayed.length) return;
             var next:int = Math.max(0, selected);
-            var across:int = gridColumns;
+            var across:int = columns;
             if (direction == "Left") { if (next % across > 0) --next; }
             else if (direction == "Right") { if (next % across < across - 1) ++next; }
             else if (direction == "Up") { if (next >= across) next -= across; }
@@ -145,7 +149,7 @@ package
         {
             while (cards.numChildren) cards.removeChildAt(0);
             while (pager.numChildren) pager.removeChildAt(0);
-            var gap:Number = 16, rowGap:Number = 14, across:int = gridColumns;
+            var gap:Number = 16, rowGap:Number = 14, across:int = columns;
             var width:Number = (MenuStyle.LIST_WIDTH - gap * (across - 1)) / across;
             // The grid runs from GRID_TOP to just above the footer divider.
             var height:Number = isExpanded ? (MenuStyle.LIST_BOTTOM - GRID_TOP - rowGap * (gridRows - 1)) / gridRows : shelfCardHeight;

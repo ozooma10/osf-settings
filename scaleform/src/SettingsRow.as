@@ -22,7 +22,7 @@ package
             var centered:TextFormat = value.defaultTextFormat; centered.align = "center";
             value.defaultTextFormat = centered; addChild(title); addChild(value);
             source = MenuStyle.field("", 16, 0, 510, MenuStyle.SMALL_SIZE + 10, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true); addChild(source);
-            heading = MenuStyle.field("", 2, 0, 600, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true); addChild(heading);
+            heading = MenuStyle.field("", 24, 0, 600, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true); addChild(heading);
         }
         // Columns are anchored to the list's right edge so they follow LIST_WIDTH.
         public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number, hovered:Boolean = false):void
@@ -42,10 +42,11 @@ package
             if (section) {
                 // Headers split a folded tab; the menu keeps selection off them.
                 source.visible = false;
-                heading.width = rowWidth; MenuStyle.fit(heading, String(row.title).toUpperCase());
-                heading.width = Math.min(rowWidth, heading.textWidth + 8);
+                heading.width = rowWidth - heading.x; MenuStyle.fit(heading, String(row.title).toUpperCase());
+                heading.width = Math.min(rowWidth - heading.x, heading.textWidth + 8);
                 heading.y = rowHeight - heading.height - 2;
                 var rule:Number = heading.y + heading.height / 2 + 1;
+                MenuStyle.diamond(graphics, 8, rule - 2, MenuStyle.ACCENT);
                 graphics.lineStyle(1, 0x33454E); graphics.moveTo(heading.x + heading.width + 12, rule); graphics.lineTo(rowWidth, rule);
                 graphics.lineStyle(); return;
             }

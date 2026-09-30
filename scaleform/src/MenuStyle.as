@@ -23,7 +23,7 @@ package
         public static const RIGHT:Number = 1888;
         public static const TITLE_TOP:Number = 26;
         public static const TITLE_SIZE:Number = CONFIG::largeText ? 40 : 34;
-        public static const HEADER_LINE:Number = 88;
+        public static const HEADER_LINE:Number = CONFIG::largeText ? 82 : 76;
         // Home and Issues label the list above it; mod pages start the list here.
         public static const SECTION_TOP:Number = 102;
         public static const SECTION_SIZE:Number = CONFIG::largeText ? 24 : 20;

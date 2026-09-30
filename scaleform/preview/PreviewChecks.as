@@ -328,11 +328,11 @@ package
                     }
                     require(launcher && launcher.visible && !launcher.expanded && list.visible, "Home combines interfaces and mod settings");
                     require(findNamed(menu,"launcher") == null, "separate Launcher tab removed");
-                    // The shelf holds two rows; its last card links to the rest of the ten interfaces.
-                    var moreCard:String = "launcher_" + (launcher.columns * 2 - 1);
-                    require(findNamed(menu,moreCard) != null && findNamed(menu,"launcher_" + launcher.columns * 2) == null &&
-                        Object(findNamed(menu,moreCard)).row.more && Object(findNamed(menu,moreCard)).row.badge == "+" + (11 - launcher.columns * 2),
-                        "Home fills two shelf rows and adds a more card");
+                    // Two columns of three cards; the sixth opens all ten interfaces.
+                    var moreCard:String = "launcher_5";
+                    require(launcher.columns == 2 && findNamed(menu,moreCard) != null && findNamed(menu,"launcher_6") == null &&
+                        Object(findNamed(menu,moreCard)).row.more && Object(findNamed(menu,moreCard)).row.title == "SHOW ALL 10",
+                        "Home fills three mission-card rows and adds Show All");
                     require(Object(findNamed(menu,"launcher_0")).row.title == "Absolute Control", "recent order overrides alphabetical order");
                     require(TextField(DisplayObjectContainer(findNamed(menu,"mods")).getChildAt(0)).text == "HOME", "Home tab label");
                     requireGlyphs("INTERFACES"); requireGlyphs("MODS");
@@ -348,10 +348,14 @@ package
                     require(launcher.focused && list.disableInput, "Up from the first mod focuses the interface shelf");
                     require(launcher.current.title == "Absolute Control" && homeDetail().title == "Absolute Control", "detail card follows the focused interface");
                     capture("home-interface");
-                    launcher.navigate("Down"); userEvent("Down"); break;
+                    launcher.navigate("Down");
+                    require(!launcher.onLastRow, "middle mission-card row keeps Down inside the shelf");
+                    launcher.navigate("Down");
+                    require(launcher.onLastRow, "third mission-card row can return to mod settings");
+                    userEvent("Down"); break;
                 case 56:
                     require(!launcher.focused && !list.disableInput, "Down from the shelf returns to mod settings");
-                    findNamed(menu,"launcher_" + (launcher.columns * 2 - 1)).dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    findNamed(menu,"launcher_5").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 57:
                     require(launcher.expanded && !list.visible, "Show more expands interfaces inside Home");
                     require(launcher.current.type == "launcher" && launcher.focused, "expanded grid selects an actual interface");

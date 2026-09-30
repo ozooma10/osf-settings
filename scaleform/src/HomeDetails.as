@@ -37,6 +37,7 @@ package
             var height:Number = BOTTOM - top;
             graphics.lineStyle(1, 0x34424B); graphics.beginFill(0x0E1B23);
             graphics.drawRect(0, 0, WIDTH, height); graphics.endFill();
+            MenuDecoration.corners(graphics, 4, 4, WIDTH - 8, height - 8);
             var large:Boolean = CONFIG::largeText;
             var badge:Badge = new Badge(detail.badge, BADGE); badge.paint(detail.tint);
             badge.x = PAD; badge.y = PAD; content.addChild(badge);
@@ -75,6 +76,7 @@ package
                 }
                 if (more) text(tr("home.moreHotkeys", {count:hotkeys.length - shown}), PAD, rowTop + 4, WIDTH - PAD * 2, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true, 1);
             }
+            MenuDecoration.orbit(graphics, PAD, cursor + hotkeyBlock + 20, WIDTH - PAD * 2, height - PAD);
         }
 
         private function keys(hotkeys:Array):String

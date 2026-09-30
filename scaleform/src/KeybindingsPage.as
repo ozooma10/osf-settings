@@ -11,7 +11,7 @@ package
 
     public final class KeybindingsPage extends Sprite
     {
-        public static const KEYBOARD_TOP:Number = MenuStyle.HEADER_LINE + 14;
+        public static const KEYBOARD_TOP:Number = MenuStyle.SECTION_TOP;
         // Column labels sit under the keyboard; the results list starts under them.
         private static const COLUMNS_TOP:Number = KEYBOARD_TOP + KeyboardMap.HEIGHT + 14;
         public static const LIST_TOP:Number = COLUMNS_TOP + MenuStyle.SMALL_SIZE + 14;

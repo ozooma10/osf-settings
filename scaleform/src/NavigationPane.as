@@ -39,9 +39,11 @@ package
             chosen = clicked; name = "navigation";
             graphics.beginFill(PANEL); graphics.drawRect(0, 0, MenuStyle.NAV_WIDTH, 1080); graphics.endFill();
             graphics.lineStyle(1, 0x1F323B); graphics.moveTo(MenuStyle.NAV_WIDTH, 0); graphics.lineTo(MenuStyle.NAV_WIDTH, 1080);
-            var title:TextField = MenuStyle.field(tr("menu.title"), PAD, MenuStyle.TITLE_TOP + MenuStyle.TITLE_SIZE - MenuStyle.SECTION_SIZE - 6,
-                ITEM_WIDTH, MenuStyle.SECTION_SIZE + 12, MenuStyle.SECTION_SIZE, MenuStyle.MUTED, true);
+            var title:TextField = MenuStyle.field(tr("menu.title"), PAD, MenuStyle.TITLE_TOP,
+                ITEM_WIDTH, MenuStyle.TITLE_SIZE + 16, MenuStyle.TITLE_SIZE, MenuStyle.MUTED, true);
+            MenuStyle.fit(title, tr("menu.title"));
             addChild(title);
+            MenuDecoration.stripe(graphics, PAD, MenuStyle.HEADER_LINE, ITEM_WIDTH);
             viewport.y = TOP; viewport.addChild(content); addChild(viewport);
             viewport.scrollRect = new Rectangle(0, 0, MenuStyle.NAV_WIDTH, BOTTOM - TOP);
             addEventListener(MouseEvent.MOUSE_WHEEL, wheel);

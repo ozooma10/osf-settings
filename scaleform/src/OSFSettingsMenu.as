@@ -75,6 +75,7 @@ package
         private var detailTitle:TextField;
         private var detailLabel:TextField;
         private var detailDivider:Sprite = new Sprite();
+        private var detailDecoration:Sprite = new Sprite();
         private var issueDetails:IssueDetails;
         private var changedLegend:Sprite = new Sprite();
         private var detailHint:TextField;
@@ -160,10 +161,9 @@ package
             types = definition("Shared.Components.SystemPanels.SettingsOptionListEntry");
             startupPhase = "build authored menu text";
             var chrome:Sprite = new Sprite(); chrome.mouseEnabled = false; addChild(chrome);
-            chrome.graphics.lineStyle(1, MenuStyle.LINE);
-            chrome.graphics.moveTo(MenuStyle.LEFT, MenuStyle.HEADER_LINE); chrome.graphics.lineTo(MenuStyle.RIGHT, MenuStyle.HEADER_LINE);
-            chrome.graphics.moveTo(MenuStyle.LEFT, MenuStyle.FOOTER_LINE); chrome.graphics.lineTo(MenuStyle.RIGHT, MenuStyle.FOOTER_LINE);
-            chrome.graphics.lineStyle();
+            MenuDecoration.rule(chrome.graphics, MenuStyle.LEFT, MenuStyle.RIGHT, MenuStyle.HEADER_LINE);
+            MenuDecoration.rule(chrome.graphics, MenuStyle.LEFT, MenuStyle.RIGHT, MenuStyle.FOOTER_LINE);
+            detailDecoration.mouseEnabled = detailDecoration.mouseChildren = false; addChild(detailDecoration);
             detailDivider.mouseEnabled = false; addChild(detailDivider);
             detailDivider.graphics.lineStyle(1, MenuStyle.LINE);
             detailDivider.graphics.moveTo(MenuStyle.DETAIL_X, 0); detailDivider.graphics.lineTo(MenuStyle.RIGHT, 0);
@@ -661,6 +661,16 @@ package
             if (range) cursor += MenuStyle.VALUE_SIZE + 16;
             showOptions(settings && enumRow ? row : null, cursor);
             stringEditor.y = cursor + 6;
+            detailDecoration.graphics.clear();
+            if (settings) {
+                var decorationBottom:Number = MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 26;
+                MenuDecoration.corners(detailDecoration.graphics, MenuStyle.DETAIL_X - 10, detailLabel.y - 2,
+                    MenuStyle.DETAIL_WIDTH + 20, decorationBottom - detailLabel.y + 2);
+                var contentBottom:Number = Math.max(cursor, detailOptions.visible ? detailOptions.y + detailOptions.height : cursor);
+                // Text editing occupies the detail column until the editor closes.
+                if (!editingString()) MenuDecoration.orbit(detailDecoration.graphics, MenuStyle.DETAIL_X,
+                    contentBottom + 24, MenuStyle.DETAIL_WIDTH, decorationBottom - 16);
+            }
             buttonData.YButton.sButtonText = reporting ? tr("buttons.scrollUp") : tr("buttons.reset");
             buttonData.XButton.sButtonText = reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding");
             resetButton.SetButtonData(buttonData.YButton); clearButton.SetButtonData(buttonData.XButton);
@@ -1179,7 +1189,7 @@ package
             if (pressed && !refreshing && !requestedRefresh && navigationFrame != frame) {
                 navigationFrame = frame;
                 if (name == "Down" && !launcher.expanded && options.entryCount &&
-                    (launcher.count <= launcher.columns || launcher.selectedIndex >= launcher.columns)) {
+                    launcher.onLastRow) {
                     focusLauncher(false); options.selectedIndex = 0;
                 }
                 else launcher.navigate(name);
