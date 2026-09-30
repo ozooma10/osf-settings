@@ -253,29 +253,9 @@ namespace OSFSettings::Papyrus
             if (!accepted) REX::WARN("Papyrus {}.{}({}/{}): receiver unavailable or VM rejected callback", receiver.script, function.c_str(), mod, key);
         }
 
-        class SessionEvents final : public RE::BSTEventSink<RE::SaveLoadEvent>,
-            public RE::BSTEventSink<RE::TESLoadGameEvent>, public RE::BSTEventSink<RE::MenuOpenCloseEvent>
+        class SessionEvents final : public RE::BSTEventSink<RE::TESLoadGameEvent>, public RE::BSTEventSink<RE::MenuOpenCloseEvent>
         {
         public:
-            RE::BSEventNotifyControl ProcessEvent(const RE::SaveLoadEvent& event, RE::BSTEventSource<RE::SaveLoadEvent>*) override
-            {
-                using Op = RE::SaveLoadEvent::OpType;
-                using Status = RE::SaveLoadEvent::Status;
-                const bool replaces = event.opType == Op::kLoadMostRecent || event.opType == Op::kQuickload ||
-                    event.opType == Op::kLoad || event.opType == Op::kLoadNamedFile ||
-                    event.opType == Op::kExitSaveToMainMenu || event.opType == Op::kExitSaveToDesktop;
-                if (replaces) {
-                    const auto operation = static_cast<std::uint8_t>(event.opType);
-                    if (event.status == Status::kBegin) {
-                        Listeners().Suspend(operation);
-                        ActionService::Get().Suspend(operation);
-                    } else if (event.status == Status::kFailed || event.status == Status::kLoadDispatchRefused) {
-                        Listeners().Resume(operation);
-                        ActionService::Get().Resume(operation);
-                    }
-                }
-                return RE::BSEventNotifyControl::kContinue;
-            }
             RE::BSEventNotifyControl ProcessEvent(const RE::TESLoadGameEvent&, RE::BSTEventSource<RE::TESLoadGameEvent>*) override
             {
                 Listeners().Clear();
@@ -313,7 +293,6 @@ namespace OSFSettings::Papyrus
         static bool installed{};
         if (installed) return;
         static auto* events = new SessionEvents;
-        RE::SaveLoadEvent::GetEventSource()->RegisterSink(events);
         RE::TESLoadGameEvent::GetEventSource()->RegisterSink(events);
         RE::UI::GetSingleton()->RegisterSink<RE::MenuOpenCloseEvent>(events);
         installed = true;
