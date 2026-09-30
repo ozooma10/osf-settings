@@ -101,7 +101,7 @@ package
         {
             var view:Object = views[host];
             if (row.type != "hotkey") {
-                if (view) { view.clip.ClearActiveBinding(); view.row = null; }
+                if (view && view.row) { view.clip.ClearActiveBinding(); view.row = null; }
                 return null;
             }
             if (!view) {
@@ -112,24 +112,32 @@ package
                 view = {clip:native, row:null}; views[host] = view;
             }
             var clip:Object = view.clip;
-            if (view.row != row) {
+            var bindingChanged:Boolean = view.row != row || view.binding != row.binding;
+            if (bindingChanged) {
                 if (!view.row || view.row.action != row.action) clip.ClearActiveBinding();
-                clip.SetEntryText(row.binding); view.row = row;
+                clip.SetEntryText(row.binding); view.row = row; view.binding = row.binding;
             }
             clip.itemIndex = Object(host).itemIndex;
             if (!busy) {
                 if (selected) {
                     if (!clip.selected) clip.onRollover();
-                    if (clip.activePriority == 2 || !(showAlternate || fullPage)) clip.SetActiveBinding(0);
+                    if (clip.activePriority == 2 || !(showAlternate || fullPage) && clip.activePriority != 0) clip.SetActiveBinding(0);
                 } else if (clip.selected || clip.activePriority != 2) clip.onRollout();
             }
+            var alternate:Boolean = showAlternate || fullPage;
+            // Native rollover/listening frames can change bounds; idle cells cannot.
+            if (!bindingChanged && view.height == height && view.alternate == alternate && view.fullPage == fullPage &&
+                view.frame == clip.currentFrame && view.mainFrame == clip.MainBinding_mc.currentFrame && view.altFrame == clip.AltBinding_mc.currentFrame)
+                return clip as DisplayObject;
+            view.height = height; view.alternate = alternate; view.fullPage = fullPage;
+            view.frame = clip.currentFrame; view.mainFrame = clip.MainBinding_mc.currentFrame; view.altFrame = clip.AltBinding_mc.currentFrame;
             // The outer SettingsRow supplies the label, background and row hit area.
             for (var i:int = 0; i < clip.numChildren; ++i) {
                 var child:DisplayObject = clip.getChildAt(i);
-                child.visible = child == clip.MainBinding_mc || (showAlternate || fullPage) && child == clip.AltBinding_mc;
+                child.visible = child == clip.MainBinding_mc || alternate && child == clip.AltBinding_mc;
             }
             var right:Number = MenuStyle.LIST_WIDTH - 24;
-            for each (var cell:Object in showAlternate || fullPage ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
+            for each (var cell:Object in alternate ? [clip.AltBinding_mc, clip.MainBinding_mc] : [clip.MainBinding_mc]) {
                 CONFIG::preview { bridge.previewBindingCell(cell); }
                 cell.scaleX = cell.scaleY = 1;
                 var bounds:Rectangle = cell.getBounds(clip);

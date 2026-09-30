@@ -9,9 +9,6 @@ package
         private var title:TextField;
         private var mod:TextField;
         private var severity:TextField;
-        private var previous:Object;
-        private var wasSelected:Boolean;
-        private var wasHovered:Boolean;
 
         public function IssueRow()
         {
@@ -25,8 +22,6 @@ package
 
         public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number, hovered:Boolean = false):void
         {
-            if (previous == row && wasSelected == selected && wasHovered == hovered) return;
-            previous = row; wasSelected = selected; wasHovered = hovered;
             var boxHeight:Number = rowHeight - 10;
             var textHeight:Number = MenuStyle.BODY_SIZE + MenuStyle.SMALL_SIZE + 18;
             title.y = (boxHeight - textHeight) / 2;

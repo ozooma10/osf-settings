@@ -12,7 +12,6 @@ package
         private var value:TextField;
         private var source:TextField;
         private var heading:TextField;
-        private var previous:String = "";
 
         public function SettingsRow()
         {
@@ -33,9 +32,6 @@ package
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
             var choice:Boolean = !modList && (row.type == "enum" || row.type == "key" || row.type == "hotkey" || row.type == "string" || row.type == "action");
             var displayValue:String = section ? "" : modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
-            var signature:String = [row.title, row.value, row.type, row.editable, row.decimals, row.count, displayValue, changed, selected, modList, row.capturing, row.keybindings, row.source, row.mod, rowHeight, hovered].join("|");
-            if (signature == previous) return;
-            previous = signature;
             graphics.clear();
             heading.visible = section;
             title.visible = value.visible = !section;

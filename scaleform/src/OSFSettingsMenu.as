@@ -7,7 +7,6 @@ package
     import flash.events.Event;
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
-    import flash.geom.ColorTransform;
     import flash.geom.Rectangle;
     import flash.text.TextField;
     import flash.text.TextFormat;
@@ -38,6 +37,7 @@ package
         // The open sidebar section's ID; empty while the whole mod is open.
         private var groupID:String = "";
         private var options:Object;
+        private var settingsList:SettingsList;
         private var nativeHotkeys:NativeHotkeysList;
         private var keybindings:KeybindingsPage;
         private var stringEditor:StringSetting;
@@ -87,7 +87,6 @@ package
         private var optionsSignature:String = "";
         private var status:TextField;
         private var empty:TextField;
-        private var rowViews:Dictionary = new Dictionary(true);
         private var resetButton:Object;
         private var acceptButton:Object;
         private var backButton:Object;
@@ -98,7 +97,6 @@ package
         // Keyboard and gamepad moves carry their direction past section headers.
         private var moveDirection:int = 0;
         private var moveFrame:int = -10;
-        private var listData:Array = [];
         // The list entry under the pointer, lit whichever side has focus.
         private var hoverIndex:int = -1;
         private var captureRow:Object;
@@ -183,6 +181,7 @@ package
             homeCount = label("", MenuStyle.LEFT, 0, 200, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             homeMods.visible = homeCount.visible = headerCount.visible = false;
             options = create("Shared.Components.SystemPanels.SettingsOptionList");
+            settingsList = new SettingsList(options);
             configureList(options, "OptionListEntry");
             options.addEventListener("SettingsOptionEntry_ValueChanged", valueChanged);
             // Restore Home's list before vanilla handles a row's hover. Selection
@@ -240,7 +239,7 @@ package
             captureBinding.visible = false;
             nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
             startupPhase = "build keybindings";
-            keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, updateBindings, focusResults);
+            keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
             addChild(keybindings);
             startupPhase = "build Home launchers";
             // Hovering the shelf moves focus between it and the list, but never out of the sidebar.
@@ -295,21 +294,6 @@ package
             describe();
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
-        private function updateBindings():void
-        {
-            if (refreshing || !bindingsPage()) return;
-            var rows:Array = keybindings.filtered();
-            // Only changed membership/order needs vanilla to rebuild its scrolling list.
-            if (rows.length != listData.length) { populate(true); return; }
-            for (var i:int = 0; i < rows.length; ++i)
-                if (rows[i].identity != listData[i].row.identity) { populate(true); return; }
-            for (i = 0; i < rows.length; ++i) {
-                var entry:Object = options.GetDataForEntry(i);
-                entry.row = rows[i]; entry.sText = html(String(rows[i].title));
-            }
-            MenuStyle.setText(empty, rows.length ? "" : keybindings.emptyText);
-            decorate(); describe();
-        }
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
         private function homePage():Boolean { return !modID && rootPage == "mods"; }
         private function launcherPage():Boolean { return homePage() && launcher && launcher.hasEntries && launcher.focused; }
@@ -377,12 +361,13 @@ package
             if (bindingsPage()) { if (reload) keybindings.open(allRows); }
             else keybindings.close();
             navSelection = NavigationPane.key(item);
+            updateNav();
             if (reload) populate();
-            updateNav(); describe(); decorate();
+            else { decorate(); describe(); }
         }
         private function navClicked(item:Object):void
         {
-            if (captureRow || bindingBusy() || searching() || editingString() || confirmingAction() || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || searching() || editingString() || confirmingAction() || requestedRefresh || settingsList.dragging) return;
             openEntry(item); focusNav(true);
         }
         // The sidebar and the page share input: one of them has focus.
@@ -435,8 +420,8 @@ package
         private function settingFrom(index:int, step:int, fallback:int):int
         {
             for each (var direction:int in [step, fallback]) {
-                for (var i:int = index + direction; direction && i >= 0 && i < listData.length; i += direction)
-                    if (listData[i].row.type != "section") return i;
+                for (var i:int = index + direction; direction && i >= 0 && i < options.entryCount; i += direction)
+                    if (options.GetDataForEntry(i).row.type != "section") return i;
             }
             return -1;
         }
@@ -445,19 +430,19 @@ package
         private function skipSection():Boolean
         {
             var index:int = options.selectedIndex;
-            if (index < 0 || index >= listData.length || listData[index].row.type != "section") return false;
+            if (index < 0 || index >= options.entryCount || options.GetDataForEntry(index).row.type != "section") return false;
             var step:int = frame - moveFrame <= 1 && moveDirection ? moveDirection : 1;
             var target:int = settingFrom(index, step, -step);
             if (target >= 0 && target != index) options.selectedIndex = target;
             return true;
         }
-        private function button(text:String, eventName:String, callback:Function, target:Object = null):Object
+        private function button(text:String, eventName:String, callback:Function):Object
         {
             var eventClass:Class = definition("Shared.Components.ButtonControls.ButtonData.UserEventData");
             var dataClass:Class = definition("Shared.Components.ButtonControls.ButtonData.ButtonBaseData");
             var factory:Class = definition("Shared.Components.ButtonControls.ButtonFactory.ButtonFactory");
             buttonData[eventName] = new dataClass(text, new eventClass(eventName, callback));
-            return Object(factory).AddToButtonBar("BasicButton", buttonData[eventName], target || bar);
+            return Object(factory).AddToButtonBar("BasicButton", buttonData[eventName], bar);
         }
         private function alignRight(field:TextField):void
         {
@@ -487,7 +472,7 @@ package
             mods = mods.filter(function(item:Object, index:int, source:Array):Boolean {
                 return item.mod != "osfsettings" || item.settings > 0 || item.actions > 0;
             });
-            for each (mod in mods) { mod.parts = summaryParts(mod); mod.summary = mod.parts.join("  |  "); mod.chips = summaryParts(mod, false); }
+            for each (mod in mods) { mod.summary = summaryParts(mod).join("  |  "); mod.chips = summaryParts(mod, false); }
             if (!seen[modID]) modID = "";
             buildTabs();
             populate(preserve); updateNav();
@@ -548,9 +533,12 @@ package
             // Whole rows only, so the last visible row is never cut by the footer.
             var pitch:Number = rowHeight() + MenuStyle.ROW_GAP;
             var listHeight:Number = Math.max(1, Math.floor((MenuStyle.LIST_BOTTOM - options.y + MenuStyle.ROW_GAP) / pitch)) * pitch - MenuStyle.ROW_GAP;
-            options.borderHeight = listHeight; options.scrollBarHeight = listHeight;
             var listWidth:Number = issuesPage() ? IssueStyle.LIST_WIDTH : MenuStyle.LIST_WIDTH;
-            options.Border_mc.width = listWidth;
+            // Setting borderHeight makes vanilla update every clip, even for the same value.
+            if (options.borderHeight != listHeight || options.Border_mc.width != listWidth) {
+                options.Border_mc.width = listWidth; options.borderHeight = listHeight;
+            }
+            options.scrollBarHeight = listHeight;
             if (options.ScrollBar) options.ScrollBar.x = listWidth + 14;
             MovieClip(options).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0,0,listWidth,listHeight);
             empty.width = listWidth - 40;
@@ -597,7 +585,8 @@ package
                     scroll = Math.max(0, selected - (options.selectedIndex - options.scrollPosition));
                 }
             }
-            options.InitializeEntries(data); hoverIndex = -1;
+            var rebuilt:Boolean = settingsList.setEntries(data, preserve);
+            if (rebuilt) hoverIndex = -1;
             // Home's detail card and empty state show current keys, which come from vanilla Controls.
             var homeKeys:Boolean = homeEmptyState();
             for each (mod in mods) if (homePage() && mod.hotkeys.length) homeKeys = true;
@@ -606,10 +595,11 @@ package
             for each (row in allRows) if (row.mod == "osfsettings" && row.key == "openMenu" && row.type == "hotkey") openKey = String(row.value || "");
             homeEmpty.show(openKey);
             selected = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
-            listData = data;
             if (selected >= 0 && data[selected].row.type == "section") selected = settingFrom(selected, 1, -1);
-            options.selectedIndex = selected;
-            options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
+            if (rebuilt) {
+                options.selectedIndex = selected;
+                options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
+            }
             if (homePage() && launcher.hasEntries && !data.length && !nav.focused) launcher.focused = true;
             options.disableInput = bindingBusy() || searching() || launcherPage() || nav.focused;
             options.disableSelection = bindingBusy() || launcherPage() || nav.focused;
@@ -630,12 +620,13 @@ package
                 MenuStyle.setText(status, issuesPage() ? tr("menu.issuesHint") : "");
                 status.textColor = MenuStyle.MUTED;
             } else if (!preserve) MenuStyle.setText(status, tr("menu.autoSave"));
-            refreshing = false; describe(); decorate();
+            decorate();
+            refreshing = false; describe();
         }
         // Previous and next walk the sidebar: the open mod's sections, then the next page or mod.
         private function changePage(direction:int):void
         {
-            if (captureRow || bindingBusy() || searching() || editingString() || confirmingAction() || requestedRefresh || dragging()) return;
+            if (captureRow || bindingBusy() || searching() || editingString() || confirmingAction() || requestedRefresh || settingsList.dragging) return;
             var item:Object = nav.move(direction);
             if (!item) return;
             var inPage:Boolean = !nav.focused;
@@ -806,7 +797,7 @@ package
             if (editingString()) { saveString(); return; }
             if (bindingBusy() || issuesPage() || searching() || frame <= searchExitFrame + 1) return;
             if (captureRow) { confirmBinding(); return; }
-            if (closing || launching || refreshing || requestedRefresh || activationFrame == frame || dragging()) return;
+            if (closing || launching || refreshing || requestedRefresh || activationFrame == frame || settingsList.dragging) return;
             activationFrame = frame;
             if (nav.focused) { enterPage(); return; }
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
@@ -829,7 +820,7 @@ package
             if (issuesPage()) { issueDetails.scroll(-160); return; }
             if (captureRow || bindingBusy() || current() && current().type == "hotkey") return;
             var row:Object = current();
-            if (!dragging() && modID && row && row.editable && row.value != row.defaultValue) edit(row, row.defaultValue);
+            if (!settingsList.dragging && modID && row && row.editable && row.value != row.defaultValue) edit(row, row.defaultValue);
         }
         private function valueChanged(event:Event):void
         {
@@ -856,7 +847,7 @@ package
             if (row.type == "action" || confirmingAction()) return;
             if (closing || refreshing || bindingBusy() || options.scrollbarScrolling || !row.editable) return;
             activationFrame = frame;
-            if (value == row.value) { requestedRefresh = true; return; }
+            if (value == row.value) return;
             var result:Object;
             if (row.type == "float") result = BGSCodeObj.setFloat(row.mod, row.key, Number(value));
             else if (row.type == "int") result = BGSCodeObj.setInt(row.mod, row.key, String(value));
@@ -993,7 +984,7 @@ package
             if (launching) { // Leave both Settings and Pause; the provider keeps opening.
                 closing = true; options.disableInput = true; BGSCodeObj.close(); return;
             }
-            if (closing || dragging() || requestedRefresh) return;
+            if (closing || settingsList.dragging || requestedRefresh) return;
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             // Back leaves the page for the sidebar; from the sidebar it closes the menu.
             if (!nav.focused) { focusNav(true); return; }
@@ -1054,7 +1045,7 @@ package
         private function wheelList(event:MouseEvent):void
         {
             if (!nav.focused || !event.delta || !initialized || closing || refreshing) return;
-            if (captureRow || bindingBusy() || editingString() || confirmingAction() || dragging()) return;
+            if (captureRow || bindingBusy() || editingString() || confirmingAction() || settingsList.dragging) return;
             var next:int = Math.max(0, Math.min(options.scrollPosition + (event.delta < 0 ? 1 : -1), options.maxScrollPosition));
             if (next != options.scrollPosition) { options.scrollPosition = next; decorate(); }
             event.stopPropagation();
@@ -1063,7 +1054,7 @@ package
         // advances. Resolve the arrow columns by position so either side steps its own way.
         private function clickStepper(event:MouseEvent):void
         {
-            if (!modID || !initialized || closing || refreshing || requestedRefresh || dragging()) return;
+            if (!modID || !initialized || closing || refreshing || requestedRefresh || settingsList.dragging) return;
             if (captureRow || bindingBusy() || editingString() || confirmingAction()) return;
             var entry:DisplayObject = event.target as DisplayObject;
             while (entry && entry != options && !("itemIndex" in entry)) entry = entry.parent;
@@ -1120,7 +1111,7 @@ package
             if (keybindings && keybindings.searchKey(event)) return;
             if (event.keyCode == Keyboard.UP || event.keyCode == Keyboard.PAGE_UP) noteMove(-1);
             else if (event.keyCode == Keyboard.DOWN || event.keyCode == Keyboard.PAGE_DOWN) noteMove(1);
-            if (!initialized || closing || refreshing || requestedRefresh || dragging()) return;
+            if (!initialized || closing || refreshing || requestedRefresh || settingsList.dragging) return;
             if (nav.focused) {
                 var code:uint = event.keyCode;
                 var input:String = code == Keyboard.UP ? "Up" : code == Keyboard.DOWN ? "Down" : code == Keyboard.RIGHT ? "Right" :
@@ -1218,16 +1209,6 @@ package
             }
             return true;
         }
-        private function dragging():Boolean
-        {
-            if (!options) return false;
-            if (options.scrollbarScrolling) return true;
-            for (var i:int = 0; i < options.totalEntryClips; ++i) {
-                var clip:Object = options.GetClipByIndex(i);
-                if (clip && clip.IsSlider() && clip.Slider_mc.dragging) return true;
-            }
-            return false;
-        }
         private function advance(event:Event):void
         {
             ++frame;
@@ -1237,12 +1218,12 @@ package
                 options.disableInput = nav.focused || launcherPage() || bindingBusy() || searching() || Boolean(captureRow) || editingString() || confirmingAction();
                 if (captureRow) pollBinding();
                 else if (!editingString() && !confirmingAction()) {
-                    if (getTimer() >= nextRevisionPoll && !bindingBusy() && !dragging() && !searching()) {
+                    if (getTimer() >= nextRevisionPoll && !bindingBusy() && !settingsList.dragging && !searching()) {
                         nextRevisionPoll = getTimer() + 250;
                         if (String(BGSCodeObj.revision()) != revision) requestedRefresh = true;
                     }
-                    if (requestedRefresh && !bindingBusy() && !dragging()) refresh();
-                    decorate();
+                    if (requestedRefresh && !bindingBusy() && !settingsList.dragging) refresh();
+                    else decorate();
                 }
                 // Captures and editors can change status without refreshing the list;
                 // native button widths can also settle after RefreshButtons returns.
@@ -1326,61 +1307,7 @@ package
         }
         private function decorate():void
         {
-            if (expandedLauncher()) return;
-            var needsLayout:Boolean = false;
-            var entryHeight:Number = rowHeight();
-            // Vanilla controls keep their offsets from the row's right edge.
-            var controlX:Number = MenuStyle.LIST_WIDTH - 476;
-            for (var i:int = 0; i < options.totalEntryClips; ++i) {
-                var clip:MovieClip = options.GetClipByIndex(i) as MovieClip;
-                if (!clip || Object(clip).itemIndex < 0) continue;
-                var item:Object = options.GetDataForEntry(Object(clip).itemIndex); if (!item) continue;
-                var view:Object = rowViews[clip];
-                var issue:Boolean = item.row.type == "issue";
-                if (!view || issue != (view is IssueRow)) {
-                    if (view) clip.removeChild(view as DisplayObject);
-                    view = issue ? new IssueRow() : new SettingsRow(); clip.addChild(view as DisplayObject); rowViews[clip] = view;
-                }
-                // Keep the vanilla hit area and behavior. Its authored timeline
-                // colors must not recolor our text or selection bar.
-                var slider:Object = Object(clip).Slider_mc;
-                var showSlider:Boolean = modID != "" && NumericSetting.isSlider(item.row);
-                var stepper:Object = Object(clip).LargeStepper_mc;
-                var showStepper:Boolean = modID != "" && item.row.type == "enum" && item.row.editable;
-                // While the sidebar has focus the page shows no selection.
-                var chosen:Boolean = Object(clip).itemIndex == options.selectedIndex && !launcherPage() && !nav.focused;
-                var binding:DisplayObject = modID || bindingsPage() ? nativeHotkeys.decorate(clip, item.row, chosen, entryHeight) : null;
-                clip.setChildIndex(view as DisplayObject, 0);
-                for (var child:int = 0; child < clip.numChildren; ++child) {
-                    var display:DisplayObject = clip.getChildAt(child);
-                    display.visible = display == view || display == binding || (showSlider && display == slider) || (showStepper && display == stepper);
-                }
-                clip.transform.colorTransform = new ColorTransform(); clip.mouseChildren = showSlider || showStepper || binding != null;
-                // Section headers take no pointer input, so hovering or clicking one changes nothing.
-                clip.mouseEnabled = item.row.type != "section";
-                if (showSlider) {
-                    slider.x = controlX; slider.y = (entryHeight - slider.height) / 2; slider.width = 330;
-                    slider.maxValue = NumericSetting.steps(item.row);
-                    slider.disableRounding = false; slider.mouseWheelValueChange = 1;
-                    if (!slider.dragging) slider.value = NumericSetting.position(item.row);
-                    slider.transform.colorTransform = chosen ?
-                        new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
-                }
-                if (showStepper) {
-                    // Keep vanilla arrows and hit areas; SettingsRow draws the label in our font.
-                    stepper.textField.visible = false;
-                    stepper.x = controlX; stepper.width = 450;
-                    stepper.y = (entryHeight - stepper.height) / 2;
-                    stepper.transform.colorTransform = chosen ?
-                        new ColorTransform(0, 0, 0, 1, 8, 21, 28, 0) : new ColorTransform();
-                }
-                var border:MovieClip = Object(clip).Border_mc;
-                border.x = 0; border.y = 0; border.width = issue ? IssueStyle.LIST_WIDTH : MenuStyle.LIST_WIDTH;
-                if (border.height != entryHeight) { border.height = entryHeight; needsLayout = true; }
-                clip.x = 0; clip.y = (Object(clip).itemIndex - options.scrollPosition) * (entryHeight + MenuStyle.ROW_GAP);
-                view.update(item.row, chosen, modID == "" && !bindingsPage(), entryHeight, Object(clip).itemIndex == hoverIndex && !chosen);
-            }
-            if (needsLayout && !dragging()) options.UpdateContainerRect();
+            settingsList.render(nativeHotkeys, rowHeight(), Boolean(modID), bindingsPage(), !launcherPage() && !nav.focused, hoverIndex);
         }
         private function resizeBackground(event:Event = null):void
         {
