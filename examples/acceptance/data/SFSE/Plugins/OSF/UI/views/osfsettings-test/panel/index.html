@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>OSF Settings external handoff test</title>
+<style>
+  :root { color-scheme: dark; font: 24px system-ui, sans-serif; }
+  body { margin: 0; background: #101f2c; color: #f2f6f9; }
+  main { max-width: 1120px; margin: 60px auto; }
+  h1 { font-size: 42px; } p { line-height: 1.5; }
+  label { display: block; margin: 24px 0 8px; }
+  input, select, button { font: inherit; padding: 12px; }
+  input[type=text] { width: 95%; }
+  input[type=range] { width: 60%; }
+  button { cursor: pointer; margin: 24px 16px 0 0; }
+  select, ::picker(select) { appearance: base-select; }
+  #result { color: #90e7bd; }
+</style>
+<script src="/shared/osfui.js"></script>
+<script src="main.js" defer></script>
+<main>
+  <h1>External handoff reached this frame</h1>
+  <p>OSF Settings should close as this panel appears. Check cold and warm opens, pointer movement across button centers and edges, typing, dragging, and Escape / controller Back.</p>
+  <label for="text">Text input: type, hold Backspace, Alt+Tab away and back</label>
+  <input id="text" type="text" placeholder="Try some text" autocomplete="off">
+  <label for="range">Drag test: <output id="value">50</output></label>
+  <input id="range" type="range" min="0" max="100" value="50">
+  <label for="select">In-page selection: Back should dismiss the list before closing the panel</label>
+  <select id="select"><option>Alpha</option><option>Beta</option><option>Gamma</option></select>
+  <div><button id="count">Click test</button><button id="close">Close and return to game</button></div>
+  <p id="result">Panel loaded. Click count: 0.</p>
+  <p>While this panel owns input, the fixture's gameplay hotkeys should not fire. After closing they should work again.</p>
+</main>
+</html>

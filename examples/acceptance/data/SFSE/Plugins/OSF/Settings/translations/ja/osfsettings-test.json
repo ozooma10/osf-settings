@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "title": "OSF Settings テスト",
+  "description": "値、入力、アクション、通知、ランチャーの動作確認。",
+  "groups": {
+    "Start here": {
+      "label": "はじめに"
+    },
+    "Value editors": {
+      "label": "設定値の編集"
+    },
+    "Native actions": {
+      "label": "アクション"
+    },
+    "Runtime provider": {
+      "label": "実行時プロバイダー"
+    },
+    "Papyrus": {
+      "label": "Papyrus テスト"
+    }
+  },
+  "settings": {
+    "enabled": {
+      "label": "有効にする"
+    },
+    "text": {
+      "label": "テキストと日本語",
+      "hint": "日本語の表示、保存、キャンセルを確認します。"
+    },
+    "mode": {
+      "label": "動作モード",
+      "optionLabels": {
+        "quiet": "静か",
+        "normal": "標準",
+        "verbose": "詳細"
+      }
+    }
+  },
+  "hotkeys": {
+    "native": {
+      "label": "テスト：ネイティブコールバック"
+    }
+  },
+  "actions": {
+    "confirmed": {
+      "label": "確認付きアクション",
+      "confirmation": "テストを実行しますか？"
+    }
+  }
+}

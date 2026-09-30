@@ -1,0 +1,15 @@
+{
+  "manifestVersion": 1,
+  "title": "TEST: OSF UI handoff",
+  "description": "Optional real external provider: test cold/warm launch, cursor, input and close.",
+  "kind": "menu",
+  "width": 1600,
+  "height": 900,
+  "transparent": false,
+  "capturesInput": true,
+  "pausesGame": true,
+  "launcher": {
+    "modId": "osfsettings-test",
+    "modTitle": "OSF Settings Test Mod"
+  }
+}

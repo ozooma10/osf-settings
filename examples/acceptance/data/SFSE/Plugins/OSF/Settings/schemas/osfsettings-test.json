@@ -1,0 +1,359 @@
+{
+  "schemaVersion": 1,
+  "title": "OSF Settings Test Mod",
+  "description": "Interactive v1 acceptance. Start with Read all values and Show test counters. Intentional failures are labeled TEST. See Docs/OSFSettingsTestMod/README.md.",
+  "groups": {
+    "Start here": [
+      {
+        "type": "action",
+        "id": "readback",
+        "label": "Read all values",
+        "hint": "Shows the actual values read by this separate native consumer."
+      },
+      {
+        "type": "action",
+        "id": "status",
+        "label": "Show test counters",
+        "hint": "Session-only callback, save, action and launcher counts. Counts restart with the game."
+      },
+      {
+        "type": "action",
+        "id": "registry",
+        "label": "Inspect public registry",
+        "hint": "Checks this page is visible through the public registry API."
+      }
+    ],
+    "Value editors": [
+      {
+        "key": "enabled",
+        "type": "bool",
+        "label": "Boolean toggle",
+        "default": true
+      },
+      {
+        "key": "count",
+        "type": "int",
+        "label": "Bounded integer",
+        "default": -2,
+        "min": -5,
+        "max": 10
+      },
+      {
+        "key": "amount",
+        "type": "float",
+        "label": "Slider with 0.05 steps",
+        "default": 0.35,
+        "min": 0,
+        "max": 1,
+        "step": 0.05
+      },
+      {
+        "key": "mode",
+        "type": "enum",
+        "label": "Named enum options",
+        "default": "normal",
+        "options": {
+          "quiet": "Quiet",
+          "normal": "Normal",
+          "verbose": "Verbose"
+        }
+      },
+      {
+        "key": "arrayMode",
+        "type": "enum",
+        "label": "Array enum options",
+        "default": "beta",
+        "options": [
+          "alpha",
+          "beta",
+          "gamma"
+        ]
+      },
+      {
+        "key": "text",
+        "type": "string",
+        "label": "Text and Unicode",
+        "default": "Café 日本語",
+        "maxLength": 128,
+        "hint": "Try typing, save, cancel, focus loss, empty text and restart. Maximum 128 UTF-8 bytes."
+      },
+      {
+        "key": "shortText",
+        "type": "string",
+        "label": "Eight-byte text limit",
+        "default": "Eight",
+        "maxLength": 8,
+        "hint": "Try nine ASCII characters and multi-byte text. Limit is bytes, not characters."
+      },
+      {
+        "key": "restartValue",
+        "type": "bool",
+        "label": "Restart-required notice",
+        "default": false,
+        "requires": "restart",
+        "hint": "This fixture tests the notice only; it has no gameplay effect."
+      },
+      {
+        "key": "longLabel",
+        "type": "bool",
+        "label": "A deliberately long setting label to check clipping, selection and large-text layout",
+        "default": true,
+        "hint": "Long help text for wrapping and scrolling.\nThe second line should remain readable at normal and large text sizes."
+      },
+      {
+        "type": "action",
+        "id": "invalid",
+        "label": "Check invalid API writes",
+        "hint": "Attempts out-of-range, bad enum, overlong string and wrong-type writes; expects rejection."
+      },
+      {
+        "type": "action",
+        "id": "reset",
+        "label": "Reset this test page",
+        "hint": "Resets only this schema's values. Native Controls and provider persistence remain separate.",
+        "confirmation": "Reset the static test page to its defaults?"
+      }
+    ],
+    "Input and subscriptions": [
+      {
+        "key": "observedKey",
+        "type": "key",
+        "label": "Observed keyboard / mouse key",
+        "default": 255,
+        "allowMouse": true,
+        "allowUnbound": true,
+        "hint": "Assign a key, close all menus and press it. Expect one HUD notification per press; gameplay input is not consumed."
+      },
+      {
+        "key": "requiredKey",
+        "type": "key",
+        "label": "Keyboard binding that cannot be cleared",
+        "default": "F8",
+        "allowUnbound": false,
+        "hint": "No handler: tests capture and allowUnbound=false. This value does not create a native Controls action."
+      },
+      {
+        "type": "action",
+        "id": "observer",
+        "label": "Toggle key observer",
+        "hint": "Starts ON. Turn off, press in gameplay and confirm the counter stays unchanged."
+      },
+      {
+        "type": "action",
+        "id": "subscription",
+        "label": "Toggle native value subscription",
+        "hint": "Starts ON. Turn off and edit a value; native change counter must stop."
+      },
+      {
+        "type": "action",
+        "id": "block",
+        "label": "Block hotkeys for 10 seconds",
+        "hint": "Close Settings immediately. Native/Papyrus hotkeys and key observers must be suppressed until the HUD release message."
+      }
+    ],
+    "Native actions": [
+      {
+        "type": "action",
+        "id": "success",
+        "label": "Immediate success",
+        "hint": "Callback should run exactly once."
+      },
+      {
+        "type": "action",
+        "id": "confirmed",
+        "label": "Confirmed action",
+        "hint": "Cancel first, then confirm. Cancellation must not increment the action count.",
+        "confirmation": "Run the native confirmation test?"
+      },
+      {
+        "type": "action",
+        "id": "failure",
+        "label": "EXPECTED TEST: failed action",
+        "hint": "Displays an intentional failure without changing gameplay."
+      },
+      {
+        "type": "action",
+        "id": "delayed",
+        "label": "Deferred success (3 seconds)",
+        "hint": "Wait with menu open; repeat and close the menu before completion."
+      },
+      {
+        "type": "action",
+        "id": "duplicate",
+        "label": "Duplicate completion rejection",
+        "hint": "First completion succeeds; second must log a nonzero status."
+      }
+    ],
+    "Runtime provider": [
+      {
+        "type": "action",
+        "id": "providerRegister",
+        "label": "Register / restore runtime provider",
+        "hint": "A second page named OSF Test - Runtime provider appears. Re-register after removal to load saved values."
+      },
+      {
+        "type": "action",
+        "id": "providerReplace",
+        "label": "Replace provider definition",
+        "hint": "Adds one field while preserving existing valid current values."
+      },
+      {
+        "type": "action",
+        "id": "providerRemove",
+        "label": "Remove runtime provider",
+        "hint": "Page disappears; saved file remains."
+      },
+      {
+        "type": "action",
+        "id": "rejectSaves",
+        "label": "Toggle intentional provider save failure",
+        "hint": "Starts OFF. Turn ON, attempt an edit on provider page, expect failure and old value. Turn OFF to recover."
+      }
+    ],
+    "Mod Issues": [
+      {
+        "type": "action",
+        "id": "issues",
+        "label": "Report test warning and errors",
+        "hint": "Adds warning, long error details and an issue from a mod without a settings page."
+      },
+      {
+        "type": "action",
+        "id": "replaceIssue",
+        "label": "Replace warning with error",
+        "hint": "Same ID must update in place and clear old detail fields."
+      },
+      {
+        "type": "action",
+        "id": "clearIssue",
+        "label": "Clear one test issue",
+        "hint": "Other reports must remain."
+      },
+      {
+        "type": "action",
+        "id": "clearIssues",
+        "label": "Clear native test issues",
+        "hint": "Clears only this fixture's native reports."
+      }
+    ],
+    "Launchers": [
+      {
+        "type": "action",
+        "id": "availability",
+        "label": "Toggle launcher availability",
+        "hint": "Enables/disables the TEST: toggle availability card. Other cards cover native, callback, delay, rejection and timeout."
+      }
+    ],
+    "Papyrus": [
+      {
+        "key": "papyrusStatus",
+        "type": "string",
+        "label": "Papyrus alias status",
+        "default": "Not initialized",
+        "maxLength": 256,
+        "hint": "Set by the quest alias. After loading a save, expect Ready. If needed use Initialize below, close Settings, then reopen."
+      },
+      {
+        "key": "papyrusGlobalStatus",
+        "type": "string",
+        "label": "Papyrus Global status",
+        "default": "Not initialized",
+        "maxLength": 256
+      },
+      {
+        "key": "papyrusAliasHits",
+        "type": "int",
+        "label": "Papyrus alias hotkey count",
+        "default": 0,
+        "min": 0,
+        "max": 1000000
+      },
+      {
+        "key": "papyrusGlobalHits",
+        "type": "int",
+        "label": "Papyrus Global hotkey count",
+        "default": 0,
+        "min": 0,
+        "max": 1000000
+      },
+      {
+        "type": "action",
+        "id": "papyrusInit",
+        "label": "Initialize / re-register Papyrus fixture",
+        "hint": "Requires OSFSettingsTestMod.esm enabled. Useful for existing saves. Close Settings to let script setup run."
+      },
+      {
+        "type": "action",
+        "id": "papyrusAlias",
+        "label": "Papyrus alias immediate action",
+        "hint": "Bound alias callback should complete and update status."
+      },
+      {
+        "type": "action",
+        "id": "papyrusGlobal",
+        "label": "Papyrus Global deferred action",
+        "hint": "Global callback completes after a 3-second menu-aware wait."
+      },
+      {
+        "type": "action",
+        "id": "papyrusValues",
+        "label": "Papyrus typed read/write check",
+        "hint": "Writes known bool/int/float/enum/string values; validates reads; check Native readback afterward.",
+        "confirmation": "Replace the test values with the Papyrus test values?"
+      },
+      {
+        "type": "action",
+        "id": "papyrusReset",
+        "label": "Papyrus reset check",
+        "hint": "Resets test value 'enabled' through the Papyrus API."
+      },
+      {
+        "type": "action",
+        "id": "papyrusIssue",
+        "label": "Papyrus report issue",
+        "hint": "Reports an intentional warning through the script API."
+      },
+      {
+        "type": "action",
+        "id": "papyrusClear",
+        "label": "Papyrus clear issue",
+        "hint": "Clears the script-owned test issue."
+      }
+    ]
+  },
+  "hotkeys": {
+    "native": {
+      "label": "TEST native callback",
+      "group": "Input and subscriptions"
+    },
+    "nativeUnbound": {
+      "label": "TEST second native callback (conflict test)",
+      "group": "Input and subscriptions"
+    },
+    "nativeMenu": {
+      "label": "TEST native menu -> Inventory",
+      "menu": "InventoryMenu",
+      "group": "Input and subscriptions"
+    },
+    "papyrusAlias": {
+      "label": "TEST Papyrus alias callback",
+      "group": "Papyrus"
+    },
+    "papyrusGlobal": {
+      "label": "TEST Papyrus Global callback",
+      "group": "Papyrus"
+    }
+  },
+  "menus": {
+    "inventory": {
+      "title": "TEST: schema -> Inventory",
+      "menu": "InventoryMenu",
+      "description": "Opens the game's existing Inventory menu through a schema launcher."
+    },
+    "missing": {
+      "title": "TEST: unavailable native menu",
+      "menu": "OSFSettingsTestIntentionallyMissingMenu",
+      "description": "Must remain unavailable because this menu is deliberately not registered."
+    }
+  }
+}

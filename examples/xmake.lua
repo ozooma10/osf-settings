@@ -27,3 +27,32 @@ for _, example in ipairs(examples) do
         end)
     target_end()
 end
+
+-- Opt-in, separately deployed consumer of the production public SDK.
+target("osfsettings-acceptance-mod")
+    set_default(false)
+    set_group("examples")
+    set_basename("OSFSettingsTestMod")
+    add_rules("commonlibsf.plugin", {
+        name = "OSF Settings Test Mod",
+        author = "ozooma10",
+        description = "Interactive release acceptance consumer"
+    })
+    add_files("acceptance/main.cpp")
+    add_includedirs("../sdk")
+    add_packages("nlohmann_json")
+    add_syslinks("shell32", "ole32")
+    set_values("commonlib.plugin.install", false)
+    on_config(function(target) target:set("installfiles", {}) end)
+target_end()
+
+-- Parse the shipped fixture with the same schema parser as the game plugin.
+-- This asset check is opt-in and is not a framework unit-test suite.
+target("osfsettings-acceptance-assets")
+    set_kind("binary")
+    set_default(false)
+    set_group("examples")
+    add_deps("osfsettings-test-core")
+    add_files("acceptance/validate.cpp")
+    set_rundir(os.projectdir())
+target_end()
