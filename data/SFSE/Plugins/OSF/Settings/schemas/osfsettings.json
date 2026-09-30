@@ -5,7 +5,7 @@
   "hotkeys": {
     "openMenu": {
       "label": "Open mod settings",
-      "default": "F10",
+      "default": "",
       "menu": "OSFSettingsMenu"
     }
   }
