@@ -325,7 +325,9 @@ namespace OSFSettings
             for (const auto& issue : DiagnosticsService::Get().Snapshot()) {
                 if (issue.modId != mod || issue.id != id || !issue.nexusModId) continue;
                 const auto url = std::format(L"https://www.nexusmods.com/starfield/mods/{}", issue.nexusModId);
-                opened = reinterpret_cast<std::intptr_t>(ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) > 32;
+                const auto result = reinterpret_cast<std::intptr_t>(ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+                opened = result > 32;
+                REX::INFO("Open mod page: issue={}/{} nexusModId={} opened={} ShellResult={}", mod, id, issue.nexusModId, opened, result);
                 break;
             }
             *params.ret = RE::Scaleform::GFx::Value(opened);
