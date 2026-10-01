@@ -51,6 +51,7 @@ package
         private var revision:String = "";
         private var launcher:LauncherPage;
         private var launcherAcceptHeld:Boolean = false;
+        private var homeFocusKey:String = "";
         // The launcher row whose destination is loading; Settings stays open until native reports.
         private var launching:Object = null;
         private var nextRevisionPoll:int = 0;
@@ -272,7 +273,13 @@ package
             launcherAcceptHeld = false;
             syncInput();
             menuStage.focus = value ? launcher : options as MovieClip;
-            if (homePage()) setStatus("");
+            if (homePage()) {
+                var row:Object = current();
+                var identity:String = row ? String(row.mod) + "/" + String(row.key || "") : "";
+                // Loading redraws cards and can emit a new hover on the same
+                // destination. Preserve its result until selection changes.
+                if (identity != homeFocusKey) { homeFocusKey = identity; setStatus(""); }
+            }
             decorate(); updateSelection();
         }
         private function searching():Boolean { return keybindings && keybindings.searching; }

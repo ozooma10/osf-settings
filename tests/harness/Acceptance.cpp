@@ -32,6 +32,7 @@ namespace OSFSettings::TestHarness
         bool nativeRegistered{};
         bool featuresRegistered{};
         std::atomic<std::uint64_t> pendingAction{};
+        std::atomic<std::uint64_t> pendingLaunch{};
 
         void Record(std::string source, std::string event, std::string key, std::string value, bool ok)
         {
@@ -90,14 +91,20 @@ namespace OSFSettings::TestHarness
             } catch (...) {}
         }
 
-        void OnLauncher(const char*, const char*, std::uint64_t request, void*) noexcept
+        void OnLauncher(const char*, const char* id, std::uint64_t request, void*) noexcept
         {
             try {
+                Record("launcher", "requested", id, std::to_string(request), true);
                 API::Launcher::Client launcher;
                 if (!launcher.Init()) return;
-                launcher.Complete(request, [](const char*, const char* id, std::uint64_t, void*) noexcept {
-                    try { Record("launcher", "callback", id, "", true); } catch (...) {}
-                });
+                if (std::string_view(id) == "pending") { pendingLaunch.store(request); return; }
+                if (std::string_view(id) == "rejected") {
+                    Require(launcher.Complete(request, nullptr, nullptr, "Expected launcher rejection"));
+                } else {
+                    Require(launcher.Complete(request, [](const char*, const char* id, std::uint64_t, void*) noexcept {
+                        try { Record("launcher", "callback", id, "", !RE::UI::GetSingleton()->IsMenuOpen("OSFSettingsMenu")); } catch (...) {}
+                    }));
+                }
             } catch (...) {}
         }
 
@@ -106,7 +113,9 @@ namespace OSFSettings::TestHarness
             API::Client settings;
             if (!settings.Init() || !settings.IsReady()) throw std::runtime_error("settings-not-ready");
             const auto operation = args.at("operation").get<std::string>();
-            if (operation == "registry") {
+            if (operation.starts_with("provider")) {
+                ProviderCommand(args);
+            } else if (operation == "registry") {
                 struct Copy { std::string caption; bool valid{}; } copy;
                 Require(settings.ReadRegistry(Mod, +[](const API::RegistryView& registry, void* context) noexcept {
                     try {
@@ -159,7 +168,7 @@ namespace OSFSettings::TestHarness
                     for (const auto* id : {"native", "failure", "deferred"}) Require(settings.RegisterAction(Mod, id, OnAction, nullptr));
                     API::Launcher::Client launcher;
                     if (!launcher.Init()) throw std::runtime_error("launcher-unavailable");
-                    for (const auto* id : {"callback", "unavailable"}) {
+                    for (const auto* id : {"callback", "unavailable", "rejected", "pending"}) {
                         const auto result = launcher.Register({.modId = Mod, .id = id, .modTitle = "Settings Acceptance",
                             .title = id, .open = OnLauncher});
                         if (result != API::Status::Ok) throw std::runtime_error("launcher-registration-failed");
@@ -168,6 +177,12 @@ namespace OSFSettings::TestHarness
                         throw std::runtime_error("launcher-availability-failed");
                     featuresRegistered = true;
                 }
+            } else if (operation == "lateLaunch") {
+                API::Launcher::Client launcher;
+                if (!launcher.Init() || !pendingLaunch.load()) throw std::runtime_error("no-pending-launch");
+                const auto result = launcher.Complete(pendingLaunch.exchange(0), nullptr, nullptr, "Late completion");
+                if (result != API::Status::UnknownLaunchRequest) throw std::runtime_error("late-launch-completion-accepted");
+                Record("launcher", "lateRejected", "pending", "", true);
             } else if (operation == "completeDeferred") {
                 const auto token = pendingAction.exchange(0);
                 if (!token) throw std::runtime_error("no-deferred-action");
@@ -245,6 +260,7 @@ namespace OSFSettings::TestHarness
         }
         result["actions"] = std::move(actions);
         result["pendingAction"] = pendingAction.load();
+        result["provider"] = ProviderSnapshot();
         auto launchers = Json::array();
         for (const auto& entry : LauncherService::Get().Snapshot()) if (entry.mod == Mod)
             launchers.push_back({{"id", entry.id}, {"available", entry.available}, {"recentOrder", entry.recentOrder}});

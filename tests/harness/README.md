@@ -109,14 +109,23 @@ restart persistence and Pause entry. Physical controller input remains separate.
 ## Release acceptance fixtures
 
 The native fixture includes handlers for actions, Papyrus issues and Home
-launchers, including native
-success/failure/deferred handlers, instance/Global action callbacks, an unavailable
+launchers, including native success/failure/deferred handlers, instance/Global action callbacks, an unavailable
 action, a callback launcher, an unavailable launcher and native/missing menu targets.
 Observers expose confirmation visibility, action status and fixture recency;
-they do not invoke menu actions for the test. The current game runner has no
-`Features` phase and does not exercise action buttons or launcher execution.
-Those remain acceptance gaps even when the suite passes. Production builds omit
-these helpers.
+they do not invoke menu actions for the test. The sibling runner's
+`-Acceptance -AcceptancePhase Features` drives the actual menu with native input.
+It covers integer/float/enum edits and resets, native and Papyrus actions,
+confirmation/cancellation, unavailable/running handlers, failure and deferred
+completion, native/callback launchers, unavailable destinations, rejection,
+timeout, cancellation, late completion rejection and persisted recency.
+
+`Providers.cpp` is a public-API consumer with its own atomic JSON persistence in
+the private values directory. Features checks menu edits, save rejection without
+notifications, registration replacement/removal/restoration, reset, key observers,
+keyboard/mouse capture, rebinding, unsubscription and gameplay/menu/block gates. The scenario never calls
+the menu bridge to perform user actions. Production builds omit these helpers.
+The release coordinator runs Features with both normal and large text. A passing
+build alone does not establish in-game acceptance of these scenarios.
 
 The harness's `SettingsSmoke -Acceptance` mode uses `Acceptance.cpp` and the
 scripts under `papyrus/`. A generated, test-only ESM defines one start-enabled

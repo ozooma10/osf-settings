@@ -32,6 +32,10 @@ package
         private var launcher:Object;
         private var originalRows:Function;
         private var launchState:String = "pending";
+        private var originalIssueOpener:Function;
+        private var issueOpenCount:int = 0;
+        private var issueOpenResult:Boolean = true;
+        private var openedIssue:String = "";
 
         public function PreviewChecks(movie:MovieClip, bindings:Boolean = false, screenshots:Boolean = false)
         {
@@ -371,8 +375,37 @@ package
                     requireGlyphs("Issues: " + issueCount);
                     userEvent("Right");
                     capture("issues");
+                    originalIssueOpener = Object(menu).BGSCodeObj.openIssueModPage;
+                    Object(menu).BGSCodeObj.openIssueModPage = function(mod:String, id:String):Boolean {
+                        ++issueOpenCount; openedIssue = mod + "/" + id; return issueOpenResult;
+                    };
                     for (var issueIndex:int = 0; issueIndex < list.entryCount; ++issueIndex)
+                        if (list.GetDataForEntry(issueIndex).row.id == "osfui-update-required") list.selectedIndex = issueIndex;
+                    require(list.selectedEntry.row.nexusModId == 17711, "compatibility warning retains its mod page destination");
+                    step = 109; break;
+                case 109:
+                    require(issueOpenCount == 0, "selecting a compatibility warning does not open the browser");
+                    userEvent("Accept"); break;
+                case 110:
+                    require(issueOpenCount == 1 && openedIssue == "osfsettings/osfui-update-required",
+                        "Open mod page sends the selected issue identity exactly once");
+                    require(findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.modPageOpened")) != null,
+                        "successful mod page opening displays feedback");
+                    capture("issue-mod-page-opened");
+                    issueOpenResult = false; userEvent("Accept"); break;
+                case 111:
+                    require(issueOpenCount == 2 && findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("errors.openModPage")) != null,
+                        "failed mod page opening displays an error and permits retry");
+                    capture("issue-mod-page-failed");
+                    for (issueIndex = 0; issueIndex < list.entryCount; ++issueIndex)
                         if (list.GetDataForEntry(issueIndex).row.id == "long-description") list.selectedIndex = issueIndex;
+                    break;
+                case 112:
+                    require(!list.selectedEntry.row.nexusModId, "ordinary issue has no external destination");
+                    userEvent("Accept"); break;
+                case 113:
+                    require(issueOpenCount == 2, "accepting an issue without a mod page never opens the browser");
+                    Object(menu).BGSCodeObj.openIssueModPage = originalIssueOpener;
                     step = 78; break;
                 case 78:
                     // Let the selected row repaint before capturing the scrolled report.
@@ -523,6 +556,11 @@ package
                     launchState = "failed"; break;
                 case 81:
                     require(!loadingCaptionVisible() && launcher.mouseChildren, "failed launch restores the caption and card input");
+                    findNamed(menu,"launcher_0").dispatchEvent(new MouseEvent(MouseEvent.ROLL_OVER));
+                    findNamed(menu,"launcher_0").dispatchEvent(new MouseEvent(MouseEvent.MOUSE_OVER,true));
+                    require(findText(menu,"Preview launch failed") != null, "launcher rejection survives hover after the loading card redraws");
+                    findNamed(menu,"launcher_1").dispatchEvent(new MouseEvent(MouseEvent.ROLL_OVER));
+                    require(findText(menu,"Preview launch failed") == null, "selecting a different launcher clears the previous rejection");
                     launchState = "pending";
                     findNamed(menu,"launcher_0").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 82:

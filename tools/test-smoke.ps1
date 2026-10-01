@@ -20,12 +20,15 @@ if (Test-Path -LiteralPath $suite) {
 }
 $names = @('coverage', 'native', 'preview-normal', 'preview-large', 'preview-bindings-normal', 'preview-bindings-large',
     'release-contracts', 'production-build', 'runtime', 'source-unchanged')
+$defined = @([regex]::Matches((Get-Content (Join-Path $repo 'tests/xmake.lua') -Raw), '"osfsettings-([a-z-]+)-tests"') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+$previewVariants = @('normal','large','bindings-normal','bindings-large')
 $unverified = @('Physical controller input and visual review of retained screenshots.',
-    'In-game action buttons, launcher completion/failure/timeout, and runtime provider/key-observer behavior.',
-    'External OSF UI provider handoff and caller-owned provider persistence in a real consumer.',
+    'External OSF UI handoff and integration with third-party consumer mods.',
+    'Text-editor focus-loss cancellation and Main Menu/Continue remain documented acceptance gaps.',
     'Production ZIP install, upgrade, and restart in game: use tools/test-release.ps1 -RunGame on a committed candidate.')
 if (-not $RunGame) { $unverified = @('All in-game cases were skipped; rerun with -RunGame.') + $unverified }
 if ($Plan) {
+    Test-SmokeCoverage $coverage $defined $previewVariants $runtimeCases
     [ordered]@{ stages=$names; runGame=[bool]$RunGame; runtimeCases=$runtimeCases; coverage=$coverage; unverified=$unverified } | ConvertTo-Json -Depth 10
     exit 0
 }
@@ -75,12 +78,9 @@ try {
     $identity | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $directory 'source.json')
     $report.source = [ordered]@{ revision=$identity.revision; sha256=$identity.sha256; dirty=$identity.dirty }
     Invoke-SmokeStage 'coverage' {
-        $defined = @([regex]::Matches((Get-Content (Join-Path $repo 'tests/xmake.lua') -Raw), '"osfsettings-([a-z-]+)-tests"') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-        $mapped = @($coverage.native | Sort-Object -Unique)
-        if (@(Compare-Object $defined $mapped).Count) { throw '[failed] Native suite inventory and smoke-coverage.json disagree.' }
+        Test-SmokeCoverage $coverage $defined $previewVariants $runtimeCases
         if ($RunGame -and -not $runtimeCases.Count) { throw '[blocked] Game suite is missing; pass -Harness.' }
-        if ($runtimeCases.Count -and @($coverage.runtime | Where-Object { $_ -notin $runtimeCases }).Count) { throw '[failed] Coverage references unknown game cases; update the sibling harness.' }
-        $script:stage.message = "$($defined.Count) native suites; $($runtimeCases.Count) game cases; $($coverage.Count) feature areas"
+        $script:stage.message = "$($defined.Count) native suites; $($previewVariants.Count) preview variants; $($runtimeCases.Count) game cases; $($coverage.Count) feature areas"
     }
     Invoke-SmokeStage 'native' {
         Invoke-SmokeCommand 'xmake' @('test','-j4','-v')

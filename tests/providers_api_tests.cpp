@@ -27,7 +27,8 @@ int main()
             {"key":"binding","type":"key","default":4,"allowMouse":true},
             {"key":"count","type":"int","default":2,"min":0,"max":10},
             {"key":"scale","type":"float","default":0.5},
-            {"key":"mode","type":"enum","default":"a","options":{"a":"A","b":"B"}}
+            {"key":"mode","type":"enum","default":"a","options":{"a":"A","b":"B"}},
+            {"key":"caption","type":"string","default":"Initial","maxLength":16}
         ]}})";
         { std::ofstream out(root / "schemas/static.mod.json"); out << schema; }
         auto& backend = SettingsService::Get();
@@ -92,9 +93,26 @@ int main()
         KeyActions::Get().Process(5);
         KeyActions::Get().Process(5);
         check(self.fired == 1);
+        check(settings.SetInt("provider.mod", "count", 7) == Status::Ok);
+        check(settings.SetFloat("provider.mod", "scale", 0.75) == Status::Ok);
+        check(settings.SetEnum("provider.mod", "mode", "b") == Status::Ok);
+        const std::string caption = "MiXeD Caf\xC3\xA9";
+        check(settings.SetString("provider.mod", "caption", caption.data(), static_cast<std::uint32_t>(caption.size())) == Status::Ok);
+        char text[32]{}; std::uint32_t required{}; double scale{};
+        check(settings.GetFloat("provider.mod", "scale", &scale) == Status::Ok && scale == 0.75);
+        check(settings.GetEnum("provider.mod", "mode", text, sizeof(text), &required) == Status::Ok && std::string(text) == "b");
+        check(settings.GetString("provider.mod", "caption", text, sizeof(text), &required) == Status::Ok && std::string(text) == caption);
+        const auto typedValues = nlohmann::json::parse(persistence.values);
+        check(typedValues.size() == 6 && typedValues["count"] == 7 && typedValues["scale"] == 0.75 &&
+            typedValues["mode"] == "b" && typedValues["caption"] == caption);
+        const auto validWrites = persistence.writes;
+        check(settings.SetEnum("provider.mod", "mode", "missing") == Status::InvalidValue);
+        check(settings.SetString("provider.mod", "caption", "too long for this setting", 25) == Status::InvalidValue);
+        check(persistence.writes == validWrites);
         check(settings.ResetMod("provider.mod") == Status::Ok);
         const auto resetValues = nlohmann::json::parse(persistence.values);
-        check(resetValues.size() == 5 && resetValues["enabled"] == true && resetValues["count"] == 2 && resetValues["binding"] == 4);
+        check(resetValues.size() == 6 && resetValues["enabled"] == true && resetValues["count"] == 2 && resetValues["binding"] == 4 &&
+            resetValues["scale"] == 0.5 && resetValues["mode"] == "a" && resetValues["caption"] == "Initial");
         const auto resetWrites = persistence.writes;
         check(settings.ResetMod("provider.mod") == Status::Ok && persistence.writes == resetWrites);
         check(api->Unregister(token) == Status::Ok);

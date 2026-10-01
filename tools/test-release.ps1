@@ -18,7 +18,7 @@ $suite = Join-Path $Harness 'Test-SettingsRelease.ps1'
 $suiteFound = Test-Path -LiteralPath $suite -PathType Leaf
 $scope = if ($RunGame) { 'offline+runtime' } else { 'offline' }
 $unverified = @('Physical controller input', 'Visual review of retained screenshots',
-    'In-game action buttons, launcher completion/failure/timeout, and runtime provider/key-observer behavior',
+    'Text-editor focus-loss cancellation and Main Menu/Continue limitations',
     'Unmodified production ZIP: clean mod-manager installation, real consumer, restart and upgrade in-game',
     'External OSF UI provider handoff')
 if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame)") + $unverified }

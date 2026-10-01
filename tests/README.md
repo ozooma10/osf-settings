@@ -15,7 +15,7 @@ xmake test -j4 'osfsettings-launcher-tests/*'
 
 | Group | Coverage |
 | --- | --- |
-| `tests/settings` | Localization, schema, store, service, SDK, strings, registry, filename validation and file-link regression checks |
+| `tests/settings` | Localization, schema, store, service, SDK, runtime providers, strings, registry, filename validation and file-link regression checks |
 | `tests/input` | Keys, registration, input routing, lifecycle, binding editor/menu/snapshots, blocks, callbacks |
 | `tests/launcher` | Launcher registry and recency |
 | `tests/actions` | Action registration, dispatch and completion |
@@ -94,6 +94,19 @@ For a single automated development entrypoint, including uncommitted changes,
 use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame`. The
 [release validation guide](../docs/RELEASE_VALIDATION.md) describes coverage, isolation, report
 formats and remaining acceptance gaps. Omit `-RunGame` for an offline run.
+
+`smoke-coverage.json` inventories 18 feature areas across all 23 native suites,
+four preview variants and 13 game cases. The coverage stage rejects empty or
+duplicate feature entries, unknown references and unmapped tests in any layer.
+JSON and Markdown reports show each feature's native, preview and game result
+separately; an offline pass leaves its game checks `not-run`.
+The normal/large Features cases exercise value editors, action consumers,
+launcher handoff and runtime providers through real game input. Focused development
+runs use the sibling `Test-Starfield.ps1 -Scenario SettingsSmoke -Acceptance
+-AcceptancePhase Features` (add `-LargeText` for accessibility text).
+When the opening hotkey is unbound, game scenarios enter through Pause and assign
+a temporary unused key with native capture. They stop the owned session and
+restore the original Controls bytes afterward, including on failure.
 
 The [release runner](../tools/test-release.ps1) combines native and preview
 checks, production archive verification, disposable reinstall checks, and a

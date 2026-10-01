@@ -18,6 +18,19 @@ Check $true 'ANSI-colored XMake summary accepted'
 Reject { Test-SmokeNativeSummary 'nothing to test' 22 } 'Missing native test summary rejected'
 Reject { Test-SmokeNativeSummary '100% tests passed, 0 test(s) failed out of 0, spent 0s' 22 } 'Zero executed native tests rejected'
 Reject { Test-SmokeNativeSummary '100% tests passed, 0 test(s) failed out of 21, spent 1s' 22 } 'Incomplete native test count rejected'
+$coverage = @(@{id='values'; feature='Values'; native=@('store'); preview=@('normal'); runtime=@('game')})
+Test-SmokeCoverage $coverage @('store') @('normal') @('game')
+Check $true 'Complete feature map accepted'
+Reject { Test-SmokeCoverage $coverage @('store','security') @('normal') @('game') } 'Unmapped native suite rejected'
+Reject { Test-SmokeCoverage $coverage @('store') @('normal','large') @('game') } 'Unmapped preview variant rejected'
+Reject { Test-SmokeCoverage $coverage @('store') @('normal') @('game','new-case') } 'Unmapped runtime case rejected'
+Reject { Test-SmokeCoverage $coverage @('store') @('normal') @('renamed') } 'Unknown runtime mapping rejected'
+Reject { Test-SmokeCoverage ($coverage + $coverage) @('store') @('normal') @('game') } 'Duplicate feature ID rejected'
+Reject { Test-SmokeCoverage @(@{id='gap'; feature='Uncovered'; native=@(); preview=@(); runtime=@()}) @('store') @('normal') @('game') } 'Feature with no checks rejected'
+Reject { Test-SmokeCoverage @() @('store') @('normal') @('game') } 'Empty feature map rejected'
+$featureReport = @{coverage=$coverage; stages=@(@{name='native';status='passed'}, @{name='preview-normal';status='failed'}, @{name='runtime';status='not-run'})}
+$featureResult = @(Get-SmokeFeatureResults $featureReport)[0]
+Check ($featureResult.native -eq 'passed' -and $featureResult.preview -eq 'failed' -and $featureResult.runtime -eq 'not-run') 'Feature evidence retains failed previews and skipped game cases'
 $null = Invoke-SmokeGit $scratch @('init','-q')
 'build/' | Set-Content (Join-Path $scratch '.gitignore')
 'one' | Set-Content (Join-Path $scratch 'source with spaces.cpp')
@@ -43,6 +56,27 @@ $receipt = @{ automatedPassed=$true; completeSuite=$true; builtFromSource=$true;
     runs=@(@{name='one'; outcome='passed'; exitCode=0; result=$result; resultSha256=(Get-FileHash $result).Hash; startedAt=$now; finishedAt=$now.AddSeconds(3)}) }
 Test-SmokeRuntimeReceipt $receipt @('one') 'source'
 Check $true 'Complete passing receipt accepted'
+$receipt.runs[0].name = 'features-normal'; $receipt.selectedCases = @('features-normal')
+Reject { Test-SmokeRuntimeReceipt $receipt @('features-normal') 'source' } 'Feature case without feature assertions rejected'
+$featureEvidence = @{ scenario='SettingsSmoke'; outcome='passed'; startedAt=$now.AddSeconds(1); finishedAt=$now.AddSeconds(2)
+    settingsFeatures=@{values=$true; actions=$true; launchers=$true; providers=$true; largeText=$false} }
+function Save-FeatureEvidence {
+    $featureEvidence | ConvertTo-Json -Depth 5 | Set-Content $result
+    $receipt.runs[0].resultSha256 = (Get-FileHash $result).Hash
+}
+Save-FeatureEvidence
+Test-SmokeRuntimeReceipt $receipt @('features-normal') 'source'
+Check $true 'Complete feature assertions and correct movie accepted'
+$featureEvidence.settingsFeatures.providers = $false; Save-FeatureEvidence
+Reject { Test-SmokeRuntimeReceipt $receipt @('features-normal') 'source' } 'Omitted provider assertions rejected'
+$featureEvidence.settingsFeatures.providers = 'true'; Save-FeatureEvidence
+Reject { Test-SmokeRuntimeReceipt $receipt @('features-normal') 'source' } 'Non-boolean feature pass rejected'
+$featureEvidence.settingsFeatures.providers = $true; $featureEvidence.settingsFeatures.largeText = $true; Save-FeatureEvidence
+Reject { Test-SmokeRuntimeReceipt $receipt @('features-normal') 'source' } 'Wrong movie variant rejected'
+$receipt.runs[0].name = 'features-large'; $receipt.selectedCases = @('features-large')
+Test-SmokeRuntimeReceipt $receipt @('features-large') 'source'
+Check $true 'Large-text feature evidence accepted'
+$receipt.runs[0].name = 'one'; $receipt.selectedCases = @('one')
 Reject { Test-SmokeRuntimeReceipt $receipt @('one','two') 'source' }
 Reject { Test-SmokeRuntimeReceipt $receipt @('one') 'other-source' }
 $receipt.completeSuite = $false

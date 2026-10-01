@@ -55,6 +55,48 @@ function Test-SmokeNativeSummary([string]$Log, [int]$ExpectedCount) {
     }
 }
 
+function Test-SmokeCoverage($Coverage, [string[]]$NativeSuites, [string[]]$PreviewVariants, [string[]]$RuntimeCases) {
+    if (-not @($Coverage).Count) { throw '[failed] Feature coverage inventory is empty.' }
+    $ids = @()
+    foreach ($feature in $Coverage) {
+        if (-not $feature.id -or -not $feature.feature -or $feature.id -in $ids) { throw '[failed] Feature coverage needs unique IDs and descriptions.' }
+        $ids += $feature.id
+        $count = 0
+        foreach ($kind in @('native','preview','runtime')) {
+            $entries = @($feature.$kind)
+            if (@($entries | Where-Object { $_ -isnot [string] -or [string]::IsNullOrWhiteSpace($_) }).Count -or
+                @($entries | Sort-Object -Unique).Count -ne $entries.Count) { throw "[failed] Invalid or duplicate $kind coverage for $($feature.id)." }
+            $count += $entries.Count
+        }
+        if (-not $count) { throw "[failed] Feature $($feature.id) has no automated coverage." }
+    }
+    foreach ($inventory in @(@{kind='native'; expected=$NativeSuites}, @{kind='preview'; expected=$PreviewVariants}, @{kind='runtime'; expected=$RuntimeCases})) {
+        $expected = @($inventory.expected)
+        # Offline use without a harness may still validate native/preview coverage.
+        if ($inventory.kind -eq 'runtime' -and -not $expected.Count) { continue }
+        if (-not $expected.Count -or @($expected | Sort-Object -Unique).Count -ne $expected.Count) { throw "[failed] Empty or duplicate $($inventory.kind) test inventory." }
+        $mapped = @($Coverage | ForEach-Object { $_.($inventory.kind) } | Sort-Object -Unique)
+        if (-not $mapped.Count -or @(Compare-Object $expected $mapped).Count) { throw "[failed] $($inventory.kind) test inventory and smoke-coverage.json disagree." }
+    }
+}
+
+function Get-SmokeFeatureResults($Report) {
+    foreach ($feature in $Report.coverage) {
+        $result = [ordered]@{ id=$feature.id; feature=$feature.feature }
+        foreach ($kind in @('native','preview','runtime')) {
+            $references = @($feature.$kind)
+            $stages = @(if ($kind -eq 'preview') { $references | ForEach-Object { "preview-$_" } } else { $kind })
+            $statuses = @($Report.stages | Where-Object name -in $stages | ForEach-Object status)
+            $result[$kind] = if (-not $references.Count) { 'not-applicable' }
+                elseif ('failed' -in $statuses) { 'failed' }
+                elseif ('blocked' -in $statuses) { 'blocked' }
+                elseif ($statuses.Count -eq $stages.Count -and @($statuses | Where-Object { $_ -ne 'passed' }).Count -eq 0) { 'passed' }
+                else { 'not-run' }
+        }
+        $result
+    }
+}
+
 function Read-SmokeCaseResult([string]$Path, [DateTimeOffset]$StartedAt, [DateTimeOffset]$FinishedAt, [int]$ExitCode) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing scenario receipt: $Path" }
     $result = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
@@ -81,12 +123,23 @@ function Test-SmokeRuntimeReceipt($Receipt, [string[]]$ExpectedCases, [string]$S
     foreach ($run in $Receipt.runs) {
         if ($run.name -notin $ExpectedCases -or $run.outcome -ne 'passed' -or $run.exitCode -ne 0 -or
             -not $run.result -or -not (Test-Path -LiteralPath $run.result -PathType Leaf)) { throw "Runtime case lacks passing evidence: $($run.name)" }
-        $null = Read-SmokeCaseResult $run.result $run.startedAt $run.finishedAt $run.exitCode
+        $evidence = Read-SmokeCaseResult $run.result $run.startedAt $run.finishedAt $run.exitCode
+        if ($run.name -in @('features-normal','features-large')) {
+            foreach ($feature in @('values','actions','launchers','providers')) {
+                if ($evidence.settingsFeatures.$feature -isnot [bool] -or -not $evidence.settingsFeatures.$feature) {
+                    throw "Runtime feature case omitted passing $feature checks: $($run.name)"
+                }
+            }
+            if ($evidence.settingsFeatures.largeText -isnot [bool] -or $evidence.settingsFeatures.largeText -ne ($run.name -eq 'features-large')) {
+                throw "Runtime feature case used the wrong movie variant: $($run.name)"
+            }
+        }
         if ((Get-FileHash -LiteralPath $run.result).Hash -cne $run.resultSha256) { throw "Runtime case has changed evidence: $($run.name)" }
     }
 }
 
 function Save-SmokeReport($Report, [string]$Directory) {
+    $Report['featureResults'] = @(Get-SmokeFeatureResults $Report)
     [IO.File]::WriteAllText((Join-Path $Directory 'result.json'), ($Report | ConvertTo-Json -Depth 30))
     $lines = @('# OSF Settings smoke bench', '', "Outcome: **$($Report.outcome)**", '',
         "Scope: $($Report.scope)", "Complete automated suite: $($Report.completeAutomatedSuite)",
@@ -96,8 +149,12 @@ function Save-SmokeReport($Report, [string]$Directory) {
         $lines += "| $($stage.name) | $($stage.status) | $($stage.seconds) | $link$($stage.message.Replace('|','/').Replace("`n",' ')) |"
     }
     if ($Report.Contains('runtime') -and $Report.runtime) { $lines += @('', "Game suite receipt: [$($Report.runtime)](<$($Report.runtime)>)") }
-    $lines += @('', '## Coverage', '', '| Feature | Native suites | Game cases |', '| --- | --- | --- |')
-    foreach ($feature in $Report.coverage) { $lines += "| $($feature.feature) | $($feature.native -join ', ') | $($feature.runtime -join ', ') |" }
+    $lines += @('', '## Coverage', '', 'Cells report the stages containing the mapped checks. Native and game stages pass only when their entire suite passes; a failure does not identify which individual features failed. A passed layer does not establish the other layers.', '',
+        '| Feature | Native suites | Preview variants | Game cases |', '| --- | --- | --- | --- |')
+    foreach ($feature in $Report.coverage) {
+        $result = @($Report.featureResults | Where-Object id -eq $feature.id)[0]
+        $lines += "| $($feature.feature) | $($result.native): $($feature.native -join ', ') | $($result.preview): $($feature.preview -join ', ') | $($result.runtime): $($feature.runtime -join ', ') |"
+    }
     $lines += @('', '## Not established by this run', '')
     foreach ($gate in $Report.unverified) { $lines += "- $gate" }
     [IO.File]::WriteAllLines((Join-Path $Directory 'report.md'), $lines)

@@ -148,6 +148,7 @@ $path = Join-Path $PSScriptRoot ('artifacts/' + [guid]::NewGuid().ToString('N') 
 $code = switch ($mode) { failed { 1 } blocked { 2 } crashed { 7 } default { 0 } }
 $outcome = switch ($code) { 0 { 'passed' } 1 { 'failed' } default { 'blocked' } }
 $result = @{ scenario='SettingsSmoke'; path=$path; outcome=$outcome; startedAt=$started.ToString('o'); finishedAt=[DateTimeOffset]::UtcNow.ToString('o') }
+if ($AcceptancePhase -eq 'Features') { $result.settingsFeatures = @{ values=$true; actions=$true; launchers=$true; providers=$true; largeText=[bool]$LargeText } }
 switch ($mode) {
     'stale-receipt' { $result.startedAt = $started.AddDays(-1).ToString('o') }
     'reversed-times' { $result.finishedAt = $started.AddSeconds(-10).ToString('o') }
@@ -234,6 +235,7 @@ function Get-OwnedGame { return $null }
 function Start-TestGame { if ($env:OSF_RELEASE_SELFTEST_MODE -eq 'startup-blocked') { throw '[blocked] fixture startup' } }
 '@ | Set-Content (Join-Path $entry 'scripts/Environment.ps1')
 '' | Set-Content (Join-Path $entry 'scripts/Multiplayer.ps1')
+'' | Set-Content (Join-Path $entry 'scripts/Animation.ps1')
 @'
 function Start-RunArtifacts([string]$Scenario) {
     $script:Run = @{ scenario=$Scenario; startedAt=[DateTimeOffset]::UtcNow.ToString('o'); outcome='running' }

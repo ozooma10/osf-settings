@@ -71,6 +71,7 @@ private function testRow(row:Object):Object
     return {kind:row.more ? "launcherMore" : row.type == "launcher" ? "launcher" : bindingsPage() ? "binding" : issuesPage() ? "issue" : modID ? "setting" : "mod", mod:row.mod, group:String(row.group || ""),
         issueId:String(row.id || ""), severity:String(row.severity || ""), impact:String(row.impact || ""), nextSteps:String(row.nextSteps || ""),
         key:String(row.key || ""), type:String(row.type || ""), value:row.value, message:String(row.message || ""),
+        available:Boolean(row.available), actionState:String(row.actionState || ""),
         action:row.action, source:row.source, records:row.records,
         alternate:row.alternate, required:Boolean(row.binding && row.binding.bRequired), title:row.title, editable:Boolean(row.editable), minimum:row.minimum, maximum:row.maximum};
 }
@@ -118,6 +119,7 @@ private function reportTestState():void
         navigation:{focused:nav.focused},
         home:{interfacesVisible:launcher.visible, expanded:launcher.expanded, interfacesFocused:launcher.focused},
         actionConfirmation:{active:confirmingAction()},
+        launch:{active:Boolean(launching)},
         bindings:{state:keybindings.state, count:keybindings.rows.length, requiredActions:requiredActions, selectedKey:keybindings.selectedKey,
             source:keybindings.source, query:keybindings.search.text, searching:searching(), slot:nativeHotkeys.selectedSlot,
             searchRect:testRect(keybindings.search.getBounds(menuStage)),

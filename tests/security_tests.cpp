@@ -44,6 +44,13 @@ int main()
         const auto victim = root / "unrelated.txt";
         const auto saved = root / "values" / "audit.json";
         write(victim, "preserve unrelated content");
+        const auto stale = root / "values" / "audit.json.tmp";
+        fs::create_hard_link(victim, stale);
+        check(Persistence::WriteAtomic(saved, "first", error) && read(saved) == "first" &&
+            read(victim) == "preserve unrelated content" && read(stale) == "preserve unrelated content",
+            "a pre-existing temporary hard link is never truncated or removed");
+        fs::remove(stale);
+        fs::remove(saved);
         fs::create_hard_link(victim, saved);
         check(Persistence::WriteAtomic(saved, "second", error) && read(saved) == "second" && read(victim) == "preserve unrelated content",
             "replacement changes destination link without truncating its target");
