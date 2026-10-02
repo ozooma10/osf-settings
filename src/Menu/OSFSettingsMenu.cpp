@@ -23,7 +23,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset };
         // Bound the loading card's wait; expiry invalidates the request.
         constexpr auto kOpenTimeout = std::chrono::seconds(30);
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
@@ -123,6 +123,7 @@ namespace OSFSettings
         RegisterNativeFunction("setEnum", static_cast<std::uint64_t>(Function::SetEnum));
         RegisterNativeFunction("setString", static_cast<std::uint64_t>(Function::SetString));
         RegisterNativeFunction("setKey", static_cast<std::uint64_t>(Function::SetKey));
+        RegisterNativeFunction("reset", static_cast<std::uint64_t>(Function::Reset));
         RegisterNativeFunction("beginKeyCapture", static_cast<std::uint64_t>(Function::BeginKeyCapture));
         RegisterNativeFunction("pollKeyCapture", static_cast<std::uint64_t>(Function::PollKeyCapture));
         RegisterNativeFunction("commitKeyCapture", static_cast<std::uint64_t>(Function::CommitKeyCapture));
@@ -488,6 +489,7 @@ namespace OSFSettings
             }
             break;
         }
+        case Function::Reset:
         case Function::SetBool:
         case Function::SetInt:
         case Function::SetFloat:
@@ -495,8 +497,11 @@ namespace OSFSettings
         case Function::SetString:
         case Function::SetKey: {
             auto result = SettingsError::InvalidArgument;
-            if (params.argCount == (function == Function::SetString ? 4u : 3u) && params.args[0].IsString() && params.args[1].IsString()) {
-                if (function == Function::SetBool && params.args[2].IsBoolean()) {
+            const auto expectedArgs = function == Function::Reset ? 2u : function == Function::SetString ? 4u : 3u;
+            if (params.argCount == expectedArgs && params.args[0].IsString() && params.args[1].IsString()) {
+                if (function == Function::Reset) {
+                    result = SettingsService::Get().Reset(ArgString(params, 0), ArgString(params, 1));
+                } else if (function == Function::SetBool && params.args[2].IsBoolean()) {
                     result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetBoolean());
                 } else if (function == Function::SetInt && params.args[2].IsString()) {
                     if (const auto value = ParseInteger(ArgString(params, 2))) {

@@ -164,7 +164,7 @@ package
         {
             menu = event.target.content;
             menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, openIssueModPage:openIssueModPage, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
-                revision:function():String { return "0:0:0"; }, invokeAction:invokeAction,
+                revision:function():String { return "0:0:0"; }, invokeAction:invokeAction, reset:resetSetting,
                 launch:function(mod:String, id:String):Boolean {
                     trace("[preview] launch " + mod + "/" + id);
                     return false; // The preview cannot open engine/provider menus.
@@ -284,6 +284,18 @@ package
                 }
             }
             return {ok:false, error:"Unknown preview action."};
+        }
+
+        private function resetSetting(mod:String, key:String):Object
+        {
+            for each (var row:Object in rows) {
+                if (row.mod == mod && row.key == key && row.hasOwnProperty("defaultValue")) {
+                    row.value = row.defaultValue;
+                    if (row.type == "key") row.valueName = previewKeyName(uint(row.value));
+                    return {ok:true, error:""};
+                }
+            }
+            return {ok:false, error:"Unknown preview setting."};
         }
 
         private function setBool(mod:String, key:String, value:Boolean):Object

@@ -783,7 +783,13 @@ package
             if (issuesPage()) { issueDetails.scroll(-160); return; }
             if (captureRow || bindingBusy() || current() && current().type == "hotkey") return;
             var row:Object = current();
-            if (!settingsList.dragging && modID && row && row.editable && row.value != row.defaultValue) edit(row, row.defaultValue);
+            if (closing || refreshing || requestedRefresh || settingsList.dragging || !modID || !row || !row.editable) return;
+            activationFrame = frame;
+            // Equal values can still have a saved override that reset must remove.
+            var result:Object = BGSCodeObj.reset(row.mod, row.key);
+            if (result && result.ok) setStatus(tr("menu.autoSave"));
+            else setStatus(result ? result.error : tr("errors.save"), true);
+            requestedRefresh = true;
         }
         private function valueChanged(event:Event):void
         {
