@@ -339,6 +339,9 @@ package
                     require(Object(primary).Icon_mc.Icon_tf.text == "A" && Object(primary).Icon_mc.Icon_tf.visible,
                         "native controller row renders the A glyph");
                     capture("keybindings-controller");
+                    list.selectedIndex = indexOf("preview/chord"); break;
+                case 101:
+                    capture("keybindings-controller-chord");
                     searchField().text = "shoulder"; searchField().dispatchEvent(new Event(Event.CHANGE));
                     Object(menu).BGSCodeObj.previewGamepad(false); step = 103; break;
                 case 103:

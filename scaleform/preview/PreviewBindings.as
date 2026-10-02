@@ -29,11 +29,11 @@ package
                 var controller:Object = {};
                 for (var property:String in entry) controller[property] = entry[property];
                 controller.bGamepadEntry = true;
-                var code:uint = entry.sInputName == "Jump" || entry.sInputName == "preview/shared" ? 4096 :
-                    entry.sInputName == "Attack" ? 10 : entry.sInputName == "preview/chord" ? 32768 : 255;
+                var code:uint = entry.sInputName == "Jump" || entry.sInputName == "preview/shared" || entry.sInputName == "preview/chord" ? 4096 :
+                    entry.sInputName == "Attack" ? 10 : 255;
                 var modifier:uint = entry.sInputName == "preview/chord" ? 256 : 255;
-                controller.MainBinding = {aPCKeyName:[], aButtonName:code == 4096 ? ["Xenon_A"] :
-                    code == 10 ? ["Xenon_R2"] : code == 32768 ? ["Xenon_L1", "Xenon_Y"] : []};
+                controller.MainBinding = {aPCKeyName:[], aButtonName:code == 4096 ?
+                    (modifier == 256 ? ["Xenon_L1", "Xenon_A"] : ["Xenon_A"]) : code == 10 ? ["Xenon_R2"] : []};
                 controller.AltBinding = {aPCKeyName:[], aButtonName:[]};
                 controllerEntries.push(controller);
                 records.push({action:entry.sInputName, context:0, device:2, slot:0, key:code, modifier:modifier});
