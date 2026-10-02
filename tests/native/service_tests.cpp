@@ -108,6 +108,7 @@ int TestSettingsService()
     backend.DispatchChanges();
     check(events.keys.size() == 1 && !backend.HasPendingChanges(), "initial refresh is delivered once");
     events.keys.clear();
+    auto revision = backend.Revision();
 
     check(service.GetBool("BAD", "enabled", &enabled) == Status::InvalidArgument &&
         service.GetBool("..", "enabled", &enabled) == Status::InvalidArgument &&
@@ -139,6 +140,7 @@ int TestSettingsService()
         service.ResetMod("missing") == Status::UnknownMod && service.ResetMod("") == Status::InvalidArgument &&
         service.Reset("sample", "") == Status::InvalidArgument, "reset arguments and lookup errors");
     check(!backend.HasPendingChanges(), "rejected writes do not notify");
+    check(backend.Revision() == revision, "rejected writes do not invalidate menu snapshots");
 
     API::Client client;
     client.Attach(&service);
@@ -167,6 +169,7 @@ int TestSettingsService()
     check(mode == "quiet" && client.GetEnum("sample", "mode", mode) == Status::Ok && mode == "verbose-mode",
         "SDK enum strings own their values and can read later changes");
     check(events.keys.empty(), "writes never dispatch inline");
+    check(backend.Revision() > revision, "committed values invalidate menu snapshots before notification dispatch");
     backend.DispatchChanges();
     check(events.keys == std::vector<std::string>{ "mode" }, "changed keys notify");
     events.keys.clear();
@@ -183,6 +186,7 @@ int TestSettingsService()
     events.keys.clear();
     const auto persisted = ReadFile(saved);
     check(Json::parse(persisted)["values"]["count"] == 8, "successful writes reach disk before returning");
+    revision = backend.Revision();
     OSFSettings::Test::FileLock writeLock(saved);
     check(service.SetInt("sample", "count", 9) == Status::SaveFailed && service.ResetMod("sample") == Status::SaveFailed &&
         service.Reset("sample", "enabled") == Status::SaveFailed, "save failures propagate through setters and resets");
@@ -190,18 +194,24 @@ int TestSettingsService()
         service.GetInt("sample", "count", &count) == Status::Ok && count == 8 && ReadFile(saved) == persisted &&
         !backend.HasPendingChanges(), "failed atomic reset preserves all live values, disk, and notifications");
     check(service.SetInt("sample", "count", 8) == Status::Ok && !backend.HasPendingChanges(), "unchanged writes skip failed storage");
+    check(backend.Revision() == revision, "failed saves and unchanged writes do not invalidate menu snapshots");
     writeLock.Release();
     check(service.ResetMod("sample") == Status::Ok, "mod reset commits");
+    check(backend.Revision() > revision, "mod reset invalidates menu snapshots");
     check(Json::parse(ReadFile(saved))["values"] == Json::object() &&
         backend.FindMod("sample")->values == backend.FindMod("sample")->schema.DefaultValues(),
         "mod reset removes all overrides and publishes defaults in one transaction");
     backend.DispatchChanges();
     check(events.keys == std::vector<std::string>{ "*" }, "mod reset requests one full refresh");
     events.keys.clear();
+    revision = backend.Revision();
     check(service.ResetMod("sample") == Status::Ok && !backend.HasPendingChanges(), "unchanged reset does not notify");
+    check(backend.Revision() == revision, "unchanged reset does not invalidate menu snapshots");
     service.SetFloat("sample", "scale", 0.4);
+    revision = backend.Revision();
     check(service.Reset("sample", "scale") == Status::Ok && service.GetFloat("sample", "scale", &scale) == Status::Ok && scale == 0.15,
         "single reset restores the exact off-step default");
+    check(backend.Revision() > revision, "single reset invalidates menu snapshots");
     backend.DispatchChanges();
     events.keys.clear();
 
@@ -317,7 +327,9 @@ int TestSettingsService()
     dispatch.join();
     check(entered && waited && finished.get() == Status::Ok && blocking.calls == 1,
         "external unsubscribe waits for an in-flight callback and dispatch remains serial");
-    service.SetBool("sample", "enabled", false);
+    revision = backend.Revision();
+    check(service.SetBool("sample", "enabled", false) == Status::Ok && backend.Revision() > revision &&
+        !backend.HasPendingChanges(), "writes invalidate menu snapshots without any subscribers");
     backend.DispatchChanges();
     check(blocking.calls == 1, "no callbacks occur after unsubscribe returns");
 

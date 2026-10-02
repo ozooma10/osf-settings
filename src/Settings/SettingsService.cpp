@@ -145,7 +145,7 @@ namespace OSFSettings
         if (!IsReady()) return SettingsError::NotReady;
         const auto id = mod.schema.id;
         const auto result = m_store.RegisterProvider(std::move(mod), std::move(save), registration);
-        if (result == SettingsError::None) { ++m_revision; Notify(id, std::nullopt); }
+        if (result == SettingsError::None) Notify(id, std::nullopt);
         return result;
     }
 
@@ -153,7 +153,6 @@ namespace OSFSettings
     {
         std::lock_guard lock(m_mutex);
         if (const auto id = m_store.UnregisterProvider(registration)) {
-            ++m_revision;
             Notify(*id, std::nullopt);
             return SettingsError::None;
         }
@@ -177,6 +176,7 @@ namespace OSFSettings
 
     void SettingsService::Notify(std::string_view mod, std::optional<std::string_view> key) noexcept
     {
+        ++m_revision;
         for (auto& [token, listener] : m_listeners) {
             if (listener->mod != mod) continue;
             if (!key) {
