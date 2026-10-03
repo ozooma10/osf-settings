@@ -46,9 +46,9 @@ package
             for each (row in rows) {
                 if (headed && row.group != lastGroup) {
                     lastGroup = row.group;
-                    // Inside a "Tab - Section" section the sidebar already names the tab.
+                    // Only IDs using "Tab - Section" opt into abbreviated labels.
                     var title:String = String(row.groupTitle), split:int = title.indexOf(" - ");
-                    if (section && split > 0) title = title.substr(split + 3);
+                    if (section && String(row.group).indexOf(" - ") > 0 && split > 0) title = title.substr(split + 3);
                     data.push({row:{type:"section", title:title, mod:row.mod, id:"@section/" + row.group, group:row.group, editable:false},
                         sText:"", uID:data.length, bDisabled:true, bShowSpinner:false, uCategory:0, bEnabled:false, bSubSetting:false,
                         uType:types.SDT_LINK, sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:false}});

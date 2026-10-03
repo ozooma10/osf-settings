@@ -63,7 +63,7 @@ package
         private var navSelection:String = "page/mods";
         private var navAcceptHeld:Boolean = false;
         // Group ID to the sidebar section (tab) that holds it, for the open mod.
-        private var groupTabs:Object = {};
+        private var groupTabs:Dictionary = new Dictionary();
         private var heading:TextField;
         private var headerSummary:TextField;
         private var section:TextField;
@@ -473,19 +473,26 @@ package
             buildTabs();
             populate(preserve); updateNav();
         }
-        // Groups titled "Tab - Section" share a sidebar section; others are sections of their
-        // own. A section keeps its first group's ID so unfolded groups keep theirs.
+        // Group IDs beginning "Tab - " share a sidebar section, regardless of their
+        // translated labels. A section keeps its first group's ID.
         private function buildTabs():void
         {
-            groups = []; groupTabs = {}; var seen:Dictionary = new Dictionary(); var folded:Object = {};
+            groups = []; groupTabs = new Dictionary(); var folded:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
                 if (row.type == "launcher" || row.mod != modID) continue;
-                if (seen[row.group]) { ++groupTabs[row.group].size; continue; }
-                seen[row.group] = true;
-                var title:String = String(row.groupTitle); var split:int = title.indexOf(" - ");
-                var name:String = split > 0 ? title.substr(0, split) : title;
-                var tab:Object = folded.hasOwnProperty(name) ? folded[name] : null;
-                if (!tab) { tab = folded[name] = {id:row.group, title:name, size:0}; groups.push(tab); }
+                if (groupTabs[row.group]) { ++groupTabs[row.group].size; continue; }
+                var id:String = String(row.group), split:int = id.indexOf(" - ");
+                var name:String = split > 0 ? id.substr(0, split) : id;
+                var tab:Object = folded[name];
+                if (!tab) {
+                    var title:String = String(row.groupTitle);
+                    // Abbreviate labels only for groups whose IDs use the convention.
+                    if (split > 0) {
+                        split = title.indexOf(" - ");
+                        if (split > 0) title = title.substr(0, split);
+                    }
+                    tab = folded[name] = {id:id, title:title, size:0}; groups.push(tab);
+                }
                 groupTabs[row.group] = tab; ++tab.size;
             }
             // A section that is gone (or no longer has siblings) falls back to the whole mod.
