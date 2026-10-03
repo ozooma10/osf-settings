@@ -119,7 +119,7 @@ private function reportTestState():void
         navigation:{focused:nav.focused},
         home:{interfacesVisible:launcher.visible, expanded:launcher.expanded, interfacesFocused:launcher.focused},
         actionConfirmation:{active:confirmingAction()},
-        launch:{active:Boolean(launching)},
+        launch:{active:launcher.launching},
         bindings:{state:keybindings.state, count:keybindings.rows.length, requiredActions:requiredActions, selectedKey:keybindings.selectedKey,
             source:keybindings.source, query:keybindings.search.text, searching:searching(), slot:nativeHotkeys.selectedSlot,
             searchRect:testRect(keybindings.search.getBounds(menuStage)),

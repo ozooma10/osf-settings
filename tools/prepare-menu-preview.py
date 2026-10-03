@@ -1,69 +1,38 @@
 """Prepare local Starfield libraries and schema defaults for the Ruffle host."""
 
 import argparse
-from functools import cache
 import json
-import math
+import mmap
 from pathlib import Path, PurePosixPath
-import re
 import struct
+import subprocess
 import xml.etree.ElementTree as ET
 import zlib
 
 from preview_abc import adapt_callbacks
 
 
-def load_schema(path):
-    schema = json.loads(path.read_text(encoding="utf-8-sig"))
-    if "actions" in schema:
-        raise ValueError(f"Move top-level actions into groups with type: action: {path}")
-    mod_id = path.stem
-    if not re.fullmatch(r"[a-z0-9._-]+", mod_id) or mod_id in (".", ".."):
-        raise ValueError(f"Invalid schema filename mod ID: {path}")
-    if "id" in schema and schema["id"] != mod_id:
-        raise ValueError(f"Schema id must match the filename stem: {path}")
-    schema["id"] = mod_id
-    schema.setdefault("title", mod_id)
-    return schema
-
-
-@cache
-def virtual_key_names():
-    # The offline preview reads the same enum used by native magic_enum reflection.
-    header = Path(__file__).resolve().parents[1] / "lib/commonlibsf/lib/commonlib-shared/include/REX/W32/USER32.h"
-    source = header.read_text(encoding="utf-8")
-    enum = re.search(r"\benum\s+VK\s*:\s*std::uint32_t\s*\{([^}]+)\}", source)
-    if enum is None:
-        raise ValueError("Cannot find CommonLib's VK enum for the preview")
-    names = {}
-    for declaration in enum[1].split(","):
-        if not declaration.strip():
-            continue
-        field = re.fullmatch(r"\s*(VK_\w+)\s*=\s*(0x[0-9a-fA-F]+|VK_\w+)\s*", declaration)
-        if field is None:
-            raise ValueError(f"Unsupported VK enum declaration: {declaration.strip()}")
-        names[field[1]] = names[field[2]] if field[2].startswith("VK_") else int(field[2], 16)
-    return names
-
-
-def key_default(value, allow_unbound=True):
-    # Match KeyCodeFromName's stable schema aliases; runtime and preview rows stay numeric.
-    if isinstance(value, str):
-        name = value.upper() if value.isascii() else ""
-        name = name.removeprefix("VK_")
-        aliases = {
-            "BACKSPACE": "BACK", "ENTER": "RETURN", "CAPSLOCK": "CAPITAL",
-            "PAGEUP": "PRIOR", "PAGEDOWN": "NEXT", "PRINTSCREEN": "SNAPSHOT",
-            "SCROLLLOCK": "SCROLL", "LCTRL": "LCONTROL", "RCTRL": "RCONTROL",
-            "LALT": "LMENU", "RALT": "RMENU",
-            "NUMPADMULTIPLY": "MULTIPLY", "NUMPADADD": "ADD", "NUMPADSUBTRACT": "SUBTRACT",
-            "NUMPADDECIMAL": "DECIMAL", "NUMPADDIVIDE": "DIVIDE",
-        }
-        value = 255 if name == "UNBOUND" else virtual_key_names().get("VK_" + aliases.get(name, name))
-    if (type(value) is not int or type(allow_unbound) is not bool or
-            not (value == 255 and allow_unbound or 0 < value < 255 and value not in (1, 2, 4, 5, 6, 27))):
-        raise ValueError("Invalid keyboard virtual-key code or key name")
-    return value
+def export_rows(exporter, executable, output, schema_paths):
+    # Read the engine's UTF-16 table without loading or running the executable.
+    # Locate its header rather than pinning a game-version-specific RVA.
+    prefix = "Backspace\t0x08\t8\nTab\t0x09\t9\n".encode("utf-16-le")
+    with executable.open("rb") as stream, mmap.mmap(stream.fileno(), 0, access=mmap.ACCESS_READ) as game:
+        start = game.find(prefix)
+        if start < 0 or start % 2 or game.find(prefix, start + 1) >= 0:
+            raise ValueError(f"Cannot uniquely locate Starfield's keyboard-name table: {executable}")
+        end = start
+        while end + 2 <= len(game) and game[end:end + 2] != b"\0\0":
+            end += 2
+        if end + 2 > len(game):
+            raise ValueError("Unterminated Starfield keyboard-name table")
+        output.mkdir(parents=True, exist_ok=True)
+        table = output / "keyboard-table.utf16"
+        table.write_bytes(game[start:end])
+    result = subprocess.run([str(exporter), str(table), *map(str, schema_paths)],
+                            capture_output=True, encoding="utf-8", check=False)
+    if result.returncode:
+        raise ValueError(result.stderr.strip() or "Native preview row export failed")
+    return json.loads(result.stdout)
 
 
 def swf_tags(source):
@@ -134,7 +103,8 @@ class InterfaceArchive:
         return data
 
 
-def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=None):
+def prepare(archive_path, output, schema_paths, large, menu_path, exporter, executable, issues_path=None):
+    exported = export_rows(exporter, executable, output, schema_paths)
     archive = InterfaceArchive(archive_path)
     assets = output / "assets"
     assets.mkdir(parents=True, exist_ok=True)
@@ -211,87 +181,16 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
     tags = [(code, text_font(data) if code == 37 else data) for code, data in tags]
     (output / "menu.swf").write_bytes(pack_swf(source, prefix, tags))
     rows = ET.SubElement(config, "rows")
-    for path in schema_paths:
-        schema = load_schema(path)
-        for name, settings in schema["groups"].items():
-            for setting in settings:
-                if setting["type"] == "action":
-                    ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
-                                  modDescription=schema.get("description", ""), group=name, groupTitle=name,
-                                  key=setting["id"], title=setting["label"], type="action", editable="true",
-                                  hint=setting.get("hint", ""), confirmation=setting.get("confirmation", ""),
-                                  actionState="Run", message="Ready.")
-                    continue
-                if "requires" in setting and setting["requires"] != "restart":
-                    raise ValueError(f'Preview requires must be "restart" when present: {path} / {setting["key"]}')
-                kind, default = setting["type"], setting["default"]
-                attributes = {"type": kind, "value": str(default).lower(), "editable": "true"}
-                if kind == "int" and type(default) is int:
-                    minimum, maximum = setting.get("min"), setting.get("max")
-                    for bound in (default, minimum, maximum):
-                        if bound is not None and (type(bound) is not int or not -(2**63) <= bound < 2**63):
-                            raise ValueError(f"Invalid preview integer: {path}")
-                    if (minimum is not None and default < minimum) or (maximum is not None and default > maximum):
-                        raise ValueError(f"Preview default is outside its bounds: {path}")
-                    if minimum is not None:
-                        attributes["minimum"] = str(minimum)
-                    if maximum is not None:
-                        attributes["maximum"] = str(maximum)
-                    attributes["editable"] = str(minimum is not None and maximum is not None and
-                        -(2**53 - 1) <= minimum < maximum <= 2**53 - 1 and maximum - minimum <= 2**32 - 1).lower()
-                elif kind == "float":
-                    minimum, maximum, step = setting.get("min"), setting.get("max"), setting.get("step", 0.1)
-                    for field in ("default", "min", "max", "step"):
-                        if field in setting and (type(setting[field]) not in (int, float) or not math.isfinite(setting[field])):
-                            raise ValueError(f"Preview {field} must be a finite number: {path}")
-                    if step <= 0 or (minimum is not None and default < minimum) or (maximum is not None and default > maximum):
-                        raise ValueError(f"Invalid preview float bounds or step: {path}")
-                    if minimum is not None:
-                        attributes["minimum"] = str(minimum)
-                    if maximum is not None:
-                        attributes["maximum"] = str(maximum)
-                    attributes.update(float_slider(minimum, maximum, step))
-                elif kind == "string":
-                    limit = setting.get("maxLength", 256)
-                    if (type(limit) is not int or not 1 <= limit <= 4096 or not isinstance(default, str) or
-                            len(default.encode("utf-8")) > limit or
-                            any(ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F or ord(c) in (0x2028, 0x2029) for c in default)):
-                        raise ValueError(f"Invalid preview string default or maxLength: {path}")
-                    attributes.update(value=default, maxLength=str(limit))
-                elif kind == "enum":
-                    options = setting.get("options")
-                    if "optionLabels" in setting:
-                        raise ValueError(f"optionLabels is no longer supported; use an options object: {path}")
-                    if (not isinstance(options, (list, dict)) or not options or
-                            any(not isinstance(value, str) or not value or "\0" in value for value in options) or
-                            len(set(options)) != len(options) or not isinstance(default, str) or default not in options):
-                        raise ValueError(f"Invalid preview enum options or default: {path}")
-                    labels = options.values() if isinstance(options, dict) else options
-                    if any(not isinstance(label, str) for label in labels):
-                        raise ValueError(f"Invalid preview enum labels: {path}")
-                    attributes.update(value=default, editable=str(len(options) > 1).lower())
-                elif kind == "key":
-                    allow_unbound = setting.get("allowUnbound", True)
-                    try:
-                        default = key_default(default, allow_unbound)
-                    except ValueError as error:
-                        raise ValueError(f"Invalid preview key default: {path} / {setting['key']}") from error
-                    attributes.update(value=str(default), allowUnbound=str(allow_unbound).lower())
-                elif kind != "bool" or type(default) is not bool:
-                    raise ValueError(f"Preview supports boolean, integer, float, enum, key, and string settings only: {path}")
-                row = ET.SubElement(rows, "row", mod=schema["id"], modTitle=schema["title"],
-                              modDescription=schema.get("description", ""),
-                              group=name, groupTitle=name, key=setting["key"],
-                              title=setting["label"], hint=setting.get("hint", ""),
-                              requiresRestart=str(setting.get("requires") == "restart").lower(),
-                              **attributes)
-                if kind == "enum":
-                    for value, label in zip(options, labels):
-                        ET.SubElement(row, "option", value=value, label=label or value)
+    def attribute(value):
+        return str(value).lower() if isinstance(value, bool) else str(value)
+
+    for fields in exported["rows"]:
+        row = ET.SubElement(rows, "row", **{key: attribute(value) for key, value in fields.items() if key != "options"})
+        for option in fields.get("options", []):
+            ET.SubElement(row, "option", **option)
     issues = ET.SubElement(config, "issues")
     if issues_path:
-        titles = {schema["id"]: schema.get("title") or schema["id"]
-                  for schema in (load_schema(path) for path in schema_paths)}
+        titles = exported["titles"]
         reports = json.loads(issues_path.read_text(encoding="utf-8"))
         for report in sorted(reports, key=lambda report: report["severity"] != "ERROR"):
             issue = ET.SubElement(issues, "issue", mod=report["modId"], id=report["id"],
@@ -303,39 +202,6 @@ def prepare(archive_path, output, schema_paths, large, menu_path, issues_path=No
     ET.ElementTree(config).write(output / "preview.xml", encoding="utf-8", xml_declaration=True)
 
 
-def float_slider(minimum, maximum, step):
-    # Match the native FloatSlider coordinates used by the same menu SWF.
-    result = {"editable": "false", "decimals": "-1"}
-    if minimum is None or maximum is None or minimum >= maximum:
-        return result
-    minimum, maximum, step = float(minimum), float(maximum), float(step)
-    magnitude = max(abs(minimum), abs(maximum))
-    if step < math.nextafter(magnitude, math.inf) - magnitude:
-        return result
-    safe_integer = 2**53 - 1
-    for decimals in range(10):
-        scale = 10**decimals
-        coordinates = []
-        for value in (minimum, maximum, step):
-            scaled = value * scale
-            if not math.isfinite(scaled) or abs(scaled) > safe_integer:
-                break
-            integer = round(scaled)
-            if integer / scale != value:
-                break
-            coordinates.append(integer)
-        if len(coordinates) != 3 or coordinates[2] <= 0:
-            continue
-        low, high, increment = coordinates
-        span = high - low
-        count = (span - 1) // increment + 1
-        if span > safe_integer or count > 2**32 - 1:
-            return result
-        return {"editable": "true", "decimals": str(decimals), "sliderMinimum": str(low),
-                "sliderMaximum": str(high), "sliderStep": str(increment), "sliderScale": str(scale),
-                "sliderSteps": str(count)}
-    return result
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
@@ -344,6 +210,8 @@ if __name__ == "__main__":
     parser.add_argument("--large", action="store_true")
     parser.add_argument("--menu", type=Path, required=True)
     parser.add_argument("--issues", type=Path)
+    parser.add_argument("--exporter", type=Path, required=True)
+    parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("schemas", type=Path, nargs="+")
     args = parser.parse_args()
-    prepare(args.archive, args.output, args.schemas, args.large, args.menu, args.issues)
+    prepare(args.archive, args.output, args.schemas, args.large, args.menu, args.exporter, args.executable, args.issues)

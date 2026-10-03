@@ -60,6 +60,20 @@ Preview fixtures explicitly mark required keys with `allowUnbound: false`.
 Install the optional preview dependency once with
 `pwsh -NoProfile -File tools/setup.ps1 -Preview`.
 
+Preview schemas pass through the production C++ parser and setting-row builder.
+`preview-menu.ps1` builds `osfsettings-preview-rows` and reads the keyboard-name
+table from the local `Starfield.exe` without running it. The executable defaults
+to the installation containing `-InterfaceArchive`; use `-GameExecutable` to
+override it. Neither the keyboard table nor game assets are shipped.
+
+To check schema/row regressions without opening Ruffle or Starfield:
+
+```powershell
+xmake build osfsettings-preview-rows
+python -B tests/preview_rows_tests.py
+pwsh -NoProfile -File tools/preview-menu.ps1 -BuildOnly
+```
+
 ```powershell
 pwsh -NoProfile -File tools/test-menu-preview.ps1
 pwsh -NoProfile -File tools/test-menu-preview.ps1 -LargeText

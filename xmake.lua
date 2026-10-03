@@ -28,7 +28,7 @@ rule("osfsettings.localization")
     end)
 rule_end()
 
-includes("tests", "examples")
+includes("tests", "examples", "tools")
 
 -- define targets
 target("OSF Settings")

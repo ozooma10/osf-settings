@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$InterfaceArchive = 'C:/Program Files (x86)/Steam/steamapps/common/Starfield/Data/Starfield - Interface.ba2',
+    [string]$GameExecutable,
     [switch]$LargeText,
     [switch]$Scrolling,
     [switch]$Design,
@@ -20,7 +21,8 @@ $ruffle = Join-Path $repo 'external/ruffle/ruffle.exe'
 $flex = Join-Path $repo 'external/flex'
 $compiler = Join-Path $flex 'bin/mxmlc.bat'
 $player = Join-Path $flex 'frameworks/libs/player/10.3/playerglobal.swc'
-$keyNames = Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/include/REX/W32/USER32.h'
+$exporter = Join-Path $output 'osfsettings-preview-rows.exe'
+if (-not $GameExecutable) { $GameExecutable = Join-Path (Split-Path (Split-Path $InterfaceArchive -Parent) -Parent) 'Starfield.exe' }
 $schemas = @((Join-Path $repo 'data/SFSE/Plugins/OSF/Settings/schemas/learning.json'))
 if ($Design) { $schemas = @((Join-Path $repo 'tests/menu/design-preview.json')) }
 if ($Scrolling) { $schemas += Join-Path $repo 'tests/menu/scrolling.json' }
@@ -32,16 +34,18 @@ if (-not $BuildOnly -and -not (Test-Path -LiteralPath $ruffle)) { & "$PSScriptRo
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 
 function Build-Preview {
+    & xmake build --project=$repo osfsettings-preview-rows
+    if ($LASTEXITCODE -ne 0) { throw 'Could not build the native preview row exporter.' }
     $variant = if ($LargeText) { 'Large' } else { 'Normal' }
     & "$PSScriptRoot/build-scaleform.ps1" -Preview -Variant $variant -Force:$Force
     $suffix = if ($LargeText) { '_LRG' } else { '' }
     $movie = "$repo/build/scaleform/preview/OSFSettingsMenu$suffix.raw.swf"
-    $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output, '--menu', $movie)
+    $prepareArgs = @('--archive', $InterfaceArchive, '--output', $output, '--menu', $movie, '--exporter', $exporter, '--executable', $GameExecutable)
     if ($LargeText) { $prepareArgs += '--large' }
     if ($Issues) { $prepareArgs += @('--issues', (Join-Path $repo 'tests/menu/issues.json')) }
-    $inputs = @($movie, $PSCommandPath, "$PSScriptRoot/BuildCache.ps1", "$PSScriptRoot/prepare-menu-preview.py", "$PSScriptRoot/preview_abc.py", $keyNames) + $schemas
+    $inputs = @($movie, $PSCommandPath, "$PSScriptRoot/BuildCache.ps1", "$PSScriptRoot/prepare-menu-preview.py", "$PSScriptRoot/preview_abc.py", $exporter) + $schemas
     if ($Issues) { $inputs += Join-Path $repo 'tests/menu/issues.json' }
-    $fingerprint = Get-BuildFingerprint -Files $inputs -MetadataFiles @($InterfaceArchive) -Values @($variant, [string]$Issues)
+    $fingerprint = Get-BuildFingerprint -Files $inputs -MetadataFiles @($InterfaceArchive, $GameExecutable) -Values @($variant, [string]$Issues)
     $stamp = Join-Path $output 'assets.stamp'
     $outputs = @("$output/menu.swf", "$output/preview.xml")
     if (Test-Path -LiteralPath "$output/preview.xml") {
@@ -86,7 +90,8 @@ function Source-Stamp {
     $files = @(Get-ChildItem -LiteralPath "$repo/scaleform" -Recurse -File)
     $files += Get-ChildItem -LiteralPath $PSScriptRoot -File | Where-Object { $_.Extension -in '.py', '.ps1' }
     $files += Get-Item -LiteralPath $schemas
-    $files += Get-Item -LiteralPath $keyNames, "$repo/data/SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json"
+    $files += Get-ChildItem -LiteralPath "$repo/src/Settings", "$repo/src/Menu", "$repo/src/Input" -Recurse -File
+    $files += Get-Item -LiteralPath "$PSScriptRoot/preview-rows.cpp", "$PSScriptRoot/xmake.lua", "$repo/xmake.lua", $GameExecutable, "$repo/data/SFSE/Plugins/OSF/Settings/translations/en/osfsettings.json"
     if ($Issues) { $files += Get-Item -LiteralPath (Join-Path $repo 'tests/menu/issues.json') }
     ($files | Sort-Object FullName | ForEach-Object { "$($_.FullName):$($_.LastWriteTimeUtc.Ticks):$($_.Length)" }) -join '|'
 }

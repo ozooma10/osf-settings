@@ -103,6 +103,7 @@ package
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
                     requiresRestart:String(row.@requiresRestart) == "true", maxLength:int(row.@maxLength),
                     type:String(row.@type), editable:String(row.@editable) == "true", allowUnbound:String(row.@allowUnbound) == "true",
+                    allowMouse:String(row.@allowMouse) == "true",
                     minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value, options:choices,
                     valueName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",
                     defaultName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",
@@ -353,7 +354,8 @@ package
         private function setKey(mod:String, key:String, value:Number):Object
         {
             for each (var row:Object in rows) {
-                if (row.mod == mod && row.key == key && row.type == "key" && isFinite(value) && value == Math.floor(value) && (value == 255 ? row.allowUnbound : bindableKey(value))) {
+                if (row.mod == mod && row.key == key && row.type == "key" && isFinite(value) && value == Math.floor(value) &&
+                    (value == 255 ? row.allowUnbound : bindableKey(value) || row.allowMouse && mouseKey(value))) {
                     row.value = value; row.valueName = previewKeyName(uint(value)); return {ok:true};
                 }
             }
@@ -386,7 +388,11 @@ package
         }
         private function bindableKey(code:Number):Boolean
         {
-            return code > 0 && code < 255 && code != 1 && code != 2 && code != 4 && code != 5 && code != 6 && code != 27;
+            return code > 0 && code < 255 && !mouseKey(code) && code != 27;
+        }
+        private function mouseKey(code:Number):Boolean
+        {
+            return code == 1 || code == 2 || code == 4 || code == 5 || code == 6;
         }
         private function captureButton(code:uint, down:Boolean):void
         {
@@ -408,13 +414,14 @@ package
             if (event.keyCode == 18) return event.keyLocation == 2 ? 165 : 164;
             return event.keyCode;
         }
-        // Preview labels only; native labels come from Windows. This never gates capture.
+        // Preview labels only; native labels come from the game. This never gates capture.
         private function previewKeyName(code:uint):String
         {
             if (code >= 65 && code <= 90 || code >= 48 && code <= 57) return String.fromCharCode(code);
             if (code >= 112 && code <= 135) return "F" + (code - 111);
             if (code >= 96 && code <= 105) return "Numpad" + (code - 96);
-            var names:Object = {8:"Backspace",9:"Tab",13:"Enter",19:"Pause",20:"CapsLock",27:"Escape",32:"Space",
+            var names:Object = {1:"Mouse 1",2:"Mouse 2",4:"Mouse 3",5:"Mouse 4",6:"Mouse 5",
+                8:"Backspace",9:"Tab",13:"Enter",19:"Pause",20:"CapsLock",27:"Escape",32:"Space",
                 160:"Left Shift",161:"Right Shift",162:"Left Ctrl",163:"Right Ctrl",164:"Left Alt",165:"Right Alt",255:"UNBOUND"};
             return names[code] || "Key 0x" + code.toString(16).toUpperCase();
         }
