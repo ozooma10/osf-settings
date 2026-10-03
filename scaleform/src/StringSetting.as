@@ -2,6 +2,7 @@ package
 {
     import flash.display.Sprite;
     import flash.events.Event;
+    import flash.events.KeyboardEvent;
     import flash.events.TextEvent;
     import flash.text.TextField;
 
@@ -11,9 +12,14 @@ package
         public var input:TextField;
         public var row:Object;
         private var feedback:TextField;
+        private var bridge:Object;
+        private var finished:Function;
+        private var openedFrame:int;
+        private var confirmHeld:Boolean;
 
-        public function StringSetting()
+        public function StringSetting(code:Object, onFinished:Function)
         {
+            bridge = code; finished = onFinished;
             // The menu sets y under the selected setting's details.
             var column:Number = MenuStyle.DETAIL_WIDTH, box:Number = MenuStyle.DETAIL_BODY_SIZE + 22;
             x = MenuStyle.DETAIL_X;
@@ -35,13 +41,60 @@ package
             visible = false;
         }
 
-        public function open(value:Object):void
+        public function open(value:Object, frame:int):Boolean
         {
-            row = value; visible = true;
+            if (!bridge.textInput(true)) return false;
+            row = value; visible = true; openedFrame = frame; confirmHeld = false;
             MenuStyle.setText(input, String(row.value));
             stage.focus = input; input.setSelection(0, input.length); changed();
+            return true;
         }
-        public function close():void { row = null; visible = false; }
+        public function close():void
+        {
+            if (!visible) return;
+            row = null; visible = false; confirmHeld = false;
+            bridge.textInput(false);
+        }
+        public function cancel():void { if (visible) finish(true); }
+        private function finish(cancelled:Boolean):void
+        {
+            close(); finished(cancelled);
+        }
+        public function save(frame:int):void
+        {
+            if (!visible || frame <= openedFrame + 1) return;
+            if (!valid) {
+                showError(tr("strings.limit", {limit:row.maxLength}));
+                stage.focus = input; return;
+            }
+            var value:String = input.text;
+            var result:Object = bridge.setString(row.mod, row.key, value, Number(byteLength(value)));
+            if (!result || !result.ok) {
+                showError(result ? result.error : tr("errors.saveText"));
+                stage.focus = input; return;
+            }
+            finish(false);
+        }
+        public function userEvent(name:String, pressed:Boolean, frame:int, event:KeyboardEvent = null):Boolean
+        {
+            if (!event) {
+                if (name == "Cancel") { if (!pressed) cancel(); return true; }
+                return false; // Let native forward raw keys and characters to the field.
+            }
+            if (name == "Accept" || name == "Cancel") {
+                event.stopImmediatePropagation(); event.preventDefault();
+                if (pressed) {
+                    if (name == "Accept" && frame > openedFrame + 1) confirmHeld = true;
+                } else {
+                    if (frame > openedFrame + 1) {
+                        if (name == "Accept") { if (confirmHeld) save(frame); }
+                        else cancel();
+                    }
+                    confirmHeld = false;
+                }
+            }
+            return true;
+        }
         CONFIG::testHarness {
             public function testState():Object {
                 return {active:visible, text:input.text, valid:valid, feedback:feedback.text,

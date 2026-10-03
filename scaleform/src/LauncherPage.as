@@ -26,10 +26,16 @@ package
         private var isLocked:Boolean = false;
         private var hasFocus:Boolean = false;
         private var loadingRow:Object = null;
+        private var bridge:Object;
+        private var status:Function;
+        private var closing:Function;
+        private var acceptDown:Boolean;
         private var pagerState:String = "";
-        public function LauncherPage(onChanged:Function, onActivated:Function, onLayout:Function)
+        public function LauncherPage(code:Object, onChanged:Function, onActivated:Function, onLayout:Function,
+                                     onStatus:Function, onClosing:Function)
         {
             changed = onChanged; activated = onActivated; layoutChanged = onLayout;
+            bridge = code; status = onStatus; closing = onClosing;
             x = MenuStyle.LEFT; y = MenuStyle.LIST_TOP;
             addChild(cards); addChild(pager);
             addEventListener(MouseEvent.MOUSE_WHEEL, wheel);
@@ -50,6 +56,17 @@ package
         public function get hasEntries():Boolean { return entries.length > 0; }
         public function get focused():Boolean { return hasFocus; }
         public function set focused(value:Boolean):void { hasFocus = value; paintSelection(); }
+        public function get acceptHeld():Boolean { return acceptDown; }
+        public function releaseAccept():void { acceptDown = false; }
+        public function accept(pressed:Boolean):void
+        {
+            if (pressed) acceptDown = true;
+            else if (acceptDown) {
+                acceptDown = false;
+                activated(); // Hand off after the launch button is released.
+            }
+        }
+        public function get launching():Boolean { return loadingRow != null; }
         public function get selectedIndex():int { return selected; }
         public function get scrollPosition():int { return first; }
         public function get current():Object { return selected >= 0 && selected < displayed.length ? displayed[selected] : null; }
@@ -89,8 +106,29 @@ package
             render();
         }
         public function toggleExpanded():void { if (isLocked) return; isExpanded = !isExpanded; hasFocus = true; layoutChanged(); }
-        // The destination loading before handoff, matched by identity so its tag survives refreshes.
-        public function set loading(row:Object):void { loadingRow = row; render(); }
+        public function launch(row:Object):void
+        {
+            // 0 rejected, 1 closing, 2 loading until pollLaunch resolves.
+            var result:int = int(bridge.launch(row.mod, row.key));
+            if (result == 2) {
+                loadingRow = row; render();
+                mouseEnabled = mouseChildren = false;
+                status(tr("home.loadingStatus", {title:String(row.title)}));
+            } else if (result == 1) closing();
+            else status(tr("home.loadFailed", {title:String(row.title)}), true);
+        }
+        public function advance():void
+        {
+            if (!loadingRow) return;
+            var result:Object = bridge.pollLaunch();
+            if (result.state == "pending") return;
+            // Keep the loading caption until native's queued hide removes the menu.
+            if (result.state == "closing") { closing(); return; }
+            var row:Object = loadingRow;
+            loadingRow = null; render();
+            mouseEnabled = mouseChildren = visible;
+            status(String(result.message) || tr("home.loadFailed", {title:String(row.title)}), true);
+        }
         private function paintSelection():void
         {
             for (var i:int = 0; i < cards.numChildren; ++i) {

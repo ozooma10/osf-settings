@@ -1,6 +1,6 @@
 #include "OSFSettingsMenu.h"
 #include "Harness/TestHarness.h"
-#include "FloatSlider.h"
+#include "SettingRow.h"
 #include "Input/KeyNames.h"
 #include "Input/NativeHotkeys.h"
 #include <cmath>
@@ -392,61 +392,25 @@ namespace OSFSettings
                         if (value == mod.values.end()) continue;
                         auto row = modRow(mod, group, setting.key, setting.label);
                         Text(row, "hint", setting.hint);
-                        row.SetMember("requiresRestart", RE::Scaleform::GFx::Value(setting.requiresRestart));
-                        if (const auto* definition = std::get_if<BoolDefinition>(&setting.definition)) {
-                            Text(row, "type", "bool");
-                            row.SetMember("value", RE::Scaleform::GFx::Value(std::get<bool>(value->second)));
-                            row.SetMember("defaultValue", RE::Scaleform::GFx::Value(definition->defaultValue));
-                            row.SetMember("editable", RE::Scaleform::GFx::Value(true));
-                        } else if (std::holds_alternative<IntDefinition>(setting.definition)) {
-                            const auto& integer = std::get<IntDefinition>(setting.definition);
-                            Text(row, "type", "int");
-                            Text(row, "value", std::to_string(std::get<std::int64_t>(value->second)));
-                            Text(row, "defaultValue", std::to_string(integer.defaultValue));
-                            if (integer.minimum) Text(row, "minimum", std::to_string(*integer.minimum));
-                            if (integer.maximum) Text(row, "maximum", std::to_string(*integer.maximum));
-                            // AS3 Number must preserve both bounds; BSSlider stores its range as uint32.
-                            const bool editable = integer.minimum && integer.maximum && *integer.minimum < *integer.maximum &&
-                                *integer.minimum >= -kMaxSafeInteger && *integer.maximum <= kMaxSafeInteger &&
-                                *integer.maximum - *integer.minimum <= 4294967295LL;
-                            row.SetMember("editable", RE::Scaleform::GFx::Value(editable));
-                        } else if (const auto* floating = std::get_if<FloatDefinition>(&setting.definition)) {
-                            Text(row, "type", "float");
-                            row.SetMember("value", RE::Scaleform::GFx::Value(std::get<double>(value->second)));
-                            row.SetMember("defaultValue", RE::Scaleform::GFx::Value(floating->defaultValue));
-                            const auto slider = MakeFloatSlider(*floating);
-                            row.SetMember("editable", RE::Scaleform::GFx::Value(slider.has_value()));
-                            row.SetMember("decimals", RE::Scaleform::GFx::Value(slider ? slider->decimals : -1));
-                            if (slider) {
-                                row.SetMember("sliderMinimum", RE::Scaleform::GFx::Value(static_cast<double>(slider->minimum)));
-                                row.SetMember("sliderMaximum", RE::Scaleform::GFx::Value(static_cast<double>(slider->maximum)));
-                                row.SetMember("sliderStep", RE::Scaleform::GFx::Value(static_cast<double>(slider->step)));
-                                row.SetMember("sliderScale", RE::Scaleform::GFx::Value(static_cast<double>(slider->scale)));
-                                row.SetMember("sliderSteps", RE::Scaleform::GFx::Value(static_cast<double>(slider->steps)));
-                            }
-                        } else if (const auto* text = std::get_if<StringDefinition>(&setting.definition)) {
-                            Text(row, "type", "string");
-                            Text(row, "value", std::get<std::string>(value->second));
-                            Text(row, "defaultValue", text->defaultValue);
-                            row.SetMember("maxLength", RE::Scaleform::GFx::Value(text->maxLength));
-                            row.SetMember("editable", RE::Scaleform::GFx::Value(true));
-                        } else if (const auto* binding = std::get_if<KeyDefinition>(&setting.definition)) {
-                            Text(row, "type", "key");
-                            const auto keyCode = std::get<KeyBinding>(value->second).keyCode;
-                            row.SetMember("value", RE::Scaleform::GFx::Value(static_cast<double>(keyCode)));
-                            row.SetMember("defaultValue", RE::Scaleform::GFx::Value(static_cast<double>(binding->defaultValue.keyCode)));
-                            Text(row, "valueName", KeyName(keyCode));
+                        const auto presentation = MakeSettingRow(setting, value->second);
+                        for (const auto& [name, field] : presentation.fields) {
+                            std::visit([&](const auto& content) {
+                                using T = std::decay_t<decltype(content)>;
+                                if constexpr (std::is_same_v<T, std::string>) {
+                                    Text(row, name, content);
+                                } else {
+                                    row.SetMember(name, RE::Scaleform::GFx::Value(content));
+                                }
+                            }, field);
+                        }
+                        if (const auto* binding = std::get_if<KeyDefinition>(&setting.definition)) {
+                            Text(row, "valueName", KeyName(std::get<KeyBinding>(value->second).keyCode));
                             Text(row, "defaultName", KeyName(binding->defaultValue.keyCode));
-                            row.SetMember("editable", RE::Scaleform::GFx::Value(true));
-                            row.SetMember("allowUnbound", RE::Scaleform::GFx::Value(binding->allowUnbound));
-                        } else if (const auto* enumeration = std::get_if<EnumDefinition>(&setting.definition)) {
-                            Text(row, "type", "enum");
-                            Text(row, "value", std::get<EnumValue>(value->second).value);
-                            Text(row, "defaultValue", enumeration->defaultValue.value);
-                            row.SetMember("editable", RE::Scaleform::GFx::Value(enumeration->options.size() > 1));
+                        }
+                        if (!presentation.options.empty()) {
                             RE::Scaleform::GFx::Value options;
                             root->CreateArray(&options);
-                            for (const auto& option : enumeration->options) {
+                            for (const auto& option : presentation.options) {
                                 RE::Scaleform::GFx::Value choice;
                                 root->CreateObject(&choice);
                                 Text(choice, "value", option.value);

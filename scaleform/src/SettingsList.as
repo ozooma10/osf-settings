@@ -3,6 +3,7 @@ package
     import flash.display.DisplayObject;
     import flash.display.MovieClip;
     import flash.geom.ColorTransform;
+    import flash.geom.Rectangle;
     import flash.utils.Dictionary;
 
     // Owns data replacement and presentation of the vanilla list's pooled clips.
@@ -13,9 +14,56 @@ package
         private static const SELECTED:ColorTransform = new ColorTransform(0, 0, 0, 1,
             MenuStyle.INK >> 16 & 0xFF, MenuStyle.INK >> 8 & 0xFF, MenuStyle.INK & 0xFF, 0);
         private var list:Object;
+        private var types:Class;
         private var views:Dictionary = new Dictionary(true);
 
-        public function SettingsList(control:Object) { list = control; }
+        public function SettingsList(control:Object, entryTypes:Class) { list = control; types = entryTypes; }
+
+        public function resize(width:Number, rowHeight:Number):void
+        {
+            // Whole rows only, so the last visible row stays above the footer.
+            var pitch:Number = rowHeight + MenuStyle.ROW_GAP;
+            var height:Number = Math.max(1, Math.floor((MenuStyle.LIST_BOTTOM - list.y + MenuStyle.ROW_GAP) / pitch)) * pitch - MenuStyle.ROW_GAP;
+            // Setting borderHeight updates every vanilla clip, even for the same value.
+            if (list.borderHeight != height || list.Border_mc.width != width) {
+                list.Border_mc.width = width; list.borderHeight = height;
+            }
+            list.scrollBarHeight = height;
+            if (list.ScrollBar) list.ScrollBar.x = width + 14;
+            MovieClip(list).getChildByName("EntryHolder_mc").scrollRect = new Rectangle(0, 0, width, height);
+        }
+
+        // Convert visible page rows to the vanilla list contract. Sections remain
+        // entries so headers scroll with their settings and can be skipped by selection.
+        public function entries(rows:Array, settings:Boolean, section:Boolean):Array
+        {
+            var data:Array = [];
+            var headed:Boolean = false, firstGroup:String = null, lastGroup:String = null;
+            for each (var row:Object in rows) if (settings) {
+                if (firstGroup == null) firstGroup = row.group;
+                else if (row.group != firstGroup) headed = true;
+            }
+            for each (row in rows) {
+                if (headed && row.group != lastGroup) {
+                    lastGroup = row.group;
+                    // Inside a "Tab - Section" section the sidebar already names the tab.
+                    var title:String = String(row.groupTitle), split:int = title.indexOf(" - ");
+                    if (section && split > 0) title = title.substr(split + 3);
+                    data.push({row:{type:"section", title:title, mod:row.mod, id:"@section/" + row.group, group:row.group, editable:false},
+                        sText:"", uID:data.length, bDisabled:true, bShowSpinner:false, uCategory:0, bEnabled:false, bSubSetting:false,
+                        uType:types.SDT_LINK, sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:false}});
+                }
+                var slider:Boolean = settings && NumericSetting.isSlider(row);
+                var text:String = String(row.title).split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;");
+                // The vanilla entry multiplies fValue by 100; our slider stores integer offsets.
+                data.push({row:row, sText:text, uID:data.length, bDisabled:false, bShowSpinner:false,
+                    uCategory:0, bEnabled:!settings || row.editable, bSubSetting:false,
+                    uType:!settings ? types.SDT_LINK : slider ? types.SDT_SLIDER : row.type == "enum" ? types.SDT_LARGE_STEPPER : row.type == "bool" ? types.SDT_CHECKBOX : types.SDT_LINK,
+                    sliderData:{fValue:slider ? NumericSetting.position(row) / 100 : 0, sDisplayValue:NumericSetting.text(row, row.value)},
+                    stepperData:{aStepperOptions:row.type == "enum" ? EnumSetting.labels(row) : [], uIndex:row.type == "enum" ? EnumSetting.index(row) : 0}, checkBoxData:{bChecked:row.type == "bool" && row.value}});
+            }
+            return data;
+        }
 
         // Returns true only when membership/order changed or the page was reset.
         public function setEntries(data:Array, preserve:Boolean):Boolean

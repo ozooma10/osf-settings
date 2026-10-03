@@ -175,6 +175,19 @@ package
             else clip.onKeyDownHandler(event);
         }
 
+        public function userEvent(name:String, pressed:Boolean, event:KeyboardEvent = null):Boolean
+        {
+            if (event) {
+                // Native input has already delivered these keys to the remap receiver.
+                event.stopImmediatePropagation();
+                if (pressed) event.preventDefault();
+                return true;
+            }
+            if (popup.active) return Boolean(popup.ProcessUserEvent(name, pressed));
+            if (pressed && name == "Cancel") cancel();
+            return true;
+        }
+
         private function begin():Boolean
         {
             if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;

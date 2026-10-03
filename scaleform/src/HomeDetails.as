@@ -4,8 +4,7 @@ package
     import flash.text.TextField;
     import flash.text.TextFormat;
 
-    // Home's right-hand card. It describes whatever is selected, a mod or an interface,
-    // from a plain detail object the menu builds. Opening stays on the footer's Accept.
+    // Home's right-hand card describes the selected mod, interface or SHOW ALL entry.
     public final class HomeDetails extends Sprite
     {
         private static const WIDTH:Number = MenuStyle.DETAIL_WIDTH;
@@ -23,9 +22,9 @@ package
 
         public function get detail():Object { return selected; }
 
-        // detail: {title, badge, tint, subtitle, description, warning, chips:[], hotkeys:[{title, key}]}
-        public function show(detail:Object, top:Number):void
+        public function show(row:Object, top:Number):void
         {
+            var detail:Object = describe(row);
             var next:String = detail ? [top, detail.title, detail.badge, detail.tint, detail.subtitle, detail.description, detail.warning,
                 detail.chips.join("|"), keys(detail.hotkeys)].join("\n") : "";
             if (next == signature) return;
@@ -77,6 +76,22 @@ package
                 if (more) text(tr("home.moreHotkeys", {count:hotkeys.length - shown}), PAD, rowTop + 4, WIDTH - PAD * 2, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true, 1);
             }
             MenuDecoration.orbit(graphics, PAD, cursor + hotkeyBlock + 20, WIDTH - PAD * 2, height - PAD);
+        }
+
+        private function describe(row:Object):Object
+        {
+            if (!row) return null;
+            if (row.more) return {title:row.title, badge:row.badge, tint:Badge.MORE, subtitle:"", description:row.hint,
+                warning:"", chips:[], hotkeys:[]};
+            if (row.type == "launcher") return {title:row.title, badge:Badge.initials(String(row.title)),
+                tint:row.editable ? Badge.color(row.mod + "/" + row.key) : MenuStyle.LINE,
+                subtitle:row.modTitle && row.modTitle != row.title ? row.modTitle : "", description:row.hint,
+                warning:row.editable ? "" : String(row.message || tr("home.unavailable")),
+                chips:row.editable ? [tr("home.interface")] : [tr("home.interface"), tr("home.unavailable")], hotkeys:[]};
+            var hotkeys:Array = [];
+            for each (var hotkey:Object in row.hotkeys) hotkeys.push({title:hotkey.title, key:hotkey.value || tr("values.unboundTitle")});
+            return {title:row.title, badge:Badge.initials(String(row.title)), tint:Badge.color(String(row.mod)), subtitle:"",
+                description:row.hint, warning:"", chips:row.chips, hotkeys:hotkeys};
         }
 
         private function keys(hotkeys:Array):String
