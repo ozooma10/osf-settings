@@ -28,7 +28,7 @@ package
         {
             var rowWidth:Number = MenuStyle.LIST_WIDTH;
             var section:Boolean = row.type == "section";
-            var changed:Boolean = !modList && !section && row.type != "hotkey" && row.type != "action" && row.value != row.defaultValue;
+            var changed:Boolean = !modList && !section && row.defaultKnown !== false && row.type != "hotkey" && row.type != "action" && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
             var displayValue:String = section ? "" : modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
             graphics.clear();

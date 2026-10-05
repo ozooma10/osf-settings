@@ -44,6 +44,7 @@ package
         private var options:Object;
         private var settingsList:SettingsList;
         private var nativeHotkeys:NativeHotkeysList;
+        private var gameplayOptions:NativeGameplayOptions;
         private var keybindings:KeybindingsPage;
         private var stringEditor:StringSetting;
         private var actionConfirmation:ActionConfirmation;
@@ -200,6 +201,9 @@ package
             captureBinding.mouseEnabled = false; captureBinding.mouseChildren = false;
             captureBinding.visible = false;
             nativeHotkeys = new NativeHotkeysList(options, create, definition, BGSCodeObj, nativeBindingsChanged);
+            if (!CONFIG::preview) {
+                gameplayOptions = new NativeGameplayOptions(definition, BGSCodeObj, gameplayChanged);
+            }
             startupPhase = "build keybindings";
             keybindings = new KeybindingsPage(BGSCodeObj, nativeHotkeys, function():void { if (!refreshing) populate(true); }, focusResults);
             addChild(keybindings);
@@ -257,6 +261,12 @@ package
             updateSelection();
         }
         private function bindingBusy():Boolean { return nativeHotkeys && (nativeHotkeys.busy || nativeHotkeys.saving); }
+        private function gameplayBusy():Boolean { return gameplayOptions && gameplayOptions.busy; }
+        private function gameplayChanged(message:String, error:Boolean):void
+        {
+            requestedRefresh = true;
+            if (initialized && !closing && message) setStatus(tr(message), error);
+        }
         private function bindingsPage():Boolean { return !modID && rootPage == "bindings"; }
         private function homePage():Boolean { return !modID && rootPage == "mods"; }
         private function launcherPage():Boolean { return homePage() && launcher && launcher.hasEntries && launcher.focused; }
@@ -282,7 +292,7 @@ package
         private function editingString():Boolean { return stringEditor && stringEditor.visible; }
         private function confirmingAction():Boolean { return actionConfirmation && actionConfirmation.visible; }
         // A key capture, native rebind, text editor or confirmation owns input until it finishes.
-        private function modalBusy():Boolean { return Boolean(captureRow) || bindingBusy() || editingString() || confirmingAction(); }
+        private function modalBusy():Boolean { return Boolean(captureRow) || bindingBusy() || gameplayBusy() || editingString() || confirmingAction(); }
         // Changing page also waits for search, a pending refresh and any drag.
         private function pageLocked():Boolean { return modalBusy() || searching() || requestedRefresh || settingsList.dragging; }
         private function inputCoolingDown():Boolean { return frame <= inputBlockedThroughFrame; }
@@ -451,6 +461,7 @@ package
             revision = String(BGSCodeObj.revision());
             issues = BGSCodeObj.getIssues() as Array || [];
             allRows = BGSCodeObj.getRows() as Array || [];
+            if (gameplayOptions) allRows = allRows.concat(gameplayOptions.rows);
             mods = []; var seen:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
                 if (row.type == "launcher") continue;
@@ -653,8 +664,8 @@ package
         private function updateFooter(row:Object):void
         {
             footerDirty = false;
-            var busy:Boolean = bindingBusy(), editing:Boolean = editingString(), reporting:Boolean = issuesPage();
-            var resetVisible:Boolean = Boolean(!captureRow && !busy && modID && row && row.editable && row.type != "hotkey" && row.type != "action");
+            var busy:Boolean = bindingBusy() || gameplayBusy(), editing:Boolean = editingString(), reporting:Boolean = issuesPage();
+            var resetVisible:Boolean = Boolean(!captureRow && !busy && modID && row && row.editable && row.defaultKnown !== false && row.type != "hotkey" && row.type != "action");
             var clearVisible:Boolean = Boolean(!captureRow && !busy && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
             var acceptText:String = acceptLabel(row);
@@ -747,6 +758,7 @@ package
             if (captureRow || bindingBusy() || current() && current().type == "hotkey") return;
             var row:Object = current();
             if (closing || refreshing || requestedRefresh || settingsList.dragging || !modID || !row || !row.editable) return;
+            if (row.defaultKnown === false) return;
             activationFrame = frame;
             // Equal values can still have a saved override that reset must remove.
             var result:Object = BGSCodeObj.reset(row.mod, row.key);
@@ -777,9 +789,13 @@ package
         private function edit(row:Object, value:*):void
         {
             if (row.type == "action" || confirmingAction()) return;
-            if (closing || refreshing || bindingBusy() || options.scrollbarScrolling || !row.editable) return;
+            if (closing || refreshing || bindingBusy() || gameplayBusy() || options.scrollbarScrolling || !row.editable) return;
             activationFrame = frame;
             if (value == row.value) return;
+            if (row.gameplayID !== undefined) {
+                if (!gameplayOptions.edit(row, value)) setStatus(tr("errors.save"), true);
+                return;
+            }
             var result:Object;
             if (row.type == "float") result = BGSCodeObj.setFloat(row.mod, row.key, Number(value));
             else if (row.type == "int") result = BGSCodeObj.setInt(row.mod, row.key, String(value));
@@ -835,6 +851,7 @@ package
         }
         private function back():void
         {
+            if (gameplayBusy()) return;
             if (confirmingAction()) { actionConfirmation.cancel(); return; }
             if (editingString()) { stringEditor.cancel(); return; }
             if (nativeHotkeys.busy) { nativeHotkeys.cancel(); return; }
@@ -929,6 +946,10 @@ package
         // A text owner may decline a named event so native forwards its characters.
         private function modalInput(name:String, pressed:Boolean, event:KeyboardEvent = null):Boolean
         {
+            if (gameplayBusy()) {
+                if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
+                return true;
+            }
             if (confirmingAction()) {
                 if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
                 return actionConfirmation.userEvent(name, pressed);
@@ -1047,6 +1068,7 @@ package
             if (initialized && !closing) {
                 launcher.advance();
                 nativeHotkeys.advance();
+                if (gameplayOptions) gameplayOptions.advance();
                 keybindings.advance(allRows,bindingBusy());
                 syncInput();
                 if (footerDirty) updateFooter(current());
@@ -1150,6 +1172,7 @@ package
             if (event.target != this) return;
             if (stringEditor) stringEditor.close();
             if (nativeHotkeys) nativeHotkeys.dispose();
+            if (gameplayOptions) gameplayOptions.dispose();
             if (captureRow) BGSCodeObj.cancelKeyCapture();
             if (menuStage) {
                 menuStage.removeEventListener(Event.RESIZE, resizeBackground);

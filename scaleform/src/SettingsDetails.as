@@ -90,7 +90,7 @@ package
             // Enum defaults are marked in the option list instead.
             var enumRow:Boolean = Boolean(row && row.type == "enum");
             if (row && row.type == "action" || enumRow) defaultLabel.visible = defaultValue.visible = false;
-            if (row && row.type == "action") { detailDivider.visible = false; changedLegend.visible = false; }
+            if (row && (row.type == "action" || row.defaultKnown === false)) { detailDivider.visible = false; changedLegend.visible = false; }
             defaultLabel.y = cursor; defaultValue.y = cursor - 1;
             MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? NumericSetting.text(row, row.defaultValue) : "");
             if (defaultLabel.visible) cursor += MenuStyle.VALUE_SIZE + 16;

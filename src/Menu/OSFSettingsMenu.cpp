@@ -16,6 +16,8 @@
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
 #include "RE/B/BSService.h"
+#include "RE/T/TESDataHandler.h"
+#include "RE/T/TESFile.h"
 
 namespace OSFSettings
 {
@@ -23,7 +25,7 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset, GetGameplaySources };
         // Bound the loading card's wait; expiry invalidates the request.
         constexpr auto kOpenTimeout = std::chrono::seconds(30);
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
@@ -108,6 +110,7 @@ namespace OSFSettings
     {
         RegisterNativeFunction("getLocalization", static_cast<std::uint64_t>(Function::GetLocalization));
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
+        RegisterNativeFunction("getGameplaySources", static_cast<std::uint64_t>(Function::GetGameplaySources));
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
         RegisterNativeFunction("openIssueModPage", static_cast<std::uint64_t>(Function::OpenIssueModPage));
         RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
@@ -354,6 +357,28 @@ namespace OSFSettings
                 row.SetMember("nexusModId", RE::Scaleform::GFx::Value(issue.nexusModId));
                 params.ret->PushBack(row);
             }
+            break;
+        }
+        case Function::GetGameplaySources: {
+            root->CreateArray(params.ret);
+            const auto* data = RE::TESDataHandler::GetSingleton();
+            if (!data) break;
+            // Compiled plugin identities are fixed by the time this menu is registered.
+            const auto append = [&](const auto& files, std::uint32_t mask, auto prefix) {
+                for (const auto* file : files) {
+                    if (!file || file->compileIndex == 0 || file->compileIndex == 0xFF) continue;
+                    RE::Scaleform::GFx::Value source;
+                    root->CreateObject(&source);
+                    Text(source, "file", file->fileName);
+                    source.SetMember("mask", RE::Scaleform::GFx::Value(static_cast<double>(mask)));
+                    source.SetMember("prefix", RE::Scaleform::GFx::Value(static_cast<double>(prefix(*file))));
+                    params.ret->PushBack(source);
+                }
+            };
+            const auto& files = data->compiledFileCollection;
+            append(files.files, 0xFF000000u, [](const RE::TESFile& file) { return std::uint32_t(file.compileIndex) << 24; });
+            append(files.mediumFiles, 0xFFFF0000u, [](const RE::TESFile& file) { return 0xFD000000u | (std::uint32_t(file.fileIndex.mediumIndex) << 16); });
+            append(files.smallFiles, 0xFFFFF000u, [](const RE::TESFile& file) { return 0xFE000000u | (std::uint32_t(file.fileIndex.smallIndex) << 12); });
             break;
         }
         case Function::GetRows: {
