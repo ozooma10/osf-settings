@@ -143,7 +143,6 @@
     "bindings.retry": "Native binding data unavailable. Reopen Keybindings to retry.",
     "bindings.noMatches": "No actions match these filters.",
     "bindings.unavailable": "Binding data unavailable",
-    "bindings.textUnavailable": "Native text input is unavailable.",
     "bindings.editHint": "Select a binding to change it. Escape cancels.",
     "values.on": "ON",
     "values.off": "OFF",

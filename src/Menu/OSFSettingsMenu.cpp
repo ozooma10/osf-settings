@@ -77,7 +77,8 @@ namespace OSFSettings
         ++*m_textRequests;
     }
 
-    bool OSFSettingsMenu::RequestTextInput(bool enabled)
+    // Queue the context change; only the latest request for this open menu applies.
+    void OSFSettingsMenu::RequestTextInput(bool enabled)
     {
         const auto generation = ++*m_textRequests;
         RE::BSService::TaskQueue::GetSingleton()->AddTask([weak = std::weak_ptr(m_textRequests), generation, enabled] {
@@ -101,7 +102,6 @@ namespace OSFSettings
             }
             menu->m_textInputActive = enabled;
         });
-        return true;
     }
 
     void OSFSettingsMenu::MapCodeObjectFunctions()
@@ -231,7 +231,7 @@ namespace OSFSettings
             break;
         }
         case Function::TextInput:
-            *params.ret = RE::Scaleform::GFx::Value(RequestTextInput(params.argCount && params.args[0].IsBoolean() && params.args[0].GetBoolean()));
+            RequestTextInput(params.argCount && params.args[0].IsBoolean() && params.args[0].GetBoolean());
             break;
         case Function::RequestBindings:
             *params.ret = RE::Scaleform::GFx::Value(RequestBindingSnapshot(m_bindings));

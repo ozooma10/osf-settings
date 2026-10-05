@@ -36,7 +36,7 @@ namespace OSFSettings
 
     private:
         void Close();
-        bool RequestTextInput(bool enabled);
+        void RequestTextInput(bool enabled);
         void OnStartupFailed(std::string_view message);
         void CommitLaunch(); // Close Pause/Settings; dispatch afterClose from removal.
         void AbandonLaunch();

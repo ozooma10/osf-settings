@@ -41,13 +41,12 @@ package
             visible = false;
         }
 
-        public function open(value:Object, frame:int):Boolean
+        public function open(value:Object, frame:int):void
         {
-            if (!bridge.textInput(true)) return false;
+            bridge.textInput(true);
             row = value; visible = true; openedFrame = frame; confirmHeld = false;
             MenuStyle.setText(input, String(row.value));
             stage.focus = input; input.setSelection(0, input.length); changed();
-            return true;
         }
         public function close():void
         {

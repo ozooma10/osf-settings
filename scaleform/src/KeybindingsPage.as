@@ -34,7 +34,6 @@ package
         private var clear:Sprite;
         private var clearLabel:TextField;
         private var notice:TextField;
-        private var textUnavailable:Boolean;
         private var selection:Object;
         private var bridge:Object;
         private var editor:NativeHotkeysList;
@@ -105,7 +104,7 @@ package
         public function get searching():Boolean { return visible && stage && stage.focus == search; }
         public function open(metadata:Array):void
         {
-            definitions = metadata; visible = true; textUnavailable = false; rows = []; editor.open(); request();
+            definitions = metadata; visible = true; rows = []; editor.open(); request();
         }
         public function close():void
         {
@@ -193,9 +192,7 @@ package
             if (selection && !selection.available) flags.push(tr("bindings.unavailable"));
             if (selection && selection.binding.bRequired) flags.push(tr("bindings.required"));
             if (selection && selection.binding.bReadOnly) flags.push(tr("bindings.readOnly"));
-            var text:String = flags.length ? selection.title + "  |  " + flags.join("  |  ") : "";
-            if (textUnavailable) text = tr("bindings.textUnavailable") + (text ? "\n" + text : "");
-            MenuStyle.setText(notice,text);
+            MenuStyle.setText(notice,flags.length ? selection.title + "  |  " + flags.join("  |  ") : "");
         }
         private function selectKey(key:int):void
         {
@@ -223,10 +220,8 @@ package
         private function focusChanged(event:FocusEvent):void
         {
             var active:Boolean = searching;
-            if (!bridge.textInput(active) && active) { textUnavailable = true; leaveSearch(); }
-            else if (active) textUnavailable = false;
-            placeholder.visible = !search.text && !searching;
-            showNotice();
+            bridge.textInput(active);
+            placeholder.visible = !search.text && !active;
         }
         public function searchKey(event:KeyboardEvent):Boolean
         {

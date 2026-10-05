@@ -121,7 +121,6 @@
     "bindings.retry": "ゲーム内のキー割り当てを取得できません。キー割り当て画面を開き直してください。",
     "bindings.noMatches": "絞り込み条件に一致するアクションがありません。",
     "bindings.unavailable": "キー割り当てを取得できません",
-    "bindings.textUnavailable": "ゲーム内のテキスト入力を利用できません。",
     "bindings.editHint": "変更する割り当てを選択してください。Escapeでキャンセルします。",
     "values.on": "オン",
     "values.off": "オフ",

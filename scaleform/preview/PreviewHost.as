@@ -195,7 +195,7 @@ package
                 },
                 requestBindings:function():uint { return ++nativeBindings.generation; },
                 pollBindings:nativeBindings.snapshot,
-                textInput:function(enabled:Boolean):Boolean { return true; },
+                textInput:function(enabled:Boolean):void {},
                 beginNativeBinding:function():Boolean { return allowNativeCapture; },
                 endNativeBinding:function(cancel:Boolean):void {}};
             addChild(menu as MovieClip);

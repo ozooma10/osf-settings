@@ -817,7 +817,7 @@ package
         }
         private function beginString(row:Object):void
         {
-            if (!stringEditor.open(row, frame)) return;
+            stringEditor.open(row, frame);
             updateSelection();
             setStatus(tr("strings.hint"));
         }
