@@ -8,6 +8,7 @@
 #include "Diagnostics/DiagnosticsService.h"
 #include "Actions/ActionService.h"
 #include "Settings/Localization.h"
+#include <algorithm>
 #include <charconv>
 #include <chrono>
 #include <Windows.h>
@@ -28,6 +29,10 @@ namespace OSFSettings
             RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset, GetGameplaySources };
         // Bound the loading card's wait; expiry invalidates the request.
         constexpr auto kOpenTimeout = std::chrono::seconds(30);
+        // Official Gameplay Option owners on 1.16.244; labels and filename prefixes are not ownership.
+        constexpr std::string_view kOfficialGameplaySources[]{
+            "starfield.esm", "sfbgs007.esm", "sfbgs00d.esm", "sfbgs050.esm"
+        };
         std::string ArgString(const RE::Scaleform::GFx::FunctionHandler::Params& params, std::uint32_t index)
         {
             return index < params.argCount && params.args[index].IsString() ? params.args[index].GetString() : "";
@@ -367,6 +372,7 @@ namespace OSFSettings
             const auto append = [&](const auto& files, std::uint32_t mask, auto prefix) {
                 for (const auto* file : files) {
                     if (!file || file->compileIndex == 0 || file->compileIndex == 0xFF) continue;
+                    if (std::ranges::contains(kOfficialGameplaySources, FoldAscii(file->fileName))) continue;
                     RE::Scaleform::GFx::Value source;
                     root->CreateObject(&source);
                     Text(source, "file", file->fileName);
