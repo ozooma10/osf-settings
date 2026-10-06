@@ -369,15 +369,26 @@ namespace OSFSettings
             break;
         }
         case Function::CommitGameplayChange: {
+            std::uint32_t values[3]{};
             bool valid = params.argCount == 3;
+            if (!valid) REX::WARN("Gameplay option commit rejected: expected 3 arguments, got {}", params.argCount);
             for (std::uint32_t i = 0; valid && i < 3; ++i) {
-                if (!params.args[i].IsNumber()) { valid = false; break; }
-                const auto value = params.args[i].GetNumber();
+                // AS3 uint/int values have distinct GFx types from Number.
+                const auto& arg = params.args[i];
+                double value{};
+                if (arg.IsUInt()) value = arg.GetUInt();
+                else if (arg.IsInt()) value = arg.GetInt();
+                else if (arg.IsNumber()) value = arg.GetNumber();
+                else {
+                    REX::WARN("Gameplay option commit rejected: argument {} has nonnumeric GFx type {}", i, static_cast<std::uint32_t>(arg.GetType()));
+                    valid = false;
+                    break;
+                }
                 valid = std::isfinite(value) && value >= 0 && value <= UINT32_MAX && value == std::floor(value);
+                if (valid) values[i] = static_cast<std::uint32_t>(value);
+                else REX::WARN("Gameplay option commit rejected: argument {} is not a uint32 value ({})", i, value);
             }
-            *params.ret = RE::Scaleform::GFx::Value(valid && GameplayOptionCommit::Commit(
-                static_cast<std::uint32_t>(params.args[0].GetNumber()), static_cast<std::uint32_t>(params.args[1].GetNumber()),
-                static_cast<std::uint32_t>(params.args[2].GetNumber())));
+            *params.ret = RE::Scaleform::GFx::Value(valid && GameplayOptionCommit::Commit(values[0], values[1], values[2]));
             break;
         }
         case Function::GetGameplaySources: {
