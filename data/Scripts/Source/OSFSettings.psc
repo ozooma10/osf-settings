@@ -1,6 +1,6 @@
 ScriptName OSFSettings Native Hidden
 
-; Version = major * 10000 + minor * 100 + patch. This API ships with 1.0.0.
+; Installed plugin version = major * 10000 + minor * 100 + patch.
 Int Function GetVersion() Global Native
 Bool Function IsReady() Global Native
 

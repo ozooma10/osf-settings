@@ -73,7 +73,11 @@ namespace OSFSettings::Papyrus
             return !first;
         }
 
-        std::int32_t GetVersion(VM&, std::uint32_t, std::monostate) { return 10000; }
+        std::int32_t GetVersion(VM&, std::uint32_t, std::monostate)
+        {
+            const auto version = SFSE::GetPluginVersion();
+            return version[0] * 10000 + version[1] * 100 + version[2];
+        }
         bool IsReady(VM&, std::uint32_t, std::monostate)
         {
             return SettingsService::Get().IsReady() && !Listeners().IsSuspended();
