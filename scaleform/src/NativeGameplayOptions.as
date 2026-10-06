@@ -3,7 +3,6 @@ package
     import flash.events.Event;
     import flash.text.TextField;
     import flash.utils.Dictionary;
-    import flash.utils.getTimer;
 
     // The engine owns these values, their persistence and Papyrus notifications.
     public final class NativeGameplayOptions
@@ -11,19 +10,17 @@ package
         private var manager:Object;
         private var global:Object;
         private var sources:Array;
+        private var bridge:Object;
         private var changed:Function;
         private var text:TextField = new TextField();
         private var entries:Array = [];
-        private var pending:Object;
-        private var deadline:int;
-        private var timedOut:Boolean = false;
         public var rows:Array = [];
-        public function get busy():Boolean { return pending != null && !timedOut; }
 
         public function NativeGameplayOptions(definition:Function, bridge:Object, notify:Function)
         {
             manager = definition("Shared.AS3.Data.BSUIDataManager");
             global = definition("Shared.GlobalFunc");
+            this.bridge = bridge;
             sources = bridge.getGameplaySources() as Array || [];
             changed = notify;
             manager.Subscribe("PEOData", updated);
@@ -56,7 +53,6 @@ package
             rows = [];
             var seen:Dictionary = new Dictionary(), groups:Dictionary = new Dictionary();
             var section:String = "", sectionKeys:Dictionary = new Dictionary();
-            var acknowledged:Boolean = false;
             for each (var entry:Object in entries) {
                 if (entry.uType == 5) {
                     section = translated(entry.sText); sectionKeys = new Dictionary();
@@ -91,44 +87,25 @@ package
                 var row:Object = {mod:mod, modTitle:file, modDescription:file, group:group,
                     groupTitle:section || file, key:key, title:translated(entry.sText),
                     hint:translated(entry.sDescription, substitutions), type:"enum", options:choices,
-                    value:String(index(entry)), defaultKnown:false, nativeEditable:entry.bEnabled !== false,
-                    editable:entry.bEnabled !== false && !pending,
+                    value:String(index(entry)), defaultKnown:false,
+                    editable:entry.bEnabled !== false && source.editable === true,
                     gameplayID:id, gameplayType:uint(entry.uType)};
                 rows.push(row);
-                if (pending && pending.id == id && pending.value == index(entry)) acknowledged = true;
             }
             for each (row in rows) if (groups[row.mod].length == 1) row.modTitle = row.groupTitle;
-            if (acknowledged) {
-                // The change crosses two native queues. Save only after PEOData confirms it.
-                pending = null; timedOut = false;
-                for each (row in rows) row.editable = row.nativeEditable;
-                manager.dispatchEvent(new Event("SettingsPanel_SaveSettings", true));
-            }
-            changed(acknowledged ? "gameplay.submitted" : "", false);
+            changed("", false);
         }
 
         public function edit(row:Object, value:*):Boolean
         {
-            if (pending || !row.editable || rows.indexOf(row) < 0) return false;
+            if (!row.editable || rows.indexOf(row) < 0) return false;
             var selected:Number = Number(value);
             if (!isFinite(selected) || selected != uint(selected) || selected >= row.options.length) return false;
-            pending = {id:uint(row.gameplayID), value:uint(selected)};
-            timedOut = false; deadline = getTimer() + 5000;
-            for each (var other:Object in rows) other.editable = false;
-            if (row.gameplayType == 3)
-                manager.dispatchCustomEvent("SettingsPanel_CheckBoxChanged", {bChecked:selected != 0, uSettingID:pending.id, bIsPEO:true});
-            else
-                manager.dispatchCustomEvent("SettingsPanel_StepperChanged", {uIndex:uint(selected), uSettingID:pending.id, bIsPEO:true});
-            changed("gameplay.applying", false);
+            if (!bridge.commitGameplayChange(uint(row.gameplayID), uint(row.gameplayType), uint(selected))) return false;
+            // The native value and save dispatch have completed; PEOData remains the live feed.
+            row.value = String(uint(selected));
+            changed("gameplay.saved", false);
             return true;
-        }
-
-        public function advance():void
-        {
-            if (busy && getTimer() >= deadline) {
-                timedOut = true;
-                changed("gameplay.timeout", true);
-            }
         }
 
         public function dispose():void

@@ -1,10 +1,12 @@
 #include "OSFSettingsMenu.h"
 #include "Harness/TestHarness.h"
 #include "SettingRow.h"
+#include "GameplayOptionCommit.h"
 #include "Input/KeyNames.h"
 #include "Input/NativeHotkeys.h"
 #include <cmath>
 #include "Core/Runtime.h"
+#include "Core/Compatibility.h"
 #include "Diagnostics/DiagnosticsService.h"
 #include "Actions/ActionService.h"
 #include "Settings/Localization.h"
@@ -26,7 +28,8 @@ namespace OSFSettings
     {
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
-            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset, GetGameplaySources };
+            RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset, GetGameplaySources,
+            CommitGameplayChange };
         // Bound the loading card's wait; expiry invalidates the request.
         constexpr auto kOpenTimeout = std::chrono::seconds(30);
         // Official Gameplay Option owners on 1.16.244; labels and filename prefixes are not ownership.
@@ -116,6 +119,7 @@ namespace OSFSettings
         RegisterNativeFunction("getLocalization", static_cast<std::uint64_t>(Function::GetLocalization));
         RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
         RegisterNativeFunction("getGameplaySources", static_cast<std::uint64_t>(Function::GetGameplaySources));
+        RegisterNativeFunction("commitGameplayChange", static_cast<std::uint64_t>(Function::CommitGameplayChange));
         RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
         RegisterNativeFunction("openIssueModPage", static_cast<std::uint64_t>(Function::OpenIssueModPage));
         RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
@@ -364,6 +368,18 @@ namespace OSFSettings
             }
             break;
         }
+        case Function::CommitGameplayChange: {
+            bool valid = params.argCount == 3;
+            for (std::uint32_t i = 0; valid && i < 3; ++i) {
+                if (!params.args[i].IsNumber()) { valid = false; break; }
+                const auto value = params.args[i].GetNumber();
+                valid = std::isfinite(value) && value >= 0 && value <= UINT32_MAX && value == std::floor(value);
+            }
+            *params.ret = RE::Scaleform::GFx::Value(valid && GameplayOptionCommit::Commit(
+                static_cast<std::uint32_t>(params.args[0].GetNumber()), static_cast<std::uint32_t>(params.args[1].GetNumber()),
+                static_cast<std::uint32_t>(params.args[2].GetNumber())));
+            break;
+        }
         case Function::GetGameplaySources: {
             root->CreateArray(params.ret);
             const auto* data = RE::TESDataHandler::GetSingleton();
@@ -378,6 +394,7 @@ namespace OSFSettings
                     Text(source, "file", file->fileName);
                     source.SetMember("mask", RE::Scaleform::GFx::Value(static_cast<double>(mask)));
                     source.SetMember("prefix", RE::Scaleform::GFx::Value(static_cast<double>(prefix(*file))));
+                    source.SetMember("editable", RE::Scaleform::GFx::Value(true));
                     params.ret->PushBack(source);
                 }
             };
