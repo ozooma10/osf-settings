@@ -5,7 +5,7 @@ for SFSE Plugins with the 1.16.244.0 database (v21). OSF UI and WebView2 are
 not required by OSF Settings. Other game versions are not verified.
 
 Install this ZIP with MO2 or Vortex and enable it. Its root is the game's Data
-directory: SFSE, Interface, Scripts and Docs belong directly under Data.
+directory: SFSE, Interface and Scripts belong directly under Data.
 Launch through SFSE, load a save, then choose MOD SETTINGS in Pause.
 The opening key defaults to unbound. Assign it in the KEYBINDINGS tab.
 No ESM/ESP activation is required for the framework itself.
@@ -52,4 +52,5 @@ Source and mod author guide:
 https://github.com/ozooma10/osf-settings-slim
 
 This archive contains a production build. Acceptance fixtures, sample mods,
-debug symbols and personal settings are excluded. See LICENSE and EXCEPTIONS.
+debug symbols and personal settings are excluded. License notices are in
+SFSE/Plugins/OSF/Settings/licenses.

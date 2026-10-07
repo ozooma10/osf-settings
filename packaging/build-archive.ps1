@@ -9,9 +9,6 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'ReleaseValidation.ps1')
-if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'README.txt'))) {
-    throw 'Missing packaging input: README.txt'
-}
 $revision = Get-ReleaseRevision $repo
 $project = Get-Content -LiteralPath (Join-Path $repo 'xmake.lua') -Raw
 $versionMatch = [regex]::Match($project, 'set_version\("([0-9]+\.[0-9]+\.[0-9]+)"\)')
@@ -47,14 +44,13 @@ try {
     Pop-Location
 }
 
-$documents = Join-Path $stage 'Docs/OSFSettings'
-New-Item -ItemType Directory -Path $documents -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.txt') -Destination $documents
-Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'EXCEPTIONS') -Destination $documents
-Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/COPYING') -Destination (Join-Path $documents 'CommonLibSF-COPYING')
-Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/EXCEPTIONS') -Destination (Join-Path $documents 'CommonLibSF-EXCEPTIONS')
-Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/LICENSE') -Destination (Join-Path $documents 'CommonLibShared-LICENSE')
-Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/EXCEPTIONS') -Destination (Join-Path $documents 'CommonLibShared-EXCEPTIONS')
+$licenses = Join-Path $stage 'SFSE/Plugins/OSF/Settings/licenses'
+New-Item -ItemType Directory -Path $licenses -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'EXCEPTIONS') -Destination $licenses
+Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/COPYING') -Destination (Join-Path $licenses 'CommonLibSF-COPYING')
+Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/EXCEPTIONS') -Destination (Join-Path $licenses 'CommonLibSF-EXCEPTIONS')
+Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/LICENSE') -Destination (Join-Path $licenses 'CommonLibShared-LICENSE')
+Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/lib/commonlib-shared/EXCEPTIONS') -Destination (Join-Path $licenses 'CommonLibShared-EXCEPTIONS')
 
 $files = @(Get-ReleasePayloadPaths)
 $allowedStageFiles = $files + 'SFSE/Plugins/OSFSettings.pdb'

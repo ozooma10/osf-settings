@@ -14,9 +14,9 @@ function Get-ReleaseRevision([string]$Repository) {
 
 function Get-ReleasePayloadPaths {
     return @(
-        'Docs/OSFSettings/CommonLibSF-COPYING', 'Docs/OSFSettings/CommonLibSF-EXCEPTIONS',
-        'Docs/OSFSettings/CommonLibShared-EXCEPTIONS', 'Docs/OSFSettings/CommonLibShared-LICENSE',
-        'Docs/OSFSettings/EXCEPTIONS', 'Docs/OSFSettings/LICENSE', 'Docs/OSFSettings/README.txt',
+        'SFSE/Plugins/OSF/Settings/licenses/CommonLibSF-COPYING', 'SFSE/Plugins/OSF/Settings/licenses/CommonLibSF-EXCEPTIONS',
+        'SFSE/Plugins/OSF/Settings/licenses/CommonLibShared-EXCEPTIONS', 'SFSE/Plugins/OSF/Settings/licenses/CommonLibShared-LICENSE',
+        'SFSE/Plugins/OSF/Settings/licenses/EXCEPTIONS', 'SFSE/Plugins/OSF/Settings/licenses/LICENSE',
         'Interface/OSFSettingsMenu.swf',
         'Interface/OSFSettingsMenu_LRG.swf', 'Scripts/OSFSettings.pex', 'Scripts/Source/OSFSettings.psc',
         'SFSE/Plugins/OSF/Settings/schemas/osfsettings.json',

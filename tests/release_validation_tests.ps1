@@ -53,7 +53,7 @@ function New-Candidate([string]$Name, [string]$Fault = '') {
 }
 $good = New-Candidate 'valid'
 $candidate = Test-ReleaseArchive $good
-Check ($candidate.files -eq 15) 'Valid archive has all expected payloads'
+Check ($candidate.files -eq 14) 'Valid archive has all expected payloads'
 $preserved = Test-ReleaseReinstall $candidate.archive (Join-Path $scratch 'reinstall')
 Check ($preserved.Count -eq 4) 'Archive overlay preserves simulated Documents state and another mod schema'
 foreach ($fault in @(
