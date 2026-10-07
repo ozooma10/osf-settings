@@ -265,6 +265,7 @@ namespace OSFSettings
                 record.SetMember("slot", RE::Scaleform::GFx::Value(entry.slot));
                 record.SetMember("key", RE::Scaleform::GFx::Value(entry.key));
                 record.SetMember("modifier", RE::Scaleform::GFx::Value(entry.modifier));
+                record.SetMember("visibleInControls", RE::Scaleform::GFx::Value(entry.visibleInControls));
                 records.PushBack(record);
             }
             params.ret->SetMember("records", records);

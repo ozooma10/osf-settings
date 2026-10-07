@@ -129,7 +129,7 @@ package
             var snapshot:Object = bridge.pollBindings();
             if (snapshot && snapshot.generation == generation && snapshot.state != "loading") {
                 if (snapshot.state == "ready" && editor.ready) {
-                    rows = KeybindingsData.join(editor.bindings,definitions,snapshot.records,editor.title);
+                    rows = KeybindingsData.join(editor.bindings,definitions,snapshot.records,editor.title,editor.gamepad);
                     if (gamepad != editor.gamepad) selectedKey = -1;
                     gamepad = editor.gamepad;
                     keyboard.visible = !gamepad;
@@ -187,6 +187,10 @@ package
         }
         private function showNotice():void
         {
+            if (selection && selection.reserved) {
+                MenuStyle.setText(notice,selection.title + "\n" + tr("bindings.reservedHint"));
+                return;
+            }
             // Only flags the list row cannot show; everything else is already on the row.
             var flags:Array = [];
             if (selection && !selection.available) flags.push(tr("bindings.unavailable"));

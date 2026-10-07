@@ -12,6 +12,7 @@ namespace OSFSettings
     {
         std::string action;
         std::uint32_t context{}, device{}, slot{}, key{}, modifier{};
+        bool visibleInControls{ true };
     };
 
     class BindingSnapshot

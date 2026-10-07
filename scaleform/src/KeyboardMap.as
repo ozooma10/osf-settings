@@ -80,8 +80,9 @@ package
                 var flags:uint = 1 | (row.mod ? 2 : 0) | (visibleSet[row] ? 4 : 0) | (row == selected ? 8 : 0);
                 for each (var record:Object in row.records) {
                     if (!KeybindingsData.bound(record.key)) continue;
-                    if (record.device == 0) mark(usage, record.key, flags);
-                    if (record.device != 2 && KeybindingsData.modified(record.modifier)) mark(usage, record.modifier, flags);
+                    var recordFlags:uint = flags | (record.visibleInControls === false ? 32 : 0);
+                    if (record.device == 0) mark(usage, record.key, recordFlags);
+                    if (record.device != 2 && KeybindingsData.modified(record.modifier)) mark(usage, record.modifier, recordFlags);
                 }
             }
             for each (var key:Object in keys) {
@@ -90,17 +91,18 @@ package
                 key.state = flags;
                 var owned:Boolean = Boolean(flags & 1), mod:Boolean = Boolean(flags & 2), shown:Boolean = Boolean(flags & 4);
                 var active:Boolean = Boolean(flags & 8), filtered:Boolean = Boolean(flags & 16);
+                var reserved:Boolean = Boolean(flags & 32);
                 var clip:Sprite = key.clip;
                 // Keys used by the visible results stay bright; free and filtered-out keys recede.
                 clip.alpha = shown || active || filtered ? 1 : .45;
                 clip.graphics.clear();
                 // The ring sits in the gap between keys so it still shows on a selected white key.
                 if (filtered) { clip.graphics.lineStyle(2,MenuStyle.WHITE); clip.graphics.drawRect(-3,-3,key.width + 6,key.height + 6); }
-                clip.graphics.lineStyle(1,active ? MenuStyle.WHITE : MenuStyle.LINE);
-                clip.graphics.beginFill(active ? MenuStyle.WHITE : MenuStyle.ROW); clip.graphics.drawRect(0,0,key.width,key.height); clip.graphics.endFill();
-                key.label.textColor = active ? MenuStyle.INK : MenuStyle.WHITE;
+                clip.graphics.lineStyle(1,active ? MenuStyle.WHITE : reserved ? MenuStyle.ROW : MenuStyle.LINE);
+                clip.graphics.beginFill(active ? MenuStyle.WHITE : reserved ? MenuStyle.INK : MenuStyle.ROW); clip.graphics.drawRect(0,0,key.width,key.height); clip.graphics.endFill();
+                key.label.textColor = active ? MenuStyle.INK : reserved ? MenuStyle.RESERVED : MenuStyle.WHITE;
                 if (owned) {
-                    clip.graphics.lineStyle(); clip.graphics.beginFill(mod ? MenuStyle.ACCENT : MenuStyle.MUTED);
+                    clip.graphics.lineStyle(); clip.graphics.beginFill(reserved ? MenuStyle.RESERVED : mod ? MenuStyle.ACCENT : MenuStyle.MUTED);
                     clip.graphics.drawRect(4,key.height - 5,key.width - 8,3); clip.graphics.endFill();
                 }
             }

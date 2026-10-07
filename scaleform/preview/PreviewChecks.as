@@ -226,10 +226,15 @@ package
                 case 34:
                     findNamed(menu,"bindings").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 35:
-                    require(list.entryCount == 40,"MainGameplay native rows include both sources and unbound actions");
+                    require(list.entryCount == 41,"MainGameplay rows include both sources, unbound actions and hidden reservations");
                     require(list.selectedEntry.row.action == "Jump","binding results start at the first native action");
                     require(!findNamed(menu,"clearBindingFilters").visible && !findNamed(menu,"bindingKeyFilter").visible,"filter controls stay hidden without a filter");
                     capture("keybindings");
+                    var keyboardStyle:Object = menu.loaderInfo.applicationDomain.getDefinition("MenuStyle");
+                    var keyboardType:Object = menu.loaderInfo.applicationDomain.getDefinition("KeyboardMap");
+                    capture("keybindings-keyboard",new Rectangle(keyboardStyle.LEFT,keyboardStyle.SECTION_TOP,23 * keyboardType.KEY_WIDTH,keyboardType.HEIGHT),1);
+                    capture("keybindings-legend",new Rectangle(keyboardStyle.LEFT + 15.5 * keyboardType.KEY_WIDTH,
+                        keyboardStyle.SECTION_TOP,7.5 * keyboardType.KEY_WIDTH,keyboardType.HEIGHT),2);
                     var firstSearch:TextField = searchField();
                     menu.stage.focus = firstSearch;
                     firstSearch.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN,true));
@@ -241,13 +246,13 @@ package
                     require(findNamed(menu,"bindingKeyFilter").visible && findNamed(menu,"clearBindingFilters").visible,"key filter shows its chip and clear control");
                     findNamed(menu,"key_77").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 37:
-                    require(list.entryCount == 40 && !findNamed(menu,"clearBindingFilters").visible,"clicking selected key clears the filter");
+                    require(list.entryCount == 41 && !findNamed(menu,"clearBindingFilters").visible,"clicking selected key clears the filter");
                     findNamed(menu,"key_162").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 38:
                     require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/chord","modifier filter finds chord");
                     capture("keybindings-chord");
                     findNamed(menu,"bindingKeyFilter").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
-                    require(list.entryCount == 40 && !findNamed(menu,"bindingKeyFilter").visible,"key chip clears the key filter");
+                    require(list.entryCount == 41 && !findNamed(menu,"bindingKeyFilter").visible,"key chip clears the key filter");
                     var search:TextField = searchField();
                     menu.stage.focus = search;
                     search.text = "alternate"; search.dispatchEvent(new Event(Event.CHANGE)); break;
@@ -276,7 +281,7 @@ package
                 case 42:
                     findNamed(menu,"bindingSource").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 43:
-                    require(list.entryCount == 32,"Game source filter");
+                    require(list.entryCount == 33,"Game source filter includes reserved bindings");
                     var mouse:TextField = searchField();
                     mouse.text = "mouse"; mouse.dispatchEvent(new Event(Event.CHANGE)); break;
                 case 44:
@@ -287,7 +292,8 @@ package
                     list.selectedIndex = list.entryCount - 1;
                     list.scrollPosition = list.maxScrollPosition; break;
                 case 46:
-                    require(list.selectedEntry.row.action == "Fixture27","last native action is reachable");
+                    require(list.selectedEntry.row.action == "CameraPath" && list.selectedEntry.row.reserved &&
+                        !list.selectedEntry.row.editable && list.selectedEntry.row.value == "F12","hidden F12 owner is reachable and read only");
                     capture("keybindings-scroll");
                     checkBindingPolicy();
                     setter = Object(menu).BGSCodeObj.pollBindings;
@@ -299,7 +305,7 @@ package
                     require(list.entryCount == 0,"stale snapshot cannot populate a new request");
                     Object(menu).BGSCodeObj.pollBindings = setter; break;
                 case 48:
-                    require(list.entryCount == 40,"current snapshot replaces loading state");
+                    require(list.entryCount == 41,"current snapshot replaces loading state");
                     searchField().text = "intentionally long"; searchField().dispatchEvent(new Event(Event.CHANGE)); break;
                 case 49:
                     require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/long","long labels remain selectable with both native slots");
@@ -349,7 +355,7 @@ package
                         "device switch retains search and clears controller button filter");
                     findNamed(menu,"clearBindingFilters").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 104:
-                    require(list.entryCount == 40 && findNamed(menu,"key_77").parent.visible,
+                    require(list.entryCount == 41 && findNamed(menu,"key_77").parent.visible,
                         "keyboard display and all rows return after switching devices");
                     require(findNamed(list.FindClipForEntry(list.selectedIndex),"AltBinding_mc").visible,
                         "keyboard publication restores Alternate");
@@ -584,7 +590,7 @@ package
         private function readyForStep():Boolean
         {
             if (step == -1) return Object(menu).startupPhase == "ready" && list != null;
-            if (step == 35 || step == 48) return list.entryCount == 40;
+            if (step == 35 || step == 48) return list.entryCount == 41;
             if (step == 100 || step == 105) return Object(findNamed(menu,"keybindingsPage")).gamepad;
             if (step == 103 || step == 108) return !Object(findNamed(menu,"keybindingsPage")).gamepad;
             if (step == 61) {
@@ -719,7 +725,7 @@ package
             }
             return null;
         }
-        private function capture(name:String):void
+        private function capture(name:String, area:Rectangle = null, scale:Number = 2 / 3):void
         {
             var style:Object = menu.loaderInfo.applicationDomain.getDefinition("MenuStyle");
             var status:TextField;
@@ -738,16 +744,18 @@ package
                     "footer status does not overlap button hints: " + name);
             }
             if (!captures) return;
-            var bitmap:BitmapData = new BitmapData(1280, 720, false, 0x08151C);
-            bitmap.draw(menu, new Matrix(2 / 3, 0, 0, 2 / 3));
+            if (!area) area = new Rectangle(0,0,1920,1080);
+            var width:int = Math.ceil(area.width * scale), height:int = Math.ceil(area.height * scale);
+            var bitmap:BitmapData = new BitmapData(width, height, false, 0x08151C);
+            bitmap.draw(menu, new Matrix(scale, 0, 0, scale,-area.x * scale,-area.y * scale));
             var pixels:ByteArray = new ByteArray();
-            for (var y:int = 0; y < 720; ++y) {
+            for (var y:int = 0; y < height; ++y) {
                 pixels.writeByte(0);
-                for (var x:int = 0; x < 1280; ++x) pixels.writeUnsignedInt((bitmap.getPixel(x, y) << 8) | 255);
+                for (var x:int = 0; x < width; ++x) pixels.writeUnsignedInt((bitmap.getPixel(x, y) << 8) | 255);
             }
             bitmap.dispose(); pixels.compress();
             var png:ByteArray = new ByteArray(); png.writeUnsignedInt(0x89504E47); png.writeUnsignedInt(0x0D0A1A0A);
-            var header:ByteArray = new ByteArray(); header.writeUnsignedInt(1280); header.writeUnsignedInt(720);
+            var header:ByteArray = new ByteArray(); header.writeUnsignedInt(width); header.writeUnsignedInt(height);
             header.writeByte(8); header.writeByte(6); header.writeByte(0); header.writeByte(0); header.writeByte(0);
             chunk(png, "IHDR", header); chunk(png, "IDAT", pixels); chunk(png, "IEND", new ByteArray());
             var alphabet:String = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

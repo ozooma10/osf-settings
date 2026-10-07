@@ -21,7 +21,7 @@ namespace OSFSettings
                 for (const auto& entry : map->GetMappings(context, device)) {
                     records.push_back({ std::string(entry.eventID.c_str()), static_cast<std::uint32_t>(context),
                         static_cast<std::uint32_t>(device), static_cast<std::uint32_t>(entry.bindingSlot),
-                        entry.keyCode, entry.modifierKeyCode });
+                        entry.keyCode, entry.modifierKeyCode, entry.visibleInControls });
                 }
             }
             target->Publish(generation, BindingSnapshot::Status::Ready, std::move(records));

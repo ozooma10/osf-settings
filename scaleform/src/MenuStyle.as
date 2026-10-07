@@ -17,6 +17,7 @@ package
         public static const HOVER:uint = 0x344B56;
         public static const LINE:uint = 0x52646D;
         public static const ACCENT:uint = 0xDE9D65;
+        public static const RESERVED:uint = 0x52646D;
         // Desk-distance layout on the 1920x1080 stage: navigation at the left, then the
         // list and the detail column. The _LRG movie keeps roomier sizes for Starfield's
         // large menu text option.

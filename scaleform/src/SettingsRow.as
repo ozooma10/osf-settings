@@ -50,7 +50,7 @@ package
             if (row.keybindings) {
                 // Orange matches the keyboard's mod-owned key marker.
                 source.y = rowHeight - MenuStyle.SMALL_SIZE - 13;
-                source.textColor = selected ? MenuStyle.INK : row.mod ? MenuStyle.ACCENT : MenuStyle.MUTED;
+                source.textColor = selected ? MenuStyle.INK : row.reserved ? MenuStyle.RESERVED : row.mod ? MenuStyle.ACCENT : MenuStyle.MUTED;
                 source.width = MenuStyle.CONTROL_X - 70;
                 MenuStyle.fit(source,row.source);
             }

@@ -25,6 +25,7 @@ package
             records.push({action:"preview/alternate",context:0,device:0,slot:1,key:118,modifier:255});
             entries[entries.length - 1].AltBinding = binding(118,255,0);
             for (var i:int = 0; i < 28; ++i) add("Fixture" + i,"Additional gameplay action " + (i + 1),i < 10 ? 48 + i : 255);
+            records.push({action:"CameraPath",context:0,device:0,slot:0,key:123,modifier:255,visibleInControls:false});
             for each (var entry:Object in entries) {
                 var controller:Object = {};
                 for (var property:String in entry) controller[property] = entry[property];

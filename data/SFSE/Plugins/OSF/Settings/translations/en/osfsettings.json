@@ -136,6 +136,8 @@
     "bindings.allSources": "All sources",
     "bindings.game": "Game",
     "bindings.mod": "Mod",
+    "bindings.reservedSource": "Game - Reserved",
+    "bindings.reservedHint": "Reserved by Starfield. This binding cannot be changed.",
     "bindings.clearFilters": "CLEAR FILTERS",
     "bindings.searchHint": "Search",
     "bindings.primary": "PRIMARY",
