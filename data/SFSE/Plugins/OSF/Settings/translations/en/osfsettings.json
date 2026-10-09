@@ -68,6 +68,8 @@
     "buttons.previousPage": "PREV PAGE",
     "buttons.nextPage": "NEXT PAGE",
     "buttons.toggle": "TOGGLE",
+    "buttons.editSetting": "EDIT SETTING",
+    "buttons.done": "DONE",
     "buttons.reset": "RESET SETTING",
     "buttons.clearBinding": "CLEAR BINDING",
     "buttons.save": "SAVE",

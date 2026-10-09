@@ -51,6 +51,8 @@
     "buttons.previousPage": "前のページ",
     "buttons.nextPage": "次のページ",
     "buttons.toggle": "切り替え",
+    "buttons.editSetting": "設定を編集",
+    "buttons.done": "完了",
     "buttons.reset": "設定をリセット",
     "buttons.clearBinding": "割り当てを解除",
     "buttons.save": "保存",

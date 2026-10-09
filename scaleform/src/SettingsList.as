@@ -107,7 +107,7 @@ package
         }
 
         public function render(hotkeys:NativeHotkeysList, height:Number, settings:Boolean, bindings:Boolean,
-                               focused:Boolean, hoverIndex:int):void
+                               focused:Boolean, hoverIndex:int, editingIndex:int = -1):void
         {
             if (!MovieClip(list).visible) return;
             var needsLayout:Boolean = false;
@@ -126,6 +126,7 @@ package
                     clip.addChild(view.content as DisplayObject); views[clip] = view;
                 }
                 var selected:Boolean = Object(clip).itemIndex == list.selectedIndex && focused;
+                var editing:Boolean = selected && Object(clip).itemIndex == editingIndex;
                 var binding:DisplayObject = hotkeys.decorate(clip, row, selected, height);
                 var slider:Object = Object(clip).Slider_mc;
                 var showSlider:Boolean = settings && NumericSetting.isSlider(row);
@@ -136,10 +137,11 @@ package
                 // Poll only the state vanilla can change under us; stable clips keep their layout.
                 if (view.row != row || view.value !== row.value || view.frame != clip.currentFrame ||
                     view.selected != selected || view.modList != modList || view.height != height ||
-                    view.dragging != sliderDragging || view.hovered != hovered || view.capturing != capturing) {
+                    view.dragging != sliderDragging || view.hovered != hovered || view.capturing != capturing || view.editing != editing) {
                     view.row = row; view.value = row.value; view.frame = clip.currentFrame;
                     view.selected = selected; view.modList = modList; view.height = height; view.dragging = sliderDragging;
                     view.hovered = hovered; view.capturing = capturing;
+                    view.editing = editing;
                     clip.setChildIndex(view.content as DisplayObject, 0);
                     var stepper:Object = Object(clip).LargeStepper_mc;
                     for (var child:int = 0; child < clip.numChildren; ++child) {
@@ -148,7 +150,7 @@ package
                             (showSlider && display == slider) || (showStepper && display == stepper);
                     }
                     clip.transform.colorTransform = NORMAL;
-                    clip.mouseChildren = showSlider || showStepper || binding != null;
+                    clip.mouseChildren = editing && (showSlider || showStepper) || binding != null;
                     clip.mouseEnabled = row.type != "section";
                     if (showSlider) {
                         slider.width = MenuStyle.SLIDER_WIDTH;
@@ -167,7 +169,8 @@ package
                     var border:MovieClip = Object(clip).Border_mc;
                     border.x = 0; border.y = 0; border.width = issue ? IssueStyle.LIST_WIDTH : MenuStyle.LIST_WIDTH;
                     if (border.height != height) { border.height = height; needsLayout = true; }
-                    view.content.update(row, selected, modList, height, hovered);
+                    if (issue) view.content.update(row, selected, modList, height, hovered);
+                    else view.content.update(row, selected, modList, height, hovered, editing);
                 }
                 clip.x = 0; clip.y = (Object(clip).itemIndex - list.scrollPosition) * (height + MenuStyle.ROW_GAP);
             }

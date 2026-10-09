@@ -18,6 +18,8 @@ package
 
         public function NativeGameplayOptions(definition:Function, bridge:Object, notify:Function)
         {
+            // HTML line breaks are discarded when SetText uses a single-line field.
+            text.multiline = true;
             manager = definition("Shared.AS3.Data.BSUIDataManager");
             global = definition("Shared.GlobalFunc");
             this.bridge = bridge;
@@ -55,7 +57,10 @@ package
             var section:String = "", sectionKeys:Dictionary = new Dictionary();
             for each (var entry:Object in entries) {
                 if (entry.uType == 5) {
-                    section = translated(entry.sText); sectionKeys = new Dictionary();
+                    // Separator-only groups can contain spaces or invisible padding.
+                    // Normalize those names so the source filename fallback also covers them.
+                    section = translated(entry.sText).replace(/^[\s\u00A0\u200B\uFEFF]+|[\s\u00A0\u200B\uFEFF]+$/g, "");
+                    sectionKeys = new Dictionary();
                     continue;
                 }
                 if (!entry.bIsPEO || (entry.uType != 1 && entry.uType != 2 && entry.uType != 3)) continue;

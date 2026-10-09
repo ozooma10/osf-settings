@@ -24,7 +24,7 @@ package
             heading = MenuStyle.field("", 16, 0, 600, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true); addChild(heading);
         }
         // Columns are anchored to the list's right edge so they follow LIST_WIDTH.
-        public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number, hovered:Boolean = false):void
+        public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number, hovered:Boolean = false, editing:Boolean = false):void
         {
             var rowWidth:Number = MenuStyle.LIST_WIDTH;
             var section:Boolean = row.type == "section";
@@ -58,6 +58,11 @@ package
             var color:uint = selected ? MenuStyle.INK : MenuStyle.WHITE;
             graphics.beginFill(selected ? MenuStyle.WHITE : hovered ? MenuStyle.HOVER : MenuStyle.ROW);
             graphics.drawRect(0, 0, rowWidth, rowHeight); graphics.endFill();
+            if (editing) {
+                graphics.lineStyle(3, MenuStyle.ACCENT);
+                graphics.drawRect(MenuStyle.CONTROL_X, 3, MenuStyle.CONTROL_WIDTH, rowHeight - 6);
+                graphics.lineStyle();
+            }
             title.textColor = color; value.textColor = modList ? (selected ? 0x3D4F58 : MenuStyle.MUTED) : color;
             title.width = modList ? rowWidth - 576 : MenuStyle.CONTROL_X - 70;
             // Mod rows summarize what each mod adds, right-aligned before the chevron.
