@@ -36,6 +36,12 @@ package
         private var issueOpenCount:int = 0;
         private var issueOpenResult:Boolean = true;
         private var openedIssue:String = "";
+        private var panelBridge:Object;
+        private var panelRows:Array;
+        private var panelGeneration:int = 0;
+        private var panelWrites:int = 0;
+        private var panelActions:int = 0;
+        private var panelBaseline:int = 0;
 
         public function PreviewChecks(movie:MovieClip, bindings:Boolean = false, screenshots:Boolean = false)
         {
@@ -90,6 +96,7 @@ package
                     require(list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview", "Home opens with the settings list selected");
                     require(findNamed(menu, "mods") != null && findNamed(menu, "issues") != null, "both root tabs are reachable");
                     checkLocalization();
+                    PreviewGameplayChecks.run(menu, require);
                     require(navFocused(), "menu opens in the sidebar");
                     capture("all-mods");
                     if (bindingsOnly) step = 34;
@@ -117,8 +124,13 @@ package
                     findNamed(menu, "Camera").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 3:
                     require(list.selectedEntry.row.key == "freeCamera" && list.entryCount == 2 && navFocused(), "a sidebar section lists only its own settings");
-                    checkShoulderNavigation();
-                    key(221); break;
+                    checkShoulderNavigation(true);
+                    userEvent("Right"); step = 114; break;
+                case 114:
+                    checkShoulderNavigation(false);
+                    userEvent("Cancel");
+                    require(navFocused(), "Back returns from a browsed section to the sidebar");
+                    key(221); step = 4; break;
                 case 4:
                     require(list.selectedEntry.row.key == "hotkeys" && list.entryCount == 3, "next page walks to the next section");
                     key(221); break;
@@ -135,8 +147,11 @@ package
                     require(!navFocused() && !list.disableInput, "Accept enters the page");
                     userEvent("Cancel"); break;
                 case 9:
+                    require(!navFocused() && list.selectedEntry.row.key == "autoAdvance", "Done ends panel editing without leaving the page");
+                    userEvent("Cancel"); step = 115; break;
+                case 115:
                     require(navFocused() && list.selectedEntry.row.key == "autoAdvance", "Back returns to the sidebar and keeps the page");
-                    userEvent("Right"); list.selectedIndex = indexOf("restoreView"); break;
+                    userEvent("Right"); list.selectedIndex = indexOf("restoreView"); step = 10; break;
                 case 10:
                     require(list.selectedEntry.row.key == "restoreView", "last row reachable");
                     capture("last-row");
@@ -150,7 +165,11 @@ package
                     Object(menu).BGSCodeObj.setBool = setter;
                     findNamed(menu, "Controls").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 12:
-                    userEvent("Right"); list.selectedIndex = indexOf("toggleKey"); userEvent("Accept"); break;
+                    userEvent("Right"); list.selectedIndex = indexOf("toggleKey"); step = 116; break;
+                case 116:
+                    require(!list.disableInput && Object(menu).BGSCodeObj.pollKeyCapture().state != "waiting",
+                        "entering a panel with a binding selected does not start capture");
+                    userEvent("Accept"); step = 13; break;
                 case 13:
                     require(list.disableInput && Object(menu).BGSCodeObj.pollKeyCapture().state == "waiting", "key capture disables list input");
                     capture("key-waiting");
@@ -262,6 +281,21 @@ package
                     key(221); key(Keyboard.B); key(Keyboard.X); userEvent("Accept"); userEvent("RShoulder");
                     require(list.entryCount == 1 && list.selectedEntry.row.action == "preview/alternate","search suppresses native and raw shortcuts");
                     var input:TextField = searchField();
+                    var originalTextInput:Function = Object(menu).BGSCodeObj.textInput;
+                    var textInputEnabled:Boolean = true;
+                    Object(menu).BGSCodeObj.textInput = function(enabled:Boolean):void {
+                        textInputEnabled = enabled; originalTextInput(enabled);
+                    };
+                    try {
+                        // This proves Flash cleanup when the event is delivered;
+                        // Windows focus-event delivery needs separate game evidence.
+                        menu.stage.dispatchEvent(new Event(Event.DEACTIVATE));
+                        require(menu.stage.focus == list && !textInputEnabled,
+                            "Flash deactivation leaves search and releases native text input");
+                        require(searchField().text == "alternate" && list.entryCount == 1 && findNamed(menu,"bindings") != null,
+                            "Flash deactivation preserves the search query and page");
+                    } finally { Object(menu).BGSCodeObj.textInput = originalTextInput; }
+                    menu.stage.focus = input;
                     input.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN,true,true,0,Keyboard.ENTER));
                     input.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_UP,true,true,0,Keyboard.ENTER));
                     require(menu.stage.focus == list,"Enter returns focus to results"); break;
@@ -541,9 +575,12 @@ package
                     require(advanced == 0 && list.entryCount == 4 &&
                         list.GetDataForEntry(advanced + 1).row.key == "rescan" && list.GetDataForEntry(advanced + 2).row.key == "resetIndex" &&
                         list.GetDataForEntry(advanced + 3).row.key == "language", "settings and actions preserve declaration order");
-                    userEvent("Right"); list.selectedIndex = advanced + 1; userEvent("YButton");
+                    userEvent("Right"); list.selectedIndex = advanced + 1; step = 117; break;
+                case 117:
+                    require(list.selectedEntry.row.actionState == "Run", "entering a panel leaves its selected action untouched");
+                    userEvent("YButton");
                     require(list.selectedEntry.row.actionState == "Run", "reset leaves action controls unchanged");
-                    userEvent("Accept"); break;
+                    userEvent("Accept"); step = 73; break;
                 case 73:
                     require(list.selectedEntry.row.key == "rescan" && list.selectedEntry.row.actionState == "Completed", "inline action completes and preserves selection");
                     list.selectedIndex = indexOf("resetIndex"); userEvent("Accept"); break;
@@ -560,9 +597,88 @@ package
                     list.selectedIndex = indexOf("language");
                     require(list.selectedEntry.row.type == "string", "setting after actions remains reachable");
                     capture("mixed-controls");
-                    step = 79;
-                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
-                    userEvent("Right"); break;
+                    startPanelFixture(); step = 200; break;
+                case 200:
+                    findNamed(menu,"Advanced").dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+                    list.selectedIndex = indexOf("debug"); break;
+                case 201:
+                    require(navFocused() && list.selectedEntry.row.key == "debug" && list.selectedEntry.row.value == false,
+                        "panel regression fixture begins in sidebar browse state");
+                    userEvent("Accept"); userEvent("Accept");
+                    require(!navFocused() && panelWrites == 0 && list.selectedEntry.row.value == false,
+                        "Confirm enters editing without changing the first value or leaking a repeated activation"); break;
+                case 202:
+                    list.selectedIndex = indexOf("panelDisabled"); key(Keyboard.RIGHT);
+                    require(panelWrites == 0 && list.selectedEntry.row.value == false, "disabled rows cannot save during a panel edit session");
+                    list.selectedIndex = indexOf("language");
+                    require(findInput(menu) == null, "passing a string row does not open its editor");
+                    list.selectedIndex = indexOf("panelKey");
+                    require(!list.disableInput && Object(menu).BGSCodeObj.pollKeyCapture().state != "waiting", "passing a key row does not capture input");
+                    list.selectedIndex = indexOf("rescan");
+                    require(list.selectedEntry.row.actionState == "Completed" && panelActions == 0, "passing an action does not invoke it again");
+                    list.selectedIndex = indexOf("panelNumber"); key(Keyboard.RIGHT); break;
+                case 203:
+                    require(list.selectedEntry.row.key == "panelNumber" && list.selectedEntry.row.value == "3" && panelWrites == 1,
+                        "panel editing survives disabled, text, key and action rows and adjusts the next numeric row");
+                    list.selectedIndex = indexOf("panelEnum"); step = 218; break;
+                case 218:
+                    key(Keyboard.RIGHT); step = 204; break;
+                case 204:
+                    require(list.selectedEntry.row.key == "panelEnum" && list.selectedEntry.row.value == "second" && panelWrites == 2,
+                        "moving from a numeric row to an enum keeps editing active (key=" + list.selectedEntry.row.key +
+                        ", value=" + list.selectedEntry.row.value + ", writes=" + panelWrites + ")");
+                    clickPanelLabel();
+                    require(panelWrites == 2 && list.selectedEntry.row.value == "second", "an active enum row label cannot change its value");
+                    var previousEnum:MovieClip = list.FindClipForEntry(list.selectedIndex) as MovieClip;
+                    Object(previousEnum).LargeStepper_mc.LeftCatcher_mc.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_OVER, true));
+                    key(Keyboard.DOWN);
+                    require(list.selectedEntry.row.key == "panelKey", "Down leaves the enum while its arrow is hovered");
+                    // GFx retargets the stationary pointer to the old row when
+                    // leaving edit mode disables that clip's mouse children.
+                    previousEnum.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_OVER, true));
+                    require(list.selectedEntry.row.key == "panelKey" && panelWrites == 2,
+                        "a stationary pointer retarget cannot undo keyboard navigation or save a value");
+                    list.selectedIndex = indexOf("debug"); key(Keyboard.RIGHT); break;
+                case 205:
+                    require(list.selectedEntry.row.key == "debug" && list.selectedEntry.row.value == true && panelWrites == 3,
+                        "moving back to a boolean keeps editing active after saves refresh the rows");
+                    userEvent("Cancel");
+                    require(!navFocused(), "Done stays in the settings panel");
+                    list.selectedIndex = indexOf("panelNumber"); key(Keyboard.RIGHT);
+                    require(panelWrites == 3 && list.selectedEntry.row.value == "3", "Done stops edits while browsing other rows"); break;
+                case 206:
+                    userEvent("Cancel");
+                    require(navFocused() && list.selectedEntry.row.key == "panelNumber", "a second Back returns to the sidebar and retains selection");
+                    userEvent("Right");
+                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Right reenters editing without stepping the selected numeric value"); break;
+                case 207:
+                    key(Keyboard.RIGHT); break;
+                case 208:
+                    require(list.selectedEntry.row.key == "panelNumber" && list.selectedEntry.row.value == "4" && panelWrites == 4,
+                        "Right-entry enables the next deliberate edit");
+                    movePanelNumberFirst(); ++panelGeneration; step = 209; break;
+                case 209:
+                    require(list.selectedIndex == 0 && list.selectedEntry.row.key == "panelNumber" && list.selectedEntry.row.value == "4",
+                        "reordered refresh retains selection by setting identity");
+                    key(Keyboard.RIGHT); break;
+                case 210:
+                    require(list.selectedEntry.row.value == "5" && panelWrites == 5, "reordered refresh preserves the panel edit session");
+                    panelRows = panelRows.filter(function(row:Object, index:int, source:Array):Boolean { return row.key != "panelNumber"; });
+                    ++panelGeneration; break;
+                case 211:
+                    require(indexOf("panelNumber") < 0, "selected setting removal is reflected by the next refresh");
+                    panelBaseline = panelWrites;
+                    list.selectedIndex = indexOf("debug"); key(Keyboard.LEFT);
+                    require(navFocused() && panelWrites == panelBaseline, "selected setting removal ends editing so Left returns to the sidebar without changing a value");
+                    restorePanelFixture();
+                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 212:
+                    require(list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview" &&
+                        list.selectedEntry.row.summary == "13 SETTINGS  |  2 ACTIONS", "panel fixture restores the original Home rows");
+                    userEvent("Right");
+                    MovieClip(list.FindClipForEntry(1)).dispatchEvent(new MouseEvent(MouseEvent.MOUSE_OVER, true));
+                    require(list.selectedIndex == 1, "pooled rows restore vanilla hover selection on Home");
+                    list.selectedIndex = 0; step = 79; break;
                 case 79:
                     Object(menu).BGSCodeObj.launch = function(mod:String, id:String):int { return 2; };
                     Object(menu).BGSCodeObj.pollLaunch = function():Object { return {state:launchState, message:"Preview launch failed"}; };
@@ -609,6 +725,11 @@ package
             // Locked alone is left over from the empty state; wait for the interfaces to arrive.
             if (step == 68) return launcher.locked && launcher.visible;
             if (step == 70) return launcher.visible && !launcher.locked;
+            if (step == 200) return indexOf("panelNumber") >= 0;
+            if (step == 209) return list.entryCount && list.GetDataForEntry(0).row.previewGeneration == 2;
+            if (step == 211) return list.entryCount && list.GetDataForEntry(0).row.previewGeneration == 3;
+            if (step == 212) return list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview" &&
+                list.selectedEntry.row.summary == "13 SETTINGS  |  2 ACTIONS";
             return true;
         }
         private function loadingCaptionVisible():Boolean
@@ -616,23 +737,91 @@ package
             var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
             return findText(DisplayObjectContainer(findNamed(menu,"launcher_0")), localization.text("home.loading")) != null;
         }
-        private function checkShoulderNavigation():void
+        private function checkShoulderNavigation(sidebar:Boolean):void
         {
-            for each (var sidebar:Boolean in [true, false]) {
-                if (!sidebar) userEvent("Right");
-                // Alternate quick taps without waiting for footer animations or a frame.
-                for (var i:int = 0; i < 4; ++i) {
-                    var name:String = i % 2 == 0 ? "RShoulder" : "LShoulder";
-                    var expected:String = i % 2 == 0 ? "hotkeys" : "freeCamera";
-                    var context:String = sidebar ? "sidebar" : "page";
-                    Object(menu).ProcessUserEvent(name, true);
-                    require(list.selectedEntry.row.key == expected, context + " shoulder tap " + i + " changes page on press");
-                    Object(menu).ProcessUserEvent(name, false);
-                    require(list.selectedEntry.row.key == expected && navFocused() == sidebar,
-                        context + " shoulder release keeps the page and focus");
-                }
+            // Entry settles in a previous verification step. The shoulder taps
+            // themselves stay back-to-back to catch duplicate release handling.
+            for (var i:int = 0; i < 4; ++i) {
+                var name:String = i % 2 == 0 ? "RShoulder" : "LShoulder";
+                var expected:String = i % 2 == 0 ? "hotkeys" : "freeCamera";
+                var context:String = sidebar ? "sidebar" : "page";
+                Object(menu).ProcessUserEvent(name, true);
+                require(list.selectedEntry.row.key == expected, context + " shoulder tap " + i + " changes page on press");
+                Object(menu).ProcessUserEvent(name, false);
+                require(list.selectedEntry.row.key == expected && navFocused() == sidebar,
+                    context + " shoulder release keeps the page and focus");
             }
-            userEvent("Cancel");
+        }
+        private function startPanelFixture():void
+        {
+            var bridge:Object = Object(menu).BGSCodeObj;
+            panelBridge = {getRows:bridge.getRows, revision:bridge.revision,
+                setBool:bridge.setBool, setInt:bridge.setInt, setEnum:bridge.setEnum, invokeAction:bridge.invokeAction};
+            panelRows = panelBridge.getRows();
+            var advanced:Array = panelRows.filter(function(row:Object, index:int, source:Array):Boolean {
+                return row.mod == "design-preview" && row.group == "Advanced";
+            });
+            panelRows = panelRows.filter(function(row:Object, index:int, source:Array):Boolean {
+                return row.mod != "design-preview" || row.group != "Advanced";
+            });
+            var debug:Object = advanced.shift();
+            debug.value = false;
+            var disabled:Object = panelRow("panelDisabled", "bool", false); disabled.editable = false;
+            var number:Object = panelRow("panelNumber", "int", "2"); number.minimum = "0"; number.maximum = "9";
+            var choice:Object = panelRow("panelEnum", "enum", "first");
+            choice.options = [{value:"first", label:"First"}, {value:"second", label:"Second"}];
+            var binding:Object = panelRow("panelKey", "key", 115); binding.allowUnbound = true; binding.valueName = "F4";
+            panelRows = panelRows.concat([debug, disabled, number, choice, binding], advanced);
+            panelGeneration = 1; panelWrites = 0; panelActions = 0;
+            bridge.getRows = function():Array {
+                var copies:Array = [];
+                for each (var row:Object in panelRows) {
+                    var copy:Object = {};
+                    for (var field:String in row) copy[field] = row[field];
+                    copy.previewGeneration = panelGeneration;
+                    copies.push(copy);
+                }
+                return copies;
+            };
+            bridge.revision = function():String { return "panel-" + panelGeneration; };
+            bridge.setBool = function(mod:String, key:String, value:Boolean):Object { return savePanelValue(mod, key, value); };
+            bridge.setInt = function(mod:String, key:String, value:String):Object { return savePanelValue(mod, key, value); };
+            bridge.setEnum = function(mod:String, key:String, value:String):Object { return savePanelValue(mod, key, value); };
+            bridge.invokeAction = function(mod:String, key:String):Object { ++panelActions; return panelBridge.invokeAction(mod, key); };
+        }
+        private function panelRow(key:String, type:String, value:*):Object
+        {
+            return {mod:"design-preview", modTitle:"OSF Animation", modDescription:"Panel regression fixture", group:"Advanced",
+                groupTitle:"Advanced", key:key, type:type, title:key, hint:"Panel edit-session regression", value:value, editable:true,
+                defaultKnown:false};
+        }
+        private function savePanelValue(mod:String, key:String, value:*):Object
+        {
+            for each (var row:Object in panelRows) if (row.mod == mod && row.key == key) {
+                require(row.editable, "disabled panel settings never reach the save bridge");
+                ++panelWrites; row.value = value; return {ok:true};
+            }
+            throw new Error("unexpected panel setting save: " + mod + "/" + key);
+        }
+        private function movePanelNumberFirst():void
+        {
+            var number:Object;
+            for each (var row:Object in panelRows) if (row.key == "panelNumber") number = row;
+            panelRows = panelRows.filter(function(item:Object, index:int, source:Array):Boolean { return item.key != "panelNumber"; });
+            panelRows.unshift(number);
+        }
+        private function clickPanelLabel():void
+        {
+            var clip:DisplayObject = list.FindClipForEntry(list.selectedIndex) as DisplayObject;
+            require(clip != null, "selected enum row has a rendered click target");
+            clip.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true, false, 24, 12));
+            clip.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true, false, 24, 12));
+        }
+        private function restorePanelFixture():void
+        {
+            var bridge:Object = Object(menu).BGSCodeObj;
+            for (var field:String in panelBridge) bridge[field] = panelBridge[field];
+            panelRows = null; panelBridge = null;
         }
         private function checkLocalization():void
         {

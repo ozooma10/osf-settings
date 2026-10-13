@@ -4,6 +4,7 @@
 #include "Utils/Paths.h"
 #include <fstream>
 #include <mutex>
+#include <string>
 
 namespace OSFSettings::TestHarness
 {
@@ -13,6 +14,7 @@ namespace OSFSettings::TestHarness
         constexpr auto Mod = "osfacceptance-provider";
         constexpr auto Schema = R"({"title":"Provider Acceptance","groups":{"General":[
             {"key":"enabled","label":"Provider enabled","type":"bool","default":false},
+            {"key":"launch.camera","label":"Launch camera","type":"enum","default":"","options":{"":"Use scene","freefly":"Free fly"}},
             {"key":"binding","label":"Observed key","type":"key","default":255,"allowMouse":true}
         ]}})";
         std::mutex mutex;
@@ -77,10 +79,13 @@ namespace OSFSettings::TestHarness
     {
         API::Client settings;
         bool enabled{}; std::uint32_t key{};
+        std::string camera;
         const bool present = settings.Init() && settings.GetBool(Mod, "enabled", &enabled) == API::Status::Ok;
         if (present) settings.GetKey(Mod, "binding", &key);
+        const bool cameraReadOk = present && settings.GetEnum(Mod, "launch.camera", camera) == API::Status::Ok;
         std::scoped_lock lock(mutex);
         return {{"present", present}, {"enabled", enabled}, {"key", key}, {"writes", writes},
+            {"cameraReadOk", cameraReadOk}, {"camera", camera},
             {"presses", presses}, {"notifications", notifications}, {"persisted", persisted}};
     }
 }

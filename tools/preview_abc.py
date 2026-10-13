@@ -10,6 +10,8 @@ CALLBACKS = {
     ("SettingsOptionList", "onBeginDrag"),
     ("SettingsOptionList", "onEndDrag"),
     ("SettingsOptionListEntry", "onCheckboxValueChange"),
+    ("SettingsOptionListEntry", "onStepperValueChange"),
+    ("SettingsOptionListEntry", "onSliderValueChange"),
 }
 
 

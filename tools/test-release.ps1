@@ -18,7 +18,7 @@ $suite = Join-Path $Harness 'Test-SettingsRelease.ps1'
 $suiteFound = Test-Path -LiteralPath $suite -PathType Leaf
 $scope = if ($RunGame) { 'offline+runtime' } else { 'offline' }
 $unverified = @('Physical controller input', 'Visual review of retained screenshots',
-    'Text-editor focus-loss cancellation and Main Menu/Continue limitations',
+    'Automatic editor/capture cancellation on Windows focus loss and Main Menu/Continue limitations',
     'Unmodified production ZIP: clean mod-manager installation, real consumer, restart and upgrade in-game',
     'External OSF UI provider handoff')
 if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame)") + $unverified }
@@ -111,6 +111,9 @@ try {
         $previewStarted = [DateTime]::UtcNow
         $arguments = @('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture') + $variant.args
         Invoke-ReleaseProcess 'pwsh' $arguments
+        if ($variant.name -eq 'normal') {
+            Invoke-ReleaseProcess 'python' @('-B', (Join-Path $repo 'tests/preview_rows_tests.py'))
+        }
         $prefix = if ($variant.name -like '*large') { 'large' } else { 'normal' }
         $captures = @(Get-ChildItem -LiteralPath (Join-Path $repo 'build/preview') -Filter "$prefix-*.png" -File | Where-Object LastWriteTimeUtc -ge $previewStarted)
         if (-not $captures.Count) { throw 'Preview passed without fresh screenshots.' }

@@ -50,6 +50,12 @@ private function testRect(rect:Rectangle):Object
 {
     return {x:rect.x, y:rect.y, width:rect.width, height:rect.height};
 }
+private function testLocalRect(clip:DisplayObject, rect:Rectangle):Object
+{
+    var first:flash.geom.Point = menuStage.globalToLocal(clip.localToGlobal(rect.topLeft));
+    var last:flash.geom.Point = menuStage.globalToLocal(clip.localToGlobal(rect.bottomRight));
+    return {x:first.x, y:first.y, width:last.x - first.x, height:last.y - first.y};
+}
 private function testMouseEvent(event:MouseEvent, previous:Object):Object
 {
     var target:DisplayObject = event.target as DisplayObject;
@@ -96,10 +102,25 @@ private function reportTestState():void
             var item:Object = options.GetDataForEntry(Object(clip).itemIndex);
             if (!item) continue;
             var row:Object = testRow(item.row); row.index = Object(clip).itemIndex;
+            for (var childIndex:int = 0; childIndex < clip.numChildren; ++childIndex) {
+                var rendered:SettingsRow = clip.getChildAt(childIndex) as SettingsRow;
+                if (rendered && rendered.visible) { row.valueText = rendered.testValueText; break; }
+            }
             // Border is the actual vanilla row hit area, without off-row text bounds.
             row.rect = testRect(DisplayObject(Object(clip).Border_mc).getBounds(menuStage));
             var control:DisplayObject = NumericSetting.isSlider(item.row) ? Object(clip).Slider_mc as DisplayObject : null;
             row.controlRect = control ? testRect(control.getBounds(menuStage)) : row.rect;
+            if (inlineSetting(item.row)) {
+                row.labelRect = testLocalRect(clip, new Rectangle(0, 0, MenuStyle.CONTROL_X, rowHeight()));
+                if (item.row.type == "bool")
+                    row.controlRect = testLocalRect(clip, new Rectangle(MenuStyle.CONTROL_X, 0, MenuStyle.CONTROL_WIDTH, rowHeight()));
+                else if (item.row.type == "enum") {
+                    var stepper:Object = Object(clip).LargeStepper_mc;
+                    row.controlRect = testRect(DisplayObject(stepper).getBounds(menuStage));
+                    row.leftControlRect = testRect(DisplayObject(stepper.LeftCatcher_mc).getBounds(menuStage));
+                    row.rightControlRect = testRect(DisplayObject(stepper.RightCatcher_mc).getBounds(menuStage));
+                }
+            }
             visibleRows.push(row);
         }
     }
@@ -116,7 +137,8 @@ private function reportTestState():void
         conflictText:nativeHotkeys.popup.active ? String(nativeHotkeys.popup.ControlInfo_mc.Label_mc.Text_tf.text) : "",
         refreshing:refreshing || requestedRefresh, startupPhase:startupPhase,
         mod:modID, group:groupID, rootPage:rootPage, issueCount:issues.length,
-        navigation:{focused:nav.focused},
+        navigation:{focused:nav.focused}, editingPanel:editingPanel, editingValue:editingValue(),
+        inputReady:!inputCoolingDown() && activationFrame != frame,
         home:{interfacesVisible:launcher.visible, expanded:launcher.expanded, interfacesFocused:launcher.focused},
         actionConfirmation:{active:confirmingAction()},
         launch:{active:launcher.launching},

@@ -2,6 +2,7 @@ package
 {
     import flash.display.DisplayObject;
     import flash.display.MovieClip;
+    import flash.events.MouseEvent;
     import flash.geom.ColorTransform;
     import flash.geom.Rectangle;
     import flash.utils.Dictionary;
@@ -124,6 +125,15 @@ package
                     if (view) clip.removeChild(view.content as DisplayObject);
                     view = {content:issue ? new IssueRow() : new SettingsRow(), row:null};
                     clip.addChild(view.content as DisplayObject); views[clip] = view;
+                }
+                if (view.settings !== settings) {
+                    // Leaving an edited control can retarget a stationary pointer
+                    // to its row. Vanilla rollover would then undo the keyboard
+                    // selection. Settings use explicit clicks; custom hover
+                    // presentation still bubbles to the menu.
+                    if (settings) clip.removeEventListener(MouseEvent.MOUSE_OVER, list.onEntryRollover);
+                    else clip.addEventListener(MouseEvent.MOUSE_OVER, list.onEntryRollover);
+                    view.settings = settings;
                 }
                 var selected:Boolean = Object(clip).itemIndex == list.selectedIndex && focused;
                 var editing:Boolean = selected && Object(clip).itemIndex == editingIndex;

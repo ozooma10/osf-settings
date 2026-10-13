@@ -23,6 +23,7 @@ package
             source = MenuStyle.field("", 16, 0, 510, MenuStyle.SMALL_SIZE + 10, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true); addChild(source);
             heading = MenuStyle.field("", 16, 0, 600, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true); addChild(heading);
         }
+        CONFIG::testHarness { public function get testValueText():String { return visible && value.visible ? value.text : ""; } }
         // Columns are anchored to the list's right edge so they follow LIST_WIDTH.
         public function update(row:Object, selected:Boolean, modList:Boolean, rowHeight:Number, hovered:Boolean = false):void
         {

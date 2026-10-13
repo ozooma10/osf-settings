@@ -59,8 +59,8 @@ namespace OSFSettings::TestHarness
                 auto result = Json::object();
                 // Deliberately only the fields this development movie emits.
                 for (const auto* field : {"initialized", "closing", "refreshing", "mod", "group", "selectedIndex",
-                    "selection", "rows", "stage", "capture", "kind", "index", "key", "type", "value", "title",
-                    "rect", "controlRect", "x", "y", "width", "height", "visibleRect", "active", "ready",
+                    "selection", "rows", "stage", "capture", "kind", "index", "key", "type", "value", "valueText", "title",
+                    "rect", "controlRect", "labelRect", "leftControlRect", "rightControlRect", "x", "y", "width", "height", "visibleRect", "active", "ready",
                     "editable", "minimum", "maximum", "status", "scrollPosition", "startupPhase", "state", "diagnosticError",
                     "mouse", "mouseDown", "mouseClick", "sequence", "frame", "target", "buttonDown", "saving",
                     "rootPage", "issueCount", "alternate", "action", "source", "records", "device", "slot", "modifier", "context",
@@ -68,7 +68,7 @@ namespace OSFSettings::TestHarness
                     "nativeRows", "divider", "presentationContext", "menuHeading", "sectionHeading", "countText",
                     "bindings", "count", "required", "requiredActions", "selectedKey", "query", "searching", "searchRect", "sourceRect", "clearRect", "primaryRect", "alternateRect",
                     "largeText", "stringEditor", "text", "valid", "feedback", "focused", "maxLength", "issueId", "severity", "impact", "nextSteps", "issueDetails", "extent", "position", "emptyText", "detailHint",
-                    "home", "interfacesVisible", "expanded", "interfacesFocused", "actionConfirmation", "actionState", "available", "launch", "message", "navigation"}) {
+                    "home", "interfacesVisible", "expanded", "interfacesFocused", "actionConfirmation", "actionState", "available", "launch", "message", "navigation", "editingPanel", "editingValue", "inputReady"}) {
                     Value member;
                     if (value.GetMember(field, &member) && !member.IsUndefined()) result[field] = CopyValue(member, depth + 1);
                 }

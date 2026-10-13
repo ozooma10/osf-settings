@@ -24,7 +24,10 @@ $player = Start-Process -FilePath $ruffle -WorkingDirectory $output -WindowStyle
     '--open-url-mode', 'deny', '--tcp-connections', 'deny', 'PreviewHost.swf'
 ) -RedirectStandardOutput $log -RedirectStandardError "$output/test-$name-errors.log" -PassThru
 try {
-    $deadline = (Get-Date).AddSeconds(30)
+    # Captures settle each scene for twelve frames and encode PNGs. The expanded
+    # regression sequence needs more total time; each stalled step still fails
+    # after two seconds inside PreviewChecks.
+    $deadline = (Get-Date).AddSeconds($(if ($Capture) { 60 } else { 30 }))
     $content = [Text.StringBuilder]::new()
     $reader = $null
     do {

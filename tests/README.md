@@ -4,7 +4,7 @@ Run from the repository root with the existing XMake configuration. XMake builds
 selected tests before running them, so a separate build command is unnecessary.
 
 ```powershell
-# All 23 native suites, including SDK, service, security and key coverage.
+# All 24 native suites, including SDK, service, security and key coverage.
 xmake test -j4
 
 # One area, or several related suites in one invocation.
@@ -16,7 +16,7 @@ xmake test -j4 'osfsettings-launcher-tests/*'
 | Group | Coverage |
 | --- | --- |
 | `tests/settings` | Localization, schema, store, service, SDK, runtime providers, strings, registry, filename validation and file-link regression checks |
-| `tests/input` | Keys, registration, input routing, lifecycle, binding editor/menu/snapshots, blocks, callbacks |
+| `tests/input` | Keys, registration, saved binding migration, input routing, lifecycle, binding editor/menu/snapshots, blocks, callbacks |
 | `tests/launcher` | Launcher registry and recency |
 | `tests/actions` | Action registration, dispatch and completion |
 | `tests/diagnostics` | Issues, diagnostics service and API |
@@ -54,6 +54,8 @@ Binding-snapshot checks exercise both queued and inline `TaskQueue::AddTask`
 execution, missing maps/contexts, invalidation and lifetime handling. They follow
 CommonLib's current task contract; they do not establish in-game threading safety.
 Preview fixtures explicitly mark required keys with `allowUnbound: false`.
+Checks use throwing functions or explicit failure counters and remain active with
+`NDEBUG` in `releasedbg`; passing tests are not disabled C assertions.
 
 ## Menu previews
 
@@ -74,6 +76,11 @@ python -B tests/preview_rows_tests.py
 pwsh -NoProfile -File tools/preview-menu.ps1 -BuildOnly
 ```
 
+Exporter regressions include declared empty enum choices/defaults, their labels,
+single-choice editability and rejection of undeclared or duplicate empty values.
+The Papyrus suite also checks empty choices through getters, setters, invalid-write
+preservation and reload with a non-empty schema default.
+
 ```powershell
 pwsh -NoProfile -File tools/test-menu-preview.ps1
 pwsh -NoProfile -File tools/test-menu-preview.ps1 -LargeText
@@ -88,8 +95,12 @@ pwsh -NoProfile -File tools/test-menu-preview.ps1 -LargeText -Capture
 Routine checks skip screenshot encoding, advance on rendered frames and expected
 asynchronous results, and fail a stalled step after two seconds. All behavioral
 assertions remain enabled. The runner reads appended log data every 50 ms.
+The overall timeout is 30 seconds, or 60 seconds when capturing the full sequence.
 `-Capture` writes `build/preview/normal-*.png` or `large-*.png`; ordinary runs do not
 refresh old captures. Do not run previews concurrently: they share prepared assets.
+The previews exercise settings-panel edit sessions and an isolated instance of
+the production `NativeGameplayOptions` bridge with synthetic native data. This
+does not establish registration or interaction with installed Gameplay Options mods.
 
 Only the requested movie variant is compiled. Movie/host builds and prepared
 assets reuse content fingerprints of authored inputs and output hashes. External
@@ -109,13 +120,27 @@ use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame`. The
 [release validation guide](../docs/RELEASE_VALIDATION.md) describes coverage, isolation, report
 formats and remaining acceptance gaps. Omit `-RunGame` for an offline run.
 
-`smoke-coverage.json` inventories 18 feature areas across all 23 native suites,
+`smoke-coverage.json` inventories 19 feature areas across all 24 native suites,
 four preview variants and 13 game cases. The coverage stage rejects empty or
 duplicate feature entries, unknown references and unmapped tests in any layer.
 JSON and Markdown reports show each feature's native, preview and game result
 separately; an offline pass leaves its game checks `not-run`.
+
+This inventory maps features to suites; it is not a measured line/branch coverage
+percentage or a claim that every behavior in a feature has been tested. In
+particular, Gameplay Options currently has preview coverage only.
+
 The normal/large Features cases exercise value editors, action consumers,
-launcher handoff and runtime providers through real game input. Focused development
+launcher handoff and runtime providers through real game input. They include a
+provider enum with a declared empty option: actual rendered
+labels, accepted/rejected writes, reset, notifications and unregister/register
+reload of the caller's saved value. The mixed mouse/keyboard regression leaves the
+pointer on an enum arrow while navigating to the next setting.
+Windows focus-cycle checks verify preserved data and explicit input recovery;
+automatic cancellation on focus loss is not established. Preview deactivation
+checks cover cleanup only when Flash receives `Event.DEACTIVATE`.
+
+Focused development
 runs use the sibling `Test-Starfield.ps1 -Scenario SettingsSmoke -Acceptance
 -AcceptancePhase Features` (add `-LargeText` for accessibility text).
 When the opening hotkey is unbound, game scenarios enter through Pause and assign
@@ -131,6 +156,9 @@ code 0 means every requested stage passed, and the report's `scope` says whether
 the in-game suite was part of it. `-Plan` lists the stages and the in-game cases;
 that case list is read from the sibling harness's `Test-SettingsRelease.ps1 -Plan`,
 so this repo never carries its own copy.
+
+The smoke and release runners include the native preview-exporter regression
+checks in their normal-preview stage after executing the Ruffle preview.
 
 Native assertions and Ruffle previews do not replace input, controller, lifecycle
 or menu-handoff acceptance in Starfield. Add `-RunGame` to run the harness suite

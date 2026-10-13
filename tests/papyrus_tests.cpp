@@ -9,6 +9,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
+#include <string_view>
 
 namespace
 {
@@ -41,6 +42,11 @@ int main()
         schema["groups"]["General"].push_back({{"key", "wideInt"}, {"type", "int"}, {"default", INT64_MAX}});
         schema["groups"]["General"].push_back({{"key", "wideFloat"}, {"type", "float"}, {"default", 1e100}});
         schema["groups"]["General"].push_back({{"key", "CaseKey"}, {"type", "bool"}, {"default", false}});
+        for (const auto* key : {"cameraDefault", "cameraOverride"}) {
+            schema["groups"]["General"].push_back({{"key", key}, {"type", "enum"},
+                {"default", std::string_view(key) == "cameraDefault" ? "" : "freefly"},
+                {"options", {{"", "Use scene"}, {"freefly", "Free fly"}}}});
+        }
         schema["hotkeys"]["menu"] = {{"label", "Menu"}, {"menu", "ExampleMenu"}};
         { std::ofstream file(schemas / "papyrusexample.json"); file << schema; }
 
@@ -98,6 +104,33 @@ int main()
         check(settings.SetValue(Mod, "mode", EnumValue{"NORMAL"}) == SettingsError::InvalidValue, "native enum matching remains exact");
         check(!api.Write("SetString", Mod, "mode", std::string("quiet")), "writes preserve enum/string separation");
         check(!api.Write("SetFloat", Mod, "volume", std::numeric_limits<double>::quiet_NaN()), "nonfinite writes fail");
+
+        check(api.Read("GetEnum", Mod, "cameraDefault", EnumValue{"fallback"}).value.empty(),
+            "a declared empty enum default is returned instead of the Papyrus fallback");
+        check(api.Write("SetEnum", "PAPYRUSEXAMPLE", "CAMERAOVERRIDE", EnumValue{}),
+            "Papyrus accepts a declared empty enum choice using pooled identifier casing");
+        check(api.Read("GetEnum", Mod, "cameraOverride", EnumValue{"fallback"}).value.empty(),
+            "an empty enum choice remains distinct from a failed read");
+        const auto emptyChoiceSaved = TestJson::parse(std::ifstream(values / "papyrusexample.json"));
+        check(emptyChoiceSaved["values"]["cameraOverride"].is_string() && emptyChoiceSaved["values"]["cameraOverride"] == "",
+            "an empty non-default enum choice persists as a JSON string");
+        check(!api.Write("SetEnum", Mod, "cameraOverride", EnumValue{"Use scene"}) &&
+            !api.Write("SetEnum", Mod, "cameraOverride", EnumValue{"missing"}) &&
+            !api.Write("SetEnum", Mod, "mode", EnumValue{}),
+            "Papyrus rejects enum labels, unknown choices and undeclared empty values");
+        check(api.Read("GetEnum", Mod, "cameraOverride", EnumValue{"fallback"}).value.empty() &&
+            TestJson::parse(std::ifstream(values / "papyrusexample.json")) == emptyChoiceSaved,
+            "invalid enum writes preserve the live empty choice and saved values");
+        {
+            SettingsService restarted;
+            restarted.Load(schemas, values); restarted.Start();
+            check(restarted.LoadErrors().empty() &&
+                Values(restarted).Read("GetEnum", Mod, "cameraOverride", EnumValue{"fallback"}).value.empty(),
+                "a fresh Papyrus bridge reloads the empty choice instead of its non-empty schema default");
+        }
+        check(api.Write("SetEnum", Mod, "cameraOverride", EnumValue{"FREEFLY"}) &&
+            api.Read("GetEnum", Mod, "cameraOverride", EnumValue{"fallback"}).value == "freefly",
+            "non-empty enum choices still resolve pooled value casing beside an empty choice");
 
         check(listeners.Register(instance, Kind::Changes, Mod) == SettingsError::None, "instance change registration succeeds");
         check(listeners.Register(instance, Kind::Changes, "PAPYRUSEXAMPLE") == SettingsError::None, "pooled mod casing deduplicates registration");

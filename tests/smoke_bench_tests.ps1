@@ -28,6 +28,11 @@ Reject { Test-SmokeCoverage $coverage @('store') @('normal') @('renamed') } 'Unk
 Reject { Test-SmokeCoverage ($coverage + $coverage) @('store') @('normal') @('game') } 'Duplicate feature ID rejected'
 Reject { Test-SmokeCoverage @(@{id='gap'; feature='Uncovered'; native=@(); preview=@(); runtime=@()}) @('store') @('normal') @('game') } 'Feature with no checks rejected'
 Reject { Test-SmokeCoverage @() @('store') @('normal') @('game') } 'Empty feature map rejected'
+$repositoryCoverage = @(Get-Content -LiteralPath (Join-Path $PSScriptRoot 'smoke-coverage.json') -Raw | ConvertFrom-Json)
+$repositorySuites = @([regex]::Matches((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'xmake.lua') -Raw), '"osfsettings-([a-z-]+)-tests"') |
+    ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+Test-SmokeCoverage $repositoryCoverage $repositorySuites @('normal','large','bindings-normal','bindings-large') @()
+Check $true 'Repository coverage includes every registered native suite and preview variant'
 $featureReport = @{coverage=$coverage; stages=@(@{name='native';status='passed'}, @{name='preview-normal';status='failed'}, @{name='runtime';status='not-run'})}
 $featureResult = @(Get-SmokeFeatureResults $featureReport)[0]
 Check ($featureResult.native -eq 'passed' -and $featureResult.preview -eq 'failed' -and $featureResult.runtime -eq 'not-run') 'Feature evidence retains failed previews and skipped game cases'

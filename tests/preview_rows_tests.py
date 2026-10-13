@@ -77,6 +77,29 @@ class PreviewRowsTests(unittest.TestCase):
         self.assertFalse(rows[2]["editable"])
         self.assertTrue(rows[3]["editable"])
 
+    def test_empty_enum_values_preserve_labels_defaults_and_editability(self):
+        for default in ["", "freefly"]:
+            with self.subTest(default=default):
+                row = self.rows([{
+                    "key": "launch.camera", "type": "enum", "default": default,
+                    "options": {"": "Use scene", "freefly": "Free fly"},
+                }])[0]
+                self.assertEqual(row["type"], "enum")
+                self.assertEqual(row["value"], default)
+                self.assertEqual(row["defaultValue"], default)
+                self.assertEqual(row["options"], [
+                    {"value": "", "label": "Use scene"},
+                    {"value": "freefly", "label": "Free fly"},
+                ])
+                self.assertTrue(row["editable"])
+        only = self.rows([{
+            "key": "sceneOnly", "type": "enum", "default": "", "options": {"": "Use scene"},
+        }])[0]
+        self.assertEqual(only["value"], "")
+        self.assertEqual(only["defaultValue"], "")
+        self.assertEqual(only["options"], [{"value": "", "label": "Use scene"}])
+        self.assertFalse(only["editable"])
+
     def test_production_schema_rejections(self):
         invalid = [
             {"key": "mouse", "type": "key", "default": "Mouse4"},
@@ -84,6 +107,8 @@ class PreviewRowsTests(unittest.TestCase):
             {"key": "key", "type": "key", "default": "UNBOUND", "allowUnbound": False},
             {"key": "alias", "type": "key", "default": "VK_F4"},
             {"key": "choice", "type": "enum", "default": "a", "options": ["a", "A"]},
+            {"key": "undeclared-empty", "type": "enum", "default": "", "options": ["freefly"]},
+            {"key": "duplicate-empty", "type": "enum", "default": "", "options": ["", ""]},
             {"key": "float", "type": "float", "default": 1, "step": 0},
             {"id": "action", "type": "action"},
         ]

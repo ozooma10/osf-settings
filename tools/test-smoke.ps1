@@ -24,7 +24,7 @@ $defined = @([regex]::Matches((Get-Content (Join-Path $repo 'tests/xmake.lua') -
 $previewVariants = @('normal','large','bindings-normal','bindings-large')
 $unverified = @('Physical controller input and visual review of retained screenshots.',
     'External OSF UI handoff and integration with third-party consumer mods.',
-    'Text-editor focus-loss cancellation and Main Menu/Continue remain documented acceptance gaps.',
+    'Automatic editor/capture cancellation on Windows focus loss and Main Menu/Continue remain documented acceptance gaps.',
     'Production ZIP install, upgrade, and restart in game: use tools/test-release.ps1 -RunGame on a committed candidate.')
 if (-not $RunGame) { $unverified = @('All in-game cases were skipped; rerun with -RunGame.') + $unverified }
 if ($Plan) {
@@ -92,6 +92,9 @@ try {
         Invoke-SmokeStage ('preview-' + $variant.name) {
             $started = [DateTime]::UtcNow
             Invoke-SmokeCommand 'pwsh' (@('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture') + $variant.args)
+            if ($variant.name -eq 'normal') {
+                Invoke-SmokeCommand 'python' @('-B', (Join-Path $repo 'tests/preview_rows_tests.py'))
+            }
             $prefix = if ($variant.name -like '*large') { 'large' } else { 'normal' }
             $captures = @(Get-ChildItem -LiteralPath (Join-Path $repo 'build/preview') -Filter "$prefix-*.png" -File | Where-Object LastWriteTimeUtc -ge $started)
             if (-not $captures.Count) { throw '[blocked] Preview returned without fresh captures.' }
