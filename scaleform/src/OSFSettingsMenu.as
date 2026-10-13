@@ -89,6 +89,8 @@ package
         // The list entry under the pointer, lit whichever side has focus.
         private var hoverIndex:int = -1;
         private var editingIndex:int = -1;
+        // Gameplay Options share one explicit edit session across their rows.
+        private var editingGameplay:Boolean = false;
         private var mouseSelectOnly:Boolean = false;
         private var captureRow:Object;
         private var captureBinding:MovieClip;
@@ -338,7 +340,7 @@ package
         private function openEntry(item:Object):void
         {
             if (!item || item.kind == "heading") return;
-            editingIndex = -1;
+            clearValueEditing();
             launcher.releaseAccept();
             var mod:String = item.kind == "page" ? "" : item.kind == "mod" ? item.id : item.mod;
             // A mod lists all its settings; one of its sections lists only its own.
@@ -365,7 +367,7 @@ package
         {
             // Repaint only when focus actually moves; a press on the sidebar must not redraw it.
             if (value == nav.focused) { if (value) menuStage.focus = nav; return; }
-            editingIndex = -1;
+            clearValueEditing();
             nav.focused = value; navAcceptHeld = false;
             if (value) { launcher.focused = false; launcher.releaseAccept(); }
             else if (homePage() && launcher.hasEntries && (!options.entryCount || expandedLauncher())) launcher.focused = true;
@@ -563,7 +565,7 @@ package
             var hasHotkeys:Boolean = false;
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
-            var selectedIssue:Object = preserve && (issuesPage() || bindingsPage()) ? current() : null;
+            var selectedRow:Object = preserve && (issuesPage() || bindingsPage() || editingGameplay) ? current() : null;
             var rows:Array = [], source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
             for each (var row:Object in source) {
                 if (row.type == "launcher") continue;
@@ -572,13 +574,20 @@ package
                 if (row.type == "hotkey") hasHotkeys = true;
             }
             var data:Array = settingsList.entries(rows, Boolean(modID), Boolean(groupID));
-            for (var i:int = 0; selectedIssue && i < data.length; ++i) {
+            var keptSelection:Boolean = false;
+            for (var i:int = 0; selectedRow && i < data.length; ++i) {
                 row = data[i].row;
-                if (bindingsPage() ? row.identity == selectedIssue.identity : row.mod == selectedIssue.mod && row.id == selectedIssue.id) {
+                if (bindingsPage() ? row.identity == selectedRow.identity : row.mod == selectedRow.mod &&
+                    (editingGameplay ? row.gameplayID === selectedRow.gameplayID : row.id == selectedRow.id)) {
                     selected = i;
                     scroll = Math.max(0, selected - (options.selectedIndex - options.scrollPosition));
+                    keptSelection = true;
+                    break;
                 }
             }
+            // PEOData replaces row objects after a save. Retain the session only
+            // while its selected option still exists, even if list order changed.
+            if (editingGameplay && !keptSelection) clearValueEditing();
             var rebuilt:Boolean = settingsList.setEntries(data, preserve);
             if (rebuilt) { hoverIndex = -1; editingIndex = -1; }
             // Home's detail card and empty state show current keys, which come from vanilla Controls.
@@ -594,6 +603,7 @@ package
                 options.selectedIndex = selected;
                 options.scrollPosition = Math.min(scroll, options.maxScrollPosition);
             }
+            syncValueEditing();
             if (homePage() && launcher.hasEntries && !data.length && !nav.focused) launcher.focused = true;
             syncInput();
             if (!searching()) menuStage.focus = nav.focused ? nav : launcherPage() ? launcher : options as MovieClip;
@@ -630,9 +640,25 @@ package
             return Boolean(modID && row && (row.type == "bool" || row.type == "enum" || NumericSetting.isSlider(row)));
         }
         private function editingValue():Boolean { return editingIndex >= 0 && editingIndex == options.selectedIndex && !nav.focused; }
-        private function finishValue():void
+        private function clearValueEditing():void
         {
             editingIndex = -1;
+            editingGameplay = false;
+        }
+        private function syncValueEditing():void
+        {
+            var row:Object = current();
+            if (editingGameplay) {
+                if (nav.focused || !inlineSetting(row) || row.gameplayID === undefined) clearValueEditing();
+                // Disabled options cannot change, but moving past one keeps the session.
+                else editingIndex = row.editable ? options.selectedIndex : -1;
+            } else if (editingIndex != options.selectedIndex || nav.focused || !inlineSetting(row) || !row.editable) {
+                editingIndex = -1;
+            }
+        }
+        private function finishValue():void
+        {
+            clearValueEditing();
             decorate(); updateSelection();
         }
         private function syncInput():void
@@ -689,7 +715,7 @@ package
             var clearVisible:Boolean = Boolean(!captureRow && !busy && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
             var acceptText:String = acceptLabel(row);
-            var backText:String = editingValue() ? tr("buttons.done") : editing || captureRow || nativeHotkeys.busy ? tr("buttons.cancel") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
+            var backText:String = editingValue() || editingGameplay ? tr("buttons.done") : editing || captureRow || nativeHotkeys.busy ? tr("buttons.cancel") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
             var acceptVisible:Boolean = !busy && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (ACCEPT_TYPES[row.type] || inlineSetting(row)))));
             if (reporting) {
                 acceptVisible = Boolean(row && row.nexusModId);
@@ -739,7 +765,7 @@ package
         private function selectionChanged(event:Event):void
         {
             if (refreshing || skipSection()) return;
-            if (editingIndex != options.selectedIndex) editingIndex = -1;
+            syncValueEditing();
             decorate();
             if (!nav.focused && homePage() && !expandedLauncher()) focusLauncher(false);
             else updateSelection();
@@ -759,6 +785,7 @@ package
             var row:Object = current(); if (!row) return;
             if (inlineSetting(row) && row.editable && !editingValue()) {
                 editingIndex = options.selectedIndex;
+                editingGameplay = row.gameplayID !== undefined;
                 decorate(); updateSelection(); return;
             }
             if (inlineSetting(row) && NumericSetting.isSlider(row)) { finishValue(); return; }
@@ -890,7 +917,7 @@ package
                 lockForClose(); BGSCodeObj.close(); return;
             }
             if (closing || settingsList.dragging || requestedRefresh) return;
-            if (editingValue()) { finishValue(); return; }
+            if (editingValue() || editingGameplay) { finishValue(); return; }
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             // Back leaves the page for the sidebar; from the sidebar it closes the menu.
             if (!nav.focused) { focusNav(true); return; }
@@ -1058,7 +1085,7 @@ package
                 return true;
             }
             if (nav.focused) return navigate(name, pressed);
-            if (modID && (name == "Left" || name == "Right") && !editingValue()) {
+            if (modID && (name == "Left" || name == "Right") && !editingValue() && !editingGameplay) {
                 // Binding slots are navigation too; Left from the first slot leaves the page.
                 if (current() && current().type == "hotkey" && (name == "Right" || nativeHotkeys.selectedSlot == 1)) return false;
                 if (pressed && name == "Left") focusNav(true);
