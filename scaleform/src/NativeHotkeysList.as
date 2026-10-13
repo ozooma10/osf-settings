@@ -26,6 +26,7 @@ package
         private var seenRemapping:Boolean = false;
         private var cancelled:Boolean = false;
         private var clearing:Boolean = false;
+        private var saveRequested:Boolean = false;
         private var openRequested:Boolean = false;
         private var showAlternate:Boolean = false;
         private var pending:Object;
@@ -301,22 +302,30 @@ package
 
         private function save():void
         {
-            saving = true;
+            saving = true; saveRequested = false;
             changed(tr("bindings.saving"), false);
             dataManager.dispatchEvent(new Event("SettingsPanel_ValidateControls", true));
         }
 
         private function saved(event:Event):void
         {
-            if (!saving) return;
+            if (!saving || clearing) return;
             var data:Object = Object(event).data;
-            if (global.HasFireForgetEvent(data, "SettingsDataModel_ControlsValidatedEvent")) {
-                dataManager.dispatchEvent(new Event("SettingsPanel_SaveControls", true));
+            // FireForgetEventData contains a batch. Once SaveControls was sent,
+            // a retained validation event must not hide completion or send it again.
+            if (saveRequested) {
+                if (global.HasFireForgetEvent(data, "SettingsDataModel_ControlsSaved")) {
+                    saving = false; saveRequested = false;
+                    advance();
+                    changed(tr("bindings.saved"), true);
+                }
             } else if (global.HasFireForgetEvent(data, "SettingsDataModel_MissingRequiredBindingError")) {
                 saving = false;
+                advance();
                 changed(tr("bindings.requiredMissing"), true);
-            } else if (global.HasFireForgetEvent(data, "SettingsDataModel_ControlsSaved")) {
-                saving = false; changed(tr("bindings.saved"), true);
+            } else if (global.HasFireForgetEvent(data, "SettingsDataModel_ControlsValidatedEvent")) {
+                saveRequested = true;
+                dataManager.dispatchEvent(new Event("SettingsPanel_SaveControls", true));
             }
         }
 

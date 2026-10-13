@@ -7,6 +7,7 @@ package
     // The engine owns these values, their persistence and Papyrus notifications.
     public final class NativeGameplayOptions
     {
+        private static const STARFIELD:String = "gameplay/starfield";
         private var manager:Object;
         private var global:Object;
         private var sources:Array;
@@ -67,8 +68,11 @@ package
                 var id:uint = uint(entry.uID), source:Object = sourceFor(id);
                 if (!source || seen[id]) continue;
                 seen[id] = true;
-                var file:String = String(source.file), mod:String = "gameplay/" + file.toLowerCase();
+                var official:Boolean = source.official === true;
+                var file:String = String(source.file), mod:String = official ? STARFIELD : "gameplay/" + file.toLowerCase();
                 var key:String = uint(id & ~uint(source.mask)).toString(16);
+                // Official plugins share one page, but may reuse local form IDs.
+                if (official) key = file.toLowerCase() + "/" + key;
                 // Headers need not carry form IDs. Anchor each section to its first option.
                 if (!sectionKeys[mod]) sectionKeys[mod] = "option-" + key;
                 var group:String = sectionKeys[mod];
@@ -89,15 +93,16 @@ package
                     if (descriptions && i < descriptions.length)
                         substitutions.push(global.DoSubstitutions(descriptions[i], [label, "(" + xp + ")"]));
                 }
-                var row:Object = {mod:mod, modTitle:file, modDescription:file, group:group,
-                    groupTitle:section || file, key:key, title:translated(entry.sText),
+                var row:Object = {mod:mod, modTitle:official ? tr("gameplay.starfield") : file,
+                    modDescription:official ? tr("gameplay.starfieldDescription") : file, group:group,
+                    groupTitle:section || (official ? tr("gameplay.options") : file), key:key, title:translated(entry.sText),
                     hint:translated(entry.sDescription, substitutions), type:"enum", options:choices,
                     value:String(index(entry)), defaultKnown:false,
                     editable:entry.bEnabled !== false && source.editable === true,
                     gameplayID:id, gameplayType:uint(entry.uType)};
                 rows.push(row);
             }
-            for each (row in rows) if (groups[row.mod].length == 1) row.modTitle = row.groupTitle;
+            for each (row in rows) if (row.mod != STARFIELD && groups[row.mod].length == 1) row.modTitle = row.groupTitle;
             changed("", false);
         }
 

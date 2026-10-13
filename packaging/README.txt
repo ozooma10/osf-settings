@@ -7,7 +7,8 @@ not required by OSF Settings. Other game versions are not verified.
 Install this ZIP with MO2 or Vortex and enable it. Its root is the game's Data
 directory: SFSE, Interface and Scripts belong directly under Data.
 Launch through SFSE, load a save, then choose MOD SETTINGS in Pause.
-The opening key defaults to unbound. Assign it in the KEYBINDINGS tab.
+The opening key defaults to F10. Rebind it in the KEYBINDINGS tab; saved custom
+bindings take precedence over the default.
 No ESM/ESP activation is required for the framework itself.
 
 OSF follows the game's language at startup. English and Japanese are included.
@@ -20,6 +21,10 @@ ALL MODS lists supporting mods. Settings save automatically; individual reset
 restores the mod author's default. Text drafts save with Enter/SAVE and can be
 cancelled. A setting marked as requiring a restart takes effect when its owning
 mod applies it after restarting Starfield.
+
+The Starfield entry contains Gameplay Options from the base game and official
+content, using the game's own values and saves. Third-party Gameplay Options
+appear under their respective mods.
 
 KEYBINDINGS searches native MainGameplay keyboard/mouse actions and registered
 mod hotkeys, with primary/alternate slots.

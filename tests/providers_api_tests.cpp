@@ -119,6 +119,51 @@ int main()
         check(settings.GetBool("provider.mod", "enabled", &enabled) == Status::UnknownMod);
         check(api->Unregister(token) == Status::InvalidArgument);
         check(settings.GetBool("static.mod", "enabled", &enabled) == Status::Ok);
+
+        // OSF UI v2's translated Animation 1.4 camera option must retain the legacy empty value.
+        const char* animationSchema = R"({"id":"osf.animation","title":"OSF Animation","groups":{"General":[
+            {"key":"hotkeys.openBrowser","type":"key","default":255,"allowMouse":true},
+            {"key":"hotkeys.openWheel","type":"key","default":255,"allowMouse":true},
+            {"key":"launch.camera","type":"enum","default":"","options":{
+                "":"Use scene","thirdperson_hold":"Third person","scene_orbit":"Scene orbit",
+                "freefly":"Free fly","vanity_orbit":"Vanity orbit"}}
+        ]}})";
+        Persistence animationSave;
+        API::Providers::Registration animationToken{};
+        check(api->Register("osf.animation", animationSchema, "{}", save, &animationSave, &animationToken) == Status::Ok && animationToken);
+        check(settings.GetEnum("osf.animation", "launch.camera", nullptr, 0, &required) == Status::BufferTooSmall && required == 1);
+        text[0] = 'x';
+        check(settings.GetEnum("osf.animation", "launch.camera", text, 1, &required) == Status::Ok && text[0] == '\0' && required == 1);
+        API::Client client;
+        check(client.Attach(&settings));
+        std::string camera = "unchanged";
+        check(client.GetEnum("osf.animation", "launch.camera", camera) == Status::Ok && camera.empty());
+        unsigned cameraChanges{};
+        API::Subscription cameraSubscription{};
+        check(settings.Subscribe("osf.animation", [](const char*, const char* key, void* context) noexcept {
+            if (key && std::string_view(key) == "launch.camera") ++*static_cast<unsigned*>(context);
+        }, &cameraChanges, &cameraSubscription) == Status::Ok);
+        backend.DispatchChanges();
+        check(settings.SetEnum("osf.animation", "launch.camera", "freefly") == Status::Ok);
+        backend.DispatchChanges();
+        check(cameraChanges == 1 && nlohmann::json::parse(animationSave.values)["launch.camera"] == "freefly");
+        animationSave.accept = false;
+        check(settings.SetEnum("osf.animation", "launch.camera", "") == Status::SaveFailed);
+        check(client.GetEnum("osf.animation", "launch.camera", camera) == Status::Ok && camera == "freefly");
+        animationSave.accept = true;
+        check(settings.SetEnum("osf.animation", "launch.camera", "") == Status::Ok);
+        backend.DispatchChanges();
+        check(cameraChanges == 2 && nlohmann::json::parse(animationSave.values)["launch.camera"] == "");
+        check(settings.SetEnum("osf.animation", "launch.camera", "Use scene") == Status::InvalidValue);
+        check(settings.Unsubscribe(cameraSubscription) == Status::Ok);
+        check(api->Unregister(animationToken) == Status::Ok);
+        animationToken = 0;
+        check(api->Register("osf.animation", animationSchema, animationSave.values.c_str(), save, &animationSave, &animationToken) == Status::Ok);
+        check(client.GetEnum("osf.animation", "launch.camera", camera) == Status::Ok && camera.empty());
+        check(settings.SetEnum("osf.animation", "launch.camera", "scene_orbit") == Status::Ok &&
+            settings.Reset("osf.animation", "launch.camera") == Status::Ok);
+        check(client.GetEnum("osf.animation", "launch.camera", camera) == Status::Ok && camera.empty());
+        check(api->Unregister(animationToken) == Status::Ok);
         std::cout << checks << " provider checks passed\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }

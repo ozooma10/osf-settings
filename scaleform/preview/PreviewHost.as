@@ -177,12 +177,25 @@ package
                 previewBindingTitle:function(entry:Object):String { return nativeBindings.labels[entry.sInputName] || entry.sInputName; },
                 previewBindingCell:fitNativeBindingCell,
                 previewGamepad:publishGamepad,
+                previewRebind:function(action:String, key:uint, label:String):void {
+                    nativeBindings.rebind(action, key, label); publishGamepad(false);
+                },
                 previewAllowNativeCapture:function(enabled:Boolean):void { allowNativeCapture = enabled; },
-                previewControlsSaved:function():void {
+                previewControlsSaved:function():uint {
                     var manager:Object = domain.getDefinition("Shared.AS3.Data.BSUIDataManager");
                     var data:Object = manager.GetDataFromClient("FireForgetEventData");
-                    data.data.aEvents = [{sEventName:"SettingsDataModel_ControlsSaved"}];
-                    data.SetReady(true); data.DispatchChange();
+                    var requests:uint = 0;
+                    var count:Function = function(event:Event):void { ++requests; };
+                    manager.addEventListener("SettingsPanel_SaveControls", count);
+                    var validated:Object = {sEventName:"SettingsDataModel_ControlsValidatedEvent"};
+                    // Repeat validation, then deliver completion in the same batch.
+                    for each (var batch:Array in [[validated], [validated],
+                        [validated, {sEventName:"SettingsDataModel_ControlsSaved"}]]) {
+                        data.data.aEvents = batch;
+                        data.SetReady(true); data.DispatchChange();
+                    }
+                    manager.removeEventListener("SettingsPanel_SaveControls", count);
+                    return requests;
                 },
                 previewConstruct:function(name:String, clip:Object):void {
                     // Ruffle rejects the game's class-only placement in this popup.

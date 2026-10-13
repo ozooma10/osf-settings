@@ -368,14 +368,21 @@ package
                 case 106:
                     require(Object(findNamed(menu,"keybindingsPage")).gamepad && list.disableInput,
                         "device publication is deferred while native capture owns input");
-                    Object(menu).BGSCodeObj.previewGamepad(false); break;
+                    Object(menu).BGSCodeObj.previewRebind("Jump", 121, "F10"); break;
                 case 107:
                     require(Object(findNamed(menu,"keybindingsPage")).gamepad && list.disableInput,
                         "device publication remains deferred until native save completes");
-                    Object(menu).BGSCodeObj.previewControlsSaved(); break;
+                    require(Object(menu).BGSCodeObj.previewControlsSaved() == 1,
+                        "repeated validation and batched save completion issue only one save"); break;
                 case 108:
                     require(!list.disableInput && !Object(findNamed(menu,"keybindingsPage")).gamepad,
                         "save completion applies the pending device publication");
+                    require(list.selectedEntry.row.value == "F10" && list.selectedEntry.row.records.length == 1 &&
+                        list.selectedEntry.row.records[0].key == 121,
+                        "saved binding replaces its label and excludes the old unbound-slot key");
+                    primary = findNamed(list.FindClipForEntry(list.selectedIndex),"MainBinding_mc");
+                    require(Object(primary).PCKey_mc.PCKey_tf.text.indexOf("F10") >= 0,
+                        "native binding cell redraws the saved key without reopening the page");
                     Object(menu).BGSCodeObj.previewAllowNativeCapture(false);
                     findNamed(menu,"issues").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); step = 53; break;
                 case 53:

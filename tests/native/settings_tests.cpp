@@ -441,6 +441,18 @@ namespace
         Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "quiet",
             "empty labels use the option value and display labels need not be unique");
         document = schema;
+        auto& emptyOption = document["groups"]["General"][modeIndex];
+        emptyOption["default"] = "";
+        emptyOption["options"] = { { "", "Use scene" }, { "normal", "Normal" } };
+        decoded = OSFSettings::SettingsJson::ParseSchema(document, "learning", error);
+        Check(decoded && decoded->FindSetting("notificationMode")->DefaultValue() == SettingValue{ OSFSettings::EnumValue{} } &&
+            std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("notificationMode")->definition).options[0].label == "Use scene",
+            "empty enum values retain their label and may be the default");
+        emptyOption["options"] = { "", "normal" };
+        Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "enum arrays also accept an empty option value");
+        emptyOption["options"] = { "", "" };
+        Reject(document, "duplicate option");
+        document = schema;
         auto& single = document["groups"]["General"][modeIndex];
         single["options"] = { { "normal", "Normal" } };
         Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "an enum object can have a single option");
@@ -472,19 +484,17 @@ namespace
             document["groups"]["General"][modeIndex]["options"] = options;
             Reject(document, "options must be a non-empty array or object");
         }
-        for (const auto& option : std::vector<Json>{ "", true, 1, 1.0, nullptr, Json::array(), Json::object() }) {
+        for (const auto& option : std::vector<Json>{ true, 1, 1.0, nullptr, Json::array(), Json::object() }) {
             document = schema;
             document["groups"]["General"][modeIndex]["options"] = Json::array({ option, "normal" });
-            Reject(document, "each option must be a non-empty string");
+            Reject(document, "each option must be a string");
         }
         document = schema;
         document["groups"]["General"][modeIndex]["options"] = { "normal", "normal" };
         Reject(document, "duplicate option");
-        for (const auto& value : { std::string{}, std::string("bad\0option", 10) }) {
-            document = schema;
-            document["groups"]["General"][modeIndex]["options"][value] = "Invalid";
-            Reject(document, value.empty() ? "each option must be a non-empty string" : "option value must not contain NUL");
-        }
+        document = schema;
+        document["groups"]["General"][modeIndex]["options"][std::string("bad\0option", 10)] = "Invalid";
+        Reject(document, "option value must not contain NUL");
         document = schema;
         document["groups"]["General"][modeIndex]["options"] = { "normal", std::string("bad\0option", 10) };
         Reject(document, "option value must not contain NUL");
@@ -586,6 +596,18 @@ namespace
                 restarted.LoadErrors()[0].file == valuesFile && restarted.LoadErrors()[0].message.find("notificationMode") != std::string::npos &&
                 Read(valuesFile) == saved.dump(), "invalid saved enums retain defaults, report their path and key, and preserve valid neighbors and the file");
         }
+
+        document = schema;
+        document["groups"]["General"][modeIndex]["options"][""] = "Use scene";
+        Write(schemaFile, document.dump(2));
+        Write(valuesFile, R"({"formatVersion":1,"values":{}})");
+        store.LoadAll(schemas, values);
+        Check(store.LoadErrors().empty() && store.Set("learning", "notificationMode", OSFSettings::EnumValue{}).ok(),
+            "an empty enum choice can be saved when it is a declared non-default option");
+        restarted.LoadAll(schemas, values);
+        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{} } &&
+            Json::parse(Read(valuesFile))["values"]["notificationMode"] == "",
+            "an explicitly saved empty enum value survives reload without becoming the default");
     }
 
     void TestStore(const Json& example, const fs::path& examplePath)

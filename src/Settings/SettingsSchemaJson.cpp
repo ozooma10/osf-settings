@@ -231,10 +231,9 @@ namespace OSFSettings::SettingsJson
                                 Require(value.is_string(), "each option label must be a string: " + setting.key);
                                 option.label = value.get<std::string>();
                             } else {
-                                Require(value.is_string(), "each option must be a non-empty string: " + setting.key);
+                                Require(value.is_string(), "each option must be a string: " + setting.key);
                                 option.value = value.get<std::string>();
                             }
-                            Require(!option.value.empty(), "each option must be a non-empty string: " + setting.key);
                             Require(option.value.find('\0') == std::string::npos, "option value must not contain NUL: " + setting.key);
                             Require(optionValues.insert(FoldAscii(option.value)).second, "duplicate option: " + setting.key + " / " + option.value);
                             if (option.label.empty()) option.label = option.value;

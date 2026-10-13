@@ -399,11 +399,11 @@ namespace OSFSettings
             // Compiled plugin identities are fixed by the time this menu is registered.
             const auto append = [&](const auto& files, std::uint32_t mask, auto prefix) {
                 for (const auto* file : files) {
-                    if (!file || file->compileIndex == 0 || file->compileIndex == 0xFF) continue;
-                    if (std::ranges::contains(kOfficialGameplaySources, FoldAscii(file->fileName))) continue;
+                    if (!file || file->compileIndex == 0xFF) continue;
                     RE::Scaleform::GFx::Value source;
                     root->CreateObject(&source);
                     Text(source, "file", file->fileName);
+                    source.SetMember("official", RE::Scaleform::GFx::Value(std::ranges::contains(kOfficialGameplaySources, FoldAscii(file->fileName))));
                     source.SetMember("mask", RE::Scaleform::GFx::Value(static_cast<double>(mask)));
                     source.SetMember("prefix", RE::Scaleform::GFx::Value(static_cast<double>(prefix(*file))));
                     source.SetMember("editable", RE::Scaleform::GFx::Value(true));

@@ -59,5 +59,13 @@ package
                 group:"hotkeys",groupTitle:"Hotkeys",key:action,title:title,defaultName:"Unbound"});
         }
         public function snapshot():Object { return {generation:generation,state:"ready",records:records}; }
+        public function rebind(action:String, key:uint, label:String):void
+        {
+            for each (var record:Object in records)
+                if (record.action == action && record.device == 0 && record.slot == 0) record.slot = 2;
+            records.push({action:action,context:0,device:0,slot:0,key:key,modifier:255});
+            for each (var entry:Object in entries)
+                if (entry.sInputName == action) entry.MainBinding = {aButtonName:[],aPCKeyName:[label]};
+        }
     }
 }

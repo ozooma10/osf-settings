@@ -33,7 +33,9 @@ package
             for each (var record:Object in records) {
                 var id:String = identity(record.context, record.action) + (record.device == 2 ? ":gp" : ":pc");
                 if (!mappings[id]) mappings[id] = [];
-                mappings[id].push(record);
+                // Native remapping can retain an old key in the unbound slot (2).
+                // Its action still exists, but that key no longer owns the action.
+                if (record.slot <= 1) mappings[id].push(record);
             }
             for each (var entry:Object in entries) {
                 if (entry.bIsDivider || entry.uContextID != 0) continue;

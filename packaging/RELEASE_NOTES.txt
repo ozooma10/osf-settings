@@ -1,0 +1,15 @@
+OSF Settings 1.1.2
+
+- Fixed OSF Animation 1.4 settings registration when using OSF UI v2 by
+  accepting empty-string enum options used by its existing schema.
+- Restored F10 as the default Open Mod Settings key. Existing custom bindings
+  and explicitly cleared bindings are preserved when upgrading.
+- Fixed a duplicate saved Open Mod Settings binding that could leave the
+  Keybindings page showing F11 after assigning another key.
+- Fixed keybinding save completion when validation and save notifications
+  arrive together. Cleared binding records no longer highlight old keys.
+- Added a dedicated Starfield entry for Gameplay Options from the base game
+  and official content. These continue to use the game's own save behavior.
+
+Upgrade by replacing the previous OSF Settings installation. Keep existing
+settings and Starfield Controls files. Restart Starfield after updating.

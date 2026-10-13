@@ -76,7 +76,10 @@ test_target("osfsettings-issues-tests", "diagnostics")
     add_files("mod_issue_tests.cpp", "diagnostics_service_tests.cpp")
 
 test_target("osfsettings-registration-tests", "input", true)
-    add_files("hotkey_registration_tests.cpp")
+    add_files("hotkey_registration_tests.cpp", "../src/Input/HotkeyBindingMigration.cpp")
+
+test_target("osfsettings-binding-migration-tests", "input")
+    add_files("hotkey_binding_migration_tests.cpp", "../src/Input/HotkeyBindingMigration.cpp")
 
 test_target("osfsettings-input-tests", "input", true)
     add_files("native_input_user_tests.cpp")

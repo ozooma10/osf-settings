@@ -43,7 +43,7 @@ int main()
         const auto parsed = SettingsJson::ParseSchema(document, "osfsettings", error);
         check(parsed && error.empty() && parsed->hotkeys.size() == 1, "example declaration loads");
         const auto& action = parsed->hotkeys.front();
-        check(action.id == "openMenu" && action.label == "Open mod settings" && !action.defaultKey && action.menu == "OSFSettingsMenu",
+        check(action.id == "openMenu" && action.label == "Open mod settings" && action.defaultKey == "F10" && action.menu == "OSFSettingsMenu",
             "identity, label, default name and registered menu target are preserved");
         check(!parsed->FindSetting("openMenu"), "hotkeys are separate from ordinary setting definitions");
         check(parsed->groups.size() == 1 && parsed->groups[0].id == "General" &&
