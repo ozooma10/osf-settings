@@ -10,6 +10,10 @@ OSF Settings 1.1.2
   arrive together. Cleared binding records no longer highlight old keys.
 - Added a dedicated Starfield entry for Gameplay Options from the base game
   and official content. These continue to use the game's own save behavior.
+- Entering a settings panel with E/Confirm or D/Right now enables editing
+  immediately. Moving between rows keeps editing active until Back, without
+  requiring confirmation for each setting.
+- Removed the orange outline around the active value control.
 
 Upgrade by replacing the previous OSF Settings installation. Keep existing
 settings and Starfield Controls files. Restart Starfield after updating.

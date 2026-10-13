@@ -89,8 +89,8 @@ package
         // The list entry under the pointer, lit whichever side has focus.
         private var hoverIndex:int = -1;
         private var editingIndex:int = -1;
-        // Gameplay Options share one explicit edit session across their rows.
-        private var editingGameplay:Boolean = false;
+        // Entering the settings panel starts one edit session across its rows.
+        private var editingPanel:Boolean = false;
         private var mouseSelectOnly:Boolean = false;
         private var captureRow:Object;
         private var captureBinding:MovieClip;
@@ -381,7 +381,7 @@ package
         {
             return modID != "" && row.mod == modID && row.type != "launcher" && (!groupID || tabOf(row) == groupID);
         }
-        // Sidebar input: Up/Down open entries as they pass, Accept or Right enters the page.
+        // Sidebar input: Accept or Right enters the settings panel for editing.
         private function navigate(name:String, pressed:Boolean):Boolean
         {
             if (name == "Up" || name == "Down") {
@@ -404,6 +404,12 @@ package
         {
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
             if (options.entryCount || homePage() && launcher.hasEntries) focusNav(false);
+            if (modID && !nav.focused) {
+                beginValueEditing();
+                // The input that entered the panel must not also change its first value.
+                activationFrame = frame;
+                deferInput();
+            }
         }
         // Keybinding and issue rows show a second line; everything else is one line.
         private function rowHeight():Number { return issuesPage() ? IssueStyle.ROW_HEIGHT : bindingsPage() ? MenuStyle.TALL_ROW_HEIGHT : MenuStyle.ROW_HEIGHT; }
@@ -565,7 +571,7 @@ package
             var hasHotkeys:Boolean = false;
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
-            var selectedRow:Object = preserve && (issuesPage() || bindingsPage() || editingGameplay) ? current() : null;
+            var selectedRow:Object = preserve && (issuesPage() || bindingsPage() || editingPanel) ? current() : null;
             var rows:Array = [], source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
             for each (var row:Object in source) {
                 if (row.type == "launcher") continue;
@@ -578,16 +584,16 @@ package
             for (var i:int = 0; selectedRow && i < data.length; ++i) {
                 row = data[i].row;
                 if (bindingsPage() ? row.identity == selectedRow.identity : row.mod == selectedRow.mod &&
-                    (editingGameplay ? row.gameplayID === selectedRow.gameplayID : row.id == selectedRow.id)) {
+                    (editingPanel ? row.type == selectedRow.type && row.key == selectedRow.key : row.id == selectedRow.id)) {
                     selected = i;
                     scroll = Math.max(0, selected - (options.selectedIndex - options.scrollPosition));
                     keptSelection = true;
                     break;
                 }
             }
-            // PEOData replaces row objects after a save. Retain the session only
+            // Saves replace row objects. Retain the session only
             // while its selected option still exists, even if list order changed.
-            if (editingGameplay && !keptSelection) clearValueEditing();
+            if (editingPanel && !keptSelection) clearValueEditing();
             var rebuilt:Boolean = settingsList.setEntries(data, preserve);
             if (rebuilt) { hoverIndex = -1; editingIndex = -1; }
             // Home's detail card and empty state show current keys, which come from vanilla Controls.
@@ -640,21 +646,25 @@ package
             return Boolean(modID && row && (row.type == "bool" || row.type == "enum" || NumericSetting.isSlider(row)));
         }
         private function editingValue():Boolean { return editingIndex >= 0 && editingIndex == options.selectedIndex && !nav.focused; }
+        private function beginValueEditing():void
+        {
+            if (!modID || nav.focused || !current()) return;
+            editingPanel = true;
+            syncValueEditing();
+            decorate(); updateSelection();
+        }
         private function clearValueEditing():void
         {
             editingIndex = -1;
-            editingGameplay = false;
+            editingPanel = false;
         }
         private function syncValueEditing():void
         {
             var row:Object = current();
-            if (editingGameplay) {
-                if (nav.focused || !inlineSetting(row) || row.gameplayID === undefined) clearValueEditing();
-                // Disabled options cannot change, but moving past one keeps the session.
-                else editingIndex = row.editable ? options.selectedIndex : -1;
-            } else if (editingIndex != options.selectedIndex || nav.focused || !inlineSetting(row) || !row.editable) {
-                editingIndex = -1;
-            }
+            if (nav.focused || !modID || !row) editingPanel = false;
+            // Text, bindings and actions still need explicit activation. Passing
+            // them or a disabled row does not end the panel's edit session.
+            editingIndex = editingPanel && inlineSetting(row) && row.editable ? options.selectedIndex : -1;
         }
         private function finishValue():void
         {
@@ -715,7 +725,7 @@ package
             var clearVisible:Boolean = Boolean(!captureRow && !busy && (modID || bindingsPage()) && row &&
                 (row.type == "key" && row.allowUnbound && Number(row.value) != 255 || row.type == "hotkey" && nativeHotkeys.canClear));
             var acceptText:String = acceptLabel(row);
-            var backText:String = editingValue() || editingGameplay ? tr("buttons.done") : editing || captureRow || nativeHotkeys.busy ? tr("buttons.cancel") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
+            var backText:String = editing || captureRow || nativeHotkeys.busy ? tr("buttons.cancel") : editingPanel ? tr("buttons.done") : expandedLauncher() && !launcher.locked ? tr("home.showLess") : tr("buttons.back");
             var acceptVisible:Boolean = !busy && (captureRow ? captureReady : Boolean(row && (!modID || row.editable && (ACCEPT_TYPES[row.type] || inlineSetting(row)))));
             if (reporting) {
                 acceptVisible = Boolean(row && row.nexusModId);
@@ -784,9 +794,7 @@ package
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
             var row:Object = current(); if (!row) return;
             if (inlineSetting(row) && row.editable && !editingValue()) {
-                editingIndex = options.selectedIndex;
-                editingGameplay = row.gameplayID !== undefined;
-                decorate(); updateSelection(); return;
+                beginValueEditing(); return;
             }
             if (inlineSetting(row) && NumericSetting.isSlider(row)) { finishValue(); return; }
             if (issuesPage()) {
@@ -794,7 +802,7 @@ package
                 return;
             }
             if (launcherPage()) { if (row.more) launcher.toggleExpanded(); else if (row.editable) launcher.launch(row); }
-            else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; focusNav(false); }
+            else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; enterPage(); }
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
@@ -917,7 +925,7 @@ package
                 lockForClose(); BGSCodeObj.close(); return;
             }
             if (closing || settingsList.dragging || requestedRefresh) return;
-            if (editingValue() || editingGameplay) { finishValue(); return; }
+            if (editingPanel) { finishValue(); return; }
             if (expandedLauncher() && !launcher.locked) { launcher.toggleExpanded(); return; }
             // Back leaves the page for the sidebar; from the sidebar it closes the menu.
             if (!nav.focused) { focusNav(true); return; }
@@ -1085,7 +1093,7 @@ package
                 return true;
             }
             if (nav.focused) return navigate(name, pressed);
-            if (modID && (name == "Left" || name == "Right") && !editingValue() && !editingGameplay) {
+            if (modID && (name == "Left" || name == "Right") && !editingPanel) {
                 // Binding slots are navigation too; Left from the first slot leaves the page.
                 if (current() && current().type == "hotkey" && (name == "Right" || nativeHotkeys.selectedSlot == 1)) return false;
                 if (pressed && name == "Left") focusNav(true);

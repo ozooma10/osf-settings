@@ -169,8 +169,7 @@ package
                     var border:MovieClip = Object(clip).Border_mc;
                     border.x = 0; border.y = 0; border.width = issue ? IssueStyle.LIST_WIDTH : MenuStyle.LIST_WIDTH;
                     if (border.height != height) { border.height = height; needsLayout = true; }
-                    if (issue) view.content.update(row, selected, modList, height, hovered);
-                    else view.content.update(row, selected, modList, height, hovered, editing);
+                    view.content.update(row, selected, modList, height, hovered);
                 }
                 clip.x = 0; clip.y = (Object(clip).itemIndex - list.scrollPosition) * (height + MenuStyle.ROW_GAP);
             }
