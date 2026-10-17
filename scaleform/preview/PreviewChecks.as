@@ -151,7 +151,7 @@ package
                     userEvent("Cancel"); step = 115; break;
                 case 115:
                     require(navFocused() && list.selectedEntry.row.key == "autoAdvance", "Back returns to the sidebar and keeps the page");
-                    userEvent("Right"); list.selectedIndex = indexOf("restoreView"); step = 10; break;
+                    userEvent("Accept"); list.selectedIndex = indexOf("restoreView"); step = 10; break;
                 case 10:
                     require(list.selectedEntry.row.key == "restoreView", "last row reachable");
                     capture("last-row");
@@ -650,12 +650,26 @@ package
                     userEvent("Cancel");
                     require(navFocused() && list.selectedEntry.row.key == "panelNumber", "a second Back returns to the sidebar and retains selection");
                     userEvent("Right");
-                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Right reenters editing without stepping the selected numeric value"); break;
+                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Right enters navigation without stepping the selected numeric value"); break;
                 case 207:
-                    key(Keyboard.RIGHT); break;
+                    key(Keyboard.RIGHT);
+                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "repeated Right while browsing cannot change a setting");
+                    userEvent("Left");
+                    require(navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Left after Right-entry returns to the sidebar without saving");
+                    key(Keyboard.RIGHT); step = 219; break;
+                case 219:
+                    key(Keyboard.LEFT);
+                    require(navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "raw arrow navigation also returns to the sidebar without saving");
+                    userEvent("Right"); step = 220; break;
+                case 220:
+                    userEvent("Accept"); userEvent("Accept");
+                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Confirm explicitly starts editing after Right-entry without changing the value");
+                    step = 221; break;
+                case 221:
+                    key(Keyboard.RIGHT); step = 208; break;
                 case 208:
                     require(list.selectedEntry.row.key == "panelNumber" && list.selectedEntry.row.value == "4" && panelWrites == 4,
-                        "Right-entry enables the next deliberate edit");
+                        "Confirm after Right-entry enables the next deliberate edit");
                     movePanelNumberFirst(); ++panelGeneration; step = 209; break;
                 case 209:
                     require(list.selectedIndex == 0 && list.selectedEntry.row.key == "panelNumber" && list.selectedEntry.row.value == "4",

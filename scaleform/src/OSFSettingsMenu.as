@@ -381,18 +381,18 @@ package
         {
             return modID != "" && row.mod == modID && row.type != "launcher" && (!groupID || tabOf(row) == groupID);
         }
-        // Sidebar input: Accept or Right enters the settings panel for editing.
+        // Directional input only moves focus; Accept explicitly starts editing.
         private function navigate(name:String, pressed:Boolean):Boolean
         {
             if (name == "Up" || name == "Down") {
                 if (pressed && navigationFrame != frame) { navigationFrame = frame; openEntry(nav.move(name == "Up" ? -1 : 1)); }
                 return true;
             }
-            if (name == "Right") { if (pressed) enterPage(); return true; }
+            if (name == "Right") { if (pressed) enterPage(false); return true; }
             if (name == "Accept") {
                 // Enter on release, like the interface shelf, so the press cannot also act on the page.
                 if (pressed) navAcceptHeld = true;
-                else if (navAcceptHeld) { navAcceptHeld = false; enterPage(); }
+                else if (navAcceptHeld) { navAcceptHeld = false; enterPage(true); }
                 return true;
             }
             if (name == "Cancel") { if (!pressed) back(); return true; }
@@ -400,12 +400,12 @@ package
             // only when the movie declines it does the engine forward the real Scaleform click.
             return false;
         }
-        private function enterPage():void
+        private function enterPage(editing:Boolean):void
         {
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
             if (options.entryCount || homePage() && launcher.hasEntries) focusNav(false);
             if (modID && !nav.focused) {
-                beginValueEditing();
+                if (editing) beginValueEditing();
                 // The input that entered the panel must not also change its first value.
                 activationFrame = frame;
                 deferInput();
@@ -790,7 +790,7 @@ package
             if (captureRow) { confirmBinding(); return; }
             if (closing || launcher.launching || refreshing || requestedRefresh || activationFrame == frame || settingsList.dragging) return;
             activationFrame = frame;
-            if (nav.focused) { enterPage(); return; }
+            if (nav.focused) { enterPage(true); return; }
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
             var row:Object = current(); if (!row) return;
             if (inlineSetting(row) && row.editable && !editingValue()) {
@@ -802,7 +802,7 @@ package
                 return;
             }
             if (launcherPage()) { if (row.more) launcher.toggleExpanded(); else if (row.editable) launcher.launch(row); }
-            else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; enterPage(); }
+            else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; enterPage(true); }
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
