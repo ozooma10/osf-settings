@@ -57,7 +57,9 @@ namespace OSFSettings
             .title = tr("issues.osfuiUpdate"),
             .impact = tr("issues.osfuiUpdateImpact", {{ "version", version->string() }}),
             .nextSteps = tr("issues.osfuiUpdateNextSteps"),
-            .nexusModId = 17711
+            .nexusModId = 17711,
+            .installedVersion = std::format("{}.{}.{}", version->major(), version->minor(), version->patch()),
+            .requiredVersion = "2.0.0"
         });
     }
 }

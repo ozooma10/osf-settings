@@ -36,6 +36,8 @@ package
         private var issueOpenCount:int = 0;
         private var issueOpenResult:Boolean = true;
         private var openedIssue:String = "";
+        private var originalControlMap:Object;
+        private var issueButtonRestColor:uint;
         private var panelBridge:Object;
         private var panelRows:Array;
         private var panelGeneration:int = 0;
@@ -435,7 +437,45 @@ package
                     step = 109; break;
                 case 109:
                     require(issueOpenCount == 0, "selecting a compatibility warning does not open the browser");
-                    userEvent("Accept"); break;
+                    require(findNamed(menu,"issueModPage") != null &&
+                        findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.requiredVersion")) != null,
+                        "a version gap with a mod page shows the versions and a prominent mod page button");
+                    var issueButton:DisplayObject = findNamed(menu,"issueModPage");
+                    var issueHint:Object = findNamed(menu,"issueConfirmHint");
+                    require(issueHint.visible && issueHint.PCButton_mc.ButtonInstance_mc.PCButton_tf.text == "E",
+                        "detail button shows the native keyboard Accept binding");
+                    issueButtonRestColor = buttonFill(issueButton);
+                    issueButton.dispatchEvent(new MouseEvent(MouseEvent.ROLL_OVER));
+                    require(buttonFill(issueButton) != issueButtonRestColor, "detail button has visible hover feedback");
+                    capture("issue-mod-page-hover");
+                    issueButton.dispatchEvent(new MouseEvent(MouseEvent.ROLL_OUT));
+                    require(buttonFill(issueButton) == issueButtonRestColor, "hover feedback clears when the pointer leaves");
+                    userEvent("Cancel");
+                    require(!issueHint.visible, "detail Accept hint hides while the sidebar owns confirmation");
+                    userEvent("Right");
+                    require(issueHint.visible && issueOpenCount == 0, "entering the issue shows its hint without opening a page");
+                    issueControlMap(1,"Xenon_A"); step = 120; break;
+                case 120:
+                    issueHint = findNamed(menu,"issueConfirmHint");
+                    var expectedGlyph:String = Object(menu.loaderInfo.applicationDomain.getDefinition("Shared.GlobalFunc")).NameToTextMap["Xenon_A"];
+                    require(issueHint.ConsoleButton_mc.ButtonInstance_mc.visible &&
+                        issueHint.ConsoleButton_mc.ButtonInstance_mc.ConsoleButton_tf.text == expectedGlyph &&
+                        !issueHint.PCButton_mc.ButtonInstance_mc.visible,
+                        "detail button follows the native controller Accept glyph on device switch");
+                    capture("issue-mod-page-controller");
+                    Object(menu).ProcessUserEvent("Accept",true); break;
+                case 121:
+                    require(issueOpenCount == 0 && buttonFill(findNamed(menu,"issueModPage")) != issueButtonRestColor,
+                        "holding controller Accept shows pressed feedback without an early browser launch");
+                    capture("issue-mod-page-pressed");
+                    Object(menu).ProcessUserEvent("Accept",false);
+                    issueControlMap(0,"F8"); break;
+                case 122:
+                    issueHint = findNamed(menu,"issueConfirmHint");
+                    require(issueHint.PCButton_mc.ButtonInstance_mc.visible &&
+                        issueHint.PCButton_mc.ButtonInstance_mc.PCButton_tf.text == "F8",
+                        "detail button follows a rebound keyboard Accept key");
+                    issueControlMap(-1,""); step = 110; break;
                 case 110:
                     require(issueOpenCount == 1 && openedIssue == "osfsettings/osfui-update-required",
                         "Open mod page sends the selected issue identity exactly once");
@@ -447,15 +487,36 @@ package
                     require(issueOpenCount == 2 && findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("errors.openModPage")) != null,
                         "failed mod page opening displays an error and permits retry");
                     capture("issue-mod-page-failed");
+                    issueOpenResult = true;
+                    var modPage:DisplayObject = findNamed(menu,"issueModPage");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(issueOpenCount == 3 && openedIssue == "osfsettings/osfui-update-required",
+                        "the detail mod page button opens on press even when GFx drops the click");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_UP, true));
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true));
+                    require(issueOpenCount == 3, "a full detail button click does not open a second browser page");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(issueOpenCount == 4, "a new detail button press can open the page again");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_UP, true));
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true));
+                    require(issueOpenCount == 4, "the repeated detail button click opens only once");
                     for (issueIndex = 0; issueIndex < list.entryCount; ++issueIndex)
-                        if (list.GetDataForEntry(issueIndex).row.id == "long-description") list.selectedIndex = issueIndex;
+                        if (list.GetDataForEntry(issueIndex).row.id == "dependency:sample-pack") list.selectedIndex = issueIndex;
                     break;
                 case 112:
-                    require(!list.selectedEntry.row.nexusModId, "ordinary issue has no external destination");
+                    require(!list.selectedEntry.row.nexusModId && findNamed(menu,"issueModPage") == null &&
+                        findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.notInstalled")) != null,
+                        "a missing dependency without a mod page shows the gap but no button");
+                    capture("issue-dependency-missing");
                     userEvent("Accept"); break;
                 case 113:
-                    require(issueOpenCount == 2, "accepting an issue without a mod page never opens the browser");
+                    require(issueOpenCount == 4, "accepting an issue without a mod page never opens the browser");
+                    for (issueIndex = 0; issueIndex < list.entryCount; ++issueIndex)
+                        if (list.GetDataForEntry(issueIndex).row.id == "long-description") list.selectedIndex = issueIndex;
                     Object(menu).BGSCodeObj.openIssueModPage = originalIssueOpener;
+                    step = 118; break;
+                case 118:
+                    // One more frame so the long report repaints before it is scrolled.
                     step = 78; break;
                 case 78:
                     // Let the selected row repaint before capturing the scrolled report.
@@ -934,6 +995,24 @@ package
                 }
             }
             return null;
+        }
+        private function buttonFill(button:DisplayObject):uint
+        {
+            var pixel:BitmapData = new BitmapData(1,1,false,0);
+            pixel.draw(button,new Matrix(1,0,0,1,-8,-8));
+            var color:uint = pixel.getPixel(0,0); pixel.dispose(); return color;
+        }
+        private function issueControlMap(controller:int, accept:String):void
+        {
+            var manager:Object = menu.loaderInfo.applicationDomain.getDefinition("Shared.AS3.Data.BSUIDataManager");
+            var control:Object = manager.GetDataFromClient("ControlMapData");
+            if (!originalControlMap) originalControlMap = {controller:control.data.uiController, events:control.data.vMappedEvents};
+            var mappings:Array = [];
+            for each (var mapping:Object in originalControlMap.events) mappings.push(mapping.strUserEventName == "Accept" ?
+                {strUserEventName:"Accept",strButtonName:accept,aButtonName:[accept],sContextName:"BasicMenuNav"} : mapping);
+            control.data.uiController = controller < 0 ? originalControlMap.controller : controller;
+            control.data.vMappedEvents = controller < 0 ? originalControlMap.events : mappings;
+            control.DispatchChange();
         }
         private function capture(name:String, area:Rectangle = null, scale:Number = 2 / 3):void
         {

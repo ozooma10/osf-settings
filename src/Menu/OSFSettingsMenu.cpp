@@ -2,6 +2,7 @@
 #include "Harness/TestHarness.h"
 #include "SettingRow.h"
 #include "GameplayOptionCommit.h"
+#include "ModPage.h"
 #include "Input/KeyNames.h"
 #include "Input/NativeHotkeys.h"
 #include <cmath>
@@ -14,7 +15,6 @@
 #include <charconv>
 #include <chrono>
 #include <Windows.h>
-#include <shellapi.h>
 #undef ERROR
 #include "RE/U/UI.h"
 #include "RE/U/UIMessageQueue.h"
@@ -338,10 +338,10 @@ namespace OSFSettings
             bool opened = false;
             for (const auto& issue : DiagnosticsService::Get().Snapshot()) {
                 if (issue.modId != mod || issue.id != id || !issue.nexusModId) continue;
-                const auto url = std::format(L"https://www.nexusmods.com/starfield/mods/{}", issue.nexusModId);
-                const auto result = reinterpret_cast<std::intptr_t>(ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-                opened = result > 32;
-                REX::INFO("Open mod page: issue={}/{} nexusModId={} opened={} ShellResult={}", mod, id, issue.nexusModId, opened, result);
+                const auto result = OpenModPage(issue.nexusModId);
+                opened = SUCCEEDED(result);
+                REX::INFO("Open mod page: issue={}/{} nexusModId={} handedOff={} DesktopShellResult={:08X}",
+                    mod, id, issue.nexusModId, opened, static_cast<std::uint32_t>(result));
                 break;
             }
             *params.ret = RE::Scaleform::GFx::Value(opened);
@@ -364,6 +364,8 @@ namespace OSFSettings
                 Text(row, "reason", issue.reason);
                 Text(row, "impact", issue.impact);
                 Text(row, "nextSteps", issue.nextSteps);
+                Text(row, "installedVersion", issue.installedVersion);
+                Text(row, "requiredVersion", issue.requiredVersion);
                 row.SetMember("nexusModId", RE::Scaleform::GFx::Value(issue.nexusModId));
                 params.ret->PushBack(row);
             }

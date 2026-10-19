@@ -15,7 +15,18 @@
     "title": "OSF UI needs an update",
     "impact": "OSF UI 1.6.0 is installed. Versions before 2.0 use the older settings menu and do not provide the OSF Settings compatibility bridge.",
     "nextSteps": "Update OSF UI to version 2.0 or later, then restart Starfield. Select Open mod page to visit OSF UI on Nexus Mods in your web browser.",
-    "nexusModId": 17711
+    "nexusModId": 17711,
+    "installedVersion": "1.6.0",
+    "requiredVersion": "2.0.0"
+  },
+  {
+    "modId": "osfsettings",
+    "id": "dependency:sample-pack",
+    "severity": "WARNING",
+    "title": "sample-pack is missing",
+    "impact": "The settings manifest sample-pack.json was not found in the active installation. These mods depend on it:\n\nMy dependent mod: prefers 1.2.0 or newer",
+    "nextSteps": "Install sample-pack 1.2.0 or later, then restart Starfield. This is an advisory check; consult the mod's installation instructions for compatibility.",
+    "requiredVersion": "1.2.0"
   },
   {
     "modId": "design-preview",

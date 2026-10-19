@@ -180,7 +180,8 @@ package
             options.addEventListener(MouseEvent.MOUSE_WHEEL, wheelList);
             options.addEventListener(MouseEvent.CLICK, clickSetting, true);
             settingsDetails = new SettingsDetails(); addChild(settingsDetails);
-            issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
+            issueDetails = new IssueDetails(function():void { if (!closing && issuesPage()) openIssueModPage(current()); }, issueConfirmHint);
+            issueDetails.visible = false; addChild(issueDetails);
             issueSummary = new IssueSummary(); issueSummary.visible = false; addChild(issueSummary);
             homeDetails = new HomeDetails(); homeDetails.visible = false; addChild(homeDetails);
             homeEmpty = new HomeEmpty(function():void {
@@ -448,6 +449,17 @@ package
             var data:Object = new dataClass(text, new eventClass(eventName, callback));
             buttons[eventName] = {data:data, clip:Object(factory).AddToButtonBar("BasicButton", data, bar)};
         }
+        private function issueConfirmHint():MovieClip
+        {
+            var eventClass:Class = definition("Shared.Components.ButtonControls.ButtonData.UserEventData");
+            var dataClass:Class = definition("Shared.Components.ButtonControls.ButtonData.ButtonBaseData");
+            var hint:MovieClip = create("BasicButton") as MovieClip;
+            // Display only: the existing footer owns Accept, so it can fire only once.
+            hint.mouseEnabled = hint.mouseChildren = false;
+            Object(hint).SetButtonData(new dataClass("", new eventClass("Accept")));
+            Object(hint).ButtonColor = MenuStyle.INK;
+            return hint;
+        }
         private function updateButton(name:String, text:String, visible:Boolean):Boolean
         {
             var button:Object = buttons[name];
@@ -696,6 +708,7 @@ package
             if (homeDetails.visible) homeDetails.show(row, launcher.visible ? launcher.y : MenuStyle.LIST_TOP);
             issueDetails.visible = issuesPage();
             issueDetails.show(issueDetails.visible ? row : null);
+            issueDetails.updateInteraction(issuesPage() && !nav.focused && !modalBusy(), actionAcceptHeld);
             if (bindingsPage()) keybindings.showSelection(row);
             updateFooter(row);
         }
@@ -782,6 +795,10 @@ package
         }
         private function focusSound(event:Event):void { Object(definition("Shared.GlobalFunc")).PlayMenuSound("UIMenuGeneralFocus"); }
         private function itemPressed(event:Event):void { accept(); }
+        private function openIssueModPage(row:Object):void
+        {
+            if (row && row.nexusModId) setStatus(BGSCodeObj.openIssueModPage(row.mod, row.id) ? tr("issues.modPageOpened") : tr("errors.openModPage"));
+        }
         private function accept():void
         {
             if (confirmingAction() || launcherPage() && launcher.acceptHeld) return;
@@ -797,10 +814,7 @@ package
                 beginValueEditing(); return;
             }
             if (inlineSetting(row) && NumericSetting.isSlider(row)) { finishValue(); return; }
-            if (issuesPage()) {
-                if (row.nexusModId) setStatus(BGSCodeObj.openIssueModPage(row.mod, row.id) ? tr("issues.modPageOpened") : tr("errors.openModPage"));
-                return;
-            }
+            if (issuesPage()) { openIssueModPage(row); return; }
             if (launcherPage()) { if (row.more) launcher.toggleExpanded(); else if (row.editable) launcher.launch(row); }
             else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; enterPage(true); }
             else if (row.type == "bool") options.OnEntryPressed();
@@ -1153,6 +1167,7 @@ package
             if (initialized && !closing) {
                 launcher.advance();
                 nativeHotkeys.advance();
+                issueDetails.updateInteraction(issuesPage() && !nav.focused && !modalBusy(), actionAcceptHeld);
                 keybindings.advance(allRows,bindingBusy());
                 syncInput();
                 if (footerDirty) updateFooter(current());
@@ -1217,6 +1232,7 @@ package
         }
         private function focusLost(event:Event):void
         {
+            issueDetails.cancelInteraction();
             finishValue();
             actionAcceptHeld = false;
             launcher.releaseAccept();

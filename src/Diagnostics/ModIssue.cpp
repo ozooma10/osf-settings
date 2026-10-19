@@ -80,7 +80,9 @@ namespace OSFSettings
                     tr("issues.dependencyUpdateImpact", {{ "mod", name }, { "installed", provider->schema.version->String() }}) :
                     tr("issues.dependencyMissingImpact", {{ "mod", id }})) + "\n\n" + affected,
                 .nextSteps = tr("issues.dependencyNextSteps", {{ "mod", name }, { "version", highest->String() }}),
-                .nexusModId = installed ? provider->schema.nexusModId : 0
+                .nexusModId = installed ? provider->schema.nexusModId : 0,
+                .installedVersion = installed ? provider->schema.version->String() : "",
+                .requiredVersion = highest->String()
             });
         }
         return issues;

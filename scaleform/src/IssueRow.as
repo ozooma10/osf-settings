@@ -30,7 +30,10 @@ package
             title.textColor = MenuStyle.WHITE;
             mod.textColor = MenuStyle.MUTED;
             severity.textColor = IssueStyle.color(row.severity);
-            MenuStyle.fit(title, row.title); MenuStyle.fit(mod, row.modTitle);
+            MenuStyle.fit(title, row.title);
+            MenuStyle.fit(mod, !row.requiredVersion ? row.modTitle : row.installedVersion ?
+                tr("issues.versionGap", {installed:row.installedVersion, required:row.requiredVersion}) :
+                tr("issues.versionMissing", {required:row.requiredVersion}));
             MenuStyle.fit(severity, row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning"));
             graphics.clear(); graphics.beginFill(selected ? MenuStyle.ROW : hovered ? 0x182A33 : 0x0E1B23);
             graphics.drawRect(0, 0, IssueStyle.LIST_WIDTH, boxHeight); graphics.endFill();
