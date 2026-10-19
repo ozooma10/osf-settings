@@ -24,6 +24,7 @@ namespace OSFSettings
 }
 
 int TestSettingsVersions();
+int TestDependencyVersions();
 
 int main()
 {
@@ -37,6 +38,7 @@ int main()
     };
     try {
         checks += TestSettingsVersions();
+        checks += TestDependencyVersions();
         std::ifstream example("data/SFSE/Plugins/OSF/Settings/schemas/osfsettings.json");
         const auto document = Json::parse(example);
         std::string error;

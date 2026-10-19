@@ -2,8 +2,20 @@
 #include "Settings/Localization.h"
 #include "Settings/SettingsSchema.h"
 
+#include <algorithm>
+#include <map>
+
 namespace OSFSettings
 {
+    namespace
+    {
+        // Invalid display text must not prevent a compatibility warning from being reported.
+        std::string DisplayName(const ModSchema& schema)
+        {
+            return IsValidString(schema.title, 256) && !schema.title.empty() ? schema.title : schema.id;
+        }
+    }
+
     std::string IssueModName(const ModIssue& issue, std::span<const ModSettings> settings)
     {
         for (const auto& mod : settings) {
@@ -34,36 +46,43 @@ namespace OSFSettings
         return issues;
     }
 
-    std::optional<ModIssue> SettingsUpdateIssue(std::span<const ModSettings> settings,
-        std::span<const SettingsLoadError> errors, const SettingsVersion& installed)
+    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings)
     {
-        auto highest = installed;
-        std::string affected;
-        const auto add = [&](std::string_view name, const std::optional<SettingsVersion>& expected) {
-            if (!expected || *expected <= installed) return;
-            if (*expected > highest) highest = *expected;
-            if (!affected.empty()) affected += '\n';
-            affected += tr("issues.settingsUpdateMod", {{ "mod", name }, { "version", expected->String() }});
-        };
+        std::map<std::string, std::vector<std::pair<std::string, SettingsVersion>>> consumers;
         for (const auto& mod : settings) {
-            // Invalid display text must not prevent the compatibility warning from being reported.
-            add(IsValidString(mod.schema.title, 256) && !mod.schema.title.empty() ? mod.schema.title : mod.schema.id,
-                mod.schema.expectedSettingsVersion);
+            for (const auto& [id, minimum] : mod.schema.dependencies) {
+                consumers[id].emplace_back(DisplayName(mod.schema), minimum);
+            }
         }
-        for (const auto& error : errors) {
-            if (!error.schema) continue;
-            const auto name = error.file.filename().u8string();
-            add(std::string(reinterpret_cast<const char*>(name.data()), name.size()), error.expectedSettingsVersion);
+
+        std::vector<ModIssue> issues;
+        for (const auto& [id, wanted] : consumers) {
+            const auto provider = std::ranges::find(settings, id, [](const ModSettings& mod) -> const std::string& { return mod.schema.id; });
+            const bool installed = provider != settings.end();
+            // An unversioned manifest cannot be compared, so stay quiet rather than guess.
+            if (installed && !provider->schema.version) continue;
+            std::optional<SettingsVersion> highest;
+            std::string affected;
+            for (const auto& [name, minimum] : wanted) {
+                if (installed && minimum <= *provider->schema.version) continue;
+                highest = std::max(highest.value_or(minimum), minimum);
+                if (!affected.empty()) affected += '\n';
+                affected += tr("issues.dependencyConsumer", {{ "mod", name }, { "version", minimum.String() }});
+            }
+            if (!highest) continue;
+            const auto name = installed ? DisplayName(provider->schema) : id;
+            issues.push_back({
+                .modId = "osfsettings",
+                .id = "dependency:" + id,
+                .severity = IssueSeverity::Warning,
+                .title = tr(installed ? "issues.dependencyUpdate" : "issues.dependencyMissing", {{ "mod", name }}),
+                .impact = (installed ?
+                    tr("issues.dependencyUpdateImpact", {{ "mod", name }, { "installed", provider->schema.version->String() }}) :
+                    tr("issues.dependencyMissingImpact", {{ "mod", id }})) + "\n\n" + affected,
+                .nextSteps = tr("issues.dependencyNextSteps", {{ "mod", name }, { "version", highest->String() }}),
+                .nexusModId = installed ? provider->schema.nexusModId : 0
+            });
         }
-        if (highest == installed) return std::nullopt;
-        return ModIssue{
-            .modId = "osfsettings",
-            .id = "settings-update-recommended",
-            .severity = IssueSeverity::Warning,
-            .title = tr("issues.settingsUpdate"),
-            .impact = tr("issues.settingsUpdateImpact", {{ "installed", installed.String() },
-                { "expected", highest.String() }, { "mods", affected }}),
-            .nextSteps = tr("issues.settingsUpdateNextSteps", {{ "version", highest.String() }})
-        };
+        return issues;
     }
 }

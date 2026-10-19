@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <filesystem>
+#include <map>
 #include <vector>
 
 #include "SettingValue.h"
@@ -117,7 +118,9 @@ namespace OSFSettings
         std::vector<SettingsGroup> groups;
         std::vector<HotkeyDefinition> hotkeys;
         std::vector<MenuDefinition> menus;
-        std::optional<SettingsVersion> expectedSettingsVersion;
+        std::optional<SettingsVersion> version; // This mod's own release; omitted means unknown.
+        std::uint32_t nexusModId{};
+        std::map<std::string, SettingsVersion> dependencies; // Minimum versions keyed by settings mod id.
         SettingDefinition* FindSetting(std::string_view key);
         const SettingDefinition* FindSetting(std::string_view key) const;
         ActionDefinition* FindAction(std::string_view actionId);
@@ -139,6 +142,5 @@ namespace OSFSettings
         std::filesystem::path file;
         std::string message;
         bool schema{}; // The schema file or directory failed, so the mod has no page.
-        std::optional<SettingsVersion> expectedSettingsVersion; // Retained even if newer controls cannot load.
     };
 }

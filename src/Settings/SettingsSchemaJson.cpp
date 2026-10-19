@@ -51,6 +51,14 @@ namespace OSFSettings::SettingsJson
             return field->get<std::string>();
         }
 
+        SettingsVersion ReadVersion(const nlohmann::ordered_json& value, const std::string& name)
+        {
+            Require(value.is_string(), name + " must be a major.minor.patch string");
+            const auto version = SettingsVersion::Parse(value.get_ref<const std::string&>());
+            Require(version.has_value(), name + " must be major.minor.patch (each component 0-65535, no leading zeros or suffixes)");
+            return *version;
+        }
+
         std::optional<SettingValue> DecodeDefault(const nlohmann::ordered_json& value, const SettingDefinition& setting)
         {
             if (std::holds_alternative<KeyDefinition>(setting.definition) && value.is_string()) {
@@ -62,12 +70,9 @@ namespace OSFSettings::SettingsJson
         }
     }
 
-    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error, std::optional<SettingsVersion>* expectedSettingsVersion)
+    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error)
     {
         error.clear();
-        if (expectedSettingsVersion) {
-            expectedSettingsVersion->reset();
-        }
         try {
             std::set<std::string> groupNames;
             std::set<std::string> hotkeyIds;
@@ -105,29 +110,19 @@ namespace OSFSettings::SettingsJson
                     }
                     return true;
                 });
-            return ParseSchema(document, modId, error, expectedSettingsVersion);
+            return ParseSchema(document, modId, error);
         } catch (const std::exception& exception) {
             error = exception.what();
             return std::nullopt;
         }
     }
 
-    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error,
-        std::optional<SettingsVersion>* expectedSettingsVersion)
+    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error)
     {
         error.clear();
-        if (expectedSettingsVersion) expectedSettingsVersion->reset();
         try {
             Require(document.is_object(), "schema must be an object");
             ModSchema mod;
-            if (const auto expected = document.find("expectedSettingsVersion"); expected != document.end()) {
-                Require(expected->is_string(), "expectedSettingsVersion must be a major.minor.patch string");
-                mod.expectedSettingsVersion = SettingsVersion::Parse(expected->get_ref<const std::string&>());
-                Require(mod.expectedSettingsVersion.has_value(), "expectedSettingsVersion must be major.minor.patch (each component 0-65535, no leading zeros or suffixes)");
-                if (expectedSettingsVersion) {
-                    *expectedSettingsVersion = mod.expectedSettingsVersion;
-                }
-            }
             Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
             const auto version = document.find("schemaVersion");
             Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
@@ -141,6 +136,19 @@ namespace OSFSettings::SettingsJson
             }
             mod.title = OptionalText(document, "title", mod.id);
             mod.description = OptionalText(document, "description");
+            if (const auto release = document.find("version"); release != document.end()) {
+                mod.version = ReadVersion(*release, "version");
+            }
+            const auto nexusModId = ReadInteger(document, "nexusModId").value_or(0);
+            Require(nexusModId >= 0 && nexusModId <= UINT32_MAX, "nexusModId must be an unsigned 32-bit integer");
+            mod.nexusModId = static_cast<std::uint32_t>(nexusModId);
+            if (const auto dependencies = document.find("dependencies"); dependencies != document.end()) {
+                Require(dependencies->is_object(), "dependencies must be an object mapping settings mod ids to minimum versions");
+                for (const auto& [id, minimum] : dependencies->items()) {
+                    Require(IsValidModId(id) && id != "internal", "dependency must name a settings mod id: " + id);
+                    mod.dependencies[id] = ReadVersion(minimum, "dependency " + id);
+                }
+            }
 
             const auto groups = document.find("groups");
             Require(groups != document.end() && groups->is_object(), "groups must be an object");

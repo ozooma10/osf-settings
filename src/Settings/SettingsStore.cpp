@@ -38,10 +38,9 @@ namespace OSFSettings
                 continue;
             }
             std::string message;
-            std::optional<SettingsVersion> expectedSettingsVersion;
-            auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message, &expectedSettingsVersion);
+            auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message);
             if (!schema) {
-                m_loadErrors.push_back({ path, std::move(message), true, expectedSettingsVersion });
+                m_loadErrors.push_back({ path, std::move(message), true });
                 continue;
             }
 
