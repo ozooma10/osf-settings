@@ -10,6 +10,7 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/ozooma10/osf-settings-slim/main/sdk/osf-settings.schema.json",
   "title": "My mod",
   "groups": {
     "General": [
@@ -41,7 +42,7 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 - The mod ID comes from the schema filename without `.json`.
 - Mod IDs use 1–128 lowercase ASCII letters, digits, `.`, `_`, or `-`; `.` and `..` are invalid. Windows device names such as `con`, `nul`, `com1`, and `lpt1` are rejected, including names followed by an extension such as `nul.extra`.
 - Group names become headings. Groups and their controls appear in authored order.
-- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod. API lookups use exact, case-sensitive keys.
+- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod, ignoring ASCII case. API lookups use exact, case-sensitive keys.
 - Optional `label` defaults to the key. `hint` adds help text.
 
 | Type | Default example | Additional fields |
@@ -57,7 +58,7 @@ Defaults must satisfy the setting's type and limits.
 
 Float `step` controls the editor increment; writes need not be multiples of it.
 
-Enum option values are unique, nonempty strings; the default and API values must match a value exactly. Options appear in authored order. Use an object to give each value a display label:
+Enum option values are strings, unique ignoring ASCII case; the default and API values must match a value exactly. An empty string is allowed when explicitly declared as an option. Options appear in authored order. Use an object to give each value a display label:
 
 ```json
 {
