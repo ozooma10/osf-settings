@@ -110,6 +110,8 @@ namespace OSFSettings
         std::vector<std::variant<SettingDefinition, ActionDefinition>> controls;
     };
 
+    using DependencyVersions = std::map<std::string, SettingsVersion>;
+
     struct ModSchema
     {
         std::string id;
@@ -120,7 +122,7 @@ namespace OSFSettings
         std::vector<MenuDefinition> menus;
         std::optional<SettingsVersion> version; // This mod's own release; omitted means unknown.
         std::uint32_t nexusModId{};
-        std::map<std::string, SettingsVersion> dependencies; // Minimum versions keyed by settings mod id.
+        DependencyVersions dependencies; // Minimum versions keyed by settings mod id.
         SettingDefinition* FindSetting(std::string_view key);
         const SettingDefinition* FindSetting(std::string_view key) const;
         ActionDefinition* FindAction(std::string_view actionId);
@@ -142,5 +144,6 @@ namespace OSFSettings
         std::filesystem::path file;
         std::string message;
         bool schema{}; // The schema file or directory failed, so the mod has no page.
+        DependencyVersions dependencies; // Valid metadata survives unsupported controls/formats.
     };
 }

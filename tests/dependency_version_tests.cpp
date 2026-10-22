@@ -1,8 +1,11 @@
 #include "Diagnostics/ModIssue.h"
 #include "Settings/SettingsJson.h"
 #include "Settings/SettingsSchema.h"
+#include "Settings/SettingsStore.h"
 
+#include <chrono>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
 
@@ -87,6 +90,65 @@ int TestDependencyVersions()
         has(issues[0].impact, "1.1.2") && has(issues[0].nextSteps, "1.2.0"), "an old OSF Settings is reported like any provider");
     stack.front().schema.version = version("1.2.0");
     check(DependencyIssues(stack).empty(), "a current OSF Settings satisfies its consumers");
+
+    DependencyVersions retained;
+    auto future = consumer;
+    future["dependencies"]["osfsettings"] = "2.0.0";
+    future["groups"]["General"] = Json::array({{{"key", "new"}, {"type", "future-control"}, {"default", true}}});
+    check(!SettingsJson::ParseSchema(future, "future", error, &retained) && retained.at("osfsettings") == version("2.0.0"),
+        "unsupported controls retain validated dependency metadata");
+    auto newerFormat = future;
+    newerFormat["schemaVersion"] = 2;
+    check(!SettingsJson::ParseSchema(newerFormat, "future", error, &retained) &&
+        has(error, "schemaVersion") && retained.at("osfsettings") == version("2.0.0"),
+        "unsupported schema formats retain update guidance");
+    std::istringstream duplicate(R"({"groups":{"General":[],"General":[]},"dependencies":{"osfsettings":"2.0.0"}})");
+    check(!SettingsJson::ParseSchema(duplicate, "future", error, &retained) &&
+        has(error, "duplicate group") && retained.at("osfsettings") == version("2.0.0"),
+        "duplicate groups still fail without losing later dependency metadata");
+    auto malformedDependencies = future;
+    malformedDependencies["dependencies"]["osfui"] = "invalid";
+    check(!SettingsJson::ParseSchema(malformedDependencies, "future", error, &retained) && retained.empty(),
+        "invalid dependency metadata does not leak a partially validated map");
+    retained["stale"] = version("1.0.0");
+    std::istringstream malformedJson(R"({"dependencies":{"osfsettings":"2.0.0"},)");
+    check(!SettingsJson::ParseSchema(malformedJson, "future", error, &retained) && retained.empty(),
+        "malformed JSON clears previous metadata without inventing dependencies");
+    retained["stale"] = version("1.0.0");
+    check(SettingsJson::ParseSchema(Json{{"groups", Json::object()}}, "plain", error, &retained).has_value() && retained.empty(),
+        "omitted dependencies clear previous metadata");
+
+    namespace fs = std::filesystem;
+    const auto root = fs::temp_directory_path() /
+        ("osf-dependencies-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    struct Cleanup {
+        fs::path root;
+        ~Cleanup() {
+            std::error_code ignored;
+            for (const auto* path : {"schemas/osfsettings.json", "schemas/future.json", "schemas", ""})
+                fs::remove(root / path, ignored);
+        }
+    } cleanup{root};
+    fs::create_directories(root / "schemas");
+    { std::ofstream out(root / "schemas/osfsettings.json"); out << R"({"version":"1.2.0","groups":{}})"; }
+    { std::ofstream out(root / "schemas/future.json"); out << future; }
+    SettingsStore failedStore;
+    failedStore.LoadAll(root / "schemas", root / "values");
+    check(failedStore.Mods().size() == 1 && failedStore.LoadErrors().size() == 1 &&
+        failedStore.LoadErrors()[0].dependencies.at("osfsettings") == version("2.0.0"),
+        "file discovery retains a failed consumer's dependencies");
+    issues = DependencyIssues(failedStore.Mods(), failedStore.LoadErrors());
+    check(issues.size() == 1 && issues[0].id == "dependency:osfsettings" &&
+        has(issues[0].impact, "future.json") && issues[0].requiredVersion == "2.0.0" &&
+        SchemaLoadIssues(failedStore.LoadErrors()).size() == 1,
+        "a broken consumer reports both its schema error and actionable update guidance");
+    auto satisfied = failedStore.Mods();
+    satisfied[0].schema.version = version("2.0.0");
+    check(DependencyIssues(satisfied, failedStore.LoadErrors()).empty(), "failed consumers do not warn about satisfied dependencies");
+    { std::ofstream out(root / "schemas/future.json"); out << R"({"groups":{}})"; }
+    failedStore.LoadAll(root / "schemas", root / "values");
+    check(failedStore.LoadErrors().empty() && DependencyIssues(failedStore.Mods(), failedStore.LoadErrors()).empty(),
+        "repairing and reloading a schema removes its obsolete dependency warnings");
 
     for (const auto* file : { "examples/dependencies/osf-stack.json", "examples/dependencies/sample-pack.json" }) {
         std::ifstream input(file);

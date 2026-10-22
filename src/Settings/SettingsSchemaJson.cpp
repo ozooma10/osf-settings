@@ -59,6 +59,19 @@ namespace OSFSettings::SettingsJson
             return *version;
         }
 
+        DependencyVersions ReadDependencies(const nlohmann::ordered_json& document)
+        {
+            DependencyVersions result;
+            if (const auto dependencies = document.find("dependencies"); dependencies != document.end()) {
+                Require(dependencies->is_object(), "dependencies must be an object mapping settings mod ids to minimum versions");
+                for (const auto& [id, minimum] : dependencies->items()) {
+                    Require(IsValidModId(id) && id != "internal", "dependency must name a settings mod id: " + id);
+                    result[id] = ReadVersion(minimum, "dependency " + id);
+                }
+            }
+            return result;
+        }
+
         std::optional<SettingValue> DecodeDefault(const nlohmann::ordered_json& value, const SettingDefinition& setting)
         {
             if (std::holds_alternative<KeyDefinition>(setting.definition) && value.is_string()) {
@@ -70,9 +83,10 @@ namespace OSFSettings::SettingsJson
         }
     }
 
-    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error)
+    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error, DependencyVersions* dependencies)
     {
         error.clear();
+        if (dependencies) dependencies->clear();
         try {
             std::set<std::string> groupNames;
             std::set<std::string> hotkeyIds;
@@ -82,6 +96,11 @@ namespace OSFSettings::SettingsJson
             bool inHotkeys{};
             bool inMenus{};
             bool inOptions{};
+            // Finish parsing valid JSON so dependency metadata survives duplicate control names too.
+            std::string duplicateError;
+            const auto unique = [&](bool inserted, std::string message) {
+                if (!inserted && duplicateError.empty()) duplicateError = std::move(message);
+            };
             const auto document = nlohmann::ordered_json::parse(input,
                 [&](int depth, nlohmann::ordered_json::parse_event_t event, nlohmann::ordered_json& value) {
                     if (event == nlohmann::ordered_json::parse_event_t::key) {
@@ -91,13 +110,13 @@ namespace OSFSettings::SettingsJson
                             inMenus = value == "menus";
                         } else if (depth == 2 && inGroups) {
                             const auto& name = value.get_ref<const std::string&>();
-                            Require(groupNames.insert(name).second, "duplicate group name: " + name);
+                            unique(groupNames.insert(name).second, "duplicate group name: " + name);
                         } else if (depth == 2 && inHotkeys) {
                             const auto& id = value.get_ref<const std::string&>();
-                            Require(hotkeyIds.insert(id).second, "duplicate hotkey id: " + id);
+                            unique(hotkeyIds.insert(id).second, "duplicate hotkey id: " + id);
                         } else if (depth == 2 && inMenus) {
                             const auto& id = value.get_ref<const std::string&>();
-                            Require(menuIds.insert(id).second, "duplicate menu id: " + id);
+                            unique(menuIds.insert(id).second, "duplicate menu id: " + id);
                         } else if (depth == 4 && inGroups) {
                             inOptions = value == "options";
                             if (inOptions) {
@@ -105,28 +124,30 @@ namespace OSFSettings::SettingsJson
                             }
                         } else if (depth == 5 && inGroups && inOptions) {
                             const auto& option = value.get_ref<const std::string&>();
-                            Require(optionValues.insert(option).second, "duplicate option: " + option);
+                            unique(optionValues.insert(option).second, "duplicate option: " + option);
                         }
                     }
                     return true;
                 });
-            return ParseSchema(document, modId, error);
+            auto schema = ParseSchema(document, modId, error, dependencies);
+            if (!duplicateError.empty()) {
+                error = std::move(duplicateError);
+                return std::nullopt;
+            }
+            return schema;
         } catch (const std::exception& exception) {
             error = exception.what();
             return std::nullopt;
         }
     }
 
-    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error)
+    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error, DependencyVersions* dependencies)
     {
         error.clear();
+        if (dependencies) dependencies->clear();
         try {
             Require(document.is_object(), "schema must be an object");
             ModSchema mod;
-            Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
-            const auto version = document.find("schemaVersion");
-            Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
-
             mod.id = modId;
             Require(IsValidModId(mod.id), "mod id must use 1-128 lowercase ASCII letters, digits, dots, underscores, or hyphens and must not be a Windows device name");
             // Values share a folder with OSF Settings' internal.json.
@@ -134,6 +155,11 @@ namespace OSFSettings::SettingsJson
             if (document.contains("id")) {
                 Require(RequiredText(document, "id") == mod.id, "schema id must match the filename stem");
             }
+            mod.dependencies = ReadDependencies(document);
+            if (dependencies) *dependencies = mod.dependencies;
+            Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
+            const auto version = document.find("schemaVersion");
+            Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
             mod.title = OptionalText(document, "title", mod.id);
             mod.description = OptionalText(document, "description");
             if (const auto release = document.find("version"); release != document.end()) {
@@ -142,14 +168,6 @@ namespace OSFSettings::SettingsJson
             const auto nexusModId = ReadInteger(document, "nexusModId").value_or(0);
             Require(nexusModId >= 0 && nexusModId <= UINT32_MAX, "nexusModId must be an unsigned 32-bit integer");
             mod.nexusModId = static_cast<std::uint32_t>(nexusModId);
-            if (const auto dependencies = document.find("dependencies"); dependencies != document.end()) {
-                Require(dependencies->is_object(), "dependencies must be an object mapping settings mod ids to minimum versions");
-                for (const auto& [id, minimum] : dependencies->items()) {
-                    Require(IsValidModId(id) && id != "internal", "dependency must name a settings mod id: " + id);
-                    mod.dependencies[id] = ReadVersion(minimum, "dependency " + id);
-                }
-            }
-
             const auto groups = document.find("groups");
             Require(groups != document.end() && groups->is_object(), "groups must be an object");
             std::set<std::string> settingKeys;

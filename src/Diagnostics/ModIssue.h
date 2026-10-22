@@ -37,5 +37,5 @@ namespace OSFSettings
     // OSF owns these reports so a mod's own ClearMod cannot hide a broken schema.
     std::vector<ModIssue> SchemaLoadIssues(std::span<const SettingsLoadError> errors);
     // One warning per declared dependency whose manifest is missing or older than a consumer asks for.
-    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings);
+    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings, std::span<const SettingsLoadError> errors = {});
 }

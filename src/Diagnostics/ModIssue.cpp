@@ -46,12 +46,20 @@ namespace OSFSettings
         return issues;
     }
 
-    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings)
+    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings, std::span<const SettingsLoadError> errors)
     {
         std::map<std::string, std::vector<std::pair<std::string, SettingsVersion>>> consumers;
         for (const auto& mod : settings) {
             for (const auto& [id, minimum] : mod.schema.dependencies) {
                 consumers[id].emplace_back(DisplayName(mod.schema), minimum);
+            }
+        }
+        for (const auto& error : errors) {
+            if (!error.schema) continue;
+            const auto name = error.file.filename().u8string();
+            const std::string file(reinterpret_cast<const char*>(name.data()), name.size());
+            for (const auto& [id, minimum] : error.dependencies) {
+                consumers[id].emplace_back(file, minimum);
             }
         }
 

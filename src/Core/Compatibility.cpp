@@ -27,7 +27,7 @@ namespace OSFSettings
         }
 
         // Clear only resolved dependency reports so unchanged ones keep their place.
-        auto dependencies = DependencyIssues(mods);
+        auto dependencies = DependencyIssues(mods, settings.LoadErrors());
         for (const auto& old : diagnostics.Snapshot()) {
             if (old.modId == "osfsettings" && old.id.starts_with("dependency:") &&
                 std::ranges::none_of(dependencies, [&](const ModIssue& issue) { return issue.id == old.id; })) {
