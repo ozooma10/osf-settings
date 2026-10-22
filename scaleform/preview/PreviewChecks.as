@@ -432,11 +432,11 @@ package
                         ++issueOpenCount; openedIssue = mod + "/" + id; return issueOpenResult;
                     };
                     for (var issueIndex:int = 0; issueIndex < list.entryCount; ++issueIndex)
-                        if (list.GetDataForEntry(issueIndex).row.id == "osfui-update-required") list.selectedIndex = issueIndex;
-                    require(list.selectedEntry.row.nexusModId == 17711, "compatibility warning retains its mod page destination");
+                        if (list.GetDataForEntry(issueIndex).row.id == "dependency:osfui") list.selectedIndex = issueIndex;
+                    require(list.selectedEntry.row.nexusModId == 17711, "dependency warning retains its mod page destination");
                     step = 109; break;
                 case 109:
-                    require(issueOpenCount == 0, "selecting a compatibility warning does not open the browser");
+                    require(issueOpenCount == 0, "selecting a dependency warning does not open the browser");
                     require(findNamed(menu,"issueModPage") != null &&
                         findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.requiredVersion")) != null,
                         "a version gap with a mod page shows the versions and a prominent mod page button");
@@ -477,7 +477,7 @@ package
                         "detail button follows a rebound keyboard Accept key");
                     issueControlMap(-1,""); step = 110; break;
                 case 110:
-                    require(issueOpenCount == 1 && openedIssue == "osfsettings/osfui-update-required",
+                    require(issueOpenCount == 1 && openedIssue == "osfsettings/dependency:osfui",
                         "Open mod page sends the selected issue identity exactly once");
                     require(findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.modPageOpened")) != null,
                         "successful mod page opening displays feedback");
@@ -490,7 +490,7 @@ package
                     issueOpenResult = true;
                     var modPage:DisplayObject = findNamed(menu,"issueModPage");
                     modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
-                    require(issueOpenCount == 3 && openedIssue == "osfsettings/osfui-update-required",
+                    require(issueOpenCount == 3 && openedIssue == "osfsettings/dependency:osfui",
                         "the detail mod page button opens on press even when GFx drops the click");
                     modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_UP, true));
                     modPage.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true));
