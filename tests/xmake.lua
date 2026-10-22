@@ -43,7 +43,8 @@ test_target("osfsettings-localization-tests", "settings")
     add_files("localization_tests.cpp")
 
 test_target("osfsettings-schema-tests", "settings")
-    add_files("hotkey_schema_tests.cpp", "settings_version_tests.cpp", "dependency_version_tests.cpp")
+    add_files("hotkey_schema_tests.cpp", "settings_version_tests.cpp", "dependency_version_tests.cpp",
+        "extension_page_tests.cpp")
 
 test_target("osfsettings-store-tests", "settings")
     add_files("native/settings_tests.cpp", "default_inheritance_tests.cpp")

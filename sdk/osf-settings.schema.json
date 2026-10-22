@@ -42,6 +42,10 @@
       "propertyNames": { "$ref": "#/definitions/modId" },
       "additionalProperties": { "$ref": "#/definitions/version" }
     },
+    "extends": {
+      "allOf": [{ "$ref": "#/definitions/modId" }],
+      "description": "Settings mod ID whose page shows this mod's controls. Values, actions and hotkeys stay owned by this mod, and the host is treated as a dependency. Must not be this schema's own ID."
+    },
     "groups": {
       "type": "object",
       "description": "Headings mapped to control arrays, displayed in authored order. Use an empty object for a mod with only hotkeys or launchers.",

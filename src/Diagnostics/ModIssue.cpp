@@ -135,4 +135,31 @@ namespace OSFSettings
         }
         return issues;
     }
+
+    std::vector<ModIssue> ExtensionIssues(std::span<const ModSettings> settings)
+    {
+        std::vector<ModIssue> issues;
+        for (const auto& mod : settings) {
+            const auto& schema = mod.schema;
+            if (schema.extends.empty() || schema.page != schema.id) continue;
+            const auto host = std::ranges::find(settings, schema.extends,
+                [](const ModSettings& other) -> const std::string& { return other.schema.id; });
+            // A host that is not installed is already reported as a missing dependency.
+            if (host == settings.end()) continue;
+            const auto name = DisplayName(schema);
+            issues.push_back({
+                .modId = "osfsettings",
+                .id = "extension:" + schema.id,
+                .severity = IssueSeverity::Warning,
+                .title = tr("issues.extensionUnresolved", {{ "mod", name }}),
+                .impact = tr("issues.extensionUnresolvedImpact", {{ "host", DisplayName(host->schema) }}),
+                .nextSteps = tr("issues.extensionUnresolvedSteps", {{ "mod", name }}),
+                .nexusModId = schema.nexusModId,
+                .reason = tr("issues.extensionUnresolvedReason", {{ "mod", schema.id }}),
+                .note = tr("issues.dependencyNote"),
+                .affectedMods = { name }
+            });
+        }
+        return issues;
+    }
 }

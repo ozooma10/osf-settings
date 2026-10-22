@@ -155,7 +155,16 @@ namespace OSFSettings::SettingsJson
             if (document.contains("id")) {
                 Require(RequiredText(document, "id") == mod.id, "schema id must match the filename stem");
             }
+            mod.page = mod.id; // Resolved against the other schemas once they have all loaded.
+            if (document.contains("extends")) {
+                mod.extends = RequiredText(document, "extends");
+                Require(IsValidModId(mod.extends), "extends must name a settings mod id: " + mod.extends);
+                Require(mod.extends != "internal", "extends must not name the reserved mod id 'internal'");
+                Require(mod.extends != mod.id, "extends must not name the schema's own mod id");
+            }
             mod.dependencies = ReadDependencies(document);
+            // Extending a page needs the host installed, so report it like any other dependency.
+            if (!mod.extends.empty()) mod.dependencies.emplace(mod.extends, SettingsVersion{});
             if (dependencies) *dependencies = mod.dependencies;
             Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
             const auto version = document.find("schemaVersion");

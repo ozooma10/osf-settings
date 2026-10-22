@@ -44,4 +44,6 @@ namespace OSFSettings
     std::vector<ModIssue> SchemaLoadIssues(std::span<const SettingsLoadError> errors);
     // One warning per declared dependency whose manifest is missing or older than a consumer asks for.
     std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings, std::span<const SettingsLoadError> errors = {});
+    // One warning per mod whose extends names an installed mod but still could not join its page.
+    std::vector<ModIssue> ExtensionIssues(std::span<const ModSettings> settings);
 }

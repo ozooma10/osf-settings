@@ -432,20 +432,30 @@ namespace OSFSettings
         }
         case Function::GetRows: {
             root->CreateArray(params.ret);
-            // Fields shared by setting, action, and hotkey rows.
-            const auto modRow = [root](const ModSettings& mod, const SettingsGroup& group, const std::string& key, const std::string& title) {
+            const auto settings = Runtime::Settings();
+            std::vector<const ModSchema*> schemas;
+            schemas.reserve(settings.size());
+            for (const auto& mod : settings) schemas.push_back(&mod.schema);
+            // Fields shared by setting, action, and hotkey rows. The page is where the row is shown;
+            // the mod is who owns it, which every read, write and reset still goes through.
+            const auto modRow = [root, &schemas](const ModSettings& mod, const SettingsGroup& group, const std::string& key, const std::string& title) {
+                const auto framing = FrameGroup(schemas, mod.schema, group);
                 RE::Scaleform::GFx::Value row;
                 root->CreateObject(&row);
                 Text(row, "mod", mod.schema.id);
                 Text(row, "modTitle", mod.schema.title);
                 Text(row, "modDescription", mod.schema.description);
+                Text(row, "page", framing.page->id);
+                Text(row, "pageTitle", framing.page->title);
                 Text(row, "group", group.id);
-                Text(row, "groupTitle", group.label);
+                Text(row, "groupTitle", framing.label);
+                Text(row, "groupSource", framing.source);
                 Text(row, "key", key);
                 Text(row, "title", title);
                 return row;
             };
-            for (const auto& mod : Runtime::Settings()) {
+            for (const auto index : PageOrder(schemas)) {
+                const auto& mod = settings[index];
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& control : group.controls) {
                         if (const auto* action = std::get_if<ActionDefinition>(&control)) {
@@ -514,6 +524,12 @@ namespace OSFSettings
                 root->CreateObject(&row);
                 Text(row, "mod", destination.mod);
                 Text(row, "modTitle", destination.modTitle);
+                // An extension's interfaces open from the page its settings joined.
+                const auto owner = std::ranges::find(schemas, destination.mod, [](const ModSchema* schema) -> const std::string& { return schema->id; });
+                const auto page = owner != schemas.end() ? std::ranges::find(schemas, (*owner)->page,
+                    [](const ModSchema* schema) -> const std::string& { return schema->id; }) : schemas.end();
+                Text(row, "page", page != schemas.end() ? (*page)->id : destination.mod);
+                Text(row, "pageTitle", page != schemas.end() ? (*page)->title : destination.modTitle);
                 Text(row, "key", destination.id);
                 Text(row, "title", destination.title);
                 Text(row, "type", "launcher");

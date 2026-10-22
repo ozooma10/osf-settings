@@ -387,10 +387,12 @@ package
             return nav.focused ? nav : launcherPage() ? launcher : options as MovieClip;
         }
         private function tabOf(row:Object):String { return groupTabs[row.group] ? groupTabs[row.group].id : row.group; }
+        // The page a row is shown on. Contributed rows keep their own mod for reads and writes.
+        private static function pageOf(row:Object):String { return row.page ? String(row.page) : String(row.mod); }
         // Whether a row belongs on the open mod's page, narrowed to the open section if there is one.
         private function inPage(row:Object):Boolean
         {
-            return modID != "" && row.mod == modID && row.type != "launcher" && (!groupID || tabOf(row) == groupID);
+            return modID != "" && pageOf(row) == modID && row.type != "launcher" && (!groupID || tabOf(row) == groupID);
         }
         // Directional input only moves focus; Accept explicitly starts editing.
         private function navigate(name:String, pressed:Boolean):Boolean
@@ -495,16 +497,21 @@ package
             mods = []; var seen:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
                 if (row.type == "launcher") continue;
-                if (!seen[row.mod]) {
-                    var mod:Object = {mod:row.mod, title:row.modTitle, hint:row.modDescription, count:0, settings:0, actions:0, interfaces:0, hotkeys:[]};
-                    seen[row.mod] = mod; mods.push(mod);
+                var page:String = pageOf(row);
+                if (!seen[page]) {
+                    var mod:Object = {mod:page, title:row.pageTitle || row.modTitle, hint:"", count:0,
+                        settings:0, actions:0, interfaces:0, hotkeys:[], contributors:[]};
+                    seen[page] = mod; mods.push(mod);
                 }
-                mod = seen[row.mod]; mod.count++;
+                mod = seen[page]; mod.count++;
+                // The page's own description, never a contributor's.
+                if (row.mod == page) { if (!mod.hint) mod.hint = row.modDescription; }
+                else if (mod.contributors.indexOf(row.modTitle) < 0) mod.contributors.push(row.modTitle);
                 if (row.type == "hotkey") mod.hotkeys.push(row);
                 else if (row.type == "action") mod.actions++;
                 else mod.settings++;
             }
-            for each (row in allRows) if (row.type == "launcher" && seen[row.mod]) seen[row.mod].interfaces++;
+            for each (row in allRows) if (row.type == "launcher" && seen[pageOf(row)]) seen[pageOf(row)].interfaces++;
             // OSF Settings' only entry is the key that opens this menu, which Home's header
             // names and Keybindings lists first.
             mods = mods.filter(function(item:Object, index:int, source:Array):Boolean {
@@ -521,7 +528,7 @@ package
         {
             groups = []; groupTabs = new Dictionary(); var folded:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
-                if (row.type == "launcher" || row.mod != modID) continue;
+                if (row.type == "launcher" || pageOf(row) != modID) continue;
                 if (groupTabs[row.group]) { ++groupTabs[row.group].size; continue; }
                 var id:String = String(row.group), split:int = id.indexOf(" - ");
                 var name:String = split > 0 ? id.substr(0, split) : id;
@@ -549,7 +556,7 @@ package
         private function interfaceRows():Array
         {
             var rows:Array = [];
-            if (modID && !groupID) for each (var row:Object in allRows) if (row.type == "launcher" && row.mod == modID) {
+            if (modID && !groupID) for each (var row:Object in allRows) if (row.type == "launcher" && pageOf(row) == modID) {
                 rows.push({type:"action", launcher:row.key, mod:row.mod, key:"@launcher/" + row.key, title:row.title, hint:row.hint,
                     message:row.message, editable:row.editable, actionState:tr(row.editable ? "buttons.open" : "actions.stateUnavailable"),
                     group:"@interfaces", groupTitle:tr("home.interfaces")});
@@ -564,6 +571,8 @@ package
             if (hotkeys && mod.hotkeys.length) parts.push(mod.hotkeys.length == 1 ? tr("summary.hotkey") : tr("summary.hotkeys", {count:mod.hotkeys.length}));
             if (mod.actions) parts.push(mod.actions == 1 ? tr("summary.action") : tr("summary.actions", {count:mod.actions}));
             if (mod.interfaces) parts.push(mod.interfaces == 1 ? tr("summary.interface") : tr("summary.interfaces", {count:mod.interfaces}));
+            if (mod.contributors && mod.contributors.length) parts.push(mod.contributors.length == 1 ?
+                tr("summary.extension") : tr("summary.extensions", {count:mod.contributors.length}));
             return parts;
         }
         private function populate(preserve:Boolean = false):void

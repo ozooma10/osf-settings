@@ -18,6 +18,8 @@ package
         private var defaultValue:TextField;
         private var rangeLabel:TextField;
         private var rangeValue:TextField;
+        private var sourceLabel:TextField;
+        private var sourceValue:TextField;
         private var detailOptions:Sprite = new Sprite();
         private var selected:Object;
         private var selectedValue:*;
@@ -43,6 +45,8 @@ package
             defaultValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(defaultValue, "right");
             rangeLabel = label(tr("menu.range"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(rangeValue, "right");
+            sourceLabel = label(tr("menu.providedBy"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            sourceValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(sourceValue, "right");
             detailOptions.x = MenuStyle.DETAIL_X; detailOptions.mouseEnabled = detailOptions.mouseChildren = false; addChild(detailOptions);
             // The changed marker only means something beside settings, so it closes the detail column.
             var legend:TextField = label(tr("menu.changed"), MenuStyle.DETAIL_X, MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 14, detailWidth,
@@ -93,6 +97,11 @@ package
             rangeLabel.visible = rangeValue.visible = Boolean(range);
             rangeLabel.y = cursor; rangeValue.y = cursor - 1; MenuStyle.fit(rangeValue, range);
             if (range) cursor += MenuStyle.VALUE_SIZE + 16;
+            // Rows another mod contributed to this page say so, whatever group they landed in.
+            var source:String = row && row.page && row.page != row.mod ? String(row.modTitle || row.mod) : "";
+            sourceLabel.visible = sourceValue.visible = Boolean(source);
+            sourceLabel.y = cursor; sourceValue.y = cursor - 1; MenuStyle.fit(sourceValue, source);
+            if (source) cursor += MenuStyle.VALUE_SIZE + 16;
             showOptions(enumRow ? row : null, cursor);
             editorTop = cursor + 6;
             detailDecoration.graphics.clear();

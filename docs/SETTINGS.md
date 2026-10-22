@@ -38,7 +38,7 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 
 ### Schema fields and types
 
-- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present.
+- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present. `extends` puts the controls on [another mod's page](#extend-another-mods-page).
 - The mod ID comes from the schema filename without `.json`.
 - Mod IDs use 1–128 lowercase ASCII letters, digits, `.`, `_`, or `-`; `.` and `..` are invalid. Windows device names such as `con`, `nul`, `com1`, and `lpt1` are rejected, including names followed by an extension such as `nul.extra`.
 - Group names become headings. Groups and their controls appear in authored order.
@@ -189,6 +189,39 @@ Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 - Papyrus integers are 32-bit and floats are single precision. Reads that overflow return the fallback; float precision may be reduced.
 
 See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../examples/papyrus/OSFSettingsExampleGlobal.psc) examples, with their [schema](../examples/papyrus/papyrusexample.json), for all value types, hotkeys, and action callbacks.
+
+## Extend another mod's page
+
+A mod that builds on another mod can put its settings on that mod's page instead of a page of
+its own. Add a root `extends` naming the host's mod ID:
+
+```json
+{
+  "title": "Base Mod - Combat Extras",
+  "extends": "basemod",
+  "groups": {
+    "Combat": [
+      { "key": "recoil", "type": "float", "default": 0.5, "label": "Extra recoil" }
+    ]
+  }
+}
+```
+
+Only the page changes. Your mod ID is still your filename, your values still live in
+`<modId>.json`, and every API call uses your own ID: `GetFloat("basemod-combat", "recoil")`.
+The host never sees your keys, and `ResetMod` on either mod leaves the other alone. Actions and
+hotkeys work unchanged, because handlers are already registered per mod and action ID.
+
+A group whose name matches one of the host's groups is appended to it and shows the host's
+heading; names are compared exactly. Any other group becomes a new group on the page, after the
+host's own, and its heading names your mod so players can see where the controls came from.
+Contributions are ordered by mod ID, so related add-ons sort predictably when you name them
+after the base mod. Rows you contribute are also labelled with your mod in the details pane.
+
+`extends` makes the host a dependency: if it is not installed, your settings appear on their own
+page and Mod Issues reports the host as missing. Add an explicit `dependencies` entry when you
+need a minimum version instead. A mod cannot extend itself, and a loop of mods extending each
+other leaves each on its own page with an issue reported.
 
 ## Action buttons
 

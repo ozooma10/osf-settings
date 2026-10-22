@@ -50,6 +50,15 @@ namespace OSFSettings
             mod.values = SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, m_loadErrors);
             m_mods.push_back(std::move(mod));
         }
+        ResolvePages();
+    }
+
+    void SettingsStore::ResolvePages()
+    {
+        std::vector<ModSchema*> schemas;
+        schemas.reserve(m_mods.size());
+        for (auto& mod : m_mods) schemas.push_back(&mod.schema);
+        OSFSettings::ResolvePages(schemas);
     }
 
     std::optional<SettingValue> SettingsStore::GetValue(std::string_view mod, std::string_view key) const
@@ -104,6 +113,8 @@ namespace OSFSettings
             m_providers.emplace(mod.schema.id, Provider{ registration, std::move(save) });
             m_mods.push_back(std::move(mod));
         }
+        // A provider can host a page or extend one, so every registration re-resolves them.
+        ResolvePages();
         return Error::None;
     }
 
@@ -114,6 +125,7 @@ namespace OSFSettings
         const auto id = found->first;
         std::erase_if(m_mods, [&](const auto& mod) { return mod.schema.id == id; });
         m_providers.erase(found);
+        ResolvePages();
         return id;
     }
 

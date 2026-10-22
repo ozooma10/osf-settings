@@ -50,6 +50,8 @@ package
                     // Only IDs using "Tab - Section" opt into abbreviated labels.
                     var title:String = String(row.groupTitle), split:int = title.indexOf(" - ");
                     if (section && String(row.group).indexOf(" - ") > 0 && split > 0) title = title.substr(split + 3);
+                    // A group only another mod provides names it here; a shared one has no single owner.
+                    if (row.groupSource) title = tr("menu.groupFrom", {group:title, mod:row.groupSource});
                     data.push({row:{type:"section", title:title, mod:row.mod, id:"@section/" + row.group, group:row.group, editable:false},
                         sText:"", uID:data.length, bDisabled:true, bShowSpinner:false, uCategory:0, bEnabled:false, bSubSetting:false,
                         uType:types.SDT_LINK, sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:false}});

@@ -26,10 +26,13 @@ namespace OSFSettings
             }
         }
 
-        // Clear only resolved dependency reports so unchanged ones keep their place.
+        // Clear only resolved dependency and extension reports so unchanged ones keep their place.
         auto dependencies = DependencyIssues(mods, settings.LoadErrors());
+        for (auto& issue : ExtensionIssues(mods)) {
+            dependencies.push_back(std::move(issue));
+        }
         for (const auto& old : diagnostics.Snapshot()) {
-            if (old.modId == "osfsettings" && old.id.starts_with("dependency:") &&
+            if (old.modId == "osfsettings" && (old.id.starts_with("dependency:") || old.id.starts_with("extension:")) &&
                 std::ranges::none_of(dependencies, [&](const ModIssue& issue) { return issue.id == old.id; })) {
                 diagnostics.Clear(old.modId, old.id);
             }

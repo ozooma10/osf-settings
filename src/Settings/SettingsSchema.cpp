@@ -132,6 +132,76 @@ namespace OSFSettings
         return values;
     }
 
+    void ResolvePages(std::span<ModSchema* const> schemas)
+    {
+        const auto find = [schemas](std::string_view id) -> const ModSchema* {
+            const auto found = std::ranges::find(schemas, id, [](const ModSchema* schema) -> const std::string& { return schema->id; });
+            return found != schemas.end() ? *found : nullptr;
+        };
+        for (auto* schema : schemas) {
+            schema->page = schema->id;
+            if (schema->extends.empty()) continue;
+            auto page = schema->extends;
+            for (int hop = 0; hop < MaxPageDepth; ++hop) {
+                const auto* host = find(page);
+                if (!host) break;
+                if (host->extends.empty()) {
+                    schema->page = page;
+                    break;
+                }
+                page = host->extends;
+            }
+        }
+    }
+
+    std::vector<std::size_t> PageOrder(std::span<const ModSchema* const> schemas)
+    {
+        std::vector<std::size_t> order;
+        order.reserve(schemas.size());
+        for (std::size_t index = 0; index < schemas.size(); ++index) {
+            if (schemas[index]->page != schemas[index]->id) continue;
+            order.push_back(index);
+            for (std::size_t other = 0; other < schemas.size(); ++other) {
+                if (other != index && schemas[other]->page == schemas[index]->id) order.push_back(other);
+            }
+        }
+        // A page that resolved to a schema outside this set would otherwise lose its rows.
+        for (std::size_t index = 0; index < schemas.size(); ++index) {
+            if (!std::ranges::contains(order, index)) order.push_back(index);
+        }
+        return order;
+    }
+
+    GroupFraming FrameGroup(std::span<const ModSchema* const> schemas, const ModSchema& mod, const SettingsGroup& group)
+    {
+        GroupFraming framing{ &mod, group.label, {} };
+        if (mod.page == mod.id) return framing;
+        const auto host = std::ranges::find(schemas, mod.page, [](const ModSchema* schema) -> const std::string& { return schema->id; });
+        if (host == schemas.end()) return framing;
+        framing.page = *host;
+        // Group ids are compared exactly, as they are within a single schema.
+        const auto shared = std::ranges::find((*host)->groups, group.id, &SettingsGroup::id);
+        if (shared != (*host)->groups.end()) {
+            // A merged group belongs to both mods, so its heading stays the host's and names nobody.
+            framing.label = shared->label;
+            return framing;
+        }
+        // Contributors can also land one group id on the same page; that group has no owner to name
+        // either, and its heading comes from whichever schema loaded first.
+        const ModSchema* first = nullptr;
+        bool sole = true;
+        for (const auto* other : schemas) {
+            if (other->page != mod.page) continue;
+            const auto declared = std::ranges::find(other->groups, group.id, &SettingsGroup::id);
+            if (declared == other->groups.end()) continue;
+            if (!first) first = other;
+            else sole = false;
+        }
+        if (sole) framing.source = mod.title;
+        else if (first) framing.label = std::ranges::find(first->groups, group.id, &SettingsGroup::id)->label;
+        return framing;
+    }
+
     std::optional<SettingValue> ModSettings::GetValue(std::string_view key) const
     {
         if (const auto saved = values.find(key); saved != values.end()) return saved->second;
