@@ -72,7 +72,6 @@ package
         private var heading:TextField;
         private var headerSummary:TextField;
         private var section:TextField;
-        private var count:TextField;
         private var homeMods:TextField;
         private var homeCount:TextField;
         private var headerCount:TextField;
@@ -165,8 +164,6 @@ package
                 MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             MenuStyle.align(headerSummary, "right");
             section = label("", MenuStyle.LEFT, MenuStyle.SECTION_TOP, 750, MenuStyle.SECTION_SIZE + 14, MenuStyle.SECTION_SIZE, MenuStyle.WHITE, true);
-            count = label("", MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 230, MenuStyle.SECTION_TOP + 3, 230, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            MenuStyle.align(count, "right");
             // Home headings carry their count right after the title: INTERFACES 10, MODS 3.
             headerCount = label("", MenuStyle.LEFT, MenuStyle.SECTION_TOP + 3, 200, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             homeMods = label(tr("home.mods"), MenuStyle.LEFT, 0, 750, MenuStyle.SECTION_SIZE + 14, MenuStyle.SECTION_SIZE, MenuStyle.WHITE, true);
@@ -184,7 +181,8 @@ package
             options.addEventListener(MouseEvent.MOUSE_WHEEL, wheelList);
             options.addEventListener(MouseEvent.CLICK, clickSetting, true);
             settingsDetails = new SettingsDetails(); addChild(settingsDetails);
-            issueDetails = new IssueDetails(function():void { if (!closing && issuesPage()) openIssueModPage(current()); }, issueConfirmHint);
+            issueDetails = new IssueDetails(function():void { if (!closing && issuesPage()) openIssueModPage(current()); }, issueConfirmHint,
+                function():void { footerDirty = true; }, function():void { if (!closing && issuesPage()) copyIssue(current()); });
             issueDetails.visible = false; addChild(issueDetails);
             issueSummary = new IssueSummary(); issueSummary.visible = false; addChild(issueSummary);
             homeDetails = new HomeDetails(); homeDetails.visible = false; addChild(homeDetails);
@@ -590,8 +588,6 @@ package
             settingsList.resize(listWidth, rowHeight());
             empty.width = listWidth - 40;
             section.visible = !bindingsPage() && !issuesPage() && !homeEmptyState() && !modID;
-            count.visible = issuesPage();
-            count.x = MenuStyle.RIGHT - count.width;
             issueSummary.visible = issuesPage();
             if (issueSummary.visible) issueSummary.update(issues);
             headerCount.visible = section.visible && homePage();
@@ -648,7 +644,6 @@ package
             MenuStyle.fit(heading, title.toUpperCase());
             MenuStyle.fit(headerSummary, summary);
             MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : homePage() ? tr("home.mods") : "");
-            MenuStyle.setText(count, tr("counts.issues", {count:data.length}));
             MenuStyle.setText(headerCount, String(launcher.visible ? launcher.count : data.length));
             headerCount.x = section.x + section.textWidth + 18;
             MenuStyle.setText(homeCount, String(data.length));
@@ -759,7 +754,9 @@ package
             if (reporting) {
                 acceptVisible = Boolean(row && row.nexusModId);
                 acceptText = tr("buttons.openModPage");
-                resetVisible = clearVisible = issueDetails.scrollable;
+                resetVisible = issueDetails.hasDetails;
+                // Controllers have one button for both: it scrolls open details to their end, then copies them.
+                clearVisible = Boolean(row) && (issueDetails.detailsExpanded || issueDetails.scrollable);
             }
             if (bindingsPage()) {
                 resetVisible = false;
@@ -782,8 +779,10 @@ package
             // Compute final states first; each native button is updated at most once.
             var changed:Boolean = updateButton("Accept", acceptText, acceptVisible);
             changed = updateButton("Cancel", backText, !busy) || changed;
-            changed = updateButton("YButton", reporting ? tr("buttons.scrollUp") : tr("buttons.reset"), resetVisible) || changed;
-            changed = updateButton("XButton", reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding"), clearVisible) || changed;
+            changed = updateButton("YButton", !reporting ? tr("buttons.reset") :
+                tr(issueDetails.detailsExpanded ? "buttons.hideDetails" : "buttons.showDetails"), resetVisible) || changed;
+            changed = updateButton("XButton", !reporting ? tr("buttons.clearBinding") :
+                tr(issueDetails.detailsExpanded && issueDetails.atEnd ? "buttons.copyDetails" : "buttons.scroll"), clearVisible) || changed;
             var pages:Boolean = !captureRow && !busy && !searching() && !editing;
             changed = updateButton("LShoulder", tr("buttons.previousPage"), pages) || changed;
             changed = updateButton("RShoulder", tr("buttons.nextPage"), pages) || changed;
@@ -807,6 +806,8 @@ package
             launcher.releaseAccept();
             syncValueEditing();
             decorate();
+            // Mod page and copy feedback last until the next report; then the restart reminder returns.
+            if (issuesPage()) setStatus(tr("menu.issuesHint"));
             if (!nav.focused && homePage() && !expandedLauncher()) focusLauncher(false);
             else updateSelection();
         }
@@ -815,6 +816,12 @@ package
         private function openIssueModPage(row:Object):void
         {
             if (row && row.nexusModId) setStatus(BGSCodeObj.openIssueModPage(row.mod, row.id) ? tr("issues.modPageOpened") : tr("errors.openModPage"));
+        }
+        private function copyIssue(row:Object):void
+        {
+            if (!row) return;
+            var copied:Boolean = Boolean(BGSCodeObj.copyIssue(row.mod, row.id));
+            setStatus(copied ? tr("issues.copied") : tr("errors.copyIssue"), !copied);
         }
         private function accept():void
         {
@@ -848,7 +855,7 @@ package
         {
             var row:Object = current();
             if (searching() || editingString() || confirmingAction() || row && row.type == "action") return;
-            if (issuesPage()) { issueDetails.scroll(-160); return; }
+            if (issuesPage()) { issueDetails.toggleDetails(); return; }
             if (captureRow || bindingBusy() || row && row.type == "hotkey") return;
             if (closing || refreshing || requestedRefresh || settingsList.dragging || !modID || !row || !row.editable) return;
             if (row.defaultKnown === false) return;
@@ -1226,7 +1233,12 @@ package
         private function clearBinding():void
         {
             if (searching() || editingString() || confirmingAction()) return;
-            if (issuesPage()) { issueDetails.scroll(160); return; }
+            if (issuesPage()) {
+                if (!issueDetails.detailsExpanded) issueDetails.scrollOn();
+                else if (issueDetails.atEnd) copyIssue(current());
+                else issueDetails.scroll(240);
+                return;
+            }
             var row:Object = current();
             if (row && row.type == "hotkey") { nativeHotkeys.clearBinding(); return; }
             if (!captureRow && modID && row && row.type == "key" && row.allowUnbound) edit(row, 255);

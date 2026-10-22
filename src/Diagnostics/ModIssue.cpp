@@ -3,6 +3,7 @@
 #include "Settings/SettingsSchema.h"
 
 #include <algorithm>
+#include <format>
 #include <map>
 
 namespace OSFSettings
@@ -26,6 +27,41 @@ namespace OSFSettings
         return issue.modId;
     }
 
+    std::string IssueReport(const ModIssue& issue, std::span<const ModSettings> settings, std::string_view pluginVersion)
+    {
+        // Labels stay English so mod authors can read reports from any language.
+        std::string report = "OSF Settings issue report\n";
+        const auto field = [&](std::string_view label, const std::string& value) {
+            if (value.empty()) return;
+            report += std::format("{}: ", label);
+            // Indent continuation lines so multi-paragraph text stays under its label.
+            for (const char c : value) {
+                report += c;
+                if (c == '\n') report += "  ";
+            }
+            report += '\n';
+        };
+        std::string affected;
+        for (const auto& name : issue.affectedMods) affected += (affected.empty() ? "" : ", ") + name;
+        const auto reporter = IssueModName(issue, settings);
+        field("Title", issue.title);
+        field("Severity", issue.severity == IssueSeverity::Error ? "Error" : "Warning");
+        field("Affects", affected.empty() ? reporter : affected);
+        field("Reported by", reporter == issue.modId ? reporter : std::format("{} ({})", reporter, issue.modId));
+        field("Issue ID", std::format("{}/{}", issue.modId, issue.id));
+        field("Impact", issue.impact);
+        field("To fix", issue.nextSteps);
+        if (!issue.requiredVersion.empty()) {
+            field("Installed version", issue.installedVersion.empty() ? "not installed" : issue.installedVersion);
+            field("Required version", issue.requiredVersion);
+        }
+        field("Reason", issue.reason);
+        field("Note", issue.note);
+        if (issue.nexusModId) field("Mod page", std::format("https://www.nexusmods.com/starfield/mods/{}", issue.nexusModId));
+        field("OSF Settings version", std::string(pluginVersion));
+        return report;
+    }
+
     std::vector<ModIssue> SchemaLoadIssues(std::span<const SettingsLoadError> errors)
     {
         std::vector<ModIssue> issues;
@@ -40,7 +76,10 @@ namespace OSFSettings
                 .title = tr("issues.schemaFailed", {{ "file", file }}),
                 .impact = tr("issues.schemaFailedImpact"),
                 .nextSteps = tr("issues.schemaFailedNextSteps"),
-                .reason = error.message
+                .reason = error.message,
+                .note = tr("issues.schemaFailedNote"),
+                // The file failed to parse, so its title is unknown.
+                .affectedMods = { tr("issues.schemaOwner", {{ "file", file }}) }
             });
         }
         return issues;
@@ -70,12 +109,11 @@ namespace OSFSettings
             // An unversioned manifest cannot be compared, so stay quiet rather than guess.
             if (installed && !provider->schema.version) continue;
             std::optional<SettingsVersion> highest;
-            std::string affected;
+            std::vector<std::string> affected;
             for (const auto& [name, minimum] : wanted) {
                 if (installed && minimum <= *provider->schema.version) continue;
                 highest = std::max(highest.value_or(minimum), minimum);
-                if (!affected.empty()) affected += '\n';
-                affected += tr("issues.dependencyConsumer", {{ "mod", name }, { "version", minimum.String() }});
+                affected.push_back(name);
             }
             if (!highest) continue;
             const auto name = installed ? DisplayName(provider->schema) : id;
@@ -84,11 +122,13 @@ namespace OSFSettings
                 .id = "dependency:" + id,
                 .severity = IssueSeverity::Warning,
                 .title = tr(installed ? "issues.dependencyUpdate" : "issues.dependencyMissing", {{ "mod", name }}),
-                .impact = (installed ?
-                    tr("issues.dependencyUpdateImpact", {{ "mod", name }, { "installed", provider->schema.version->String() }}) :
-                    tr("issues.dependencyMissingImpact", {{ "mod", id }})) + "\n\n" + affected,
-                .nextSteps = tr("issues.dependencyNextSteps", {{ "mod", name }, { "version", highest->String() }}),
+                .impact = tr(installed ? "issues.dependencyUpdateImpact" : "issues.dependencyMissingImpact", {{ "mod", name }}),
+                .nextSteps = tr(installed ? "issues.dependencyUpdateSteps" : "issues.dependencyMissingSteps",
+                    {{ "mod", name }, { "version", highest->String() }}),
                 .nexusModId = installed ? provider->schema.nexusModId : 0,
+                .reason = installed ? "" : tr("issues.dependencyMissingReason", {{ "mod", id }}),
+                .note = tr("issues.dependencyNote"),
+                .affectedMods = std::move(affected),
                 .installedVersion = installed ? provider->schema.version->String() : "",
                 .requiredVersion = highest->String()
             });

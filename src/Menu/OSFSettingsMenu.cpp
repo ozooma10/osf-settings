@@ -3,6 +3,7 @@
 #include "SettingRow.h"
 #include "GameplayOptionCommit.h"
 #include "ModPage.h"
+#include "Clipboard.h"
 #include "Input/KeyNames.h"
 #include "Input/NativeHotkeys.h"
 #include <cmath>
@@ -30,12 +31,12 @@ namespace OSFSettings
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
             RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset, GetGameplaySources,
-            CommitGameplayChange };
+            CommitGameplayChange, CopyIssue };
         // Movie-callable names and the dispatch id each one carries into Call.
         constexpr std::pair<const char*, Function> kMovieFunctions[]{
             { "getLocalization", Function::GetLocalization }, { "getRows", Function::GetRows },
             { "getGameplaySources", Function::GetGameplaySources }, { "commitGameplayChange", Function::CommitGameplayChange },
-            { "getIssues", Function::GetIssues }, { "openIssueModPage", Function::OpenIssueModPage },
+            { "getIssues", Function::GetIssues }, { "openIssueModPage", Function::OpenIssueModPage }, { "copyIssue", Function::CopyIssue },
             { "invokeAction", Function::InvokeAction }, { "revision", Function::Revision },
             { "launch", Function::Launch }, { "pollLaunch", Function::PollLaunch },
             { "requestBindings", Function::RequestBindings }, { "pollBindings", Function::PollBindings },
@@ -337,6 +338,19 @@ namespace OSFSettings
             *params.ret = RE::Scaleform::GFx::Value(opened);
             break;
         }
+        case Function::CopyIssue: {
+            const auto mod = ArgString(params, 0), id = ArgString(params, 1);
+            bool copied = false;
+            for (const auto& issue : DiagnosticsService::Get().Snapshot()) {
+                if (issue.modId != mod || issue.id != id) continue;
+                const auto version = SFSE::GetPluginVersion();
+                copied = CopyToClipboard(IssueReport(issue, Runtime::Settings(), std::format("{}.{}.{}", version[0], version[1], version[2])));
+                REX::INFO("Copy issue: issue={}/{} copied={}", mod, id, copied);
+                break;
+            }
+            *params.ret = RE::Scaleform::GFx::Value(copied);
+            break;
+        }
         case Function::GetIssues: {
             const auto issues = DiagnosticsService::Get().Snapshot();
             const auto settings = Runtime::Settings();
@@ -347,13 +361,21 @@ namespace OSFSettings
                 Text(row, "type", "issue");
                 Text(row, "mod", issue.modId);
                 Text(row, "id", issue.id);
-                Text(row, "modTitle", IssueModName(issue, settings));
+                const auto reporter = IssueModName(issue, settings);
+                Text(row, "modTitle", reporter);
+                RE::Scaleform::GFx::Value affected;
+                root->CreateArray(&affected);
+                for (const auto& name : issue.affectedMods.empty() ? std::vector{ reporter } : issue.affectedMods) {
+                    affected.PushBack(RE::Scaleform::GFx::Value(name.c_str()));
+                }
+                row.SetMember("affected", affected);
                 Text(row, "severity", issue.severity == IssueSeverity::Error ? "ERROR" : "WARNING");
                 Text(row, "severityLabel", tr(issue.severity == IssueSeverity::Error ? "issues.error" : "issues.warning"));
                 Text(row, "title", issue.title);
                 Text(row, "reason", issue.reason);
                 Text(row, "impact", issue.impact);
                 Text(row, "nextSteps", issue.nextSteps);
+                Text(row, "note", issue.note);
                 Text(row, "installedVersion", issue.installedVersion);
                 Text(row, "requiredVersion", issue.requiredVersion);
                 row.SetMember("nexusModId", RE::Scaleform::GFx::Value(issue.nexusModId));

@@ -18,6 +18,12 @@ package
         {
             return row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning");
         }
+        // The mods a report affects; older rows fall back to the reporting mod.
+        public static function affected(row:Object):String
+        {
+            var names:Array = row.affected as Array;
+            return names && names.length ? names.join(", ") : row.modTitle || row.mod || "";
+        }
 
         public static function icon(g:Graphics, x:Number, y:Number, error:Boolean, radius:Number = 18):void
         {

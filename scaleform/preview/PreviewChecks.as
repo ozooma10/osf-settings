@@ -36,6 +36,8 @@ package
         private var issueOpenCount:int = 0;
         private var issueOpenResult:Boolean = true;
         private var openedIssue:String = "";
+        private var copiedIssues:Array = [];
+        private var originalIssueCopier:Function;
         private var originalControlMap:Object;
         private var issueButtonRestColor:uint;
         private var panelBridge:Object;
@@ -427,7 +429,9 @@ package
                     var issueCount:int = Object(menu).BGSCodeObj.getIssues().length;
                     require(issueCount > 0 && list.entryCount == issueCount, "all fixture reports appear on the issues page");
                     checkIssueVersions();
-                    requireGlyphs("Issues: " + issueCount);
+                    var errorCount:int = 0;
+                    for each (var report:Object in Object(menu).BGSCodeObj.getIssues()) if (report.severity == "ERROR") ++errorCount;
+                    requireGlyphs(menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.error") + "  " + errorCount);
                     userEvent("Right");
                     capture("issues");
                     originalIssueOpener = Object(menu).BGSCodeObj.openIssueModPage;
@@ -441,8 +445,9 @@ package
                 case 109:
                     require(issueOpenCount == 0, "selecting a dependency warning does not open the browser");
                     require(findNamed(menu,"issueModPage") != null &&
-                        findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.requiredVersion")) != null,
-                        "a version gap with a mod page shows the versions and a prominent mod page button");
+                        findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.installedVersion") + "  2.0.0") != null &&
+                        findText(menu, "OSF Animation, Navigation Tools") != null,
+                        "a version gap with a mod page names the affected mods, the installed version and a prominent mod page button");
                     var issueButton:DisplayObject = findNamed(menu,"issueModPage");
                     var issueHint:Object = findNamed(menu,"issueConfirmHint");
                     require(issueHint.visible && issueHint.PCButton_mc.ButtonInstance_mc.PCButton_tf.text == "E",
@@ -514,6 +519,37 @@ package
                     userEvent("Accept"); break;
                 case 113:
                     require(issueOpenCount == 4, "accepting an issue without a mod page never opens the browser");
+                    var issuePanel:Object = findNamed(menu,"issueDetails");
+                    var reason:String = list.selectedEntry.row.reason;
+                    require(!issuePanel.detailsExpanded && findNamed(menu,"issueDetailsToggle") != null && findText(menu, reason) == null,
+                        "reference details start folded");
+                    userEvent("YButton");
+                    require(issuePanel.detailsExpanded && findText(menu, reason) != null && findText(menu, list.selectedEntry.row.note) != null,
+                        "the Details control shows the reason and note");
+                    step = 130; break;
+                case 130:
+                    // Native footer labels redraw on the frame after RefreshButtons.
+                    require(findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("buttons.hideDetails")) != null,
+                        "the footer offers to hide open details");
+                    var strings:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(footerShows(strings.text("buttons.copyDetails")) && findNamed(menu,"issueCopyDetails") != null,
+                        "open details that fit offer Copy details in the footer and the pane");
+                    var copied:Array = [];
+                    var originalCopy:Function = Object(menu).BGSCodeObj.copyIssue;
+                    Object(menu).BGSCodeObj.copyIssue = function(mod:String, id:String):Boolean { copied.push(mod + "/" + id); return true; };
+                    userEvent("XButton");
+                    findNamed(menu,"issueCopyDetails").dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(copied.length == 2 && copied[0] == "osfsettings/dependency:sample-pack" && copied[1] == copied[0] &&
+                        findText(menu, strings.text("issues.copied")) != null, "X and the Copy button copy the selected issue once each");
+                    capture("issue-details");
+                    Object(menu).BGSCodeObj.copyIssue = function(mod:String, id:String):Boolean { return false; };
+                    userEvent("XButton");
+                    require(findText(menu, strings.text("errors.copyIssue")) != null, "a refused copy reports the failure");
+                    Object(menu).BGSCodeObj.copyIssue = originalCopy;
+                    issuePanel = findNamed(menu,"issueDetails");
+                    reason = list.selectedEntry.row.reason;
+                    findNamed(menu,"issueDetailsToggle").dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(!issuePanel.detailsExpanded && findText(menu, reason) == null, "pressing the Details heading folds them again");
                     for (issueIndex = 0; issueIndex < list.entryCount; ++issueIndex)
                         if (list.GetDataForEntry(issueIndex).row.id == "long-description") list.selectedIndex = issueIndex;
                     Object(menu).BGSCodeObj.openIssueModPage = originalIssueOpener;
@@ -527,7 +563,35 @@ package
                     require(issuePane.scrollable, "long reports scroll within the wider details pane");
                     issuePane.scroll(10000);
                     require(list.selectedEntry.row.id == "long-description", "scrolling report details preserves issue selection");
+                    require(findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("menu.issuesHint")) != null,
+                        "selecting another report restores the restart reminder");
                     capture("issues-long");
+                    userEvent("YButton");
+                    issuePane.scroll(-100000);
+                    require(issuePane.detailsExpanded && !issuePane.atEnd, "open details on a long report start above the end");
+                    copiedIssues = [];
+                    originalIssueCopier = Object(menu).BGSCodeObj.copyIssue;
+                    Object(menu).BGSCodeObj.copyIssue = function(mod:String, id:String):Boolean { copiedIssues.push(mod + "/" + id); return true; };
+                    step = 131; break;
+                case 131:
+                    issuePane = findNamed(menu,"issueDetails");
+                    strings = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(footerShows(strings.text("buttons.scroll")) && !footerShows(strings.text("buttons.copyDetails")),
+                        "the footer offers Scroll while open details continue below the pane");
+                    for (var press:int = 0; press < 50 && !issuePane.atEnd; ++press) userEvent("XButton");
+                    require(issuePane.atEnd && copiedIssues.length == 0, "X scrolls open details to their end without copying");
+                    step = 132; break;
+                case 132:
+                    issuePane = findNamed(menu,"issueDetails");
+                    strings = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(footerShows(strings.text("buttons.copyDetails")) && !footerShows(strings.text("buttons.scroll")),
+                        "the footer offers Copy details once open details reach their end");
+                    capture("issues-long-details-end");
+                    userEvent("XButton");
+                    require(copiedIssues.length == 1 && copiedIssues[0] == "example-mod/long-description", "X copies at the end of open details");
+                    userEvent("YButton");
+                    require(!issuePane.detailsExpanded && !issuePane.atEnd, "closing details returns to the top of the report");
+                    Object(menu).BGSCodeObj.copyIssue = originalIssueCopier;
                     step = 54;
                     findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 54:
@@ -969,6 +1033,15 @@ package
                 require(localization.text("counts.mods", {count:3}) == "Mods: 3", "missing translation uses English with parameters");
             } finally { localization.initialize(null); }
         }
+        // The detail pane repeats some footer labels, so footer checks search only the button bar.
+        private function footerShows(text:String):Boolean
+        {
+            for (var i:int = 0; i < menu.numChildren; ++i) {
+                var child:Object = menu.getChildAt(i);
+                if ("RefreshButtons" in child) return findText(child as DisplayObjectContainer, text) != null;
+            }
+            return false;
+        }
         private function findText(container:DisplayObjectContainer, text:String):TextField
         {
             if (!container.visible) return null;
@@ -1060,49 +1133,29 @@ package
             var cases:Array = [
                 {name:"short", installed:"2.0.0", required:"2.1.0"},
                 {name:"missing", installed:"", required:"1.2.0"},
-                {name:"long", installed:"1.16.244", required:"1.16.255"},
                 {name:"maximum", installed:"65534.65535.65535", required:"65535.65535.65535"},
-                {name:"translated", installed:"", required:"1.2.0"}
+                {name:"translated", installed:"1.16.244", required:"1.16.255"}
             ];
             try {
                 for each (var sample:Object in cases) {
                     if (sample.name == "translated") localization.initialize({
                         "issues.installedVersion":"Installed version on this computer",
-                        "issues.requiredVersion":"Minimum version requested by the mods in this installation",
                         "issues.notInstalled":"This dependency has not been installed on this computer"
                     });
                     panel.show({mod:"osfsettings", id:"version-" + sample.name, modTitle:"OSF Settings", severity:"WARNING",
-                        title:"Dependency version comparison", installedVersion:sample.installed, requiredVersion:sample.required});
+                        title:"Dependency version comparison", nextSteps:"Update the dependency to " + sample.required + " or later.",
+                        installedVersion:sample.installed, requiredVersion:sample.required});
                     var viewport:DisplayObjectContainer = DisplayObjectContainer(panel).getChildAt(0) as DisplayObjectContainer;
                     var content:DisplayObjectContainer = viewport.getChildAt(0) as DisplayObjectContainer;
-                    var have:TextField = findText(content,sample.installed || localization.text("issues.notInstalled"));
-                    var need:TextField = findText(content,sample.required);
-                    var haveLabel:TextField = findText(content,localization.text("issues.installedVersion"));
-                    var needLabel:TextField = findText(content,localization.text("issues.requiredVersion"));
-                    require(have && need && haveLabel && needLabel, "version card preserves complete text: " + sample.name);
-                    var fields:Array = [haveLabel, have, needLabel, need];
-                    for (var i:int = 0; i < fields.length; ++i) {
-                        var field:TextField = fields[i];
-                        var bounds:Rectangle = field.getBounds(content);
-                        require(bounds.left >= 0 && bounds.right <= viewport.scrollRect.width &&
-                            field.textWidth <= field.width && field.textHeight <= field.height - 4,
-                            "version card text fits its viewport and field: " + sample.name + "/" + i);
-                        for (var j:int = 0; j < i; ++j) {
-                            var other:TextField = fields[j];
-                            var otherBounds:Rectangle = other.getBounds(content);
-                            // Flash rounds display bounds to twentieths of a pixel.
-                            require(bounds.right <= otherBounds.left + 0.1 || bounds.left >= otherBounds.right - 0.1 ||
-                                bounds.bottom <= otherBounds.top + 0.1 || bounds.top >= otherBounds.bottom - 0.1,
-                                "version labels and values do not overlap: " + sample.name);
-                        }
-                    }
-                    require(need.numLines == 1 && (!sample.installed || have.numLines == 1), "version numbers remain on one line: " + sample.name);
-                    if (sample.name == "short") require(have.y == need.y, "short versions retain the side-by-side layout");
-                    if (sample.name == "long" || sample.name == "maximum") {
-                        require(needLabel.y >= have.y + have.height, "long versions use separate rows: " + sample.name);
-                        capture("issue-version-" + sample.name);
-                    }
-                    if (sample.name == "translated") capture("issue-version-translated");
+                    var chip:TextField = findText(content, sample.installed ?
+                        localization.text("issues.installedVersion") + "  " + sample.installed : localization.text("issues.notInstalled"));
+                    require(chip != null, "version chip preserves complete text: " + sample.name);
+                    var bounds:Rectangle = chip.getBounds(content);
+                    require(bounds.left >= 0 && bounds.right <= viewport.scrollRect.width &&
+                        chip.textWidth <= chip.width && chip.textHeight <= chip.height - 4,
+                        "version chip fits its viewport and field: " + sample.name);
+                    if (sample.name != "translated") require(chip.numLines == 1, "version chip stays on one line: " + sample.name);
+                    if (sample.name == "maximum" || sample.name == "translated") capture("issue-version-" + sample.name);
                 }
             } finally {
                 localization.initialize(null);

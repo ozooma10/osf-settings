@@ -46,7 +46,7 @@ target("OSF Settings")
     add_includedirs("src", "build/generated")
     set_pcxxheader("src/pch.h")
     add_packages("nlohmann_json")
-    add_syslinks("ole32", "oleaut32", "uuid", "shlwapi")
+    add_syslinks("ole32", "oleaut32", "uuid", "shlwapi", "user32")
     if has_config("test_harness") then
         add_defines("OSFSETTINGS_TEST_HARNESS")
         add_files("tests/harness/*.cpp")

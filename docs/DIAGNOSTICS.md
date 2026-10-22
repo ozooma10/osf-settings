@@ -1,6 +1,8 @@
 # Issue reporting
 
-Report detected problems in the menu's **Mod Issues** tab. OSF Settings also lists schema files that failed to load there, under its own name.
+Report detected problems in the menu's **Mod Issues** tab. OSF Settings also lists schema files that failed to load and missing or outdated dependencies there, attributed to the mods they affect.
+
+The tab shows each report's title and `impact` first, then `nextSteps` as the fix. Keep `nextSteps` to the action a player takes; the tab already tells players to restart Starfield after installing or updating mods.
 
 ## Papyrus
 

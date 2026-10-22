@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 #include <nlohmann/json.hpp>
 
 int TestDependencyVersions()
@@ -61,11 +62,12 @@ int TestDependencyVersions()
     auto issues = DependencyIssues(mods);
     check(issues.size() == 1 && issues[0].id == "dependency:osfui" && issues[0].nexusModId == 17711 &&
         issues[0].title == "OSF UI update recommended", "an old provider is reported with its own mod page");
-    check(has(issues[0].impact, "First mod") && has(issues[0].impact, "Second mod") && has(issues[0].nextSteps, "2.10.0"),
-        "all unmet consumers and the highest version are shown");
+    check(issues[0].affectedMods == std::vector<std::string>{ "First mod", "Second mod" } && has(issues[0].nextSteps, "2.10.0") &&
+        issues[0].installedVersion == "2.0.0" && issues[0].reason.empty() && !issues[0].note.empty(),
+        "all unmet consumers are attributed and the highest version is requested");
     mods.back().schema.version = version("2.1.0");
     issues = DependencyIssues(mods);
-    check(issues.size() == 1 && !has(issues[0].impact, "First mod"), "satisfied consumers are omitted");
+    check(issues.size() == 1 && issues[0].affectedMods == std::vector<std::string>{ "Second mod" }, "satisfied consumers are omitted");
     for (const auto* current : { "2.10.0", "3.0.0" }) {
         mods.back().schema.version = version(current);
         check(DependencyIssues(mods).empty(), "equal and newer providers have no warning");
@@ -75,7 +77,7 @@ int TestDependencyVersions()
     mods.pop_back();
     issues = DependencyIssues(mods);
     check(issues.size() == 1 && issues[0].title == "osfui is missing" && issues[0].nexusModId == 0 &&
-        has(issues[0].nextSteps, "2.10.0"), "a missing provider is reported by id");
+        has(issues[0].nextSteps, "2.10.0") && has(issues[0].reason, "osfui.json"), "a missing provider is reported by id");
     check(DependencyIssues({}).empty(), "no declarations produces no warnings");
 
     // OSF Settings is an ordinary dependency once the running version is stamped on its manifest.
@@ -87,7 +89,7 @@ int TestDependencyVersions()
     stack.push_back({ .schema = *parse(consumer) });
     issues = DependencyIssues(stack);
     check(issues.size() == 1 && issues[0].id == "dependency:osfsettings" && issues[0].title == "OSF Settings update recommended" &&
-        has(issues[0].impact, "1.1.2") && has(issues[0].nextSteps, "1.2.0"), "an old OSF Settings is reported like any provider");
+        issues[0].installedVersion == "1.1.2" && has(issues[0].nextSteps, "1.2.0"), "an old OSF Settings is reported like any provider");
     stack.front().schema.version = version("1.2.0");
     check(DependencyIssues(stack).empty(), "a current OSF Settings satisfies its consumers");
 
@@ -139,7 +141,7 @@ int TestDependencyVersions()
         "file discovery retains a failed consumer's dependencies");
     issues = DependencyIssues(failedStore.Mods(), failedStore.LoadErrors());
     check(issues.size() == 1 && issues[0].id == "dependency:osfsettings" &&
-        has(issues[0].impact, "future.json") && issues[0].requiredVersion == "2.0.0" &&
+        issues[0].affectedMods == std::vector<std::string>{ "future.json" } && issues[0].requiredVersion == "2.0.0" &&
         SchemaLoadIssues(failedStore.LoadErrors()).size() == 1,
         "a broken consumer reports both its schema error and actionable update guidance");
     auto satisfied = failedStore.Mods();

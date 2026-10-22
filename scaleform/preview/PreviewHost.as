@@ -78,8 +78,13 @@ package
         {
             var config:XML = new XML(URLLoader(event.target).data);
             for each (var issue:XML in config.issues.issue) {
-                issues.push({type:"issue", mod:String(issue.@mod), id:String(issue.@id), modTitle:String(issue.@modTitle),
-                    severity:String(issue.@severity), title:String(issue.title), reason:String(issue.reason), impact:String(issue.impact), nextSteps:String(issue.nextSteps), nexusModId:uint(issue.@nexusModId),
+                // Native sends the reporting mod when a report names no affected mods.
+                var affected:Array = [];
+                for each (var name:XML in issue.affected) affected.push(String(name));
+                if (!affected.length) affected.push(String(issue.@modTitle));
+                issues.push({type:"issue", mod:String(issue.@mod), id:String(issue.@id), modTitle:String(issue.@modTitle), affected:affected,
+                    severity:String(issue.@severity), title:String(issue.title), reason:String(issue.reason), impact:String(issue.impact), nextSteps:String(issue.nextSteps),
+                    note:String(issue.note), nexusModId:uint(issue.@nexusModId),
                     installedVersion:String(issue.@installedVersion), requiredVersion:String(issue.@requiredVersion)});
             }
             for each (var library:XML in config.libraries.library) libraries.push(String(library.@url));
@@ -165,7 +170,8 @@ package
         private function menuLoaded(event:Event):void
         {
             menu = event.target.content;
-            menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, openIssueModPage:openIssueModPage, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
+            menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, openIssueModPage:openIssueModPage,
+                copyIssue:function(mod:String, id:String):Boolean { return true; }, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
                 revision:function():String { return "0:0:0"; }, invokeAction:invokeAction, reset:resetSetting,
                 launch:function(mod:String, id:String):Boolean {
                     trace("[preview] launch " + mod + "/" + id);
