@@ -45,10 +45,11 @@ namespace OSFSettings
     {
         TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::Snapshot);
         std::lock_guard lock(m_mutex);
-        auto mods = m_store.Mods();
+        std::vector<ModSettings> mods;
+        mods.reserve(m_store.Mods().size());
         const auto catalog = Localization::Get();
-        for (auto& mod : mods) {
-            mod.values = mod.ResolvedValues();
+        for (const auto& stored : m_store.Mods()) {
+            auto& mod = mods.emplace_back(ModSettings{ stored.schema, stored.ResolvedValues() });
             catalog->Apply(mod.schema);
         }
         return mods;
@@ -60,8 +61,7 @@ namespace OSFSettings
         std::lock_guard lock(m_mutex);
         const auto* stored = m_store.FindMod(mod);
         if (!stored) return std::nullopt;
-        auto copy = *stored;
-        copy.values = copy.ResolvedValues();
+        ModSettings copy{ stored->schema, stored->ResolvedValues() };
         Localization::Get()->Apply(copy.schema);
         return copy;
     }

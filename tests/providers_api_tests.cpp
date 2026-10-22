@@ -166,6 +166,31 @@ int main()
             settings.Reset("osf.animation", "launch.camera") == Status::Ok);
         check(client.GetEnum("osf.animation", "launch.camera", camera) == Status::Ok && camera.empty());
         check(api->Unregister(animationToken) == Status::Ok);
+        API::Providers::Registration replacementToken{};
+        check(api->Register("replacement", schema, R"({"enabled":false,"count":8,"mode":"b","caption":"Saved"})", save, &persistence, &replacementToken) == Status::Ok);
+        auto detached = backend.FindMod("replacement");
+        const char* replacementSchema = R"({"groups":{"New":[
+            {"key":"added","type":"bool","default":false},
+            {"key":"caption","type":"string","default":"Fresh","maxLength":16},
+            {"key":"count","type":"int","default":2,"min":0,"max":3},
+            {"key":"enabled","type":"string","default":"Changed type"},
+            {"key":"mode","type":"enum","default":"a","options":{"a":"A"}}
+        ]}})";
+        const auto writesBeforeReplace = persistence.writes;
+        check(api->Register("replacement", replacementSchema, "{}", save, &persistence, &replacementToken) == Status::Ok);
+        const auto replaced = backend.FindMod("replacement");
+        check(replaced->schema.groups[0].id == "New" && std::get<SettingDefinition>(replaced->schema.groups[0].controls[0]).key == "added");
+        check(std::get<std::string>(*replaced->GetValue("caption")) == "Saved" && std::get<std::int64_t>(*replaced->GetValue("count")) == 2);
+        check(std::get<std::string>(*replaced->GetValue("enabled")) == "Changed type" && std::get<EnumValue>(*replaced->GetValue("mode")).value == "a");
+        check(!replaced->GetValue("binding") && !std::get<bool>(*replaced->GetValue("added")) && persistence.writes == writesBeforeReplace);
+        check(std::get<std::int64_t>(*detached->GetValue("count")) == 8 && std::get<EnumValue>(*detached->GetValue("mode")).value == "b");
+        detached->values["count"] = std::int64_t{99};
+        check(std::get<std::int64_t>(*backend.FindMod("replacement")->GetValue("count")) == 2);
+        check(api->Unregister(replacementToken) == Status::Ok);
+        replacementToken = 0;
+        check(api->Register("replacement", schema, "{}", save, &persistence, &replacementToken) == Status::Ok);
+        check(std::get<bool>(*backend.FindMod("replacement")->GetValue("enabled")) && api->Unregister(replacementToken) == Status::Ok);
+
         // Drive the same refresh the permanent dispatcher performs after runtime schema changes.
         auto& diagnostics = DiagnosticsService::Get();
         check(diagnostics.Report({.modId="other", .id="keep", .title="Unrelated issue"}));
