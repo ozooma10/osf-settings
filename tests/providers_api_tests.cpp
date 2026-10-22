@@ -3,6 +3,8 @@
 #include "Settings/SettingsService.h"
 #include "Input/KeyActions.h"
 #include "Input/HotkeyInputState.h"
+#include "Core/Compatibility.h"
+#include "Diagnostics/DiagnosticsService.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -164,6 +166,42 @@ int main()
             settings.Reset("osf.animation", "launch.camera") == Status::Ok);
         check(client.GetEnum("osf.animation", "launch.camera", camera) == Status::Ok && camera.empty());
         check(api->Unregister(animationToken) == Status::Ok);
+        // Drive the same refresh the permanent dispatcher performs after runtime schema changes.
+        auto& diagnostics = DiagnosticsService::Get();
+        check(diagnostics.Report({.modId="other", .id="keep", .title="Unrelated issue"}));
+        const auto dependency = [&]() -> std::optional<ModIssue> {
+            for (const auto& issue : diagnostics.Snapshot())
+                if (issue.id == "dependency:dependency.provider") return issue;
+            return std::nullopt;
+        };
+        API::Providers::Registration consumerToken{}, providerToken{};
+        check(api->Register("dependency.consumer", R"({"dependencies":{"dependency.provider":"2.0.0"},"groups":{}})",
+            "{}", save, &persistence, &consumerToken) == Status::Ok);
+        ReportCompatibilityIssues();
+        check(dependency() && dependency()->installedVersion.empty());
+        auto providerSchema = nlohmann::json::parse(schema);
+        providerSchema["version"] = "2.0.0";
+        check(api->Register("dependency.provider", providerSchema.dump().c_str(), "{}", save, &persistence, &providerToken) == Status::Ok);
+        ReportCompatibilityIssues();
+        check(!dependency());
+        const auto schemaRevision = backend.SchemaRevision(), issueRevision = diagnostics.Revision();
+        check(settings.SetBool("dependency.provider", "enabled", false) == Status::Ok);
+        ReportCompatibilityIssues();
+        check(backend.SchemaRevision() == schemaRevision && diagnostics.Revision() == issueRevision);
+        providerSchema["version"] = "1.0.0";
+        check(api->Register("dependency.provider", providerSchema.dump().c_str(), "{}", save, &persistence, &providerToken) == Status::Ok);
+        ReportCompatibilityIssues();
+        check(dependency() && dependency()->installedVersion == "1.0.0" && dependency()->requiredVersion == "2.0.0");
+        const auto replacedRevision = backend.SchemaRevision();
+        API::Providers::Registration wrongOwner{};
+        check(api->Register("dependency.provider", providerSchema.dump().c_str(), "{}", save, &persistence, &wrongOwner) == Status::AlreadyRegistered);
+        check(backend.SchemaRevision() == replacedRevision);
+        check(api->Unregister(providerToken) == Status::Ok);
+        ReportCompatibilityIssues();
+        check(dependency() && dependency()->installedVersion.empty());
+        check(api->Unregister(consumerToken) == Status::Ok);
+        ReportCompatibilityIssues();
+        check(!dependency() && diagnostics.Snapshot().size() == 1 && diagnostics.Snapshot()[0].id == "keep");
         std::cout << checks << " provider checks passed\n";
         return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }

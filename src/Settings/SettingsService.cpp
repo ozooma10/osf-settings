@@ -26,6 +26,7 @@ namespace OSFSettings
         if (m_loaded) return;
         m_store.LoadAll(schemas, values);
         m_loaded = true;
+        ++m_schemaRevision;
     }
 
     bool SettingsService::Start()
@@ -65,6 +66,7 @@ namespace OSFSettings
     {
         std::lock_guard lock(m_mutex);
         Localization::Publish(std::make_shared<Localization::Catalog>(directory, language, m_store.Mods()));
+        ++m_schemaRevision;
         for (const auto& mod : m_store.Mods()) {
             Notify(mod.schema.id, std::nullopt);
         }
@@ -144,7 +146,10 @@ namespace OSFSettings
         if (!IsReady()) return SettingsError::NotReady;
         const auto id = mod.schema.id;
         const auto result = m_store.RegisterProvider(std::move(mod), std::move(save), registration);
-        if (result == SettingsError::None) Notify(id, std::nullopt);
+        if (result == SettingsError::None) {
+            ++m_schemaRevision;
+            Notify(id, std::nullopt);
+        }
         return result;
     }
 
@@ -152,6 +157,7 @@ namespace OSFSettings
     {
         std::lock_guard lock(m_mutex);
         if (const auto id = m_store.UnregisterProvider(registration)) {
+            ++m_schemaRevision;
             Notify(*id, std::nullopt);
             return SettingsError::None;
         }

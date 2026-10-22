@@ -52,6 +52,8 @@ namespace OSFSettings
         SettingsError RegisterProvider(ModSettings mod, SettingsStore::Save save, std::uint64_t& registration);
         SettingsError UnregisterProvider(std::uint64_t registration);
         std::uint64_t Revision() const noexcept { return m_revision.load(); }
+        // Definition/localization changes affect dependency reports; ordinary value writes do not.
+        std::uint64_t SchemaRevision() const noexcept { return m_schemaRevision.load(); }
         SettingsError Subscribe(std::string_view mod, Changed callback, Subscription& out);
         SettingsError Unsubscribe(Subscription subscription);
 
@@ -80,5 +82,6 @@ namespace OSFSettings
         std::atomic_bool m_pending{};
         std::atomic_bool m_dispatching{};
         std::atomic_uint64_t m_revision{};
+        std::atomic_uint64_t m_schemaRevision{};
     };
 }
