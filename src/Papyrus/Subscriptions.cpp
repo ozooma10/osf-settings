@@ -1,6 +1,6 @@
 #include "Subscriptions.h"
-#include "Values.h"
-#include <algorithm>
+
+#include <utility>
 
 namespace OSFSettings::Papyrus
 {
@@ -19,21 +19,22 @@ namespace OSFSettings::Papyrus
             return SettingsError::InvalidArgument;
         }
         if (!m_settings.IsReady()) return SettingsError::NotReady;
-        const auto schema = m_settings.FindMod(mod);
-        if (!schema) {
-            return SettingsError::UnknownMod;
-        }
-        if (kind == Kind::Hotkey) {
+        // Hotkey ids resolve case-insensitively to their authored spelling without copying the mod record.
+        const auto resolved = m_settings.Inspect(mod, [&](const ModSettings* item) -> std::expected<std::string, SettingsError> {
+            if (!item) return std::unexpected(SettingsError::UnknownMod);
+            if (kind != Kind::Hotkey) return key;
             const auto id = FoldAscii(key);
             const HotkeyDefinition* found{};
-            for (const auto& hotkey : schema->schema.hotkeys) {
+            for (const auto& hotkey : item->schema.hotkeys) {
                 if (FoldAscii(hotkey.id) != id) continue;
-                if (found) return SettingsError::InvalidArgument;
+                if (found) return std::unexpected(SettingsError::InvalidArgument);
                 found = &hotkey;
             }
-            if (!found) return SettingsError::UnknownHotkey;
-            key = found->id;
-        }
+            if (!found) return std::unexpected(SettingsError::UnknownHotkey);
+            return found->id;
+        });
+        if (!resolved) return resolved.error();
+        key = *resolved;
 
         std::lock_guard lock(m_state->mutex);
         if (m_state->suspended.load()) return SettingsError::NotReady;

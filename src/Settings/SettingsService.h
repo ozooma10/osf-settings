@@ -10,6 +10,7 @@
 #include <mutex>
 #include <set>
 #include <thread>
+#include <utility>
 
 namespace OSFSettings
 {
@@ -31,6 +32,14 @@ namespace OSFSettings
         void Localize(const std::filesystem::path& directory, std::string_view language);
         std::vector<ModSettings> Snapshot() const;
         std::optional<ModSettings> FindMod(std::string_view mod) const; // Localized copy of one mod.
+        // Reads one stored record (sparse values, untranslated) under the service lock without copying it.
+        // fn receives nullptr for an unknown mod and must not call back into the service.
+        template <class F>
+        auto Inspect(std::string_view mod, F&& fn) const
+        {
+            std::lock_guard lock(m_mutex);
+            return std::forward<F>(fn)(m_store.FindMod(mod));
+        }
         std::vector<SettingsLoadError> LoadErrors() const;
         bool HasPendingChanges() const noexcept;
         void DispatchChanges() noexcept;
