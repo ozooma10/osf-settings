@@ -1,5 +1,6 @@
 #include "OSFSettingsMenu.h"
 #include "Harness/TestHarness.h"
+#include "Harness/Performance.h"
 #include "SettingRow.h"
 #include "GameplayOptionCommit.h"
 #include "ModPage.h"
@@ -431,6 +432,7 @@ namespace OSFSettings
             break;
         }
         case Function::GetRows: {
+            TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::GetRows);
             root->CreateArray(params.ret);
             // Fields shared by setting, action, and hotkey rows.
             const auto modRow = [root](const ModSettings& mod, const SettingsGroup& group, const std::string& key, const std::string& title) {
