@@ -505,9 +505,10 @@ package
                 else mod.settings++;
             }
             for each (row in allRows) if (row.type == "launcher" && seen[row.mod]) seen[row.mod].interfaces++;
-            // OSF Settings' only entry is the key that opens this menu, which Keybindings already lists.
+            // OSF Settings' only entry is the key that opens this menu, which Home's header
+            // names and Keybindings lists first.
             mods = mods.filter(function(item:Object, index:int, source:Array):Boolean {
-                return item.mod != "osfsettings" || item.settings > 0 || item.actions > 0;
+                return item.mod != KeybindingsData.SELF_MOD || item.settings > 0 || item.actions > 0;
             });
             for each (mod in mods) { mod.summary = summaryParts(mod).join("  |  "); mod.chips = summaryParts(mod, false); }
             if (!seen[modID]) modID = "";
@@ -620,12 +621,10 @@ package
             if (editingPanel && !keptSelection) clearValueEditing();
             var rebuilt:Boolean = settingsList.setEntries(data, preserve);
             if (rebuilt) { hoverIndex = -1; editingIndex = -1; }
-            // Home's detail card and empty state show current keys, which come from vanilla Controls.
-            var homeKeys:Boolean = homeEmptyState();
-            for each (mod in mods) if (homePage() && mod.hotkeys.length) homeKeys = true;
-            if (hasHotkeys || homeKeys) nativeHotkeys.open();
+            // Home's header, detail card and empty state all show current keys, which come from vanilla Controls.
+            if (hasHotkeys || homePage()) nativeHotkeys.open();
             var openKey:String = "";
-            for each (row in allRows) if (row.mod == "osfsettings" && row.key == "openMenu" && row.type == "hotkey") openKey = String(row.value || "");
+            for each (row in allRows) if (row.mod == KeybindingsData.SELF_MOD && row.key == KeybindingsData.OPEN_MENU && row.type == "hotkey") openKey = String(row.value || "");
             homeEmpty.show(openKey);
             selected = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             if (selected >= 0 && data[selected].row.type == "section") selected = settingFrom(selected, 1, -1);
@@ -641,6 +640,8 @@ package
             MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? tr("menu.noIssues") : tr("menu.noSettings"));
             var title:String = bindingsPage() ? tr("menu.keybindings") : issuesPage() ? tr("menu.issues") : tr("menu.home"); var summary:String = "";
             for each (var mod:Object in mods) if (mod.mod == modID) { title = mod.title; summary = mod.summary; }
+            // Home names the key that opens this menu; its empty state already shows that key in full.
+            if (homePage() && !homeEmptyState() && openKey) summary = tr("home.opensMenuHint", {key:openKey});
             MenuStyle.fit(heading, title.toUpperCase());
             MenuStyle.fit(headerSummary, summary);
             MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : homePage() ? tr("home.mods") : "");

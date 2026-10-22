@@ -40,6 +40,7 @@
     "home.emptyTitle": "OSF Settingsを使用するMODはまだありません",
     "home.emptyBody": "OSF Settingsに対応したMODをインストールすると、設定・ホットキー・メニューがここに表示されます。インストール後にStarfieldを再起動してください。",
     "home.opensMenu": "このメニューを開く",
+    "home.opensMenuHint": "{key}  このメニューを開く",
     "home.changeInKeybindings": "キー割り当てで変更",
     "home.moreHotkeys": "他{count}件はキー割り当てで確認",
     "menu.keybindings": "キー割り当て",
