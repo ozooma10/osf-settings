@@ -100,10 +100,15 @@ namespace OSFSettings
         const auto owner = m_providers.find(mod.schema.id);
         if (existing) {
             if (owner == m_providers.end() || !registration || owner->second.token != registration) return Error::AlreadyRegistered;
-            for (auto& [key, value] : mod.values) {
-                const auto old = existing->values.find(key);
-                const auto* setting = mod.schema.FindSetting(key);
-                if (old != existing->values.end() && setting && IsValidValue(*setting, old->second)) value = old->second;
+            // Registered schemas have unique setting keys. Walk the definitions
+            // once instead of searching the entire schema for each incoming value.
+            for (const auto& group : mod.schema.groups) for (const auto& control : group.controls) {
+                const auto* setting = std::get_if<SettingDefinition>(&control);
+                if (!setting) continue;
+                const auto value = mod.values.find(setting->key);
+                if (value == mod.values.end()) continue;
+                const auto old = existing->values.find(setting->key);
+                if (old != existing->values.end() && IsValidValue(*setting, old->second)) value->second = old->second;
             }
             *existing = std::move(mod);
             owner->second.save = std::move(save);

@@ -2,6 +2,7 @@
 #include "Diagnostics/DiagnosticsService.h"
 #include "Settings/SettingsService.h"
 #include "SFSE/API.h"
+#include "Harness/Performance.h"
 
 #include <mutex>
 
@@ -9,6 +10,7 @@ namespace OSFSettings
 {
     void ReportCompatibilityIssues()
     {
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::Compatibility);
         // Serialize startup/localization and dispatcher reports so an older snapshot cannot win.
         static std::mutex mutex;
         static std::optional<std::uint64_t> reportedRevision;

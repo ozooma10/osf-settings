@@ -12,3 +12,13 @@ target("osfsettings-preview-rows")
         "../src/Settings/SettingsJson.cpp", "../src/Settings/SettingsVersion.cpp",
         "../src/Settings/Localization.cpp", "../src/Menu/FloatSlider.cpp", "../src/Menu/SettingRow.cpp")
 target_end()
+
+-- Opt-in host profiler; never linked into or installed with the plugin.
+target("osfsettings-performance")
+    set_kind("binary")
+    set_default(false)
+    set_group("tools")
+    add_deps("osfsettings-test-services")
+    add_forceincludes("SFSE/Impl/PCH.h")
+    add_files("performance.cpp")
+target_end()

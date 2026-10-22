@@ -1,5 +1,6 @@
 #include "OSFSettingsMenu.h"
 #include "Harness/TestHarness.h"
+#include "Harness/Performance.h"
 #include "SettingRow.h"
 #include "GameplayOptionCommit.h"
 #include "ModPage.h"
@@ -431,6 +432,7 @@ namespace OSFSettings
             break;
         }
         case Function::GetRows: {
+            TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::GetRows);
             root->CreateArray(params.ret);
             const auto settings = Runtime::Settings();
             std::vector<const ModSchema*> schemas;
