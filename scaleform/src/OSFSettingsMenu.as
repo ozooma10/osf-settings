@@ -804,6 +804,7 @@ package
         private function selectionChanged(event:Event):void
         {
             if (refreshing || skipSection()) return;
+            launcher.releaseAccept();
             syncValueEditing();
             decorate();
             if (!nav.focused && homePage() && !expandedLauncher()) focusLauncher(false);
@@ -972,6 +973,7 @@ package
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (name == "Accept") actionAcceptHeld = pressed;
+            if (name == "Accept" && !pressed && releaseLauncherAccept()) return true;
             if (!initialized || closing) return false;
             if (pressed) noteMove(name);
             if (modalBusy() || searching()) return modalInput(name, pressed);
@@ -1088,6 +1090,9 @@ package
             var pressed:Boolean = event.type == KeyboardEvent.KEY_DOWN;
             var input:String = keyboardName(event.keyCode);
             if (input == "Accept") actionAcceptHeld = pressed;
+            if (input == "Accept" && !pressed && releaseLauncherAccept()) {
+                event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
             if (modalBusy() || searching()) { modalInput(input, pressed, event); return; }
             if (!pressed) {
                 if (input == "Accept" && (nav.focused || launcherPage() || launcherAction())) {
@@ -1119,6 +1124,15 @@ package
                 }
             } else return;
             event.stopImmediatePropagation(); event.preventDefault();
+        }
+        // Release belongs to the launcher that received the press, even if another input owner took over.
+        private function releaseLauncherAccept():Boolean
+        {
+            if (!launcher || !launcher.acceptHeld) return false;
+            if (initialized && !closing && !nav.focused && !modalBusy() && !searching() && !inputCoolingDown() &&
+                (launcherPage() || launcherAction())) launcher.accept(false);
+            else launcher.releaseAccept();
+            return true;
         }
         private function routeNavigation(name:String, pressed:Boolean):Boolean
         {

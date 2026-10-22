@@ -778,9 +778,33 @@ package
                     Object(menu).ProcessUserEvent("Accept", false); break;
                 case 225:
                     require(launchedInterface == "design-preview/studio", "a mod page Open button launches its interface");
+                    launchedInterface = "";
+                    Object(menu).ProcessUserEvent("Accept", true);
+                    key(Keyboard.DOWN);
+                    require(list.selectedEntry.row.key == "autoAdvance", "Down can leave a launcher while Accept is held");
+                    Object(menu).ProcessUserEvent("Accept", false);
+                    require(!launcher.acceptHeld && launchedInterface == "", "Accept release on a setting cancels the launcher press");
+                    list.selectedIndex = 1; step = 227; break;
+                case 227:
+                    var launchClip:DisplayObject = list.FindClipForEntry(1) as DisplayObject;
+                    launchClip.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    launchClip.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_UP, true));
+                    launchClip.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true));
+                    require(launchedInterface == "design-preview/studio", "mouse launch still works after a cancelled held press");
+                    launchedInterface = "";
+                    key(Keyboard.ENTER); key(Keyboard.DOWN);
+                    list.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_UP, true, true, 0, Keyboard.ENTER));
+                    require(!launcher.acceptHeld && launchedInterface == "", "raw keyboard release also cancels a launcher press after moving");
+                    list.selectedIndex = 1; break;
+                case 228:
+                    Object(menu).ProcessUserEvent("Accept", true);
+                    key(Keyboard.DOWN);
+                    list.selectedIndex = 1;
+                    Object(menu).ProcessUserEvent("Accept", false);
+                    require(!launcher.acceptHeld && launchedInterface == "", "returning to the launcher cannot revive a cancelled press");
                     Object(menu).BGSCodeObj.getRows = modPageRows;
                     Object(menu).BGSCodeObj.revision = function():String { return "mod-interface-removed"; };
-                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); step = 226; break;
                 case 226:
                     userEvent("Right"); list.selectedIndex = 0; step = 79; break;
                 case 79:
