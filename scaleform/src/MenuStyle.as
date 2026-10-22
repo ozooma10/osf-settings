@@ -84,11 +84,22 @@ package
             var format:TextFormat = field.defaultTextFormat; format.color = field.textColor;
             field.text = text; field.defaultTextFormat = format; field.setTextFormat(format);
         }
+        public static function align(field:TextField, alignment:String):void
+        {
+            var format:TextFormat = field.defaultTextFormat; format.align = alignment;
+            field.defaultTextFormat = format; field.setTextFormat(format);
+        }
+        private static function fits(field:TextField, maxHeight:Number):Boolean
+        {
+            return maxHeight ? field.textHeight <= maxHeight : field.textWidth <= field.width - 6;
+        }
         // Fit a single line by width, or wrapped text by the supplied height.
         public static function fit(field:TextField, text:String, maxHeight:Number = 0):void
         {
             setText(field, text);
-            if (!text.length || (maxHeight ? field.textHeight <= maxHeight : field.textWidth <= field.width - 6)) return;
+            if (!text.length || fits(field, maxHeight)) return;
+            // setText has stored the colored default format; one copy serves every candidate.
+            var format:TextFormat = field.defaultTextFormat;
             var low:int = 0, high:int = text.length - 1;
             var result:String = "...";
             while (low <= high) {
@@ -96,12 +107,11 @@ package
                 var end:int = middle;
                 if (end && text.charCodeAt(end - 1) >= 0xD800 && text.charCodeAt(end - 1) <= 0xDBFF) --end;
                 var candidate:String = text.substr(0, end) + "...";
-                setText(field, candidate);
-                if (maxHeight ? field.textHeight <= maxHeight : field.textWidth <= field.width - 6) {
-                    result = candidate; low = middle + 1;
-                } else high = middle - 1;
+                field.text = candidate; field.setTextFormat(format);
+                if (fits(field, maxHeight)) { result = candidate; low = middle + 1; }
+                else high = middle - 1;
             }
-            setText(field, result);
+            field.text = result; field.setTextFormat(format);
         }
         public static function diamond(graphics:Graphics, x:Number, y:Number, color:uint):void
         {

@@ -40,16 +40,16 @@ package
             descriptionFormat.leading = CONFIG::largeText ? 8 : 6; detailHint.defaultTextFormat = descriptionFormat;
             detailHint.addEventListener(MouseEvent.MOUSE_WHEEL, scrollDescription);
             defaultLabel = label(tr("menu.default"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            defaultValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(defaultValue);
+            defaultValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(defaultValue, "right");
             rangeLabel = label(tr("menu.range"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(rangeValue);
+            rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(rangeValue, "right");
             detailOptions.x = MenuStyle.DETAIL_X; detailOptions.mouseEnabled = detailOptions.mouseChildren = false; addChild(detailOptions);
             // The changed marker only means something beside settings, so it closes the detail column.
             var legend:TextField = label(tr("menu.changed"), MenuStyle.DETAIL_X, MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 14, detailWidth,
                 MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
             changedLegend.mouseEnabled = false; changedLegend.mouseChildren = false;
             addChild(changedLegend); changedLegend.addChild(legend);
-            alignRight(legend);
+            MenuStyle.align(legend, "right");
             MenuStyle.diamond(changedLegend.graphics, MenuStyle.RIGHT - legend.textWidth - 22, legend.y + legend.height / 2 - 1, MenuStyle.ACCENT);
         }
         CONFIG::testHarness { public function get hintText():String { return visible ? detailHint.text : ""; } }
@@ -58,11 +58,6 @@ package
         {
             var field:TextField = MenuStyle.field(text, x, y, width, height, size, color, isLabel);
             addChild(field); return field;
-        }
-        private function alignRight(field:TextField):void
-        {
-            var format:TextFormat = field.defaultTextFormat; format.align = "right";
-            field.defaultTextFormat = format; field.setTextFormat(format);
         }
         public function show(row:Object, top:Number, editing:Boolean):void
         {
@@ -135,7 +130,7 @@ package
                 detailOptions.addChild(option); MenuStyle.fit(option, String(labels[i]));
                 if (row.options[i].value === row.defaultValue) {
                     var tag:TextField = MenuStyle.field(tr("menu.default"), columnWidth - 160, line + 2, 160, pitch, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true);
-                    alignRight(tag); detailOptions.addChild(tag);
+                    MenuStyle.align(tag, "right"); detailOptions.addChild(tag);
                 }
             }
             if (shown < labels.length)

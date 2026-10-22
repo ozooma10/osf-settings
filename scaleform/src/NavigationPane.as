@@ -4,7 +4,6 @@ package
     import flash.events.MouseEvent;
     import flash.geom.Rectangle;
     import flash.text.TextField;
-    import flash.text.TextFormat;
 
     // The menu's left column: pinned pages, then every mod, with the open mod's sections
     // nested under it. Items are plain objects the menu builds; the menu decides what
@@ -100,9 +99,9 @@ package
                 label.y = heading ? span - label.height - 2 : (span - size) / 2 - 3;
                 MenuStyle.fit(label, heading ? String(item.title).toUpperCase() : String(item.title));
                 var count:TextField = MenuStyle.field("", ITEM_WIDTH - 80, 0, 66, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true);
-                var format:TextFormat = count.defaultTextFormat; format.align = "right"; count.defaultTextFormat = format;
+                MenuStyle.align(count, heading ? "left" : "right");
                 count.y = (span - MenuStyle.SMALL_SIZE + 1) / 2 - 3; MenuStyle.setText(count, item.count ? String(item.count) : "");
-                if (heading) { count.x = label.x + label.textWidth + 12; count.y = label.y + 1; format.align = "left"; count.defaultTextFormat = format; MenuStyle.setText(count, count.text); }
+                if (heading) { count.x = label.x + label.textWidth + 12; count.y = label.y + 1; }
                 row.addChild(label); row.addChild(count);
                 // Rows open on press: the game's player drops the click when a row repaints under it.
                 if (!heading) {

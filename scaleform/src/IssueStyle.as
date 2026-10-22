@@ -13,6 +13,11 @@ package
         public static const WARNING:uint = 0xE7B566;
 
         public static function color(severity:String):uint { return severity == "ERROR" ? ERROR : WARNING; }
+        // Native supplies the translated severity; older rows fall back to the movie's catalog.
+        public static function label(row:Object):String
+        {
+            return row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning");
+        }
 
         public static function icon(g:Graphics, x:Number, y:Number, error:Boolean, radius:Number = 18):void
         {

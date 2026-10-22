@@ -33,7 +33,10 @@ package
         private var actionFocused:Boolean = false;
         private var confirmHeld:Boolean = false;
         private var releaseStage:Stage;
-        private var lastButtonLayout:String = "";
+        // The hint geometry last laid out; null until the button is laid out once.
+        private var hintBounds:Rectangle;
+        private var hintFocused:Boolean;
+        private var hintOffset:Number;
 
         public function IssueDetails(openModPage:Function, makeConfirmHint:Function)
         {
@@ -63,13 +66,11 @@ package
             selected = row;
             cancelInteraction();
             pressedModPage = null;
-            modPage = null; modPageText = null; confirmHint = null;
-            lastButtonLayout = "";
+            modPage = null; modPageText = null; confirmHint = null; hintBounds = null;
             while (content.numChildren) content.removeChildAt(0);
             content.graphics.clear(); extent = 0;
             if (row) {
-                line(row.modTitle + " / " + (row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning")),
-                    MenuStyle.SMALL_SIZE + 1, IssueStyle.color(row.severity), true, 12);
+                line(row.modTitle + " / " + IssueStyle.label(row), MenuStyle.SMALL_SIZE + 1, IssueStyle.color(row.severity), true, 12);
                 line(row.title, MenuStyle.DETAIL_TITLE_SIZE + 4, MenuStyle.WHITE, false, 22);
                 if (row.requiredVersion) versions(row);
                 if (row.nexusModId) modPageButton(row.nexusModId);
@@ -205,9 +206,8 @@ package
             confirmHint.visible = actionFocused;
             var bounds:Rectangle = confirmHint.getBounds(confirmHint);
             var offset:Number = mousePressed && hovered || confirmHeld ? 2 : 0;
-            var layout:String = [actionFocused,offset,bounds.x,bounds.y,bounds.width,bounds.height].join("/");
-            if (layout == lastButtonLayout) return;
-            lastButtonLayout = layout;
+            if (hintBounds && hintBounds.equals(bounds) && hintFocused == actionFocused && hintOffset == offset) return;
+            hintBounds = bounds; hintFocused = actionFocused; hintOffset = offset;
             var hintWidth:Number = actionFocused ? bounds.width + 18 : 0;
             MenuStyle.setText(modPageText, tr("buttons.openModPage"));
             modPageText.width = Math.min(TEXT_WIDTH - hintWidth - 32, modPageText.textWidth + 8);
@@ -236,8 +236,7 @@ package
         private function centered(text:String, size:Number, color:uint, bold:Boolean):TextField
         {
             var field:TextField = MenuStyle.field("", 0, 0, TEXT_WIDTH, 40, size, color, bold);
-            var format:TextFormat = field.defaultTextFormat; format.align = "center";
-            field.defaultTextFormat = format; MenuStyle.setText(field, text);
+            MenuStyle.align(field, "center"); MenuStyle.setText(field, text);
             field.height = field.textHeight + 6;
             return field;
         }
