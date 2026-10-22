@@ -12,7 +12,6 @@ namespace OSFSettings
         {
             return !key.empty() && key.find('\0') == std::string_view::npos;
         }
-
     }
 
     SettingsService& SettingsService::Get()

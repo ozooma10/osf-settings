@@ -52,7 +52,7 @@ namespace OSFSettings
     std::vector<ModIssue> IssueRegistry::Snapshot() const
     {
         auto issues = m_issues;
-        std::stable_partition(issues.begin(), issues.end(), [](const ModIssue& issue) {
+        std::ranges::stable_partition(issues, [](const ModIssue& issue) {
             return issue.severity == IssueSeverity::Error;
         });
         return issues;

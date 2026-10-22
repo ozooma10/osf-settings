@@ -48,7 +48,6 @@ namespace OSFSettings
             mod.schema = std::move(*schema);
             mod.values = SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, m_loadErrors);
             m_mods.push_back(std::move(mod));
-
         }
     }
 
