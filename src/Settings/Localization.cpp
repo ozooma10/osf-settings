@@ -86,6 +86,16 @@ namespace OSFSettings::Localization
 
             void Apply(const Json& document, ModSchema& mod)
             {
+                // Catalog validation also resolves every translated key. Build a
+                // temporary index once per overlay, preserving first-match lookup.
+                std::map<std::string_view, SettingDefinition*, std::less<>> settings;
+                std::map<std::string_view, ActionDefinition*, std::less<>> actions;
+                const bool hasSettings = document.contains("settings");
+                const bool hasActions = document.contains("actions");
+                if (hasSettings || hasActions) for (auto& group : mod.groups) for (auto& control : group.controls) {
+                    if (auto* setting = std::get_if<SettingDefinition>(&control); setting && hasSettings) settings.try_emplace(setting->key, setting);
+                    if (auto* action = std::get_if<ActionDefinition>(&control); action && hasActions) actions.try_emplace(action->id, action);
+                }
                 Text(document, "title", mod.title, "");
                 Text(document, "description", mod.description, "", true, true);
                 Entries(document, "groups", "", [&](const auto& id, const auto& entry, const auto& field) {
@@ -96,8 +106,9 @@ namespace OSFSettings::Localization
                     return true;
                 });
                 Entries(document, "settings", "", [&](const auto& id, const auto& entry, const auto& field) {
-                    auto* setting = mod.FindSetting(id);
-                    if (!setting) return false;
+                    const auto found = settings.find(id);
+                    if (found == settings.end()) return false;
+                    auto* setting = found->second;
                     Fields(entry, { "label", "hint", "optionLabels" }, field);
                     Text(entry, "label", setting->label, field);
                     Text(entry, "hint", setting->hint, field, true, true);
@@ -126,8 +137,9 @@ namespace OSFSettings::Localization
                     return true;
                 });
                 Entries(document, "actions", "", [&](const auto& id, const auto& entry, const auto& field) {
-                    auto* action = mod.FindAction(id);
-                    if (!action) return false;
+                    const auto found = actions.find(id);
+                    if (found == actions.end()) return false;
+                    auto* action = found->second;
                     Fields(entry, { "label", "hint", "confirmation" }, field);
                     Text(entry, "label", action->label, field);
                     Text(entry, "hint", action->hint, field, true, true);
@@ -140,6 +152,52 @@ namespace OSFSettings::Localization
                     }
                     return true;
                 });
+            }
+
+            // Diagnostics were emitted when the catalog loaded. Walk the current
+            // schema and look up its translations, rather than scanning the whole
+            // schema for every JSON entry on each menu/registry snapshot. Resolve
+            // against the live definitions: providers may replace/reorder controls,
+            // change enum options or add/remove an action's confirmation requirement.
+            void Replay(const Json& document, ModSchema& mod)
+            {
+                const auto object = [](const Json* parent, std::string_view key) -> const Json* {
+                    if (!parent) return nullptr;
+                    const auto found = parent->find(key);
+                    return found != parent->end() && found->is_object() ? &*found : nullptr;
+                };
+                Text(document, "title", mod.title, "");
+                Text(document, "description", mod.description, "", true, true);
+                const auto* groups = object(&document, "groups");
+                const auto* settings = object(&document, "settings");
+                const auto* actions = object(&document, "actions");
+                for (auto& group : mod.groups) {
+                    if (const auto* entry = object(groups, group.id)) Text(*entry, "label", group.label, "");
+                    if (!settings && !actions) continue;
+                    for (auto& control : group.controls) {
+                        if (auto* setting = std::get_if<SettingDefinition>(&control)) {
+                            const auto* entry = object(settings, setting->key);
+                            if (!entry) continue;
+                            Text(*entry, "label", setting->label, "");
+                            Text(*entry, "hint", setting->hint, "", true, true);
+                            const auto* labels = object(entry, "optionLabels");
+                            auto* definition = std::get_if<EnumDefinition>(&setting->definition);
+                            if (labels && definition) for (auto& option : definition->options) {
+                                const auto label = labels->find(option.value);
+                                if (label != labels->end() && ValidText(*label, false, false)) option.label = label->get<std::string>();
+                            }
+                        } else if (auto* action = std::get_if<ActionDefinition>(&control)) {
+                            const auto* entry = object(actions, action->id);
+                            if (!entry) continue;
+                            Text(*entry, "label", action->label, "");
+                            Text(*entry, "hint", action->hint, "", true, true);
+                            if (!action->confirmation.empty()) Text(*entry, "confirmation", action->confirmation, "", true);
+                        }
+                    }
+                }
+                if (const auto* hotkeys = object(&document, "hotkeys")) for (auto& hotkey : mod.hotkeys) {
+                    if (const auto* entry = object(hotkeys, hotkey.id)) Text(*entry, "label", hotkey.label, "");
+                }
             }
 
             void Interface(const Json& document, std::string_view mod, Messages& ui)
@@ -256,7 +314,7 @@ namespace OSFSettings::Localization
         if (!m_overlays) return;
         if (const auto found = m_overlays->find(schema.id); found != m_overlays->end()) {
             for (const auto& document : found->second) {
-                Overlay{ {}, nullptr }.Apply(document, schema);
+                Overlay{ {}, nullptr }.Replay(document, schema);
             }
         }
     }
