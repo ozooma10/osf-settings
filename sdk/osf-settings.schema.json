@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/ozooma10/osf-settings-slim/main/sdk/osf-settings.schema.json",
-  "title": "OSF Settings mod definition",
-  "description": "Settings, action buttons, hotkeys, launchers, and dependency versions for one mod. Save as Data/SFSE/Plugins/OSF/Settings/schemas/<modId>.json.",
-  "$comment": "Keep aligned with src/Settings/SettingsSchemaJson.cpp and SettingsSchema.cpp. Unknown properties are allowed, as in the runtime parser. Runtime validation additionally checks filenames, case-insensitive uniqueness, cross-field relationships, UTF-8 byte lengths, native key names, and integer JSON syntax. See docs/SETTINGS.md.",
+  "title": "OSF Settings mod definition schema",
+  "description": "Settings, action buttons, hotkeys, launchers, and dependency versions. Save as Data/SFSE/Plugins/OSF/Settings/schemas/<modId>.json.",
+  "$comment": "Unknown properties are allowed, as in the runtime parser. Runtime validation additionally checks filenames, case-insensitive uniqueness, cross-field relationships, UTF-8 byte lengths, native key names, and integer JSON syntax. See docs/SETTINGS.md.",
   "type": "object",
   "required": ["groups"],
   "properties": {
