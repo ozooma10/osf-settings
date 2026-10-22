@@ -540,6 +540,17 @@ package
                 if (modID && navSelection.indexOf("section/") == 0) navSelection = "mod/" + modID;
             }
         }
+        // A mod's full page leads with its own interfaces as Open buttons, launched like Home's cards.
+        private function interfaceRows():Array
+        {
+            var rows:Array = [];
+            if (modID && !groupID) for each (var row:Object in allRows) if (row.type == "launcher" && row.mod == modID) {
+                rows.push({type:"action", launcher:row.key, mod:row.mod, key:"@launcher/" + row.key, title:row.title, hint:row.hint,
+                    message:row.message, editable:row.editable, actionState:tr(row.editable ? "buttons.open" : "actions.stateUnavailable"),
+                    group:"@interfaces", groupTitle:tr("home.interfaces")});
+            }
+            return rows;
+        }
         // The detail card lists hotkeys themselves, so its chips leave out their count.
         private function summaryParts(mod:Object, hotkeys:Boolean = true):Array
         {
@@ -584,7 +595,7 @@ package
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
             var selectedRow:Object = preserve && (issuesPage() || bindingsPage() || editingPanel) ? current() : null;
-            var rows:Array = [], source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
+            var rows:Array = [], source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? interfaceRows().concat(allRows) : mods;
             for each (var row:Object in source) {
                 if (row.type == "launcher") continue;
                 if (modID && !inPage(row)) continue;
@@ -722,7 +733,7 @@ package
             if (inlineSetting(row) && !editingValue()) return tr("buttons.editSetting");
             if (inlineSetting(row) && NumericSetting.isSlider(row)) return tr("buttons.done");
             if (row) switch (row.type) {
-                case "action": return tr("buttons.runAction");
+                case "action": return tr(row.launcher ? "buttons.open" : "buttons.runAction");
                 case "string": return tr("buttons.editText");
                 case "key":
                 case "hotkey": return tr("buttons.changeBinding");
@@ -801,7 +812,7 @@ package
         }
         private function accept():void
         {
-            if (confirmingAction() || launcherPage() && launcher.acceptHeld) return;
+            if (confirmingAction() || (launcherPage() || launcherAction()) && launcher.acceptHeld) return;
             if (editingString()) { stringEditor.save(frame); return; }
             if (bindingBusy() || searching() || inputCoolingDown()) return;
             if (captureRow) { confirmBinding(); return; }
@@ -889,6 +900,11 @@ package
             else setStatus(result ? result.error : tr("errors.save"), true);
             requestedRefresh = true;
         }
+        private function launcherAction():Boolean
+        {
+            var row:Object = current();
+            return Boolean(modID && row && row.type == "action" && row.launcher);
+        }
         private function beginAction(row:Object):void
         {
             if (!row.confirmation) { invokeAction(row); return; }
@@ -903,6 +919,10 @@ package
         }
         private function invokeAction(row:Object):void
         {
+            if (row.launcher) {
+                launcher.launch({mod:row.mod, key:row.launcher, title:row.title});
+                syncInput(); return;
+            }
             var result:Object = BGSCodeObj.invokeAction(row.mod, row.key);
             // Refresh from the service, including handlers which completed immediately.
             refresh();
@@ -1068,7 +1088,7 @@ package
             if (input == "Accept") actionAcceptHeld = pressed;
             if (modalBusy() || searching()) { modalInput(input, pressed, event); return; }
             if (!pressed) {
-                if (input == "Accept" && (nav.focused || launcherPage())) {
+                if (input == "Accept" && (nav.focused || launcherPage() || launcherAction())) {
                     routeNavigation(input, false); event.stopImmediatePropagation(); event.preventDefault(); return;
                 }
                 if (inputCoolingDown() || input == "Accept") event.stopImmediatePropagation();
@@ -1113,7 +1133,7 @@ package
                 if (pressed && name == "Left") focusNav(true);
                 return true;
             }
-            if (launcherPage() && name == "Accept") { launcher.accept(pressed); return true; }
+            if ((launcherPage() || launcherAction()) && name == "Accept") { launcher.accept(pressed); return true; }
             if (launcherPage() && navigateLauncher(name, pressed)) return true;
             if (homePage() && launcher.hasEntries && name == "Up" && options.selectedIndex <= 0) {
                 if (pressed && navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }

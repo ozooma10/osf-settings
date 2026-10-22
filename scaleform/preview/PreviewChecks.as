@@ -44,6 +44,8 @@ package
         private var panelWrites:int = 0;
         private var panelActions:int = 0;
         private var panelBaseline:int = 0;
+        private var modPageRows:Function;
+        private var launchedInterface:String = "";
 
         public function PreviewChecks(movie:MovieClip, bindings:Boolean = false, screenshots:Boolean = false)
         {
@@ -753,7 +755,34 @@ package
                     userEvent("Right");
                     MovieClip(list.FindClipForEntry(1)).dispatchEvent(new MouseEvent(MouseEvent.MOUSE_OVER, true));
                     require(list.selectedIndex == 1, "pooled rows restore vanilla hover selection on Home");
-                    list.selectedIndex = 0; step = 79; break;
+                    list.selectedIndex = 0;
+                    modPageRows = Object(menu).BGSCodeObj.getRows;
+                    Object(menu).BGSCodeObj.getRows = function():Array {
+                        return modPageRows().concat({type:"launcher", mod:"design-preview", modTitle:"Design Preview", key:"studio",
+                            title:"Open studio", hint:"Open this mod's interface.", recentOrder:0, editable:true, message:""});
+                    };
+                    Object(menu).BGSCodeObj.revision = function():String { return "mod-interface"; };
+                    step = 222; break;
+                case 222: break;
+                case 223:
+                    list.selectedIndex = 0; userEvent("Accept"); break;
+                case 224:
+                    var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(list.entryCount == 21 && list.GetDataForEntry(0).row.title == localization.text("home.interfaces") &&
+                        list.GetDataForEntry(1).row.key == "@launcher/studio" && list.GetDataForEntry(1).row.actionState == localization.text("buttons.open") &&
+                        list.GetDataForEntry(2).row.type == "section", "a mod's full page leads with its own interfaces");
+                    Object(menu).BGSCodeObj.launch = function(mod:String, id:String):int { launchedInterface = mod + "/" + id; return 0; };
+                    list.selectedIndex = 1;
+                    Object(menu).ProcessUserEvent("Accept", true);
+                    require(launchedInterface == "", "a mod page interface waits for Accept release");
+                    Object(menu).ProcessUserEvent("Accept", false); break;
+                case 225:
+                    require(launchedInterface == "design-preview/studio", "a mod page Open button launches its interface");
+                    Object(menu).BGSCodeObj.getRows = modPageRows;
+                    Object(menu).BGSCodeObj.revision = function():String { return "mod-interface-removed"; };
+                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
+                case 226:
+                    userEvent("Right"); list.selectedIndex = 0; step = 79; break;
                 case 79:
                     Object(menu).BGSCodeObj.launch = function(mod:String, id:String):int { return 2; };
                     Object(menu).BGSCodeObj.pollLaunch = function():Object { return {state:launchState, message:"Preview launch failed"}; };
@@ -803,6 +832,9 @@ package
             if (step == 200) return indexOf("panelNumber") >= 0;
             if (step == 209) return list.entryCount && list.GetDataForEntry(0).row.previewGeneration == 2;
             if (step == 211) return list.entryCount && list.GetDataForEntry(0).row.previewGeneration == 3;
+            if (step == 223) return launcher.count == 11;
+            if (step == 224) return list.entryCount == 21;
+            if (step == 226) return launcher.visible && launcher.count == 10;
             if (step == 212) return list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview" &&
                 list.selectedEntry.row.summary == "13 SETTINGS  |  2 ACTIONS";
             return true;

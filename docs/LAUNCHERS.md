@@ -2,6 +2,8 @@
 
 Add launch cards for your menus to the **Home** tab, above the mod settings list. Declare native menus in your schema, or register a C++ callback to open custom interfaces such as ImGui or WebView overlays.
 
+If your mod also has settings, its page lists the same launchers as **Open** buttons under an Interfaces header, above its first group. You don't need to declare anything extra.
+
 ## Schema
 
 Add a `menus` object keyed by ID to `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json`:
