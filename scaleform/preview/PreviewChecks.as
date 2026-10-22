@@ -1102,6 +1102,19 @@ package
             require(policy.filter(joined,"shoulder", "all",256).length == 1 && policy.filter(joined,"triangle", "all",32768).length == 1,
                 "controller names and both chord members are searchable");
             require(!policy.includes(joined[0].records[0],256), "controller modifier cannot match a keyboard filter");
+            // This menu's own key leads the list however Controls orders it.
+            var pinned:Array = policy.join(
+                [{sInputName:"vanilla",uContextID:0,bGamepadEntry:false,bIsDivider:false,bReadOnly:false,bRequired:false,
+                    MainBinding:{aPCKeyName:["E"],aButtonName:[]},AltBinding:{aPCKeyName:[],aButtonName:[]}},
+                 {sInputName:"osfsettings/openMenu",uContextID:0,bGamepadEntry:false,bIsDivider:false,bReadOnly:false,bRequired:false,
+                    MainBinding:{aPCKeyName:["F10"],aButtonName:[]},AltBinding:{aPCKeyName:[],aButtonName:[]}}],
+                [{type:"hotkey",action:"osfsettings/openMenu",registered:true,mod:policy.SELF_MOD,key:policy.OPEN_MENU,
+                    title:"Open mod settings",modTitle:"OSF Settings"}],
+                [{action:"vanilla",context:0,device:0,slot:0,key:69,modifier:255},
+                 {action:"osfsettings/openMenu",context:0,device:0,slot:0,key:121,modifier:255}],
+                function(row:Object):String { return "Native"; });
+            require(pinned.length == 2 && pinned[0].mod == policy.SELF_MOD && pinned[0].key == policy.OPEN_MENU &&
+                pinned[1].source == "Game", "the key that opens this menu leads the bindings list");
         }
         private function findInput(container:DisplayObjectContainer):TextField
         {

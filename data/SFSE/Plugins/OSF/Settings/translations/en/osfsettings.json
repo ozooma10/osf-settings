@@ -41,6 +41,7 @@
     "home.emptyTitle": "No mods use OSF Settings yet",
     "home.emptyBody": "Mods that support OSF Settings add their settings, hotkeys and menus here. Install one, then restart Starfield.",
     "home.opensMenu": "OPENS THIS MENU",
+    "home.opensMenuHint": "{key}  OPENS THIS MENU",
     "home.changeInKeybindings": "CHANGE IN KEYBINDINGS",
     "home.moreHotkeys": "+{count} MORE IN KEYBINDINGS",
     "menu.keybindings": "KEYBINDINGS",
