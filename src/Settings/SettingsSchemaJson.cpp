@@ -156,16 +156,29 @@ namespace OSFSettings::SettingsJson
                 Require(RequiredText(document, "id") == mod.id, "schema id must match the filename stem");
             }
             mod.page = mod.id; // Resolved against the other schemas once they have all loaded.
-            if (document.contains("extends")) {
-                mod.extends = RequiredText(document, "extends");
+            if (const auto extends = document.find("extends"); extends != document.end()) {
+                // A string names a required host; the object form can make the host optional.
+                if (extends->is_object()) {
+                    mod.extends = RequiredText(*extends, "mod");
+                    if (const auto optional = extends->find("optional"); optional != extends->end()) {
+                        Require(optional->is_boolean(), "extends optional must be a boolean");
+                        mod.extendsOptional = optional->get<bool>();
+                    }
+                } else {
+                    mod.extends = RequiredText(document, "extends");
+                }
                 Require(IsValidModId(mod.extends), "extends must name a settings mod id: " + mod.extends);
                 Require(mod.extends != "internal", "extends must not name the reserved mod id 'internal'");
                 Require(mod.extends != mod.id, "extends must not name the schema's own mod id");
             }
             mod.dependencies = ReadDependencies(document);
             // Extending a page needs the host installed, so report it like any other dependency.
-            if (!mod.extends.empty()) mod.dependencies.emplace(mod.extends, SettingsVersion{});
-            if (dependencies) *dependencies = mod.dependencies;
+            if (!mod.extends.empty() && !mod.extendsOptional) mod.dependencies.emplace(mod.extends, SettingsVersion{});
+            if (dependencies) {
+                *dependencies = mod.dependencies;
+                // A schema that failed to load joins no page, so an optional host is never missing for it.
+                if (mod.extendsOptional) dependencies->erase(mod.extends);
+            }
             Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
             const auto version = document.find("schemaVersion");
             Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");

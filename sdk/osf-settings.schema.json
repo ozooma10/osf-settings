@@ -43,8 +43,21 @@
       "additionalProperties": { "$ref": "#/definitions/version" }
     },
     "extends": {
-      "allOf": [{ "$ref": "#/definitions/modId" }],
-      "description": "Settings mod ID whose page shows this mod's controls. Values, actions and hotkeys stay owned by this mod, and the host is treated as a dependency. Must not be this schema's own ID."
+      "description": "Settings mod ID whose page shows this mod's controls. Values, actions and hotkeys stay owned by this mod, and the host is treated as a dependency. Must not be this schema's own ID. The object form with optional: true instead hides this mod while the host is not installed, without reporting it.",
+      "oneOf": [
+        { "$ref": "#/definitions/modId" },
+        {
+          "type": "object",
+          "required": ["mod"],
+          "properties": {
+            "mod": { "$ref": "#/definitions/modId" },
+            "optional": {
+              "type": "boolean",
+              "description": "When true, a missing host hides this mod's controls, hotkeys and launchers instead of reporting a missing dependency."
+            }
+          }
+        }
+      ]
     },
     "groups": {
       "type": "object",

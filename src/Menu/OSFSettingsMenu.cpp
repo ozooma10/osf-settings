@@ -522,12 +522,13 @@ namespace OSFSettings
                 }
             }
             for (const auto& destination : LauncherService::Get().Snapshot()) {
+                const auto owner = std::ranges::find(schemas, destination.mod, [](const ModSchema* schema) -> const std::string& { return schema->id; });
+                if (owner != schemas.end() && (*owner)->hidden) continue;
                 RE::Scaleform::GFx::Value row;
                 root->CreateObject(&row);
                 Text(row, "mod", destination.mod);
                 Text(row, "modTitle", destination.modTitle);
                 // An extension's interfaces open from the page its settings joined.
-                const auto owner = std::ranges::find(schemas, destination.mod, [](const ModSchema* schema) -> const std::string& { return schema->id; });
                 const auto page = owner != schemas.end() ? std::ranges::find(schemas, (*owner)->page,
                     [](const ModSchema* schema) -> const std::string& { return schema->id; }) : schemas.end();
                 Text(row, "page", page != schemas.end() ? (*page)->id : destination.mod);

@@ -192,10 +192,10 @@ See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../e
 
 ## Extend another mod's page
 
-A mod that builds on another mod can put its settings on that mod's page instead of a page of
-its own. Add a root `extends` naming the host's mod ID:
+A mod that builds on another mod can put its settings on that mod's page instead of a page of its own. Add a root `extends` naming the host's mod ID:
 
 ```json
+//Starfield/OSF/Settings/basemod_combatextras.json
 {
   "title": "Base Mod - Combat Extras",
   "extends": "basemod",
@@ -207,21 +207,20 @@ its own. Add a root `extends` naming the host's mod ID:
 }
 ```
 
-Only the page changes. Your mod ID is still your filename, your values still live in
-`<modId>.json`, and every API call uses your own ID: `GetFloat("basemod-combat", "recoil")`.
-The host never sees your keys, and `ResetMod` on either mod leaves the other alone. Actions and
-hotkeys work unchanged, because handlers are already registered per mod and action ID.
+Only the page changes, Your mod ID is still your filename, your values still live in `<modId>.json`, and use your own ID in API calls: `GetFloat("basemod_combatextras", "recoil")`.
 
-A group whose name matches one of the host's groups is appended to it and shows the host's
-heading; names are compared exactly. Any other group becomes a new group on the page, after the
-host's own, and its heading names your mod so players can see where the controls came from.
-Contributions are ordered by mod ID, so related add-ons sort predictably when you name them
-after the base mod. Rows you contribute are also labelled with your mod in the details pane.
+`extends` makes the host a dependency: if it is not installed, your settings appear on their own page and Mod Issues reports the host as missing.
+Add an explicit `dependencies` entry when you need a minimum version instead. A mod cannot extend itself, and a loop of mods extending each other leaves each on its own page with an issue reported.
 
-`extends` makes the host a dependency: if it is not installed, your settings appear on their own
-page and Mod Issues reports the host as missing. Add an explicit `dependencies` entry when you
-need a minimum version instead. A mod cannot extend itself, and a loop of mods extending each
-other leaves each on its own page with an issue reported.
+### Optional integrations
+
+For settings that only matter when the host is installed, make the host optional:
+
+```json
+"extends": { "mod": "basemod", "optional": true }
+```
+
+With the host installed this behaves exactly like `"extends": "basemod"`. Without it, nothing is reported and your mod is hidden. Your schema still loads, so `Get*`/`Set*` calls keep working and saved values are kept. 
 
 ## Action buttons
 

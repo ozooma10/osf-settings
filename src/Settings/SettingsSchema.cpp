@@ -140,7 +140,8 @@ namespace OSFSettings
         };
         for (auto* schema : schemas) {
             schema->page = schema->id;
-            if (schema->extends.empty()) continue;
+            schema->hidden = schema->extendsOptional && !find(schema->extends);
+            if (schema->extends.empty() || schema->hidden) continue;
             auto page = schema->extends;
             for (int hop = 0; hop < MaxPageDepth; ++hop) {
                 const auto* host = find(page);
@@ -159,15 +160,15 @@ namespace OSFSettings
         std::vector<std::size_t> order;
         order.reserve(schemas.size());
         for (std::size_t index = 0; index < schemas.size(); ++index) {
-            if (schemas[index]->page != schemas[index]->id) continue;
+            if (schemas[index]->hidden || schemas[index]->page != schemas[index]->id) continue;
             order.push_back(index);
             for (std::size_t other = 0; other < schemas.size(); ++other) {
-                if (other != index && schemas[other]->page == schemas[index]->id) order.push_back(other);
+                if (other != index && !schemas[other]->hidden && schemas[other]->page == schemas[index]->id) order.push_back(other);
             }
         }
         // A page that resolved to a schema outside this set would otherwise lose its rows.
         for (std::size_t index = 0; index < schemas.size(); ++index) {
-            if (!std::ranges::contains(order, index)) order.push_back(index);
+            if (!schemas[index]->hidden && !std::ranges::contains(order, index)) order.push_back(index);
         }
         return order;
     }

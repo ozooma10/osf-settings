@@ -104,6 +104,49 @@ int TestExtensionPages()
     check(ExtensionIssues(resolved).empty() && DependencyIssues(resolved).empty(),
         "an installed host produces no reports at all");
 
+    // An optional host is not a dependency; without it the extension is hidden and nothing is reported.
+    auto optionalJoins = joins;
+    optionalJoins["extends"] = {{ "mod", "basemod" }, { "optional", true }};
+    const auto optional = parse(optionalJoins, "basemod-combat");
+    check(optional.extends == "basemod" && optional.extendsOptional && optional.dependencies.empty(),
+        "the object form parses an optional host without implying a dependency");
+    auto requiredObject = joins;
+    requiredObject["extends"] = {{ "mod", "basemod" }};
+    const auto required = parse(requiredObject, "basemod-combat");
+    check(!required.extendsOptional && required.dependencies.size() == 1, "the object form without optional is a required host");
+    for (const auto& bad : { Json::object(), Json{{ "mod", "basemod" }, { "optional", "yes" }}, Json{{ "mod", "basemod-combat" }} }) {
+        auto invalid = joins;
+        invalid["extends"] = bad;
+        check(!SettingsJson::ParseSchema(invalid, "basemod-combat", error), "invalid optional extends objects are rejected");
+    }
+    std::vector<ModSchema> missingHost{ optional, parse(host, "other") };
+    std::vector<ModSchema*> missingMutable{ &missingHost[0], &missingHost[1] };
+    ResolvePages(missingMutable);
+    const std::vector<const ModSchema*> missingSchemas{ &missingHost[0], &missingHost[1] };
+    check(missingHost[0].hidden && !missingHost[1].hidden && PageOrder(missingSchemas) == std::vector<std::size_t>{ 1 },
+        "an optional extension without its host is hidden from every page");
+    const std::vector<ModSettings> optionalAlone{ { .schema = missingHost[0] } };
+    check(ExtensionIssues(optionalAlone).empty() && DependencyIssues(optionalAlone).empty(),
+        "a missing optional host is not reported");
+    std::vector<ModSchema> presentHost{ parse(host, "basemod"), optional };
+    std::vector<ModSchema*> presentMutable{ &presentHost[0], &presentHost[1] };
+    ResolvePages(presentMutable);
+    check(!presentHost[1].hidden && presentHost[1].page == "basemod", "an installed optional host is joined like a required one");
+    auto optionalFloor = optionalJoins;
+    optionalFloor["dependencies"] = {{ "basemod", "2.0.0" }};
+    auto oldHost = parse(host, "basemod");
+    oldHost.version = SettingsVersion::Parse("1.0.0");
+    const std::vector<ModSettings> floorMissing{ { .schema = parse(optionalFloor, "basemod-combat") } };
+    check(DependencyIssues(floorMissing).empty(), "a version floor on a missing optional host is not reported");
+    const std::vector<ModSettings> floorOld{ { .schema = oldHost }, { .schema = parse(optionalFloor, "basemod-combat") } };
+    auto outdated = DependencyIssues(floorOld);
+    check(outdated.size() == 1 && outdated[0].requiredVersion == "2.0.0", "an installed optional host below its floor is reported");
+    DependencyVersions failedDependencies;
+    auto failing = optionalFloor;
+    failing["groups"] = Json::array();
+    check(!SettingsJson::ParseSchema(failing, "basemod-combat", error, &failedDependencies) && failedDependencies.empty(),
+        "a failed schema does not report its optional host");
+
     namespace fs = std::filesystem;
     const auto root = fs::temp_directory_path() /
         ("osf-extensions-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));

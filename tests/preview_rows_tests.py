@@ -158,6 +158,17 @@ class PreviewRowsTests(unittest.TestCase):
         self.assertEqual([row["page"] for row in rows], ["basemod-combat"])
         self.assertEqual([row["groupSource"] for row in rows], [""])
 
+    def test_optional_extends_without_host_is_hidden(self):
+        toggle = [{"key": "toggle", "type": "bool", "default": True}]
+        result = self.export_all([
+            ("other", {"title": "Other", "groups": {"General": toggle}}),
+            ("basemod-combat", {"title": "Combat Extras", "extends": {"mod": "basemod", "optional": True},
+                                "groups": {"Extras": toggle}}),
+        ])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = json.loads(result.stdout)["rows"]
+        self.assertEqual([row["mod"] for row in rows], ["other"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -125,7 +125,9 @@ namespace OSFSettings
         std::uint32_t nexusModId{};
         DependencyVersions dependencies; // Minimum versions keyed by settings mod id.
         std::string extends; // Settings mod id whose page shows this mod's controls; empty means its own.
+        bool extendsOptional{}; // The host may be absent; this mod is then hidden instead of reported.
         std::string page; // Resolved page owner; equals id unless extends resolved to another mod.
+        bool hidden{}; // Resolved: an optional extension whose host is not installed shows nowhere.
         SettingDefinition* FindSetting(std::string_view key);
         const SettingDefinition* FindSetting(std::string_view key) const;
         ActionDefinition* FindAction(std::string_view actionId);
@@ -144,12 +146,12 @@ namespace OSFSettings
     GroupFraming FrameGroup(std::span<const ModSchema* const> schemas, const ModSchema& mod, const SettingsGroup& group);
     // Longest chain of extends links followed before a page is treated as unresolvable.
     inline constexpr int MaxPageDepth = 8;
-    // Points each schema's page at the mod whose page shows its controls, following extends to the
-    // first schema that does not extend another. A missing host, a cycle or a longer chain keeps
-    // the schema on its own page; both cases are reported as issues rather than failing the load.
+    // Points each schema's page at the mod whose page shows its controls, following extends to the first schema that does not extend another. 
+    // A missing host, a cycle or a longer chain keeps the schema on its own page; both cases are reported as issues rather than failing the load.
+    // An optional extension whose host is missing is hidden instead, and nothing is reported.
     void ResolvePages(std::span<ModSchema* const> schemas);
-    // Indexes into schemas in load order, with each page owner followed by its contributors, so a
-    // page's own groups always come before the ones another mod added to it.
+    // Indexes into schemas in load order, with each page owner followed by its contributors, so a page's own groups always come before the ones another mod added to it. 
+    // Hidden schemas are left out.
     std::vector<std::size_t> PageOrder(std::span<const ModSchema* const> schemas);
 
     struct ModSettings

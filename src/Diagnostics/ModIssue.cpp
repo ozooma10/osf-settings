@@ -87,10 +87,16 @@ namespace OSFSettings
 
     std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings, std::span<const SettingsLoadError> errors)
     {
-        std::map<std::string, std::vector<std::pair<std::string, SettingsVersion>>> consumers;
+        struct Consumer
+        {
+            std::string name;
+            SettingsVersion minimum;
+            bool optional{}; // Only an installed provider is checked against the minimum.
+        };
+        std::map<std::string, std::vector<Consumer>> consumers;
         for (const auto& mod : settings) {
             for (const auto& [id, minimum] : mod.schema.dependencies) {
-                consumers[id].emplace_back(DisplayName(mod.schema), minimum);
+                consumers[id].push_back({ DisplayName(mod.schema), minimum, mod.schema.extendsOptional && id == mod.schema.extends });
             }
         }
         for (const auto& error : errors) {
@@ -98,7 +104,7 @@ namespace OSFSettings
             const auto name = error.file.filename().u8string();
             const std::string file(reinterpret_cast<const char*>(name.data()), name.size());
             for (const auto& [id, minimum] : error.dependencies) {
-                consumers[id].emplace_back(file, minimum);
+                consumers[id].push_back({ file, minimum });
             }
         }
 
@@ -110,8 +116,8 @@ namespace OSFSettings
             if (installed && !provider->schema.version) continue;
             std::optional<SettingsVersion> highest;
             std::vector<std::string> affected;
-            for (const auto& [name, minimum] : wanted) {
-                if (installed && minimum <= *provider->schema.version) continue;
+            for (const auto& [name, minimum, optional] : wanted) {
+                if (installed ? minimum <= *provider->schema.version : optional) continue;
                 highest = std::max(highest.value_or(minimum), minimum);
                 affected.push_back(name);
             }
