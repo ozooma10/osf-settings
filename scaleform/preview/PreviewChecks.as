@@ -426,6 +426,7 @@ package
                 case 53:
                     var issueCount:int = Object(menu).BGSCodeObj.getIssues().length;
                     require(issueCount > 0 && list.entryCount == issueCount, "all fixture reports appear on the issues page");
+                    checkIssueVersions();
                     requireGlyphs("Issues: " + issueCount);
                     userEvent("Right");
                     capture("issues");
@@ -1051,6 +1052,62 @@ package
                 }
             }
             return null;
+        }
+        private function checkIssueVersions():void
+        {
+            var panel:Object = findNamed(menu,"issueDetails");
+            var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+            var cases:Array = [
+                {name:"short", installed:"2.0.0", required:"2.1.0"},
+                {name:"missing", installed:"", required:"1.2.0"},
+                {name:"long", installed:"1.16.244", required:"1.16.255"},
+                {name:"maximum", installed:"65534.65535.65535", required:"65535.65535.65535"},
+                {name:"translated", installed:"", required:"1.2.0"}
+            ];
+            try {
+                for each (var sample:Object in cases) {
+                    if (sample.name == "translated") localization.initialize({
+                        "issues.installedVersion":"Installed version on this computer",
+                        "issues.requiredVersion":"Minimum version requested by the mods in this installation",
+                        "issues.notInstalled":"This dependency has not been installed on this computer"
+                    });
+                    panel.show({mod:"osfsettings", id:"version-" + sample.name, modTitle:"OSF Settings", severity:"WARNING",
+                        title:"Dependency version comparison", installedVersion:sample.installed, requiredVersion:sample.required});
+                    var viewport:DisplayObjectContainer = DisplayObjectContainer(panel).getChildAt(0) as DisplayObjectContainer;
+                    var content:DisplayObjectContainer = viewport.getChildAt(0) as DisplayObjectContainer;
+                    var have:TextField = findText(content,sample.installed || localization.text("issues.notInstalled"));
+                    var need:TextField = findText(content,sample.required);
+                    var haveLabel:TextField = findText(content,localization.text("issues.installedVersion"));
+                    var needLabel:TextField = findText(content,localization.text("issues.requiredVersion"));
+                    require(have && need && haveLabel && needLabel, "version card preserves complete text: " + sample.name);
+                    var fields:Array = [haveLabel, have, needLabel, need];
+                    for (var i:int = 0; i < fields.length; ++i) {
+                        var field:TextField = fields[i];
+                        var bounds:Rectangle = field.getBounds(content);
+                        require(bounds.left >= 0 && bounds.right <= viewport.scrollRect.width &&
+                            field.textWidth <= field.width && field.textHeight <= field.height - 4,
+                            "version card text fits its viewport and field: " + sample.name + "/" + i);
+                        for (var j:int = 0; j < i; ++j) {
+                            var other:TextField = fields[j];
+                            var otherBounds:Rectangle = other.getBounds(content);
+                            // Flash rounds display bounds to twentieths of a pixel.
+                            require(bounds.right <= otherBounds.left + 0.1 || bounds.left >= otherBounds.right - 0.1 ||
+                                bounds.bottom <= otherBounds.top + 0.1 || bounds.top >= otherBounds.bottom - 0.1,
+                                "version labels and values do not overlap: " + sample.name);
+                        }
+                    }
+                    require(need.numLines == 1 && (!sample.installed || have.numLines == 1), "version numbers remain on one line: " + sample.name);
+                    if (sample.name == "short") require(have.y == need.y, "short versions retain the side-by-side layout");
+                    if (sample.name == "long" || sample.name == "maximum") {
+                        require(needLabel.y >= have.y + have.height, "long versions use separate rows: " + sample.name);
+                        capture("issue-version-" + sample.name);
+                    }
+                    if (sample.name == "translated") capture("issue-version-translated");
+                }
+            } finally {
+                localization.initialize(null);
+                panel.show(list.selectedEntry.row);
+            }
         }
         private function buttonFill(button:DisplayObject):uint
         {

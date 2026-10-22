@@ -105,7 +105,7 @@ package
             scroll(0);
         }
 
-        // Installed and required versions side by side, so the gap reads at a glance.
+        // Short versions share a row; longer versions and translations use the full width.
         private function versions(row:Object):void
         {
             var top:Number = extent, inset:Number = 20, big:Number = MenuStyle.DETAIL_TITLE_SIZE + 30;
@@ -116,17 +116,51 @@ package
             var arrow:Number = Math.max(haveLabel.x + haveLabel.width, have.x + have.width) + 18;
             var needLabel:TextField = textAt(tr("issues.requiredVersion"), arrow + 62, top + 16, IssueStyle.WARNING);
             var need:TextField = textAt(row.requiredVersion, needLabel.x, 0, IssueStyle.WARNING, big);
-            // Align the numbers on their bottoms when "not installed" uses smaller text.
-            var bottom:Number = haveLabel.y + haveLabel.height + Math.max(have.height, need.height);
-            have.y = bottom - have.height; need.y = bottom - need.height;
+            var stacked:Boolean = need.x + Math.max(need.width, needLabel.width) > TEXT_WIDTH - inset;
+            var bottom:Number;
+            if (stacked) {
+                var width:Number = TEXT_WIDTH - 2 * inset;
+                wrapVersionText(haveLabel, width); wrapVersionText(needLabel, width);
+                if (installed) fitVersion(have, width);
+                else wrapVersionText(have, width);
+                fitVersion(need, width);
+                have.y = haveLabel.y + haveLabel.height;
+                needLabel.x = need.x = inset;
+                needLabel.y = have.y + have.height + 16;
+                need.y = needLabel.y + needLabel.height;
+                bottom = need.y + need.height;
+            } else {
+                // Align the numbers on their bottoms when "not installed" uses smaller text.
+                bottom = top + 16 + Math.max(haveLabel.height, needLabel.height) + Math.max(have.height, need.height);
+                have.y = bottom - have.height; need.y = bottom - need.height;
+            }
             var height:Number = bottom + 14 - top;
             content.graphics.beginFill(0x0E1B23); content.graphics.drawRect(0, top, TEXT_WIDTH, height); content.graphics.endFill();
-            var middle:Number = bottom - need.height / 2;
-            content.graphics.lineStyle(2, MenuStyle.MUTED);
-            content.graphics.moveTo(arrow, middle); content.graphics.lineTo(arrow + 42, middle);
-            content.graphics.moveTo(arrow + 32, middle - 10); content.graphics.lineTo(arrow + 42, middle);
-            content.graphics.lineTo(arrow + 32, middle + 10); content.graphics.lineStyle();
+            if (!stacked) {
+                var middle:Number = bottom - need.height / 2;
+                content.graphics.lineStyle(2, MenuStyle.MUTED);
+                content.graphics.moveTo(arrow, middle); content.graphics.lineTo(arrow + 42, middle);
+                content.graphics.moveTo(arrow + 32, middle - 10); content.graphics.lineTo(arrow + 42, middle);
+                content.graphics.lineTo(arrow + 32, middle + 10); content.graphics.lineStyle();
+            }
             extent += height + 20;
+        }
+
+        private function wrapVersionText(field:TextField, width:Number):void
+        {
+            field.width = width; field.multiline = field.wordWrap = true;
+            field.height = field.textHeight + 6;
+        }
+
+        // Preserve every digit, including the maximum 65535.65535.65535 version.
+        private function fitVersion(field:TextField, width:Number):void
+        {
+            if (field.width > width) {
+                var format:TextFormat = field.defaultTextFormat;
+                format.size = Math.floor(Number(format.size) * (width - 8) / field.textWidth);
+                field.defaultTextFormat = format; field.setTextFormat(format);
+                field.width = width; field.height = field.textHeight + 6;
+            }
         }
 
         // A prominent, clickable twin of the footer's Open mod page control.
