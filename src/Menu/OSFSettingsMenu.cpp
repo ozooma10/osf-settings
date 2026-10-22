@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <format>
 #include <Windows.h>
 #undef ERROR
 #include "RE/U/UI.h"
@@ -30,6 +31,23 @@ namespace OSFSettings
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
             RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset, GetGameplaySources,
             CommitGameplayChange };
+        // Movie-callable names and the dispatch id each one carries into Call.
+        constexpr std::pair<const char*, Function> kMovieFunctions[]{
+            { "getLocalization", Function::GetLocalization }, { "getRows", Function::GetRows },
+            { "getGameplaySources", Function::GetGameplaySources }, { "commitGameplayChange", Function::CommitGameplayChange },
+            { "getIssues", Function::GetIssues }, { "openIssueModPage", Function::OpenIssueModPage },
+            { "invokeAction", Function::InvokeAction }, { "revision", Function::Revision },
+            { "launch", Function::Launch }, { "pollLaunch", Function::PollLaunch },
+            { "requestBindings", Function::RequestBindings }, { "pollBindings", Function::PollBindings },
+            { "textInput", Function::TextInput },
+            { "setBool", Function::SetBool }, { "setInt", Function::SetInt }, { "setFloat", Function::SetFloat },
+            { "setEnum", Function::SetEnum }, { "setString", Function::SetString }, { "setKey", Function::SetKey },
+            { "reset", Function::Reset },
+            { "beginKeyCapture", Function::BeginKeyCapture }, { "pollKeyCapture", Function::PollKeyCapture },
+            { "commitKeyCapture", Function::CommitKeyCapture }, { "cancelKeyCapture", Function::CancelKeyCapture },
+            { "beginNativeBinding", Function::BeginNativeBinding }, { "endNativeBinding", Function::EndNativeBinding },
+            { "close", Function::Close }, { "startup", Function::Startup }, { "startupFailed", Function::StartupFailed },
+        };
         // Bound the loading card's wait; expiry invalidates the request.
         constexpr auto kOpenTimeout = std::chrono::seconds(30);
         // Official Gameplay Option owners on 1.16.244; labels and filename prefixes are not ownership.
@@ -116,35 +134,9 @@ namespace OSFSettings
 
     void OSFSettingsMenu::MapCodeObjectFunctions()
     {
-        RegisterNativeFunction("getLocalization", static_cast<std::uint64_t>(Function::GetLocalization));
-        RegisterNativeFunction("getRows", static_cast<std::uint64_t>(Function::GetRows));
-        RegisterNativeFunction("getGameplaySources", static_cast<std::uint64_t>(Function::GetGameplaySources));
-        RegisterNativeFunction("commitGameplayChange", static_cast<std::uint64_t>(Function::CommitGameplayChange));
-        RegisterNativeFunction("getIssues", static_cast<std::uint64_t>(Function::GetIssues));
-        RegisterNativeFunction("openIssueModPage", static_cast<std::uint64_t>(Function::OpenIssueModPage));
-        RegisterNativeFunction("invokeAction", static_cast<std::uint64_t>(Function::InvokeAction));
-        RegisterNativeFunction("revision", static_cast<std::uint64_t>(Function::Revision));
-        RegisterNativeFunction("launch", static_cast<std::uint64_t>(Function::Launch));
-        RegisterNativeFunction("pollLaunch", static_cast<std::uint64_t>(Function::PollLaunch));
-        RegisterNativeFunction("requestBindings", static_cast<std::uint64_t>(Function::RequestBindings));
-        RegisterNativeFunction("pollBindings", static_cast<std::uint64_t>(Function::PollBindings));
-        RegisterNativeFunction("textInput", static_cast<std::uint64_t>(Function::TextInput));
-        RegisterNativeFunction("setBool", static_cast<std::uint64_t>(Function::SetBool));
-        RegisterNativeFunction("setInt", static_cast<std::uint64_t>(Function::SetInt));
-        RegisterNativeFunction("setFloat", static_cast<std::uint64_t>(Function::SetFloat));
-        RegisterNativeFunction("setEnum", static_cast<std::uint64_t>(Function::SetEnum));
-        RegisterNativeFunction("setString", static_cast<std::uint64_t>(Function::SetString));
-        RegisterNativeFunction("setKey", static_cast<std::uint64_t>(Function::SetKey));
-        RegisterNativeFunction("reset", static_cast<std::uint64_t>(Function::Reset));
-        RegisterNativeFunction("beginKeyCapture", static_cast<std::uint64_t>(Function::BeginKeyCapture));
-        RegisterNativeFunction("pollKeyCapture", static_cast<std::uint64_t>(Function::PollKeyCapture));
-        RegisterNativeFunction("commitKeyCapture", static_cast<std::uint64_t>(Function::CommitKeyCapture));
-        RegisterNativeFunction("cancelKeyCapture", static_cast<std::uint64_t>(Function::CancelKeyCapture));
-        RegisterNativeFunction("beginNativeBinding", static_cast<std::uint64_t>(Function::BeginNativeBinding));
-        RegisterNativeFunction("endNativeBinding", static_cast<std::uint64_t>(Function::EndNativeBinding));
-        RegisterNativeFunction("close", static_cast<std::uint64_t>(Function::Close));
-        RegisterNativeFunction("startup", static_cast<std::uint64_t>(Function::Startup));
-        RegisterNativeFunction("startupFailed", static_cast<std::uint64_t>(Function::StartupFailed));
+        for (const auto& [name, function] : kMovieFunctions) {
+            RegisterNativeFunction(name, static_cast<std::uint64_t>(function));
+        }
         TestHarness::RegisterMenuFunctions(*this);
     }
 
@@ -161,7 +153,6 @@ namespace OSFSettings
         
         auto* root = params.movie->asMovieRoot.get();
         const auto function = static_cast<Function>(reinterpret_cast<std::uintptr_t>(params.userData));
-        auto& runtime = Runtime::Get();
         switch (function) {
         case Function::Launch: {
             // 0 = rejected, 1 = closing (handoff queued), 2 = loading (pollLaunch reports the outcome).
@@ -223,9 +214,8 @@ namespace OSFSettings
             break;
         }
         case Function::Revision:
-            root->CreateString(params.ret, (std::to_string(SettingsService::Get().Revision()) + ":" + std::to_string(ActionService::Get().Revision()) + ":" +
-                std::to_string(LauncherService::Get().Revision()) + ":" +
-                std::to_string(DiagnosticsService::Get().Revision())).c_str());
+            root->CreateString(params.ret, std::format("{}:{}:{}:{}", SettingsService::Get().Revision(), ActionService::Get().Revision(),
+                LauncherService::Get().Revision(), DiagnosticsService::Get().Revision()).c_str());
             break;
         case Function::InvokeAction: {
             ActionService::Invocation invocation{};
@@ -316,7 +306,7 @@ namespace OSFSettings
         case Function::CommitKeyCapture: {
             const auto snapshot = m_capture.GetSnapshot();
             const bool canSaveBinding = snapshot.selectedKeyReleased && (snapshot.state == KeyCapture::State::KeySelected || snapshot.state == KeyCapture::State::ConfirmationRequested);
-            const bool ok = canSaveBinding && runtime.SetValue(m_captureMod, m_captureKey, KeyBinding{ snapshot.selectedKeyCode }) == SettingsError::None;
+            const bool ok = canSaveBinding && Runtime::SetValue(m_captureMod, m_captureKey, KeyBinding{ snapshot.selectedKeyCode }) == SettingsError::None;
             if (ok) m_capture.EndCapture();
             else m_capture.RetryConfirmation();
             root->CreateObject(params.ret);
@@ -349,7 +339,7 @@ namespace OSFSettings
         }
         case Function::GetIssues: {
             const auto issues = DiagnosticsService::Get().Snapshot();
-            const auto settings = runtime.Settings();
+            const auto settings = Runtime::Settings();
             root->CreateArray(params.ret);
             for (const auto& issue : issues) {
                 RE::Scaleform::GFx::Value row;
@@ -433,7 +423,7 @@ namespace OSFSettings
                 Text(row, "title", title);
                 return row;
             };
-            for (const auto& mod : runtime.Settings()) {
+            for (const auto& mod : Runtime::Settings()) {
                 for (const auto& group : mod.schema.groups) {
                     for (const auto& control : group.controls) {
                         if (const auto* action = std::get_if<ActionDefinition>(&control)) {
@@ -528,25 +518,25 @@ namespace OSFSettings
                 if (function == Function::Reset) {
                     result = SettingsService::Get().Reset(ArgString(params, 0), ArgString(params, 1));
                 } else if (function == Function::SetBool && params.args[2].IsBoolean()) {
-                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetBoolean());
+                    result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetBoolean());
                 } else if (function == Function::SetInt && params.args[2].IsString()) {
                     if (const auto value = ParseInteger(ArgString(params, 2))) {
-                        result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), *value);
+                        result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), *value);
                     }
                 } else if (function == Function::SetFloat && params.args[2].IsNumber()) {
-                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetNumber());
+                    result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), params.args[2].GetNumber());
                 } else if (function == Function::SetEnum && params.args[2].IsString()) {
-                    result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), EnumValue{ ArgString(params, 2) });
+                    result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), EnumValue{ ArgString(params, 2) });
                 } else if (function == Function::SetString && params.args[2].IsString() && params.args[3].IsNumber()) {
                     // GFx exposes a C string. The movie also supplies its UTF-8 byte count so embedded NUL cannot turn a rejected draft into a prefix.
                     auto text = ArgString(params, 2);
                     if (params.args[3].GetNumber() == static_cast<double>(text.size())) {
-                        result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), std::move(text));
+                        result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), std::move(text));
                     }
                 } else if (function == Function::SetKey && params.args[2].IsNumber()) {
                     const auto code = params.args[2].GetNumber();
                     if (std::isfinite(code) && code == std::floor(code) && code >= 0 && code <= KeyBinding::Unbound) {
-                        result = runtime.SetValue(ArgString(params, 0), ArgString(params, 1), KeyBinding{ static_cast<std::uint32_t>(code) });
+                        result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), KeyBinding{ static_cast<std::uint32_t>(code) });
                     }
                 }
             }
