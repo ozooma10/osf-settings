@@ -36,12 +36,18 @@ package
         private var issueOpenCount:int = 0;
         private var issueOpenResult:Boolean = true;
         private var openedIssue:String = "";
+        private var copiedIssues:Array = [];
+        private var originalIssueCopier:Function;
+        private var originalControlMap:Object;
+        private var issueButtonRestColor:uint;
         private var panelBridge:Object;
         private var panelRows:Array;
         private var panelGeneration:int = 0;
         private var panelWrites:int = 0;
         private var panelActions:int = 0;
         private var panelBaseline:int = 0;
+        private var modPageRows:Function;
+        private var launchedInterface:String = "";
 
         public function PreviewChecks(movie:MovieClip, bindings:Boolean = false, screenshots:Boolean = false)
         {
@@ -151,7 +157,7 @@ package
                     userEvent("Cancel"); step = 115; break;
                 case 115:
                     require(navFocused() && list.selectedEntry.row.key == "autoAdvance", "Back returns to the sidebar and keeps the page");
-                    userEvent("Right"); list.selectedIndex = indexOf("restoreView"); step = 10; break;
+                    userEvent("Accept"); list.selectedIndex = indexOf("restoreView"); step = 10; break;
                 case 10:
                     require(list.selectedEntry.row.key == "restoreView", "last row reachable");
                     capture("last-row");
@@ -422,7 +428,10 @@ package
                 case 53:
                     var issueCount:int = Object(menu).BGSCodeObj.getIssues().length;
                     require(issueCount > 0 && list.entryCount == issueCount, "all fixture reports appear on the issues page");
-                    requireGlyphs("Issues: " + issueCount);
+                    checkIssueVersions();
+                    var errorCount:int = 0;
+                    for each (var report:Object in Object(menu).BGSCodeObj.getIssues()) if (report.severity == "ERROR") ++errorCount;
+                    requireGlyphs(menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.error") + "  " + errorCount);
                     userEvent("Right");
                     capture("issues");
                     originalIssueOpener = Object(menu).BGSCodeObj.openIssueModPage;
@@ -430,14 +439,53 @@ package
                         ++issueOpenCount; openedIssue = mod + "/" + id; return issueOpenResult;
                     };
                     for (var issueIndex:int = 0; issueIndex < list.entryCount; ++issueIndex)
-                        if (list.GetDataForEntry(issueIndex).row.id == "osfui-update-required") list.selectedIndex = issueIndex;
-                    require(list.selectedEntry.row.nexusModId == 17711, "compatibility warning retains its mod page destination");
+                        if (list.GetDataForEntry(issueIndex).row.id == "dependency:osfui") list.selectedIndex = issueIndex;
+                    require(list.selectedEntry.row.nexusModId == 17711, "dependency warning retains its mod page destination");
                     step = 109; break;
                 case 109:
-                    require(issueOpenCount == 0, "selecting a compatibility warning does not open the browser");
-                    userEvent("Accept"); break;
+                    require(issueOpenCount == 0, "selecting a dependency warning does not open the browser");
+                    require(findNamed(menu,"issueModPage") != null &&
+                        findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.installedVersion") + "  2.0.0") != null &&
+                        findText(menu, "OSF Animation, Navigation Tools") != null,
+                        "a version gap with a mod page names the affected mods, the installed version and a prominent mod page button");
+                    var issueButton:DisplayObject = findNamed(menu,"issueModPage");
+                    var issueHint:Object = findNamed(menu,"issueConfirmHint");
+                    require(issueHint.visible && issueHint.PCButton_mc.ButtonInstance_mc.PCButton_tf.text == "E",
+                        "detail button shows the native keyboard Accept binding");
+                    issueButtonRestColor = buttonFill(issueButton);
+                    issueButton.dispatchEvent(new MouseEvent(MouseEvent.ROLL_OVER));
+                    require(buttonFill(issueButton) != issueButtonRestColor, "detail button has visible hover feedback");
+                    capture("issue-mod-page-hover");
+                    issueButton.dispatchEvent(new MouseEvent(MouseEvent.ROLL_OUT));
+                    require(buttonFill(issueButton) == issueButtonRestColor, "hover feedback clears when the pointer leaves");
+                    userEvent("Cancel");
+                    require(!issueHint.visible, "detail Accept hint hides while the sidebar owns confirmation");
+                    userEvent("Right");
+                    require(issueHint.visible && issueOpenCount == 0, "entering the issue shows its hint without opening a page");
+                    issueControlMap(1,"Xenon_A"); step = 120; break;
+                case 120:
+                    issueHint = findNamed(menu,"issueConfirmHint");
+                    var expectedGlyph:String = Object(menu.loaderInfo.applicationDomain.getDefinition("Shared.GlobalFunc")).NameToTextMap["Xenon_A"];
+                    require(issueHint.ConsoleButton_mc.ButtonInstance_mc.visible &&
+                        issueHint.ConsoleButton_mc.ButtonInstance_mc.ConsoleButton_tf.text == expectedGlyph &&
+                        !issueHint.PCButton_mc.ButtonInstance_mc.visible,
+                        "detail button follows the native controller Accept glyph on device switch");
+                    capture("issue-mod-page-controller");
+                    Object(menu).ProcessUserEvent("Accept",true); break;
+                case 121:
+                    require(issueOpenCount == 0 && buttonFill(findNamed(menu,"issueModPage")) != issueButtonRestColor,
+                        "holding controller Accept shows pressed feedback without an early browser launch");
+                    capture("issue-mod-page-pressed");
+                    Object(menu).ProcessUserEvent("Accept",false);
+                    issueControlMap(0,"F8"); break;
+                case 122:
+                    issueHint = findNamed(menu,"issueConfirmHint");
+                    require(issueHint.PCButton_mc.ButtonInstance_mc.visible &&
+                        issueHint.PCButton_mc.ButtonInstance_mc.PCButton_tf.text == "F8",
+                        "detail button follows a rebound keyboard Accept key");
+                    issueControlMap(-1,""); step = 110; break;
                 case 110:
-                    require(issueOpenCount == 1 && openedIssue == "osfsettings/osfui-update-required",
+                    require(issueOpenCount == 1 && openedIssue == "osfsettings/dependency:osfui",
                         "Open mod page sends the selected issue identity exactly once");
                     require(findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.modPageOpened")) != null,
                         "successful mod page opening displays feedback");
@@ -447,15 +495,67 @@ package
                     require(issueOpenCount == 2 && findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("errors.openModPage")) != null,
                         "failed mod page opening displays an error and permits retry");
                     capture("issue-mod-page-failed");
+                    issueOpenResult = true;
+                    var modPage:DisplayObject = findNamed(menu,"issueModPage");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(issueOpenCount == 3 && openedIssue == "osfsettings/dependency:osfui",
+                        "the detail mod page button opens on press even when GFx drops the click");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_UP, true));
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true));
+                    require(issueOpenCount == 3, "a full detail button click does not open a second browser page");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(issueOpenCount == 4, "a new detail button press can open the page again");
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_UP, true));
+                    modPage.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true));
+                    require(issueOpenCount == 4, "the repeated detail button click opens only once");
                     for (issueIndex = 0; issueIndex < list.entryCount; ++issueIndex)
-                        if (list.GetDataForEntry(issueIndex).row.id == "long-description") list.selectedIndex = issueIndex;
+                        if (list.GetDataForEntry(issueIndex).row.id == "dependency:sample-pack") list.selectedIndex = issueIndex;
                     break;
                 case 112:
-                    require(!list.selectedEntry.row.nexusModId, "ordinary issue has no external destination");
+                    require(!list.selectedEntry.row.nexusModId && findNamed(menu,"issueModPage") == null &&
+                        findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("issues.notInstalled")) != null,
+                        "a missing dependency without a mod page shows the gap but no button");
+                    capture("issue-dependency-missing");
                     userEvent("Accept"); break;
                 case 113:
-                    require(issueOpenCount == 2, "accepting an issue without a mod page never opens the browser");
+                    require(issueOpenCount == 4, "accepting an issue without a mod page never opens the browser");
+                    var issuePanel:Object = findNamed(menu,"issueDetails");
+                    var reason:String = list.selectedEntry.row.reason;
+                    require(!issuePanel.detailsExpanded && findNamed(menu,"issueDetailsToggle") != null && findText(menu, reason) == null,
+                        "reference details start folded");
+                    userEvent("YButton");
+                    require(issuePanel.detailsExpanded && findText(menu, reason) != null && findText(menu, list.selectedEntry.row.note) != null,
+                        "the Details control shows the reason and note");
+                    step = 130; break;
+                case 130:
+                    // Native footer labels redraw on the frame after RefreshButtons.
+                    require(findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("buttons.hideDetails")) != null,
+                        "the footer offers to hide open details");
+                    var strings:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(footerShows(strings.text("buttons.copyDetails")) && findNamed(menu,"issueCopyDetails") != null,
+                        "open details that fit offer Copy details in the footer and the pane");
+                    var copied:Array = [];
+                    var originalCopy:Function = Object(menu).BGSCodeObj.copyIssue;
+                    Object(menu).BGSCodeObj.copyIssue = function(mod:String, id:String):Boolean { copied.push(mod + "/" + id); return true; };
+                    userEvent("XButton");
+                    findNamed(menu,"issueCopyDetails").dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(copied.length == 2 && copied[0] == "osfsettings/dependency:sample-pack" && copied[1] == copied[0] &&
+                        findText(menu, strings.text("issues.copied")) != null, "X and the Copy button copy the selected issue once each");
+                    capture("issue-details");
+                    Object(menu).BGSCodeObj.copyIssue = function(mod:String, id:String):Boolean { return false; };
+                    userEvent("XButton");
+                    require(findText(menu, strings.text("errors.copyIssue")) != null, "a refused copy reports the failure");
+                    Object(menu).BGSCodeObj.copyIssue = originalCopy;
+                    issuePanel = findNamed(menu,"issueDetails");
+                    reason = list.selectedEntry.row.reason;
+                    findNamed(menu,"issueDetailsToggle").dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    require(!issuePanel.detailsExpanded && findText(menu, reason) == null, "pressing the Details heading folds them again");
+                    for (issueIndex = 0; issueIndex < list.entryCount; ++issueIndex)
+                        if (list.GetDataForEntry(issueIndex).row.id == "long-description") list.selectedIndex = issueIndex;
                     Object(menu).BGSCodeObj.openIssueModPage = originalIssueOpener;
+                    step = 118; break;
+                case 118:
+                    // One more frame so the long report repaints before it is scrolled.
                     step = 78; break;
                 case 78:
                     // Let the selected row repaint before capturing the scrolled report.
@@ -463,7 +563,35 @@ package
                     require(issuePane.scrollable, "long reports scroll within the wider details pane");
                     issuePane.scroll(10000);
                     require(list.selectedEntry.row.id == "long-description", "scrolling report details preserves issue selection");
+                    require(findText(menu, menu.loaderInfo.applicationDomain.getDefinition("Localization").text("menu.issuesHint")) != null,
+                        "selecting another report restores the restart reminder");
                     capture("issues-long");
+                    userEvent("YButton");
+                    issuePane.scroll(-100000);
+                    require(issuePane.detailsExpanded && !issuePane.atEnd, "open details on a long report start above the end");
+                    copiedIssues = [];
+                    originalIssueCopier = Object(menu).BGSCodeObj.copyIssue;
+                    Object(menu).BGSCodeObj.copyIssue = function(mod:String, id:String):Boolean { copiedIssues.push(mod + "/" + id); return true; };
+                    step = 131; break;
+                case 131:
+                    issuePane = findNamed(menu,"issueDetails");
+                    strings = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(footerShows(strings.text("buttons.scroll")) && !footerShows(strings.text("buttons.copyDetails")),
+                        "the footer offers Scroll while open details continue below the pane");
+                    for (var press:int = 0; press < 50 && !issuePane.atEnd; ++press) userEvent("XButton");
+                    require(issuePane.atEnd && copiedIssues.length == 0, "X scrolls open details to their end without copying");
+                    step = 132; break;
+                case 132:
+                    issuePane = findNamed(menu,"issueDetails");
+                    strings = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(footerShows(strings.text("buttons.copyDetails")) && !footerShows(strings.text("buttons.scroll")),
+                        "the footer offers Copy details once open details reach their end");
+                    capture("issues-long-details-end");
+                    userEvent("XButton");
+                    require(copiedIssues.length == 1 && copiedIssues[0] == "example-mod/long-description", "X copies at the end of open details");
+                    userEvent("YButton");
+                    require(!issuePane.detailsExpanded && !issuePane.atEnd, "closing details returns to the top of the report");
+                    Object(menu).BGSCodeObj.copyIssue = originalIssueCopier;
                     step = 54;
                     findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); break;
                 case 54:
@@ -650,12 +778,26 @@ package
                     userEvent("Cancel");
                     require(navFocused() && list.selectedEntry.row.key == "panelNumber", "a second Back returns to the sidebar and retains selection");
                     userEvent("Right");
-                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Right reenters editing without stepping the selected numeric value"); break;
+                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Right enters navigation without stepping the selected numeric value"); break;
                 case 207:
-                    key(Keyboard.RIGHT); break;
+                    key(Keyboard.RIGHT);
+                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "repeated Right while browsing cannot change a setting");
+                    userEvent("Left");
+                    require(navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Left after Right-entry returns to the sidebar without saving");
+                    key(Keyboard.RIGHT); step = 219; break;
+                case 219:
+                    key(Keyboard.LEFT);
+                    require(navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "raw arrow navigation also returns to the sidebar without saving");
+                    userEvent("Right"); step = 220; break;
+                case 220:
+                    userEvent("Accept"); userEvent("Accept");
+                    require(!navFocused() && panelWrites == 3 && list.selectedEntry.row.value == "3", "Confirm explicitly starts editing after Right-entry without changing the value");
+                    step = 221; break;
+                case 221:
+                    key(Keyboard.RIGHT); step = 208; break;
                 case 208:
                     require(list.selectedEntry.row.key == "panelNumber" && list.selectedEntry.row.value == "4" && panelWrites == 4,
-                        "Right-entry enables the next deliberate edit");
+                        "Confirm after Right-entry enables the next deliberate edit");
                     movePanelNumberFirst(); ++panelGeneration; step = 209; break;
                 case 209:
                     require(list.selectedIndex == 0 && list.selectedEntry.row.key == "panelNumber" && list.selectedEntry.row.value == "4",
@@ -678,7 +820,58 @@ package
                     userEvent("Right");
                     MovieClip(list.FindClipForEntry(1)).dispatchEvent(new MouseEvent(MouseEvent.MOUSE_OVER, true));
                     require(list.selectedIndex == 1, "pooled rows restore vanilla hover selection on Home");
-                    list.selectedIndex = 0; step = 79; break;
+                    list.selectedIndex = 0;
+                    modPageRows = Object(menu).BGSCodeObj.getRows;
+                    Object(menu).BGSCodeObj.getRows = function():Array {
+                        return modPageRows().concat({type:"launcher", mod:"design-preview", modTitle:"Design Preview", key:"studio",
+                            title:"Open studio", hint:"Open this mod's interface.", recentOrder:0, editable:true, message:""});
+                    };
+                    Object(menu).BGSCodeObj.revision = function():String { return "mod-interface"; };
+                    step = 222; break;
+                case 222: break;
+                case 223:
+                    list.selectedIndex = 0; userEvent("Accept"); break;
+                case 224:
+                    var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+                    require(list.entryCount == 21 && list.GetDataForEntry(0).row.title == localization.text("home.interfaces") &&
+                        list.GetDataForEntry(1).row.key == "@launcher/studio" && list.GetDataForEntry(1).row.actionState == localization.text("buttons.open") &&
+                        list.GetDataForEntry(2).row.type == "section", "a mod's full page leads with its own interfaces");
+                    Object(menu).BGSCodeObj.launch = function(mod:String, id:String):int { launchedInterface = mod + "/" + id; return 0; };
+                    list.selectedIndex = 1;
+                    Object(menu).ProcessUserEvent("Accept", true);
+                    require(launchedInterface == "", "a mod page interface waits for Accept release");
+                    Object(menu).ProcessUserEvent("Accept", false); break;
+                case 225:
+                    require(launchedInterface == "design-preview/studio", "a mod page Open button launches its interface");
+                    launchedInterface = "";
+                    Object(menu).ProcessUserEvent("Accept", true);
+                    key(Keyboard.DOWN);
+                    require(list.selectedEntry.row.key == "autoAdvance", "Down can leave a launcher while Accept is held");
+                    Object(menu).ProcessUserEvent("Accept", false);
+                    require(!launcher.acceptHeld && launchedInterface == "", "Accept release on a setting cancels the launcher press");
+                    list.selectedIndex = 1; step = 227; break;
+                case 227:
+                    var launchClip:DisplayObject = list.FindClipForEntry(1) as DisplayObject;
+                    launchClip.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_DOWN, true));
+                    launchClip.dispatchEvent(new MouseEvent(MouseEvent.MOUSE_UP, true));
+                    launchClip.dispatchEvent(new MouseEvent(MouseEvent.CLICK, true));
+                    require(launchedInterface == "design-preview/studio", "mouse launch still works after a cancelled held press");
+                    launchedInterface = "";
+                    key(Keyboard.ENTER); key(Keyboard.DOWN);
+                    list.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_UP, true, true, 0, Keyboard.ENTER));
+                    require(!launcher.acceptHeld && launchedInterface == "", "raw keyboard release also cancels a launcher press after moving");
+                    list.selectedIndex = 1; break;
+                case 228:
+                    Object(menu).ProcessUserEvent("Accept", true);
+                    key(Keyboard.DOWN);
+                    list.selectedIndex = 1;
+                    Object(menu).ProcessUserEvent("Accept", false);
+                    require(!launcher.acceptHeld && launchedInterface == "", "returning to the launcher cannot revive a cancelled press");
+                    Object(menu).BGSCodeObj.getRows = modPageRows;
+                    Object(menu).BGSCodeObj.revision = function():String { return "mod-interface-removed"; };
+                    findNamed(menu,"mods").dispatchEvent(new MouseEvent(MouseEvent.CLICK)); step = 226; break;
+                case 226:
+                    userEvent("Right"); list.selectedIndex = 0; step = 79; break;
                 case 79:
                     Object(menu).BGSCodeObj.launch = function(mod:String, id:String):int { return 2; };
                     Object(menu).BGSCodeObj.pollLaunch = function():Object { return {state:launchState, message:"Preview launch failed"}; };
@@ -728,6 +921,9 @@ package
             if (step == 200) return indexOf("panelNumber") >= 0;
             if (step == 209) return list.entryCount && list.GetDataForEntry(0).row.previewGeneration == 2;
             if (step == 211) return list.entryCount && list.GetDataForEntry(0).row.previewGeneration == 3;
+            if (step == 223) return launcher.count == 11;
+            if (step == 224) return list.entryCount == 21;
+            if (step == 226) return launcher.visible && launcher.count == 10;
             if (step == 212) return list.entryCount == 3 && list.selectedEntry.row.mod == "design-preview" &&
                 list.selectedEntry.row.summary == "13 SETTINGS  |  2 ACTIONS";
             return true;
@@ -837,6 +1033,15 @@ package
                 require(localization.text("counts.mods", {count:3}) == "Mods: 3", "missing translation uses English with parameters");
             } finally { localization.initialize(null); }
         }
+        // The detail pane repeats some footer labels, so footer checks search only the button bar.
+        private function footerShows(text:String):Boolean
+        {
+            for (var i:int = 0; i < menu.numChildren; ++i) {
+                var child:Object = menu.getChildAt(i);
+                if ("RefreshButtons" in child) return findText(child as DisplayObjectContainer, text) != null;
+            }
+            return false;
+        }
         private function findText(container:DisplayObjectContainer, text:String):TextField
         {
             if (!container.visible) return null;
@@ -897,6 +1102,19 @@ package
             require(policy.filter(joined,"shoulder", "all",256).length == 1 && policy.filter(joined,"triangle", "all",32768).length == 1,
                 "controller names and both chord members are searchable");
             require(!policy.includes(joined[0].records[0],256), "controller modifier cannot match a keyboard filter");
+            // This menu's own key leads the list however Controls orders it.
+            var pinned:Array = policy.join(
+                [{sInputName:"vanilla",uContextID:0,bGamepadEntry:false,bIsDivider:false,bReadOnly:false,bRequired:false,
+                    MainBinding:{aPCKeyName:["E"],aButtonName:[]},AltBinding:{aPCKeyName:[],aButtonName:[]}},
+                 {sInputName:"osfsettings/openMenu",uContextID:0,bGamepadEntry:false,bIsDivider:false,bReadOnly:false,bRequired:false,
+                    MainBinding:{aPCKeyName:["F10"],aButtonName:[]},AltBinding:{aPCKeyName:[],aButtonName:[]}}],
+                [{type:"hotkey",action:"osfsettings/openMenu",registered:true,mod:policy.SELF_MOD,key:policy.OPEN_MENU,
+                    title:"Open mod settings",modTitle:"OSF Settings"}],
+                [{action:"vanilla",context:0,device:0,slot:0,key:69,modifier:255},
+                 {action:"osfsettings/openMenu",context:0,device:0,slot:0,key:121,modifier:255}],
+                function(row:Object):String { return "Native"; });
+            require(pinned.length == 2 && pinned[0].mod == policy.SELF_MOD && pinned[0].key == policy.OPEN_MENU &&
+                pinned[1].source == "Game", "the key that opens this menu leads the bindings list");
         }
         private function findInput(container:DisplayObjectContainer):TextField
         {
@@ -920,6 +1138,60 @@ package
                 }
             }
             return null;
+        }
+        private function checkIssueVersions():void
+        {
+            var panel:Object = findNamed(menu,"issueDetails");
+            var localization:Object = menu.loaderInfo.applicationDomain.getDefinition("Localization");
+            var cases:Array = [
+                {name:"short", installed:"2.0.0", required:"2.1.0"},
+                {name:"missing", installed:"", required:"1.2.0"},
+                {name:"maximum", installed:"65534.65535.65535", required:"65535.65535.65535"},
+                {name:"translated", installed:"1.16.244", required:"1.16.255"}
+            ];
+            try {
+                for each (var sample:Object in cases) {
+                    if (sample.name == "translated") localization.initialize({
+                        "issues.installedVersion":"Installed version on this computer",
+                        "issues.notInstalled":"This dependency has not been installed on this computer"
+                    });
+                    panel.show({mod:"osfsettings", id:"version-" + sample.name, modTitle:"OSF Settings", severity:"WARNING",
+                        title:"Dependency version comparison", nextSteps:"Update the dependency to " + sample.required + " or later.",
+                        installedVersion:sample.installed, requiredVersion:sample.required});
+                    var viewport:DisplayObjectContainer = DisplayObjectContainer(panel).getChildAt(0) as DisplayObjectContainer;
+                    var content:DisplayObjectContainer = viewport.getChildAt(0) as DisplayObjectContainer;
+                    var chip:TextField = findText(content, sample.installed ?
+                        localization.text("issues.installedVersion") + "  " + sample.installed : localization.text("issues.notInstalled"));
+                    require(chip != null, "version chip preserves complete text: " + sample.name);
+                    var bounds:Rectangle = chip.getBounds(content);
+                    require(bounds.left >= 0 && bounds.right <= viewport.scrollRect.width &&
+                        chip.textWidth <= chip.width && chip.textHeight <= chip.height - 4,
+                        "version chip fits its viewport and field: " + sample.name);
+                    if (sample.name != "translated") require(chip.numLines == 1, "version chip stays on one line: " + sample.name);
+                    if (sample.name == "maximum" || sample.name == "translated") capture("issue-version-" + sample.name);
+                }
+            } finally {
+                localization.initialize(null);
+                panel.show(list.selectedEntry.row);
+            }
+        }
+        private function buttonFill(button:DisplayObject):uint
+        {
+            var pixel:BitmapData = new BitmapData(1,1,false,0);
+            pixel.draw(button,new Matrix(1,0,0,1,-8,-8));
+            var color:uint = pixel.getPixel(0,0); pixel.dispose(); return color;
+        }
+        private function issueControlMap(controller:int, accept:String):void
+        {
+            var manager:Object = menu.loaderInfo.applicationDomain.getDefinition("Shared.AS3.Data.BSUIDataManager");
+            var control:Object = manager.GetDataFromClient("ControlMapData");
+            if (!originalControlMap) originalControlMap = {controller:control.data.uiController, events:control.data.vMappedEvents};
+            var mappings:Array = [];
+            for each (var mapping:Object in originalControlMap.events) mappings.push(mapping.strUserEventName == "Accept" ?
+                {strUserEventName:"Accept",strButtonName:accept,aButtonName:[accept],sContextName:"BasicMenuNav"} : mapping);
+            control.data.uiController = controller < 0 ? originalControlMap.controller : controller;
+            control.data.vMappedEvents = controller < 0 ? originalControlMap.events : mappings;
+            control.DispatchChange();
         }
         private function capture(name:String, area:Rectangle = null, scale:Number = 2 / 3):void
         {

@@ -126,6 +126,7 @@ $fake = Join-Path $scratch 'harness'
 foreach ($directory in @('scripts', 'artifacts', 'settings/packaging', 'settings/tools')) { [IO.Directory]::CreateDirectory((Join-Path $fake $directory)) | Out-Null }
 Copy-Item -LiteralPath $suite -Destination $fake
 Copy-Item -LiteralPath (Join-Path $Harness 'scripts/Common.ps1') -Destination (Join-Path $fake 'scripts')
+Copy-Item -LiteralPath (Join-Path $Harness 'scripts/Cleanup.ps1') -Destination (Join-Path $fake 'scripts')
 Copy-Item -LiteralPath (Join-Path $repo 'packaging/ReleaseValidation.ps1') -Destination (Join-Path $fake 'settings/packaging')
 Copy-Item -LiteralPath (Join-Path $repo 'tools/SmokeBench.ps1') -Destination (Join-Path $fake 'settings/tools')
 $settings = Join-Path $fake 'settings'
@@ -136,7 +137,7 @@ $settings = Join-Path $fake 'settings'
 @('artifacts/', 'settings/') | Set-Content (Join-Path $fake '.gitignore')
 @'
 [CmdletBinding()]
-param([string]$Action, [string]$Scenario, [switch]$SkipBuild, [switch]$Acceptance, [string]$AcceptancePhase, [switch]$LargeText,
+param([string]$Action, [string]$Scenario, [switch]$Interactive, [switch]$SkipBuild, [switch]$Acceptance, [string]$AcceptancePhase, [switch]$LargeText,
     [switch]$Keybindings, [switch]$TextInput, [switch]$TranslationRegistration, [switch]$NativeBindings, [string]$ResultPath)
 $ErrorActionPreference = 'Stop'
 $mode = $env:OSF_RELEASE_SELFTEST_MODE
@@ -174,6 +175,9 @@ if ($LASTEXITCODE) { throw 'Harness plan failed.' }
 Check ($cases.Count -gt 0 -and ($advertised -join ',') -ceq ($cases -join ',')) 'Release runner advertises exactly the harness cases'
 $coverage = @(Get-Content (Join-Path $repo 'tests/smoke-coverage.json') -Raw | ConvertFrom-Json)
 Check (@($coverage.runtime | Where-Object { $_ -notin $cases }).Count -eq 0) 'Every advertised coverage case exists in the harness'
+$unattendedReceipt = Join-Path $scratch 'unattended-result.json'
+& pwsh -NoProfile -File (Join-Path $fake 'Test-SettingsRelease.ps1') -ResultPath $unattendedReceipt > (Join-Path $scratch 'unattended.log') 2>&1
+Check ($LASTEXITCODE -ne 0 -and -not (Test-Path $unattendedReceipt)) 'Interactive suite rejects unattended invocation before running fixtures'
 $oldMode = $env:OSF_RELEASE_SELFTEST_MODE
 try {
     foreach ($mode in @('passed', 'filtered', 'failed', 'blocked', 'crashed', 'build-fail', 'source-changed', 'harness-changed',
@@ -186,7 +190,9 @@ try {
         $identity = Get-SmokeSourceIdentity $settings
         $receipt = Join-Path $scratch "$mode-result.json"
         $expectedProject = if ($mode -eq 'wrong-project') { $source } else { $settings }
-        $arguments = @('-NoProfile', '-File', (Join-Path $fake 'Test-SettingsRelease.ps1'), '-ResultPath', $receipt, '-ExpectedSettingsProject', $expectedProject)
+        # Only this disposable coordinator has a fake runner: Interactive tests
+        # its opt-in contract without launching a game or calling input helpers.
+        $arguments = @('-NoProfile', '-File', (Join-Path $fake 'Test-SettingsRelease.ps1'), '-Interactive', '-ResultPath', $receipt, '-ExpectedSettingsProject', $expectedProject)
         if ($mode -in @('filtered', 'failed')) { $arguments += @('-Cases', 'acceptance-normal,acceptance-large') }
         if ($mode -like 'working-tree*') { $arguments += '-WorkingTree' }
         if ($mode -eq 'skip-build') { $arguments += '-SkipBuild' }
@@ -226,6 +232,7 @@ foreach ($directory in @('scripts','scenarios','artifacts')) { [IO.Directory]::C
 Copy-Item (Join-Path $Harness 'Test-Starfield.ps1') $entry
 Copy-Item (Join-Path $fake 'config.psd1') $entry
 Copy-Item (Join-Path $Harness 'scripts/Common.ps1') (Join-Path $entry 'scripts')
+Copy-Item (Join-Path $Harness 'scripts/Cleanup.ps1') (Join-Path $entry 'scripts')
 @'
 function Initialize-Harness {}
 function Build-Harness {}
@@ -252,7 +259,7 @@ try {
         $env:OSF_RELEASE_SELFTEST_MODE = $mode
         $receipt = Join-Path $scratch "entry-$mode.json"
         $started = [DateTimeOffset]::UtcNow
-        & pwsh -NoProfile -File (Join-Path $entry 'Test-Starfield.ps1') -ResultPath $receipt > (Join-Path $scratch "entry-$mode.log") 2>&1
+        & pwsh -NoProfile -File (Join-Path $entry 'Test-Starfield.ps1') -Scenario SettingsSmoke -Interactive -ResultPath $receipt > (Join-Path $scratch "entry-$mode.log") 2>&1
         $code = $LASTEXITCODE
         $expected = switch ($mode) { passed { 0 } scenario-failed { 1 } startup-blocked { 2 } }
         Check ($code -eq $expected) "Real entrypoint returns the expected $mode exit code"

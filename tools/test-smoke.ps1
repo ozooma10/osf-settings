@@ -3,6 +3,7 @@
 param(
     [switch]$RunGame,
     [switch]$Plan,
+    [switch]$ForceVerification,
     [string]$Harness = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'OSF Test Harness'),
     [string]$OutputDirectory = ''
 )
@@ -10,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'SmokeBench.ps1')
+. (Join-Path $PSScriptRoot 'WorkflowChecks.ps1')
 $coverage = @(Get-Content -LiteralPath (Join-Path $repo 'tests/smoke-coverage.json') -Raw | ConvertFrom-Json)
 $suite = Join-Path $Harness 'Test-SettingsRelease.ps1'
 $runtimeCases = @()
@@ -87,27 +89,29 @@ try {
         $log = Get-Content -LiteralPath $script:stage.log -Raw
         Test-SmokeNativeSummary $log @($coverage.native | Sort-Object -Unique).Count
     }
-    foreach ($variant in @(@{name='normal';args=@()}, @{name='large';args=@('-LargeText')},
-        @{name='bindings-normal';args=@('-Bindings')}, @{name='bindings-large';args=@('-Bindings','-LargeText')})) {
+    foreach ($variant in @(@{name='normal';args=@()}, @{name='bindings-normal';args=@('-Bindings')},
+        @{name='large';args=@('-LargeText')}, @{name='bindings-large';args=@('-Bindings','-LargeText')})) {
         Invoke-SmokeStage ('preview-' + $variant.name) {
-            $started = [DateTime]::UtcNow
-            Invoke-SmokeCommand 'pwsh' (@('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture') + $variant.args)
+            $previewReceipt = Join-Path $directory ("preview-" + $variant.name + ".json")
+            $arguments = @('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture','-ResultPath',$previewReceipt) + $variant.args
+            if ($ForceVerification) { $arguments += '-Force' }
+            Invoke-SmokeCommand 'pwsh' $arguments
             if ($variant.name -eq 'normal') {
                 Invoke-SmokeCommand 'python' @('-B', (Join-Path $repo 'tests/preview_rows_tests.py'))
             }
-            $prefix = if ($variant.name -like '*large') { 'large' } else { 'normal' }
-            $captures = @(Get-ChildItem -LiteralPath (Join-Path $repo 'build/preview') -Filter "$prefix-*.png" -File | Where-Object LastWriteTimeUtc -ge $started)
-            if (-not $captures.Count) { throw '[blocked] Preview returned without fresh captures.' }
+            $verification = Get-Content -LiteralPath $previewReceipt -Raw | ConvertFrom-Json
+            $captures = @($verification.outputs | Where-Object { $_ -like '*.png' } | Get-Item)
+            if (-not $captures.Count) { throw 'Preview returned without verified captures.' }
             $destination = Join-Path $directory $script:stage.name
             [IO.Directory]::CreateDirectory($destination) | Out-Null
             $captures | Copy-Item -Destination $destination
-            Copy-Item -LiteralPath (Join-Path $repo "build/preview/test-$prefix-errors.log") -Destination $destination
-            $script:stage.message = "$($captures.Count) fresh screenshots"
+            $verification.outputs | Where-Object { $_ -like '*-errors.log' } | ForEach-Object { Copy-Item -LiteralPath $_ -Destination $destination }
+            $script:stage.message = "$($captures.Count) verified screenshots; tested $($verification.completedUtc)"
         }
     }
     Invoke-SmokeStage 'release-contracts' {
-        Invoke-SmokeCommand 'pwsh' @('-NoProfile','-File',(Join-Path $repo 'tests/smoke_bench_tests.ps1'))
-        Invoke-SmokeCommand 'pwsh' @('-NoProfile','-File',(Join-Path $repo 'tests/release_validation_tests.ps1'),'-Harness',$Harness)
+        $script:stage.log = Join-Path $directory 'release-contracts.log'
+        Invoke-SettingsContractChecks $repo $Harness $script:stage.log -Force:$ForceVerification
     }
     Invoke-SmokeStage 'production-build' {
         $oldMods = $env:XSE_SF_MODS_PATH; $oldGame = $env:XSE_SF_GAME_PATH

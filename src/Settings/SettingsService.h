@@ -10,6 +10,7 @@
 #include <mutex>
 #include <set>
 #include <thread>
+#include <utility>
 
 namespace OSFSettings
 {
@@ -31,6 +32,14 @@ namespace OSFSettings
         void Localize(const std::filesystem::path& directory, std::string_view language);
         std::vector<ModSettings> Snapshot() const;
         std::optional<ModSettings> FindMod(std::string_view mod) const; // Localized copy of one mod.
+        // Reads one stored record (sparse values, untranslated) under the service lock without copying it.
+        // fn receives nullptr for an unknown mod and must not call back into the service.
+        template <class F>
+        auto Inspect(std::string_view mod, F&& fn) const
+        {
+            std::lock_guard lock(m_mutex);
+            return std::forward<F>(fn)(m_store.FindMod(mod));
+        }
         std::vector<SettingsLoadError> LoadErrors() const;
         bool HasPendingChanges() const noexcept;
         void DispatchChanges() noexcept;
@@ -43,6 +52,8 @@ namespace OSFSettings
         SettingsError RegisterProvider(ModSettings mod, SettingsStore::Save save, std::uint64_t& registration);
         SettingsError UnregisterProvider(std::uint64_t registration);
         std::uint64_t Revision() const noexcept { return m_revision.load(); }
+        // Definition/localization changes affect dependency reports; ordinary value writes do not.
+        std::uint64_t SchemaRevision() const noexcept { return m_schemaRevision.load(); }
         SettingsError Subscribe(std::string_view mod, Changed callback, Subscription& out);
         SettingsError Unsubscribe(Subscription subscription);
 
@@ -71,5 +82,6 @@ namespace OSFSettings
         std::atomic_bool m_pending{};
         std::atomic_bool m_dispatching{};
         std::atomic_uint64_t m_revision{};
+        std::atomic_uint64_t m_schemaRevision{};
     };
 }

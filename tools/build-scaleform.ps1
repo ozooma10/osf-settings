@@ -148,6 +148,7 @@ function Add-GameLibraries([string]$InputPath, [string]$OutputPath, [string]$Set
 }
 
 $outputDirectory = Join-Path $repo 'build\scaleform'
+if ($TestHarness) { $outputDirectory = Join-Path $outputDirectory 'harness' }
 if ($Preview) { $outputDirectory = Join-Path $outputDirectory 'preview' }
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 $env:JAVA_HOME = $jdk

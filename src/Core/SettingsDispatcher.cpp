@@ -1,4 +1,5 @@
 #include "SettingsDispatcher.h"
+#include "Compatibility.h"
 #include "Settings/SettingsService.h"
 #include "Harness/TestHarness.h"
 #include "SFSE/SFSE.h"
@@ -17,6 +18,7 @@ namespace OSFSettings::SettingsDispatcher
                 if (settings.HasPendingChanges()) {
                     settings.DispatchChanges();
                 }
+                ReportCompatibilityIssues();
             });
             installed = true;
             REX::INFO("Settings notifications: SFSE dispatcher installed");

@@ -2,37 +2,38 @@
 
 namespace OSFSettings::Papyrus
 {
-    std::expected<std::pair<std::string, std::string>, SettingsError> Values::Resolve(std::string_view mod, std::string_view key, SettingValue* value) const
+    Values::Resolved Values::Resolve(std::string_view mod, std::string_view key, SettingValue* value) const
     {
         if (!m_service.IsReady()) return std::unexpected(SettingsError::NotReady);
         const auto keyId = FoldAscii(key);
-        // Papyrus interns identifiers without case sensitivity. Resolve only unique names.
-        const auto item = m_service.FindMod(FoldAscii(mod));
-        if (!item) return std::unexpected(SettingsError::UnknownMod);
-        const SettingDefinition* found{};
-        for (const auto& group : item->schema.groups) {
-            for (const auto& control : group.controls) {
-                const auto* setting = std::get_if<SettingDefinition>(&control);
-                if (!setting || FoldAscii(setting->key) != keyId) continue;
-                if (found) return std::unexpected(SettingsError::InvalidArgument);
-                found = setting;
-            }
-        }
-        if (!found) return std::unexpected(SettingsError::UnknownSetting);
-        if (auto* option = value ? std::get_if<EnumValue>(value) : nullptr) {
-            if (const auto* definition = std::get_if<EnumDefinition>(&found->definition)) {
-                const auto id = FoldAscii(option->value);
-                const EnumOption* match{};
-                for (const auto& candidate : definition->options) {
-                    if (FoldAscii(candidate.value) != id) continue;
-                    if (match) return std::unexpected(SettingsError::InvalidArgument);
-                    match = &candidate;
+        // Papyrus interns identifiers without case sensitivity. Resolve only unique names, reading the stored record in place.
+        return m_service.Inspect(FoldAscii(mod), [&](const ModSettings* item) -> Resolved {
+            if (!item) return std::unexpected(SettingsError::UnknownMod);
+            const SettingDefinition* found{};
+            for (const auto& group : item->schema.groups) {
+                for (const auto& control : group.controls) {
+                    const auto* setting = std::get_if<SettingDefinition>(&control);
+                    if (!setting || FoldAscii(setting->key) != keyId) continue;
+                    if (found) return std::unexpected(SettingsError::InvalidArgument);
+                    found = setting;
                 }
-                if (!match) return std::unexpected(SettingsError::InvalidValue);
-                option->value = match->value;
             }
-        }
-        return std::pair{ item->schema.id, found->key };
+            if (!found) return std::unexpected(SettingsError::UnknownSetting);
+            if (auto* option = value ? std::get_if<EnumValue>(value) : nullptr) {
+                if (const auto* definition = std::get_if<EnumDefinition>(&found->definition)) {
+                    const auto id = FoldAscii(option->value);
+                    const EnumOption* match{};
+                    for (const auto& candidate : definition->options) {
+                        if (FoldAscii(candidate.value) != id) continue;
+                        if (match) return std::unexpected(SettingsError::InvalidArgument);
+                        match = &candidate;
+                    }
+                    if (!match) return std::unexpected(SettingsError::InvalidValue);
+                    option->value = match->value;
+                }
+            }
+            return std::pair{ item->schema.id, found->key };
+        });
     }
 
     const char* ErrorName(SettingsError error) noexcept

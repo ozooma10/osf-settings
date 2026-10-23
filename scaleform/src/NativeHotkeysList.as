@@ -11,6 +11,7 @@ package
     // Adapts vanilla binding rows to the same scrolling list as ordinary settings.
     public final class NativeHotkeysList
     {
+        private static const MOUSE_EVENTS:Array = [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL];
         private var list:Object;
         private var create:Function;
         private var views:Dictionary = new Dictionary(true);
@@ -22,6 +23,8 @@ package
         private var bridge:Object;
         private var changed:Function;
         private var entries:Array = [];
+        // The first MainGameplay entry for each action name, rebuilt with entries.
+        private var actions:Object = {};
         private var definitions:Array = [];
         private var seenRemapping:Boolean = false;
         private var cancelled:Boolean = false;
@@ -34,7 +37,6 @@ package
         public function get secondary():Boolean { return showAlternate; }
         public var revision:uint = 0;
         public var ready:Boolean = false;
-        public var fullPage:Boolean = false;
         private var labelEntry:Object;
 
         public function get bindings():Array { return entries; }
@@ -60,8 +62,7 @@ package
             dataManager.Subscribe("RemapConfirmationData", confirmationChanged);
             dataManager.Subscribe("FireForgetEventData", saved);
             dataManager.addEventListener("SettingsPanel_RemapConfirmed", remapConfirmed);
-            for each (var type:String in [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL])
-                list.addEventListener(type, blockMouse, true, 100);
+            for each (var type:String in MOUSE_EVENTS) list.addEventListener(type, blockMouse, true, 100);
         }
 
         public function open():void
@@ -78,12 +79,7 @@ package
             definitions = rows;
             for each (var row:Object in rows) {
                 if (row.type != "hotkey") continue;
-                var native:Object = null;
-                for each (var entry:Object in entries) {
-                    if (!entry.bIsDivider && entry.uContextID == 0 && entry.sInputName == row.action) {
-                        native = entry; break;
-                    }
-                }
+                var native:Object = actions.hasOwnProperty(row.action) ? actions[row.action] : null;
                 row.editable = Boolean(native && !native.bReadOnly);
                 row.value = native ? KeybindingsData.bindingText(native.MainBinding) : "";
                 row.alternate = native && showAlternate ? KeybindingsData.bindingText(native.AltBinding) : "";
@@ -130,10 +126,10 @@ package
             }
             var alternate:Boolean = showAlternate;
             // Native rollover/listening frames can change bounds; idle cells cannot.
-            if (!bindingChanged && view.height == height && view.alternate == alternate && view.fullPage == fullPage &&
+            if (!bindingChanged && view.height == height && view.alternate == alternate &&
                 view.frame == clip.currentFrame && view.mainFrame == clip.MainBinding_mc.currentFrame && view.altFrame == clip.AltBinding_mc.currentFrame)
                 return clip as DisplayObject;
-            view.height = height; view.alternate = alternate; view.fullPage = fullPage;
+            view.height = height; view.alternate = alternate;
             view.frame = clip.currentFrame; view.mainFrame = clip.MainBinding_mc.currentFrame; view.altFrame = clip.AltBinding_mc.currentFrame;
             // The outer SettingsRow supplies the label, background and row hit area.
             for (var i:int = 0; i < clip.numChildren; ++i) {
@@ -233,9 +229,10 @@ package
 
         public function get canClear():Boolean
         {
-            if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
-            var binding:Object = currentClip.activePriority == 0 ? list.selectedEntry.row.binding.MainBinding :
-                showAlternate && currentClip.activePriority == 1 ? list.selectedEntry.row.binding.AltBinding : null;
+            var clip:Object = currentClip;
+            if (busy || saving || !clip || !list.selectedEntry.row.editable) return false;
+            var binding:Object = clip.activePriority == 0 ? list.selectedEntry.row.binding.MainBinding :
+                showAlternate && clip.activePriority == 1 ? list.selectedEntry.row.binding.AltBinding : null;
             return Boolean(binding && (binding.aPCKeyName.length || binding.aButtonName.length));
         }
 
@@ -289,8 +286,14 @@ package
         {
             if (!pending || busy || saving) return;
             entries = pending.entries; showAlternate = pending.secondary; pending = null;
-            // Empty publications retain the last device family until rows arrive.
-            for each (var entry:Object in entries) if (!entry.bIsDivider) { gamepad = Boolean(entry.bGamepadEntry); break; }
+            actions = {};
+            var first:Boolean = true;
+            for each (var entry:Object in entries) {
+                if (entry.bIsDivider) continue;
+                // Empty publications retain the last device family until rows arrive.
+                if (first) { gamepad = Boolean(entry.bGamepadEntry); first = false; }
+                if (entry.uContextID == 0 && !actions.hasOwnProperty(entry.sInputName)) actions[entry.sInputName] = entry;
+            }
             ready = true; ++revision;
             changed("", true);
         }
@@ -354,8 +357,7 @@ package
             dataManager.Unsubscribe("RemapConfirmationData", confirmationChanged);
             dataManager.Unsubscribe("FireForgetEventData", saved);
             dataManager.removeEventListener("SettingsPanel_RemapConfirmed", remapConfirmed);
-            for each (var type:String in [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL])
-                list.removeEventListener(type, blockMouse, true);
+            for each (var type:String in MOUSE_EVENTS) list.removeEventListener(type, blockMouse, true);
             for each (var view:Object in views) view.clip.removeEventListener(MouseEvent.CLICK, beforeBindingClick, true);
         }
     }

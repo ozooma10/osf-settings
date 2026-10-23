@@ -60,7 +60,6 @@ namespace OSFSettings
         bool m_historyDirty{};
         std::vector<std::pair<std::string, std::string>> m_recent;
         void SaveHistory(); // Called with m_mutex held; writes cannot overtake one another.
-        bool RecordOpenedLocked(std::string_view mod, std::string_view id);
         std::atomic_uint64_t m_revision{};
     };
 }

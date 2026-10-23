@@ -51,6 +51,27 @@ namespace OSFSettings::SettingsJson
             return field->get<std::string>();
         }
 
+        SettingsVersion ReadVersion(const nlohmann::ordered_json& value, const std::string& name)
+        {
+            Require(value.is_string(), name + " must be a major.minor.patch string");
+            const auto version = SettingsVersion::Parse(value.get_ref<const std::string&>());
+            Require(version.has_value(), name + " must be major.minor.patch (each component 0-65535, no leading zeros or suffixes)");
+            return *version;
+        }
+
+        DependencyVersions ReadDependencies(const nlohmann::ordered_json& document)
+        {
+            DependencyVersions result;
+            if (const auto dependencies = document.find("dependencies"); dependencies != document.end()) {
+                Require(dependencies->is_object(), "dependencies must be an object mapping settings mod ids to minimum versions");
+                for (const auto& [id, minimum] : dependencies->items()) {
+                    Require(IsValidModId(id) && id != "internal", "dependency must name a settings mod id: " + id);
+                    result[id] = ReadVersion(minimum, "dependency " + id);
+                }
+            }
+            return result;
+        }
+
         std::optional<SettingValue> DecodeDefault(const nlohmann::ordered_json& value, const SettingDefinition& setting)
         {
             if (std::holds_alternative<KeyDefinition>(setting.definition) && value.is_string()) {
@@ -62,12 +83,10 @@ namespace OSFSettings::SettingsJson
         }
     }
 
-    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error, std::optional<SettingsVersion>* expectedSettingsVersion)
+    std::optional<ModSchema> ParseSchema(std::istream& input, std::string_view modId, std::string& error, DependencyVersions* dependencies)
     {
         error.clear();
-        if (expectedSettingsVersion) {
-            expectedSettingsVersion->reset();
-        }
+        if (dependencies) dependencies->clear();
         try {
             std::set<std::string> groupNames;
             std::set<std::string> hotkeyIds;
@@ -77,6 +96,11 @@ namespace OSFSettings::SettingsJson
             bool inHotkeys{};
             bool inMenus{};
             bool inOptions{};
+            // Finish parsing valid JSON so dependency metadata survives duplicate control names too.
+            std::string duplicateError;
+            const auto unique = [&](bool inserted, std::string message) {
+                if (!inserted && duplicateError.empty()) duplicateError = std::move(message);
+            };
             const auto document = nlohmann::ordered_json::parse(input,
                 [&](int depth, nlohmann::ordered_json::parse_event_t event, nlohmann::ordered_json& value) {
                     if (event == nlohmann::ordered_json::parse_event_t::key) {
@@ -86,13 +110,13 @@ namespace OSFSettings::SettingsJson
                             inMenus = value == "menus";
                         } else if (depth == 2 && inGroups) {
                             const auto& name = value.get_ref<const std::string&>();
-                            Require(groupNames.insert(name).second, "duplicate group name: " + name);
+                            unique(groupNames.insert(name).second, "duplicate group name: " + name);
                         } else if (depth == 2 && inHotkeys) {
                             const auto& id = value.get_ref<const std::string&>();
-                            Require(hotkeyIds.insert(id).second, "duplicate hotkey id: " + id);
+                            unique(hotkeyIds.insert(id).second, "duplicate hotkey id: " + id);
                         } else if (depth == 2 && inMenus) {
                             const auto& id = value.get_ref<const std::string&>();
-                            Require(menuIds.insert(id).second, "duplicate menu id: " + id);
+                            unique(menuIds.insert(id).second, "duplicate menu id: " + id);
                         } else if (depth == 4 && inGroups) {
                             inOptions = value == "options";
                             if (inOptions) {
@@ -100,38 +124,30 @@ namespace OSFSettings::SettingsJson
                             }
                         } else if (depth == 5 && inGroups && inOptions) {
                             const auto& option = value.get_ref<const std::string&>();
-                            Require(optionValues.insert(option).second, "duplicate option: " + option);
+                            unique(optionValues.insert(option).second, "duplicate option: " + option);
                         }
                     }
                     return true;
                 });
-            return ParseSchema(document, modId, error, expectedSettingsVersion);
+            auto schema = ParseSchema(document, modId, error, dependencies);
+            if (!duplicateError.empty()) {
+                error = std::move(duplicateError);
+                return std::nullopt;
+            }
+            return schema;
         } catch (const std::exception& exception) {
             error = exception.what();
             return std::nullopt;
         }
     }
 
-    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error,
-        std::optional<SettingsVersion>* expectedSettingsVersion)
+    std::optional<ModSchema> ParseSchema(const nlohmann::ordered_json& document, std::string_view modId, std::string& error, DependencyVersions* dependencies)
     {
         error.clear();
-        if (expectedSettingsVersion) expectedSettingsVersion->reset();
+        if (dependencies) dependencies->clear();
         try {
             Require(document.is_object(), "schema must be an object");
             ModSchema mod;
-            if (const auto expected = document.find("expectedSettingsVersion"); expected != document.end()) {
-                Require(expected->is_string(), "expectedSettingsVersion must be a major.minor.patch string");
-                mod.expectedSettingsVersion = SettingsVersion::Parse(expected->get_ref<const std::string&>());
-                Require(mod.expectedSettingsVersion.has_value(), "expectedSettingsVersion must be major.minor.patch (each component 0-65535, no leading zeros or suffixes)");
-                if (expectedSettingsVersion) {
-                    *expectedSettingsVersion = mod.expectedSettingsVersion;
-                }
-            }
-            Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
-            const auto version = document.find("schemaVersion");
-            Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
-
             mod.id = modId;
             Require(IsValidModId(mod.id), "mod id must use 1-128 lowercase ASCII letters, digits, dots, underscores, or hyphens and must not be a Windows device name");
             // Values share a folder with OSF Settings' internal.json.
@@ -139,9 +155,41 @@ namespace OSFSettings::SettingsJson
             if (document.contains("id")) {
                 Require(RequiredText(document, "id") == mod.id, "schema id must match the filename stem");
             }
+            mod.page = mod.id; // Resolved against the other schemas once they have all loaded.
+            if (const auto extends = document.find("extends"); extends != document.end()) {
+                // A string names a required host; the object form can make the host optional.
+                if (extends->is_object()) {
+                    mod.extends = RequiredText(*extends, "mod");
+                    if (const auto optional = extends->find("optional"); optional != extends->end()) {
+                        Require(optional->is_boolean(), "extends optional must be a boolean");
+                        mod.extendsOptional = optional->get<bool>();
+                    }
+                } else {
+                    mod.extends = RequiredText(document, "extends");
+                }
+                Require(IsValidModId(mod.extends), "extends must name a settings mod id: " + mod.extends);
+                Require(mod.extends != "internal", "extends must not name the reserved mod id 'internal'");
+                Require(mod.extends != mod.id, "extends must not name the schema's own mod id");
+            }
+            mod.dependencies = ReadDependencies(document);
+            // Extending a page needs the host installed, so report it like any other dependency.
+            if (!mod.extends.empty() && !mod.extendsOptional) mod.dependencies.emplace(mod.extends, SettingsVersion{});
+            if (dependencies) {
+                *dependencies = mod.dependencies;
+                // A schema that failed to load joins no page, so an optional host is never missing for it.
+                if (mod.extendsOptional) dependencies->erase(mod.extends);
+            }
+            Require(!document.contains("actions"), "top-level actions are no longer supported; move each action into a group with type: action and remove its group field");
+            const auto version = document.find("schemaVersion");
+            Require(version == document.end() || (version->is_number_integer() && *version == 1), "schemaVersion must be the integer 1 when present");
             mod.title = OptionalText(document, "title", mod.id);
             mod.description = OptionalText(document, "description");
-
+            if (const auto release = document.find("version"); release != document.end()) {
+                mod.version = ReadVersion(*release, "version");
+            }
+            const auto nexusModId = ReadInteger(document, "nexusModId").value_or(0);
+            Require(nexusModId >= 0 && nexusModId <= UINT32_MAX, "nexusModId must be an unsigned 32-bit integer");
+            mod.nexusModId = static_cast<std::uint32_t>(nexusModId);
             const auto groups = document.find("groups");
             Require(groups != document.end() && groups->is_object(), "groups must be an object");
             std::set<std::string> settingKeys;

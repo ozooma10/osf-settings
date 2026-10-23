@@ -6,16 +6,41 @@
     "title": "Settings file osfsettings.json could not be loaded",
     "reason": "default must not be empty",
     "impact": "The mod that provides this file has no settings page, hotkeys or menu cards in OSF Settings.",
-    "nextSteps": "Update or reinstall the mod that provides this file, then restart Starfield. The file's full path is in OSF Settings.log."
+    "nextSteps": "Update or reinstall the mod that provides this file.",
+    "note": "The file's full path is in OSF Settings.log.",
+    "affectedMods": [
+      "Unknown mod (osfsettings.json)"
+    ]
   },
   {
     "modId": "osfsettings",
-    "id": "osfui-update-required",
+    "id": "dependency:osfui",
     "severity": "WARNING",
-    "title": "OSF UI needs an update",
-    "impact": "OSF UI 1.6.0 is installed. Versions before 2.0 use the older settings menu and do not provide the OSF Settings compatibility bridge.",
-    "nextSteps": "Update OSF UI to version 2.0 or later, then restart Starfield. Select Open mod page to visit OSF UI on Nexus Mods in your web browser.",
-    "nexusModId": 17711
+    "title": "OSF UI update recommended",
+    "impact": "Mods that use OSF UI ask for a newer release. Some of their features may not work until you update it.",
+    "nextSteps": "Update OSF UI to 2.1.0 or later.",
+    "nexusModId": 17711,
+    "installedVersion": "2.0.0",
+    "requiredVersion": "2.1.0",
+    "note": "This is an advisory check. Follow each mod's installation instructions for compatibility.",
+    "affectedMods": [
+      "OSF Animation",
+      "Navigation Tools"
+    ]
+  },
+  {
+    "modId": "osfsettings",
+    "id": "dependency:sample-pack",
+    "severity": "WARNING",
+    "title": "sample-pack is missing",
+    "impact": "Mods that use sample-pack cannot find it. Some of their features may not work until you install it.",
+    "nextSteps": "Install sample-pack 1.2.0 or later.",
+    "requiredVersion": "1.2.0",
+    "reason": "No settings manifest named sample-pack.json was found in the active installation.",
+    "note": "This is an advisory check. Follow each mod's installation instructions for compatibility.",
+    "affectedMods": [
+      "My dependent mod"
+    ]
   },
   {
     "modId": "design-preview",

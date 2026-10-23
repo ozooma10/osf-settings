@@ -1,6 +1,7 @@
 package
 {
     import flash.display.DisplayObject;
+    import flash.display.InteractiveObject;
     import flash.display.MovieClip;
     import flash.display.Sprite;
     import flash.display.Stage;
@@ -10,7 +11,6 @@ package
     import flash.events.MouseEvent;
     import flash.geom.Rectangle;
     import flash.text.TextField;
-    import flash.text.TextFormat;
     import flash.ui.Keyboard;
     import flash.utils.Dictionary;
     import flash.utils.getDefinitionByName;
@@ -59,6 +59,10 @@ package
         private var bar:Object;
         private var background:MovieClip;
         private var menuStage:Stage;
+        // Game classes resolved once at startup and used by later input and layout.
+        private var global:Object;
+        private var userEventClass:Class;
+        private var buttonDataClass:Class;
         private var nav:NavigationPane;
         // The sidebar entry that is open, as NavigationPane.key() spells it.
         private var navSelection:String = "page/mods";
@@ -68,7 +72,6 @@ package
         private var heading:TextField;
         private var headerSummary:TextField;
         private var section:TextField;
-        private var count:TextField;
         private var homeMods:TextField;
         private var homeCount:TextField;
         private var headerCount:TextField;
@@ -159,10 +162,8 @@ package
             heading = label("", MenuStyle.LEFT, MenuStyle.TITLE_TOP, MenuStyle.RIGHT - MenuStyle.LEFT - 460, MenuStyle.TITLE_SIZE + 16, MenuStyle.TITLE_SIZE, MenuStyle.WHITE, true);
             headerSummary = label("", MenuStyle.RIGHT - 440, MenuStyle.TITLE_TOP + MenuStyle.TITLE_SIZE - MenuStyle.SECTION_SIZE - 2, 440,
                 MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            alignRight(headerSummary);
+            MenuStyle.align(headerSummary, "right");
             section = label("", MenuStyle.LEFT, MenuStyle.SECTION_TOP, 750, MenuStyle.SECTION_SIZE + 14, MenuStyle.SECTION_SIZE, MenuStyle.WHITE, true);
-            count = label("", MenuStyle.LEFT + MenuStyle.LIST_WIDTH - 230, MenuStyle.SECTION_TOP + 3, 230, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            alignRight(count);
             // Home headings carry their count right after the title: INTERFACES 10, MODS 3.
             headerCount = label("", MenuStyle.LEFT, MenuStyle.SECTION_TOP + 3, 200, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             homeMods = label(tr("home.mods"), MenuStyle.LEFT, 0, 750, MenuStyle.SECTION_SIZE + 14, MenuStyle.SECTION_SIZE, MenuStyle.WHITE, true);
@@ -180,7 +181,9 @@ package
             options.addEventListener(MouseEvent.MOUSE_WHEEL, wheelList);
             options.addEventListener(MouseEvent.CLICK, clickSetting, true);
             settingsDetails = new SettingsDetails(); addChild(settingsDetails);
-            issueDetails = new IssueDetails(); issueDetails.visible = false; addChild(issueDetails);
+            issueDetails = new IssueDetails(function():void { if (!closing && issuesPage()) openIssueModPage(current()); }, issueConfirmHint,
+                function():void { footerDirty = true; }, function():void { if (!closing && issuesPage()) copyIssue(current()); });
+            issueDetails.visible = false; addChild(issueDetails);
             issueSummary = new IssueSummary(); issueSummary.visible = false; addChild(issueSummary);
             homeDetails = new HomeDetails(); homeDetails.visible = false; addChild(homeDetails);
             homeEmpty = new HomeEmpty(function():void {
@@ -192,6 +195,9 @@ package
             status.multiline = true; status.wordWrap = true;
             empty = label("", MenuStyle.LEFT + 16, MenuStyle.LIST_TOP + 16, MenuStyle.LIST_WIDTH - 40, 130, MenuStyle.BODY_SIZE, MenuStyle.MUTED);
             empty.multiline = true; empty.wordWrap = true;
+            global = definition("Shared.GlobalFunc");
+            userEventClass = definition("Shared.Components.ButtonControls.ButtonData.UserEventData");
+            buttonDataClass = definition("Shared.Components.ButtonControls.ButtonData.ButtonBaseData");
             bar = create("Shared.Components.ButtonControls.ButtonBar.ButtonBar");
             // Native button scale; the _LRG movie's vanilla buttons are already larger.
             bar.x = MenuStyle.RIGHT; bar.y = MenuStyle.FOOTER_Y; addChild(bar as MovieClip); bar.Initialize(1, 30);
@@ -372,27 +378,34 @@ package
             if (value) { launcher.focused = false; launcher.releaseAccept(); }
             else if (homePage() && launcher.hasEntries && (!options.entryCount || expandedLauncher())) launcher.focused = true;
             syncInput();
-            menuStage.focus = value ? nav : launcherPage() ? launcher : options as MovieClip;
+            menuStage.focus = focusTarget();
             decorate(); updateSelection();
         }
+        // Whichever of the sidebar, Home's interface shelf or the list owns keyboard focus.
+        private function focusTarget():InteractiveObject
+        {
+            return nav.focused ? nav : launcherPage() ? launcher : options as MovieClip;
+        }
         private function tabOf(row:Object):String { return groupTabs[row.group] ? groupTabs[row.group].id : row.group; }
+        // The page a row is shown on. Contributed rows keep their own mod for reads and writes.
+        private static function pageOf(row:Object):String { return row.page ? String(row.page) : String(row.mod); }
         // Whether a row belongs on the open mod's page, narrowed to the open section if there is one.
         private function inPage(row:Object):Boolean
         {
-            return modID != "" && row.mod == modID && row.type != "launcher" && (!groupID || tabOf(row) == groupID);
+            return modID != "" && pageOf(row) == modID && row.type != "launcher" && (!groupID || tabOf(row) == groupID);
         }
-        // Sidebar input: Accept or Right enters the settings panel for editing.
+        // Directional input only moves focus; Accept explicitly starts editing.
         private function navigate(name:String, pressed:Boolean):Boolean
         {
             if (name == "Up" || name == "Down") {
                 if (pressed && navigationFrame != frame) { navigationFrame = frame; openEntry(nav.move(name == "Up" ? -1 : 1)); }
                 return true;
             }
-            if (name == "Right") { if (pressed) enterPage(); return true; }
+            if (name == "Right") { if (pressed) enterPage(false); return true; }
             if (name == "Accept") {
                 // Enter on release, like the interface shelf, so the press cannot also act on the page.
                 if (pressed) navAcceptHeld = true;
-                else if (navAcceptHeld) { navAcceptHeld = false; enterPage(); }
+                else if (navAcceptHeld) { navAcceptHeld = false; enterPage(true); }
                 return true;
             }
             if (name == "Cancel") { if (!pressed) back(); return true; }
@@ -400,12 +413,12 @@ package
             // only when the movie declines it does the engine forward the real Scaleform click.
             return false;
         }
-        private function enterPage():void
+        private function enterPage(editing:Boolean):void
         {
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
             if (options.entryCount || homePage() && launcher.hasEntries) focusNav(false);
             if (modID && !nav.focused) {
-                beginValueEditing();
+                if (editing) beginValueEditing();
                 // The input that entered the panel must not also change its first value.
                 activationFrame = frame;
                 deferInput();
@@ -416,10 +429,13 @@ package
         // The nearest non-header entry from index, trying step first and then fallback.
         private function settingFrom(index:int, step:int, fallback:int):int
         {
-            for each (var direction:int in [step, fallback]) {
-                for (var i:int = index + direction; direction && i >= 0 && i < options.entryCount; i += direction)
-                    if (options.GetDataForEntry(i).row.type != "section") return i;
-            }
+            var found:int = settingToward(index, step);
+            return found >= 0 ? found : settingToward(index, fallback);
+        }
+        private function settingToward(index:int, direction:int):int
+        {
+            for (var i:int = index + direction; direction && i >= 0 && i < options.entryCount; i += direction)
+                if (options.GetDataForEntry(i).row.type != "section") return i;
             return -1;
         }
         private function noteMove(name:String):void
@@ -442,11 +458,18 @@ package
         }
         private function button(text:String, eventName:String, callback:Function):void
         {
-            var eventClass:Class = definition("Shared.Components.ButtonControls.ButtonData.UserEventData");
-            var dataClass:Class = definition("Shared.Components.ButtonControls.ButtonData.ButtonBaseData");
             var factory:Class = definition("Shared.Components.ButtonControls.ButtonFactory.ButtonFactory");
-            var data:Object = new dataClass(text, new eventClass(eventName, callback));
+            var data:Object = new buttonDataClass(text, new userEventClass(eventName, callback));
             buttons[eventName] = {data:data, clip:Object(factory).AddToButtonBar("BasicButton", data, bar)};
+        }
+        private function issueConfirmHint():MovieClip
+        {
+            var hint:MovieClip = create("BasicButton") as MovieClip;
+            // Display only: the existing footer owns Accept, so it can fire only once.
+            hint.mouseEnabled = hint.mouseChildren = false;
+            Object(hint).SetButtonData(new buttonDataClass("", new userEventClass("Accept")));
+            Object(hint).ButtonColor = MenuStyle.INK;
+            return hint;
         }
         private function updateButton(name:String, text:String, visible:Boolean):Boolean
         {
@@ -464,11 +487,6 @@ package
             MenuStyle.setText(status, text);
             status.textColor = error ? MenuStyle.ACCENT : MenuStyle.MUTED;
         }
-        private function alignRight(field:TextField):void
-        {
-            var format:TextFormat = field.defaultTextFormat; format.align = "right";
-            field.defaultTextFormat = format; field.setTextFormat(format);
-        }
         private function refresh(preserve:Boolean = true):void
         {
             // Read the revision first so a concurrent completion triggers another refresh.
@@ -479,19 +497,25 @@ package
             mods = []; var seen:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
                 if (row.type == "launcher") continue;
-                if (!seen[row.mod]) {
-                    var mod:Object = {mod:row.mod, title:row.modTitle, hint:row.modDescription, count:0, settings:0, actions:0, interfaces:0, hotkeys:[]};
-                    seen[row.mod] = mod; mods.push(mod);
+                var page:String = pageOf(row);
+                if (!seen[page]) {
+                    var mod:Object = {mod:page, title:row.pageTitle || row.modTitle, hint:"", count:0,
+                        settings:0, actions:0, interfaces:0, hotkeys:[], contributors:[]};
+                    seen[page] = mod; mods.push(mod);
                 }
-                mod = seen[row.mod]; mod.count++;
+                mod = seen[page]; mod.count++;
+                // The page's own description, never a contributor's.
+                if (row.mod == page) { if (!mod.hint) mod.hint = row.modDescription; }
+                else if (mod.contributors.indexOf(row.modTitle) < 0) mod.contributors.push(row.modTitle);
                 if (row.type == "hotkey") mod.hotkeys.push(row);
                 else if (row.type == "action") mod.actions++;
                 else mod.settings++;
             }
-            for each (row in allRows) if (row.type == "launcher" && seen[row.mod]) seen[row.mod].interfaces++;
-            // OSF Settings' only entry is the key that opens this menu, which Keybindings already lists.
+            for each (row in allRows) if (row.type == "launcher" && seen[pageOf(row)]) seen[pageOf(row)].interfaces++;
+            // OSF Settings' only entry is the key that opens this menu, which Home's header
+            // names and Keybindings lists first.
             mods = mods.filter(function(item:Object, index:int, source:Array):Boolean {
-                return item.mod != "osfsettings" || item.settings > 0 || item.actions > 0;
+                return item.mod != KeybindingsData.SELF_MOD || item.settings > 0 || item.actions > 0;
             });
             for each (mod in mods) { mod.summary = summaryParts(mod).join("  |  "); mod.chips = summaryParts(mod, false); }
             if (!seen[modID]) modID = "";
@@ -504,7 +528,7 @@ package
         {
             groups = []; groupTabs = new Dictionary(); var folded:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
-                if (row.type == "launcher" || row.mod != modID) continue;
+                if (row.type == "launcher" || pageOf(row) != modID) continue;
                 if (groupTabs[row.group]) { ++groupTabs[row.group].size; continue; }
                 var id:String = String(row.group), split:int = id.indexOf(" - ");
                 var name:String = split > 0 ? id.substr(0, split) : id;
@@ -528,6 +552,17 @@ package
                 if (modID && navSelection.indexOf("section/") == 0) navSelection = "mod/" + modID;
             }
         }
+        // A mod's full page leads with its own interfaces as Open buttons, launched like Home's cards.
+        private function interfaceRows():Array
+        {
+            var rows:Array = [];
+            if (modID && !groupID) for each (var row:Object in allRows) if (row.type == "launcher" && pageOf(row) == modID) {
+                rows.push({type:"action", launcher:row.key, mod:row.mod, key:"@launcher/" + row.key, title:row.title, hint:row.hint,
+                    message:row.message, editable:row.editable, actionState:tr(row.editable ? "buttons.open" : "actions.stateUnavailable"),
+                    group:"@interfaces", groupTitle:tr("home.interfaces")});
+            }
+            return rows;
+        }
         // The detail card lists hotkeys themselves, so its chips leave out their count.
         private function summaryParts(mod:Object, hotkeys:Boolean = true):Array
         {
@@ -536,13 +571,14 @@ package
             if (hotkeys && mod.hotkeys.length) parts.push(mod.hotkeys.length == 1 ? tr("summary.hotkey") : tr("summary.hotkeys", {count:mod.hotkeys.length}));
             if (mod.actions) parts.push(mod.actions == 1 ? tr("summary.action") : tr("summary.actions", {count:mod.actions}));
             if (mod.interfaces) parts.push(mod.interfaces == 1 ? tr("summary.interface") : tr("summary.interfaces", {count:mod.interfaces}));
+            if (mod.contributors && mod.contributors.length) parts.push(mod.contributors.length == 1 ?
+                tr("summary.extension") : tr("summary.extensions", {count:mod.contributors.length}));
             return parts;
         }
         private function populate(preserve:Boolean = false):void
         {
             refreshing = true; requestedRefresh = false;
             nativeHotkeys.populate(allRows);
-            nativeHotkeys.fullPage = bindingsPage();
             keybindings.visible = bindingsPage();
             // With no mod settings, interfaces fill Home as a grid that cannot collapse.
             if (homePage()) launcher.populate(allRows, preserve, !mods.length);
@@ -562,8 +598,6 @@ package
             settingsList.resize(listWidth, rowHeight());
             empty.width = listWidth - 40;
             section.visible = !bindingsPage() && !issuesPage() && !homeEmptyState() && !modID;
-            count.visible = issuesPage();
-            count.x = MenuStyle.RIGHT - count.width;
             issueSummary.visible = issuesPage();
             if (issueSummary.visible) issueSummary.update(issues);
             headerCount.visible = section.visible && homePage();
@@ -572,7 +606,7 @@ package
             var selected:int = preserve ? options.selectedIndex : 0;
             var scroll:int = preserve ? options.scrollPosition : 0;
             var selectedRow:Object = preserve && (issuesPage() || bindingsPage() || editingPanel) ? current() : null;
-            var rows:Array = [], source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? allRows : mods;
+            var rows:Array = [], source:Array = bindingsPage() ? keybindings.filtered() : issuesPage() ? issues : modID ? interfaceRows().concat(allRows) : mods;
             for each (var row:Object in source) {
                 if (row.type == "launcher") continue;
                 if (modID && !inPage(row)) continue;
@@ -596,12 +630,10 @@ package
             if (editingPanel && !keptSelection) clearValueEditing();
             var rebuilt:Boolean = settingsList.setEntries(data, preserve);
             if (rebuilt) { hoverIndex = -1; editingIndex = -1; }
-            // Home's detail card and empty state show current keys, which come from vanilla Controls.
-            var homeKeys:Boolean = homeEmptyState();
-            for each (mod in mods) if (homePage() && mod.hotkeys.length) homeKeys = true;
-            if (hasHotkeys || homeKeys) nativeHotkeys.open();
+            // Home's header, detail card and empty state all show current keys, which come from vanilla Controls.
+            if (hasHotkeys || homePage()) nativeHotkeys.open();
             var openKey:String = "";
-            for each (row in allRows) if (row.mod == "osfsettings" && row.key == "openMenu" && row.type == "hotkey") openKey = String(row.value || "");
+            for each (row in allRows) if (row.mod == KeybindingsData.SELF_MOD && row.key == KeybindingsData.OPEN_MENU && row.type == "hotkey") openKey = String(row.value || "");
             homeEmpty.show(openKey);
             selected = data.length ? Math.max(0, Math.min(selected, data.length - 1)) : -1;
             if (selected >= 0 && data[selected].row.type == "section") selected = settingFrom(selected, 1, -1);
@@ -612,15 +644,16 @@ package
             syncValueEditing();
             if (homePage() && launcher.hasEntries && !data.length && !nav.focused) launcher.focused = true;
             syncInput();
-            if (!searching()) menuStage.focus = nav.focused ? nav : launcherPage() ? launcher : options as MovieClip;
+            if (!searching()) menuStage.focus = focusTarget();
             empty.visible = !expandedLauncher() && !homeEmptyState();
             MenuStyle.setText(empty, data.length ? "" : bindingsPage() ? keybindings.emptyText : issuesPage() ? tr("menu.noIssues") : tr("menu.noSettings"));
             var title:String = bindingsPage() ? tr("menu.keybindings") : issuesPage() ? tr("menu.issues") : tr("menu.home"); var summary:String = "";
             for each (var mod:Object in mods) if (mod.mod == modID) { title = mod.title; summary = mod.summary; }
+            // Home names the key that opens this menu; its empty state already shows that key in full.
+            if (homePage() && !homeEmptyState() && openKey) summary = tr("home.opensMenuHint", {key:openKey});
             MenuStyle.fit(heading, title.toUpperCase());
             MenuStyle.fit(headerSummary, summary);
             MenuStyle.setText(section, launcher.visible ? tr("home.interfaces") : issuesPage() ? tr("menu.reportedIssues") : homePage() ? tr("home.mods") : "");
-            MenuStyle.setText(count, tr("counts.issues", {count:data.length}));
             MenuStyle.setText(headerCount, String(launcher.visible ? launcher.count : data.length));
             headerCount.x = section.x + section.textWidth + 18;
             MenuStyle.setText(homeCount, String(data.length));
@@ -696,6 +729,7 @@ package
             if (homeDetails.visible) homeDetails.show(row, launcher.visible ? launcher.y : MenuStyle.LIST_TOP);
             issueDetails.visible = issuesPage();
             issueDetails.show(issueDetails.visible ? row : null);
+            issueDetails.updateInteraction(issuesPage() && !nav.focused && !modalBusy(), actionAcceptHeld);
             if (bindingsPage()) keybindings.showSelection(row);
             updateFooter(row);
         }
@@ -709,7 +743,7 @@ package
             if (inlineSetting(row) && !editingValue()) return tr("buttons.editSetting");
             if (inlineSetting(row) && NumericSetting.isSlider(row)) return tr("buttons.done");
             if (row) switch (row.type) {
-                case "action": return tr("buttons.runAction");
+                case "action": return tr(row.launcher ? "buttons.open" : "buttons.runAction");
                 case "string": return tr("buttons.editText");
                 case "key":
                 case "hotkey": return tr("buttons.changeBinding");
@@ -730,7 +764,9 @@ package
             if (reporting) {
                 acceptVisible = Boolean(row && row.nexusModId);
                 acceptText = tr("buttons.openModPage");
-                resetVisible = clearVisible = issueDetails.scrollable;
+                resetVisible = issueDetails.hasDetails;
+                // Controllers have one button for both: it scrolls open details to their end, then copies them.
+                clearVisible = Boolean(row) && (issueDetails.detailsExpanded || issueDetails.scrollable);
             }
             if (bindingsPage()) {
                 resetVisible = false;
@@ -753,8 +789,10 @@ package
             // Compute final states first; each native button is updated at most once.
             var changed:Boolean = updateButton("Accept", acceptText, acceptVisible);
             changed = updateButton("Cancel", backText, !busy) || changed;
-            changed = updateButton("YButton", reporting ? tr("buttons.scrollUp") : tr("buttons.reset"), resetVisible) || changed;
-            changed = updateButton("XButton", reporting ? tr("buttons.scrollDown") : tr("buttons.clearBinding"), clearVisible) || changed;
+            changed = updateButton("YButton", !reporting ? tr("buttons.reset") :
+                tr(issueDetails.detailsExpanded ? "buttons.hideDetails" : "buttons.showDetails"), resetVisible) || changed;
+            changed = updateButton("XButton", !reporting ? tr("buttons.clearBinding") :
+                tr(issueDetails.detailsExpanded && issueDetails.atEnd ? "buttons.copyDetails" : "buttons.scroll"), clearVisible) || changed;
             var pages:Boolean = !captureRow && !busy && !searching() && !editing;
             changed = updateButton("LShoulder", tr("buttons.previousPage"), pages) || changed;
             changed = updateButton("RShoulder", tr("buttons.nextPage"), pages) || changed;
@@ -775,34 +813,44 @@ package
         private function selectionChanged(event:Event):void
         {
             if (refreshing || skipSection()) return;
+            launcher.releaseAccept();
             syncValueEditing();
             decorate();
+            // Mod page and copy feedback last until the next report; then the restart reminder returns.
+            if (issuesPage()) setStatus(tr("menu.issuesHint"));
             if (!nav.focused && homePage() && !expandedLauncher()) focusLauncher(false);
             else updateSelection();
         }
-        private function focusSound(event:Event):void { Object(definition("Shared.GlobalFunc")).PlayMenuSound("UIMenuGeneralFocus"); }
+        private function focusSound(event:Event):void { global.PlayMenuSound("UIMenuGeneralFocus"); }
         private function itemPressed(event:Event):void { accept(); }
+        private function openIssueModPage(row:Object):void
+        {
+            if (row && row.nexusModId) setStatus(BGSCodeObj.openIssueModPage(row.mod, row.id) ? tr("issues.modPageOpened") : tr("errors.openModPage"));
+        }
+        private function copyIssue(row:Object):void
+        {
+            if (!row) return;
+            var copied:Boolean = Boolean(BGSCodeObj.copyIssue(row.mod, row.id));
+            setStatus(copied ? tr("issues.copied") : tr("errors.copyIssue"), !copied);
+        }
         private function accept():void
         {
-            if (confirmingAction() || launcherPage() && launcher.acceptHeld) return;
+            if (confirmingAction() || (launcherPage() || launcherAction()) && launcher.acceptHeld) return;
             if (editingString()) { stringEditor.save(frame); return; }
             if (bindingBusy() || searching() || inputCoolingDown()) return;
             if (captureRow) { confirmBinding(); return; }
             if (closing || launcher.launching || refreshing || requestedRefresh || activationFrame == frame || settingsList.dragging) return;
             activationFrame = frame;
-            if (nav.focused) { enterPage(); return; }
+            if (nav.focused) { enterPage(true); return; }
             if (homeEmptyState()) { openEntry({kind:"page", id:"bindings"}); return; }
             var row:Object = current(); if (!row) return;
             if (inlineSetting(row) && row.editable && !editingValue()) {
                 beginValueEditing(); return;
             }
             if (inlineSetting(row) && NumericSetting.isSlider(row)) { finishValue(); return; }
-            if (issuesPage()) {
-                if (row.nexusModId) setStatus(BGSCodeObj.openIssueModPage(row.mod, row.id) ? tr("issues.modPageOpened") : tr("errors.openModPage"));
-                return;
-            }
+            if (issuesPage()) { openIssueModPage(row); return; }
             if (launcherPage()) { if (row.more) launcher.toggleExpanded(); else if (row.editable) launcher.launch(row); }
-            else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; enterPage(); }
+            else if (!modID && !bindingsPage()) { openEntry({kind:"mod", id:row.mod}); nav.focused = true; enterPage(true); }
             else if (row.type == "bool") options.OnEntryPressed();
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
@@ -815,10 +863,10 @@ package
         }
         private function reset():void
         {
-            if (searching() || editingString() || confirmingAction() || current() && current().type == "action") return;
-            if (issuesPage()) { issueDetails.scroll(-160); return; }
-            if (captureRow || bindingBusy() || current() && current().type == "hotkey") return;
             var row:Object = current();
+            if (searching() || editingString() || confirmingAction() || row && row.type == "action") return;
+            if (issuesPage()) { issueDetails.toggleDetails(); return; }
+            if (captureRow || bindingBusy() || row && row.type == "hotkey") return;
             if (closing || refreshing || requestedRefresh || settingsList.dragging || !modID || !row || !row.editable) return;
             if (row.defaultKnown === false) return;
             activationFrame = frame;
@@ -870,10 +918,14 @@ package
             if (result && result.ok) {
                 if (row.type == "key") row.valueName = NumericSetting.text(row, value);
                 row.value = value; updateSelection();
-            }
-            if (result && result.ok) setStatus(tr("menu.autoSave"));
-            else setStatus(result ? result.error : tr("errors.save"), true);
+                setStatus(tr("menu.autoSave"));
+            } else setStatus(result ? result.error : tr("errors.save"), true);
             requestedRefresh = true;
+        }
+        private function launcherAction():Boolean
+        {
+            var row:Object = current();
+            return Boolean(modID && row && row.type == "action" && row.launcher);
         }
         private function beginAction(row:Object):void
         {
@@ -889,6 +941,10 @@ package
         }
         private function invokeAction(row:Object):void
         {
+            if (row.launcher) {
+                launcher.launch({mod:row.mod, key:row.launcher, title:row.title});
+                syncInput(); return;
+            }
             var result:Object = BGSCodeObj.invokeAction(row.mod, row.key);
             // Refresh from the service, including handlers which completed immediately.
             refresh();
@@ -934,6 +990,7 @@ package
         public function ProcessUserEvent(name:String, pressed:Boolean):Boolean
         {
             if (name == "Accept") actionAcceptHeld = pressed;
+            if (name == "Accept" && !pressed && releaseLauncherAccept()) return true;
             if (!initialized || closing) return false;
             if (pressed) noteMove(name);
             if (modalBusy() || searching()) return modalInput(name, pressed);
@@ -941,17 +998,21 @@ package
             if (routeNavigation(name, pressed)) return true;
             if (nav.focused) return false;
             if (bar.ProcessUserEvent(name, pressed)) return true;
-            if (launcherPage()) return false;
+            if (launcherPage() || !editingValue()) return false;
             var clip:Object = options.FindClipForEntry(options.selectedIndex);
-            return editingValue() && clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
+            return clip && clip.IsSlider() ? Boolean(clip.Slider_mc.ProcessUserEvent(name, pressed)) : false;
+        }
+        // The list entry clip that holds target, or null outside the list's entries.
+        private function entryOf(target:DisplayObject):DisplayObject
+        {
+            while (target && target != options && !("itemIndex" in target)) target = target.parent;
+            return target && target != options ? target : null;
         }
         private function hoverEntry(event:MouseEvent):void
         {
-            var index:int = -1;
             var hovered:DisplayObject = event.type == MouseEvent.MOUSE_OVER ? event.target as DisplayObject : event.relatedObject;
-            if (hovered && MovieClip(options).contains(hovered))
-                for (var target:DisplayObject = hovered; target && target != options; target = target.parent)
-                    if ("itemIndex" in target) { index = Object(target).itemIndex; break; }
+            var entry:DisplayObject = hovered && MovieClip(options).contains(hovered) ? entryOf(hovered) : null;
+            var index:int = entry ? Object(entry).itemIndex : -1;
             if (index != hoverIndex) { hoverIndex = index; decorate(); updateSelection(); }
         }
         // Vanilla ignores the wheel while the list's input is off, which it is whenever the
@@ -968,9 +1029,8 @@ package
         private function clickSetting(event:MouseEvent):void
         {
             if (!modID || !initialized || closing || refreshing || requestedRefresh || settingsList.dragging || modalBusy()) return;
-            var entry:DisplayObject = event.target as DisplayObject;
-            while (entry && entry != options && !("itemIndex" in entry)) entry = entry.parent;
-            if (!entry || entry == options) return;
+            var entry:DisplayObject = entryOf(event.target as DisplayObject);
+            if (!entry) return;
             var item:Object = options.GetDataForEntry(Object(entry).itemIndex);
             if (!item || item.row.type == "section") return;
             if (mouseSelectOnly) { event.stopImmediatePropagation(); return; }
@@ -1003,11 +1063,9 @@ package
             CONFIG::testHarness { if (event.type == MouseEvent.MOUSE_DOWN) testMouseDown = testMouseEvent(event, testMouseDown); }
             if (modalBusy() || !initialized || closing) return;
             var target:DisplayObject = event.target as DisplayObject;
+            var entry:DisplayObject = entryOf(target);
             if (event.type == MouseEvent.MOUSE_DOWN && target) {
-                var entry:DisplayObject = target;
-                while (entry && entry != options && !("itemIndex" in entry)) entry = entry.parent;
-                mouseSelectOnly = Boolean(modID && entry && entry != options &&
-                    (nav.focused || options.selectedIndex != Object(entry).itemIndex));
+                mouseSelectOnly = Boolean(modID && entry && (nav.focused || options.selectedIndex != Object(entry).itemIndex));
                 // Pressing anywhere on the page moves focus there; the footer buttons act on either.
                 if (nav.contains(target)) { focusNav(true); return; }
                 if (nav.focused && !MovieClip(bar).contains(target)) focusNav(false);
@@ -1019,10 +1077,7 @@ package
             if (!target || !MovieClip(options).contains(target)) return;
             if (homePage()) focusLauncher(false);
             menuStage.focus = options as MovieClip; syncInput();
-            while (target && target != options) {
-                if ("itemIndex" in target) { options.selectedIndex = Object(target).itemIndex; break; }
-                target = target.parent;
-            }
+            if (entry) options.selectedIndex = Object(entry).itemIndex;
             if (event.type == MouseEvent.MOUSE_DOWN && mouseSelectOnly) event.stopImmediatePropagation();
         }
         // Named game events and raw keyboard events choose the same input owner.
@@ -1052,9 +1107,12 @@ package
             var pressed:Boolean = event.type == KeyboardEvent.KEY_DOWN;
             var input:String = keyboardName(event.keyCode);
             if (input == "Accept") actionAcceptHeld = pressed;
+            if (input == "Accept" && !pressed && releaseLauncherAccept()) {
+                event.stopImmediatePropagation(); event.preventDefault(); return;
+            }
             if (modalBusy() || searching()) { modalInput(input, pressed, event); return; }
             if (!pressed) {
-                if (input == "Accept" && (nav.focused || launcherPage())) {
+                if (input == "Accept" && (nav.focused || launcherPage() || launcherAction())) {
                     routeNavigation(input, false); event.stopImmediatePropagation(); event.preventDefault(); return;
                 }
                 if (inputCoolingDown() || input == "Accept") event.stopImmediatePropagation();
@@ -1066,11 +1124,11 @@ package
                 event.stopImmediatePropagation(); event.preventDefault(); return;
             }
             if (nav.focused) return;
+            var row:Object = current();
             if (event.keyCode == Keyboard.B) reset();
-            else if (event.keyCode == Keyboard.X && (issuesPage() || current() && (current().type == "key" || current().type == "hotkey"))) clearBinding();
+            else if (event.keyCode == Keyboard.X && (issuesPage() || row && (row.type == "key" || row.type == "hotkey"))) clearBinding();
             else if (issuesPage() && (input == "PageUp" || input == "PageDown")) issueDetails.scroll(input == "PageUp" ? -360 : 360);
             else if (input == "Left" || input == "Right") {
-                var row:Object = current();
                 if (modID && row && row.editable) {
                     if (row.type == "hotkey") nativeHotkeys.navigate(event);
                     else if (NumericSetting.isSlider(row)) {
@@ -1084,6 +1142,15 @@ package
             } else return;
             event.stopImmediatePropagation(); event.preventDefault();
         }
+        // Release belongs to the launcher that received the press, even if another input owner took over.
+        private function releaseLauncherAccept():Boolean
+        {
+            if (!launcher || !launcher.acceptHeld) return false;
+            if (initialized && !closing && !nav.focused && !modalBusy() && !searching() && !inputCoolingDown() &&
+                (launcherPage() || launcherAction())) launcher.accept(false);
+            else launcher.releaseAccept();
+            return true;
+        }
         private function routeNavigation(name:String, pressed:Boolean):Boolean
         {
             // Page navigation responds on press in either focus area. Consume the
@@ -1095,11 +1162,12 @@ package
             if (nav.focused) return navigate(name, pressed);
             if (modID && (name == "Left" || name == "Right") && !editingPanel) {
                 // Binding slots are navigation too; Left from the first slot leaves the page.
-                if (current() && current().type == "hotkey" && (name == "Right" || nativeHotkeys.selectedSlot == 1)) return false;
+                var row:Object = current();
+                if (row && row.type == "hotkey" && (name == "Right" || nativeHotkeys.selectedSlot == 1)) return false;
                 if (pressed && name == "Left") focusNav(true);
                 return true;
             }
-            if (launcherPage() && name == "Accept") { launcher.accept(pressed); return true; }
+            if ((launcherPage() || launcherAction()) && name == "Accept") { launcher.accept(pressed); return true; }
             if (launcherPage() && navigateLauncher(name, pressed)) return true;
             if (homePage() && launcher.hasEntries && name == "Up" && options.selectedIndex <= 0) {
                 if (pressed && navigationFrame != frame) { navigationFrame = frame; focusLauncher(true); }
@@ -1153,6 +1221,7 @@ package
             if (initialized && !closing) {
                 launcher.advance();
                 nativeHotkeys.advance();
+                issueDetails.updateInteraction(issuesPage() && !nav.focused && !modalBusy(), actionAcceptHeld);
                 keybindings.advance(allRows,bindingBusy());
                 syncInput();
                 if (footerDirty) updateFooter(current());
@@ -1174,9 +1243,14 @@ package
         private function clearBinding():void
         {
             if (searching() || editingString() || confirmingAction()) return;
-            if (issuesPage()) { issueDetails.scroll(160); return; }
-            if (current() && current().type == "hotkey") { nativeHotkeys.clearBinding(); return; }
+            if (issuesPage()) {
+                if (!issueDetails.detailsExpanded) issueDetails.scrollOn();
+                else if (issueDetails.atEnd) copyIssue(current());
+                else issueDetails.scroll(240);
+                return;
+            }
             var row:Object = current();
+            if (row && row.type == "hotkey") { nativeHotkeys.clearBinding(); return; }
             if (!captureRow && modID && row && row.type == "key" && row.allowUnbound) edit(row, 255);
         }
         private function beginBinding(row:Object):void
@@ -1217,6 +1291,7 @@ package
         }
         private function focusLost(event:Event):void
         {
+            issueDetails.cancelInteraction();
             finishValue();
             actionAcceptHeld = false;
             launcher.releaseAccept();
