@@ -9,6 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 . "$PSScriptRoot/BuildCache.ps1"
+. "$PSScriptRoot/WorkflowCache.ps1"
 $source = Join-Path $repo 'data\Scripts\Source'
 $output = Join-Path $repo 'build\papyrus'
 $flags = Join-Path $Imports 'Starfield_Papyrus_Flags.flg'
@@ -41,7 +42,16 @@ if ($TestHarness) {
     $testSource = Join-Path $repo 'tests\harness\papyrus'
     $testOutput = Join-Path $output 'harness'
     New-Item -ItemType Directory -Force -Path $testOutput | Out-Null
-    & $Compiler $testSource "-i=$testSource;$source;$Imports" "-o=$testOutput" "-f=$flags" -all
-    if ($LASTEXITCODE -ne 0) { throw 'Papyrus acceptance fixture compilation failed.' }
-    & (Join-Path $repo 'tests\harness\build-fixture.ps1') -OutputDirectory $testOutput
+    $null = Invoke-WorkflowCached -Stamp (Join-Path $output 'harness.cache.json') -Force:$Force -Fingerprint {
+        Get-WorkflowFingerprint -Paths @($source, $testSource, $Imports, (Split-Path $Compiler -Parent),
+            "$repo/tests/harness/build-fixture.ps1", $PSCommandPath, "$PSScriptRoot/WorkflowCache.ps1")
+    } -Outputs {
+        $expected = @(Get-ChildItem -LiteralPath $testSource -Filter '*.psc' -File | ForEach-Object { Join-Path $testOutput ($_.BaseName + '.pex') })
+        $expected += Join-Path $testOutput 'OSFSettingsAcceptance.esm'
+        @(Get-WorkflowFiles (@($testOutput) + $expected))
+    } -Action {
+        & $Compiler $testSource "-i=$testSource;$source;$Imports" "-o=$testOutput" "-f=$flags" -all
+        if ($LASTEXITCODE -ne 0) { throw 'Papyrus acceptance fixture compilation failed.' }
+        & (Join-Path $repo 'tests/harness/build-fixture.ps1') -OutputDirectory $testOutput
+    }
 }

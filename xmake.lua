@@ -69,4 +69,5 @@ target("OSF Settings")
     add_installfiles("data/SFSE/Plugins/OSF/Settings/translations/ja/osfsettings.json", { prefixdir = "SFSE/Plugins/OSF/Settings/translations/ja" })
     add_installfiles("data/Scripts/Source/OSFSettings.psc", { prefixdir = "Scripts/Source" })
     add_installfiles("build/papyrus/OSFSettings.pex", { prefixdir = "Scripts" })
-    add_installfiles("build/scaleform/OSFSettingsMenu.swf", "build/scaleform/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })
+    local movieDir = has_config("test_harness") and "build/scaleform/harness" or "build/scaleform"
+    add_installfiles(movieDir .. "/OSFSettingsMenu.swf", movieDir .. "/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })
