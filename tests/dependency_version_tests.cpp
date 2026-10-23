@@ -42,9 +42,6 @@ int TestDependencyVersions()
         auto invalid = document;
         invalid["dependencies"]["osfui"] = bad;
         check(!parse(invalid), "invalid dependency versions are rejected");
-        invalid = document;
-        invalid["version"] = bad;
-        check(!parse(invalid), "invalid own versions are rejected");
     }
     for (const auto& bad : { Json(-1), Json(1.5), Json(4294967296ULL) }) {
         auto invalid = document;

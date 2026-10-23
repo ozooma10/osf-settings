@@ -57,6 +57,24 @@ Preview fixtures explicitly mark required keys with `allowUnbound: false`.
 Checks use throwing functions or explicit failure counters and remain active with
 `NDEBUG` in `releasedbg`; passing tests are not disabled C assertions.
 
+## Coverage ownership
+
+The October 2026 audit retained all 24 native suites and removed repeated cases
+within them. Keep shared behavior in its owning fixture:
+
+- `default_inheritance_tests.cpp` covers unchanged writes and actual `Reset` /
+  `ResetMod` behavior across every setting type and schema updates. Repeating
+  `Set(default)` in each type fixture adds no reset coverage.
+- `native/settings_tests.cpp` keeps type-specific validation and serialization,
+  plus a shared store save-failure/retry case. Service and API tests retain their
+  distinct error mapping, notification and snapshot checks.
+- `security_tests.cpp` checks real temporary-file cleanup by enumerating the
+  directory. The writer uses unique `.tmp.*` names; checking that a fixed `.tmp`
+  path is absent does not prove cleanup. Stale-file preservation stays covered.
+- Schema/store tests own general parsing rules, including version syntax, enum
+  collisions and NUL rejection. Preview-exporter tests focus on row output, key
+  resolution and propagation of representative parser failures.
+
 ## Menu previews
 
 Install the optional preview dependency once with
@@ -77,7 +95,8 @@ pwsh -NoProfile -File tools/preview-menu.ps1 -BuildOnly
 ```
 
 Exporter regressions include declared empty enum choices/defaults, their labels,
-single-choice editability and rejection of undeclared or duplicate empty values.
+and single-choice editability. Native store tests cover rejection of undeclared
+or duplicate empty values.
 The Papyrus suite also checks empty choices through getters, setters, invalid-write
 preservation and reload with a non-empty schema default.
 

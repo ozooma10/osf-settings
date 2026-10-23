@@ -307,11 +307,10 @@ int main()
             "menu IDs are case-sensitive and keep authored order");
         for (const auto* source : {
             R"({"groups":{},"menus":{"panel":{"title":"First","menu":"A"},"panel":{"title":"Second","menu":"B"}}})",
-            R"({"groups":{},"menus":{"panel":{"title":"First","menu":"A"},"panel":{"title":"Second","menu":"B"}}})",
             R"({"menus":{"panel":{"title":"First","menu":"A"},"panel":{"title":"Second","menu":"B"}},"groups":{}})"
         }) {
             check(!parseText(source) && error == "duplicate menu id: panel",
-                "duplicate source IDs cannot overwrite menus, including escaped keys");
+                "duplicate source IDs cannot overwrite menus before or after groups");
         }
         {
             std::ifstream input("examples/launchers/absolute-control.json");
@@ -319,9 +318,6 @@ int main()
             check(result && error.empty() && result->menus.size() == 1 && result->menus[0].id == "panel" &&
                 result->menus[0].menu == "AbsoluteControlPanelMenu", "shipped launcher example loads through the source parser");
         }
-        check(!SettingsJson::ParseSchema(menuDocument, std::string(129, 'x'), error),
-            "launcher mod IDs retain their length limit when supplied by the filename");
-
         const auto root = fs::temp_directory_path() /
             ("osf-hotkey-schema-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         struct Cleanup

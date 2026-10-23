@@ -110,15 +110,13 @@ class PreviewRowsTests(unittest.TestCase):
         self.assertFalse(only["editable"])
 
     def test_production_schema_rejections(self):
+        # Keep exporter-specific key resolution and one ordinary parser failure.
+        # The native schema/store suites own the general validation matrix.
         invalid = [
             {"key": "mouse", "type": "key", "default": "Mouse4"},
             {"key": "mouse", "type": "key", "default": 5, "allowMouse": "true"},
             {"key": "key", "type": "key", "default": "UNBOUND", "allowUnbound": False},
             {"key": "alias", "type": "key", "default": "VK_F4"},
-            {"key": "choice", "type": "enum", "default": "a", "options": ["a", "A"]},
-            {"key": "undeclared-empty", "type": "enum", "default": "", "options": ["freefly"]},
-            {"key": "duplicate-empty", "type": "enum", "default": "", "options": ["", ""]},
-            {"key": "float", "type": "float", "default": 1, "step": 0},
             {"id": "action", "type": "action"},
         ]
         for setting in invalid:
