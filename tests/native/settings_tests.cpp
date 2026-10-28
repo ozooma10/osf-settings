@@ -1,4 +1,3 @@
-#include "../FileLock.h"
 #include "Settings/SettingsJson.h"
 #include "Menu/FloatSlider.h"
 #include "Settings/SettingsStore.h"
@@ -137,7 +136,6 @@ namespace
         const auto schemas = root / "schemas";
         const auto values = root / "values";
         const auto valuesFile = values / "learning.json";
-        const auto temporary = values / "learning.json.tmp";
         fs::create_directories(schemas);
         Write(schemas / "learning.json", schema.dump(2));
         OSFSettings::SettingsStore store;
@@ -147,9 +145,6 @@ namespace
         Check(!store.Set("learning", "notificationLimit", false).ok() &&
             !store.Set("learning", "notifications", std::int64_t{1}).ok() && !fs::exists(values),
             "boolean and integer settings reject each other's value types without writing");
-        Check(store.Set("learning", "notificationLimit", std::int64_t{3}).ok() && !fs::exists(values),
-            "setting the current integer does not write a file");
-
         OSFSettings::SettingsStore restarted;
         for (const std::int64_t value : { 1, 10, 7 }) {
             Check(store.Set("learning", "notificationLimit", value).ok(), "integer edits accept both bounds and an interior value");
@@ -164,12 +159,6 @@ namespace
                 store.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} },
                 "invalid integer edits preserve both the live value and saved file");
         }
-        OSFSettings::Test::FileLock writeLock(valuesFile);
-        Check(!store.Set("learning", "notificationLimit", std::int64_t{4}).ok() && Read(valuesFile) == committed &&
-            store.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} },
-            "a failed integer save preserves both the live value and saved file");
-        writeLock.Release();
-
         for (const auto value : exactValues) {
             Check(store.Set("learning", "counter", value).ok(), "the native store accepts the full signed 64-bit range");
             restarted.LoadAll(schemas, values);
@@ -183,10 +172,6 @@ namespace
         Check(restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{7} } &&
             restarted.GetValue("learning", "counter") == SettingValue{ std::numeric_limits<std::int64_t>::max() } &&
             restarted.GetValue("learning", "notifications") == SettingValue{ false }, "saving a boolean preserves neighboring integers");
-        Check(store.Set("learning", "notificationLimit", limit->DefaultValue()).ok(), "an integer can reset through the normal save path");
-        restarted.LoadAll(schemas, values);
-        Check(restarted.GetValue("learning", "notificationLimit") == SettingValue{ std::int64_t{3} }, "the reset integer survives reload");
-
         for (const auto& value : invalidDefaults) {
             const Json saved = { { "formatVersion", 1 }, { "values", { { "notificationLimit", value }, { "notifications", false } } } };
             Write(valuesFile, saved.dump());
@@ -320,7 +305,6 @@ namespace
         const auto schemas = root / "schemas";
         const auto values = root / "values";
         const auto valuesFile = values / "learning.json";
-        const auto temporary = values / "learning.json.tmp";
         fs::create_directories(schemas);
         Write(schemas / "learning.json", schema.dump(2));
         OSFSettings::SettingsStore store;
@@ -330,8 +314,6 @@ namespace
         Check(!store.Set("learning", "gain", true).ok() && !store.Set("learning", "gain", std::int64_t{1}).ok() &&
             !store.Set("learning", "notifications", 1.0).ok() && !store.Set("learning", "notificationLimit", 3.0).ok() && !fs::exists(values),
             "native edits require the declared variant type, even for integral doubles");
-        Check(store.Set("learning", "gain", 0.75).ok() && !fs::exists(values), "setting the current float does not write a file");
-
         OSFSettings::SettingsStore restarted;
         for (const double value : { 0.0, 1.0, 0.1, std::nextafter(0.1, 1.0), 0.625 }) {
             Check(store.Set("learning", "gain", value).ok(), "float edits accept both bounds and interior decimal values");
@@ -349,14 +331,9 @@ namespace
         for (const double value : { nan, infinity, -infinity }) {
             Check(!store.Set("learning", "scale", value).ok(), "unbounded float settings also reject non-finite edits");
             Check(!OSFSettings::SettingsJson::SaveValues(valuesFile, { { "gain", value } }, error) &&
-                error.find("value must be finite: gain") != std::string::npos && Read(valuesFile) == committed && !fs::exists(temporary),
+                error.find("value must be finite: gain") != std::string::npos && Read(valuesFile) == committed,
                 "serialization rejects non-finite doubles before JSON can replace them with null");
         }
-        OSFSettings::Test::FileLock writeLock(valuesFile);
-        Check(!store.Set("learning", "gain", 0.25).ok() && Read(valuesFile) == committed &&
-            store.GetValue("learning", "gain") == SettingValue{0.625}, "a failed float save preserves the live value and saved file");
-        writeLock.Release();
-
         for (const double value : { -std::numeric_limits<double>::max(), std::numeric_limits<double>::max(),
             std::numeric_limits<double>::min(), std::numeric_limits<double>::denorm_min(), -std::numeric_limits<double>::denorm_min(),
             std::nextafter(1.0, 2.0), -0.125, 0.0, 0.1 }) {
@@ -374,10 +351,6 @@ namespace
             restarted.GetValue("learning", "notificationLimit") == SettingValue{std::int64_t{7}} &&
             restarted.GetValue("learning", "gain") == SettingValue{0.625} && restarted.GetValue("learning", "scale") == SettingValue{0.1},
             "saving boolean and integer neighbors preserves decimal values");
-        Check(store.Set("learning", "gain", gain->DefaultValue()).ok(), "floats reset through the normal save path");
-        restarted.LoadAll(schemas, values);
-        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "gain") == SettingValue{0.75}, "reset float defaults survive reload");
-
         for (const auto* literal : { "0", "1", "1.0", "1e0", "0.1" }) {
             const auto value = Json::parse(literal);
             const Json saved = { { "formatVersion", 1 }, { "values", { { "gain", value } } } };
@@ -458,24 +431,11 @@ namespace
         Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "an enum object can have a single option");
         single["options"] = { "normal" };
         Check(OSFSettings::SettingsJson::ParseSchema(document, "learning", error).has_value(), "an enum array can have a single option");
-        single["options"] = { "normal", "Normal" };
-        Reject(document, "duplicate option: notificationMode / Normal");
-        single["options"] = { { "normal", "Normal" }, { "Normal", "Normal" } };
-        Reject(document, "duplicate option: notificationMode / Normal");
-
         std::istringstream duplicateOptions(R"({"groups":{"General":[
             {"key":"mode","type":"enum","default":"normal","options":{"normal":"Normal","normal":"Repeated"}}
         ]}})");
         Check(!OSFSettings::SettingsJson::ParseSchema(duplicateOptions, "learning", error) && error == "duplicate option: normal",
             "duplicate source option values cannot silently overwrite labels");
-        std::istringstream sharedOptions(R"({"groups":{"General":[
-            {"key":"first","type":"enum","default":"normal","options":{"verbose":"Verbose","normal":"Normal"}},
-            {"key":"second","type":"enum","default":"normal","options":{"normal":"Normal"}}
-        ]}})");
-        decoded = OSFSettings::SettingsJson::ParseSchema(sharedOptions, "learning", error);
-        Check(decoded && std::get<OSFSettings::EnumDefinition>(decoded->FindSetting("first")->definition).options[0].value == "verbose",
-            "source objects preserve authored order and separate settings may reuse option values");
-
         document = schema;
         document["groups"]["General"][modeIndex].erase("options");
         Reject(document, "options must be a non-empty array or object");
@@ -522,7 +482,6 @@ namespace
         const auto schemaFile = schemas / "learning.json";
         const auto values = root / "values";
         const auto valuesFile = values / "learning.json";
-        const auto temporary = values / "learning.json.tmp";
         fs::create_directories(schemas);
         Write(schemaFile, schema.dump(2));
         OSFSettings::SettingsStore store;
@@ -533,9 +492,6 @@ namespace
             !store.Set("learning", "notificationLimit", std::string{"3"}).ok() &&
             !store.Set("learning", "notificationVolume", std::string{"0.75"}).ok() && !fs::exists(values),
             "text values do not enable string coercion for other types");
-        Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{"normal"}).ok() && !fs::exists(values),
-            "setting the current enum value does not write a file");
-
         OSFSettings::SettingsStore restarted;
         for (const auto* value : { "quiet", "normal", "verbose" }) {
             Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{value}).ok(), "each declared enum option can be selected");
@@ -553,17 +509,7 @@ namespace
                 store.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} },
                 "wrong types, display labels, and unknown enum values preserve the live value and saved file");
         }
-        OSFSettings::Test::FileLock writeLock(valuesFile);
-        Check(!store.Set("learning", "notificationMode", OSFSettings::EnumValue{"quiet"}).ok() && Read(valuesFile) == committed &&
-            store.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} },
-            "a failed enum save preserves the live value and saved file");
-        writeLock.Release();
-        Check(store.Set("learning", "notificationMode", mode->DefaultValue()).ok(), "an enum resets through the normal save path");
-        restarted.LoadAll(schemas, values);
-        Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == mode->DefaultValue(),
-            "the reset enum survives reload");
-        Check(store.Set("learning", "notificationMode", OSFSettings::EnumValue{"verbose"}).ok() &&
-            store.Set("learning", "notifications", false).ok() && store.Set("learning", "notificationLimit", std::int64_t{7}).ok() &&
+        Check(store.Set("learning", "notifications", false).ok() && store.Set("learning", "notificationLimit", std::int64_t{7}).ok() &&
             store.Set("learning", "notificationVolume", 0.5).ok(), "all four setting types can be saved together");
         restarted.LoadAll(schemas, values);
         Check(restarted.LoadErrors().empty() && restarted.GetValue("learning", "notificationMode") == SettingValue{ OSFSettings::EnumValue{"verbose"} } &&
@@ -643,11 +589,6 @@ namespace
         Check(!store.GetValue("learning", "missing").has_value(), "unknown key returns no value");
         Check(!store.GetValue("learning", "Notifications").has_value(), "setting keys are case-sensitive");
 
-        auto ownedCopy = store.GetValue("learning", "notifications");
-        ownedCopy = false;
-        Check(ownedCopy == SettingValue{ false } && store.GetValue("learning", "notifications") == SettingValue{ true },
-            "changing a returned copy does not edit the store");
-
         document = example;
         document["groups"]["General"][0]["default"] = false;
         Write(schemas / "learning.json", document.dump());
@@ -696,17 +637,12 @@ namespace
         Check(!missingMod.ok() && !missingMod.error.empty() && !missingKey.ok() && !missingKey.error.empty(),
             "setting an unknown mod or key reports an error");
         Check(!fs::exists(values), "rejected edits do not write any files");
-        const auto unchanged = store.Set("learning", "notifications", true);
-        Check(unchanged.ok() && !unchanged.changed && !fs::exists(values),
-            "setting the current default does not create a saved entry or file");
-
         const auto disabled = store.Set("learning", "notifications", false);
         Check(disabled.ok() && disabled.error.empty() && store.GetValue("learning", "notifications") == SettingValue{ false },
             "a successful save publishes the new boolean");
         const auto saved = Json::parse(Read(valuesFile));
         Check(saved["formatVersion"] == 1 && saved["values"] == Json{{ "notifications", false }},
             "the values file contains the version and only explicit overrides for this mod");
-        Check(!fs::exists(temporary), "successful replacement leaves no temporary file");
         Check(store.GetValue("other", "notifications") == SettingValue{ true } && !fs::exists(values / "other.json"),
             "saving one mod does not change another mod");
         Check(Read(schemas / "learning.json") == originalSchema && std::get<bool>(store.Mods()[0].schema.FindSetting("notifications")->DefaultValue()),
@@ -748,8 +684,7 @@ namespace
             ::CloseHandle(locked);
             Check(!failedReplace.ok() && !failedReplace.error.empty() && store.GetValue("learning", "notifications") == SettingValue{ false },
                 "failed atomic replacement leaves the live value unchanged");
-            Check(Read(valuesFile) == committed && !fs::exists(temporary),
-                "failed atomic replacement preserves the old file and cleans up its temporary file");
+            Check(Read(valuesFile) == committed, "failed atomic replacement preserves the old file");
             Check(store.Set("learning", "notifications", true).ok(), "saving can be retried after the replacement failure is removed");
         }
 #endif

@@ -13,6 +13,8 @@
 
 #include <Windows.h>
 #undef ERROR
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <optional>
 
@@ -23,6 +25,15 @@ namespace OSFSettings::HotkeyInput
         constexpr std::ptrdiff_t kInitializeCall = 0x303;
         using InitializeHook = REL::THook<void(RE::MenuControls*)>;
         std::optional<InitializeHook> g_initializeHook;
+
+        // Settings-backed key observers stay quiet while one of these menus owns input.
+        bool BlockingMenuOpen(const RE::UI& ui)
+        {
+            // Leaked: the engine's string pool may already be gone when statics are destroyed.
+            static const auto* menus = new std::array<RE::BSFixedString, 5>{ RE::BSFixedString("MainMenu"), RE::BSFixedString("LoadingMenu"),
+                RE::BSFixedString("Console"), RE::BSFixedString("PauseMenu"), RE::BSFixedString("OSFSettingsMenu") };
+            return std::ranges::any_of(*menus, [&](const RE::BSFixedString& menu) { return ui.IsMenuOpen(menu); });
+        }
 
         class HotkeyHandler final : public BSInputEventUserStandalone
         {
@@ -46,12 +57,7 @@ namespace OSFSettings::HotkeyInput
                 TestHarness::ObserveInput(button, true);
                 const auto* ui = RE::UI::GetSingleton();
                 if (button->deviceType != RE::InputEvent::DeviceType::kGamepad &&
-                    button->value > 0 && button->heldDownSecs == 0 && ui && ui->pauseRequestCount == 0 &&
-                    !ui->IsMenuOpen(RE::BSFixedString("MainMenu")) &&
-                    !ui->IsMenuOpen(RE::BSFixedString("LoadingMenu")) &&
-                    !ui->IsMenuOpen(RE::BSFixedString("Console")) &&
-                    !ui->IsMenuOpen(RE::BSFixedString("PauseMenu")) &&
-                    !ui->IsMenuOpen(RE::BSFixedString("OSFSettingsMenu"))) {
+                    button->value > 0 && button->heldDownSecs == 0 && ui && ui->pauseRequestCount == 0 && !BlockingMenuOpen(*ui)) {
                     KeyActions::Get().Process(button->deviceType == RE::InputEvent::DeviceType::kMouse ?
                         MouseVirtualKey(static_cast<std::uint32_t>(button->idCode)) : static_cast<std::uint32_t>(button->idCode));
                 }

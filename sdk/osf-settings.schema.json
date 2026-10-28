@@ -1,0 +1,410 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/ozooma10/osf-settings-slim/main/sdk/osf-settings.schema.json",
+  "title": "OSF Settings mod definition schema",
+  "description": "Settings, action buttons, hotkeys, launchers, and dependency versions. Save as Data/SFSE/Plugins/OSF/Settings/schemas/<modId>.json.",
+  "$comment": "Unknown properties are allowed, as in the runtime parser. Runtime validation additionally checks filenames, case-insensitive uniqueness, cross-field relationships, UTF-8 byte lengths, native key names, and integer JSON syntax. See docs/SETTINGS.md.",
+  "type": "object",
+  "required": ["groups"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Editor schema reference. Ignored by OSF Settings."
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version. Omit or use 1."
+    },
+    "id": {
+      "$ref": "#/definitions/modId"
+    },
+    "title": {
+      "type": "string",
+      "description": "Display name; defaults to the mod ID. With launchers, must be single-line UTF-8 within 256 bytes."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description of the mod."
+    },
+    "version": {
+      "$ref": "#/definitions/version"
+    },
+    "nexusModId": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Nexus Mods ID; 0 or omission means unspecified."
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "Minimum versions keyed by settings mod ID, not DLL filename.",
+      "propertyNames": { "$ref": "#/definitions/modId" },
+      "additionalProperties": { "$ref": "#/definitions/version" }
+    },
+    "extends": {
+      "description": "Settings mod ID whose page shows this mod's controls. Values, actions and hotkeys stay owned by this mod, and the host is treated as a dependency. Must not be this schema's own ID. The object form with optional: true instead hides this mod while the host is not installed, without reporting it.",
+      "oneOf": [
+        { "$ref": "#/definitions/modId" },
+        {
+          "type": "object",
+          "required": ["mod"],
+          "properties": {
+            "mod": { "$ref": "#/definitions/modId" },
+            "optional": {
+              "type": "boolean",
+              "description": "When true, a missing host hides this mod's controls, hotkeys and launchers instead of reporting a missing dependency."
+            }
+          }
+        }
+      ]
+    },
+    "groups": {
+      "type": "object",
+      "description": "Headings mapped to control arrays, displayed in authored order. Use an empty object for a mod with only hotkeys or launchers.",
+      "propertyNames": { "$ref": "#/definitions/nonEmptyText" },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            { "$ref": "#/definitions/setting" },
+            { "$ref": "#/definitions/action" }
+          ]
+        }
+      }
+    },
+    "hotkeys": {
+      "type": "object",
+      "description": "Rebindable actions keyed by ID. IDs must be unique ignoring ASCII case.",
+      "propertyNames": { "$ref": "#/definitions/identifier" },
+      "additionalProperties": { "$ref": "#/definitions/hotkey" }
+    },
+    "menus": {
+      "type": "object",
+      "description": "Native menu launchers keyed by case-sensitive ID. IDs must be nonempty, single-line UTF-8 within 256 bytes.",
+      "propertyNames": {
+        "allOf": [
+          { "$ref": "#/definitions/text256" },
+          { "minLength": 1 }
+        ]
+      },
+      "additionalProperties": { "$ref": "#/definitions/menu" }
+    },
+    "actions": false
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["menus"],
+        "properties": { "menus": { "type": "object", "minProperties": 1 } }
+      },
+      "then": {
+        "properties": { "title": { "$ref": "#/definitions/text256" } }
+      }
+    }
+  ],
+  "definitions": {
+    "modId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Lowercase ASCII letters, digits, dots, underscores, or hyphens. Windows device names and internal are reserved. A root id must match the filename without .json.",
+      "allOf": [
+        { "not": { "pattern": "[^a-z0-9._-]" } },
+        { "not": { "enum": [".", "..", "internal"] } },
+        { "not": { "pattern": "^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\\.|$)" } }
+      ]
+    },
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "[^A-Za-z0-9_-]" },
+      "description": "Nonempty ASCII letters, digits, underscores, or hyphens."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])(\\.(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])){2}$",
+      "not": { "pattern": "[^0-9.]" },
+      "description": "major.minor.patch, each component 0-65535, without leading zeros or suffixes.",
+      "examples": ["1.0.0", "2.1.0"]
+    },
+    "text": {
+      "type": "string",
+      "not": { "pattern": "\\u0000" }
+    },
+    "nonEmptyText": {
+      "allOf": [
+        { "$ref": "#/definitions/text" },
+        { "minLength": 1 }
+      ]
+    },
+    "singleLineText": {
+      "type": "string",
+      "not": { "pattern": "[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]" },
+      "description": "Single-line UTF-8 without NUL, control characters, or Unicode line/paragraph separators."
+    },
+    "text256": {
+      "allOf": [
+        { "$ref": "#/definitions/singleLineText" },
+        { "maxLength": 256 }
+      ],
+      "description": "Single-line UTF-8, at most 256 bytes. The editor counts characters; the runtime enforces the byte limit."
+    },
+    "text4096": {
+      "allOf": [
+        { "$ref": "#/definitions/singleLineText" },
+        { "maxLength": 4096 }
+      ],
+      "description": "Single-line UTF-8, at most 4096 bytes. The editor counts characters; the runtime enforces the byte limit."
+    },
+    "integer": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807,
+      "description": "Signed 64-bit integer. Write without a decimal point or exponent."
+    },
+    "setting": {
+      "type": "object",
+      "required": ["key", "type", "default"],
+      "properties": {
+        "key": {
+          "allOf": [{ "$ref": "#/definitions/nonEmptyText" }],
+          "description": "Setting key, unique across all groups ignoring ASCII case. API lookups use exact casing."
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label; defaults to the key."
+        },
+        "hint": {
+          "type": "string",
+          "description": "Help text."
+        },
+        "requires": {
+          "const": "restart",
+          "description": "Show a restart notice. Values still save immediately."
+        }
+      },
+      "oneOf": [
+        {
+          "title": "Boolean setting",
+          "properties": {
+            "type": { "const": "bool" },
+            "default": { "type": "boolean" }
+          }
+        },
+        {
+          "title": "Integer setting",
+          "properties": {
+            "type": { "const": "int" },
+            "default": { "$ref": "#/definitions/integer" },
+            "min": { "$ref": "#/definitions/integer" },
+            "max": { "$ref": "#/definitions/integer" }
+          }
+        },
+        {
+          "title": "Float setting",
+          "properties": {
+            "type": { "const": "float" },
+            "default": { "type": "number" },
+            "min": { "type": "number", "description": "Inclusive lower bound." },
+            "max": { "type": "number", "description": "Inclusive upper bound." },
+            "step": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "default": 0.1,
+              "description": "Editor increment. Stored values need not be multiples of this step."
+            }
+          }
+        },
+        {
+          "title": "Enum setting",
+          "required": ["options"],
+          "properties": {
+            "type": { "const": "enum" },
+            "default": {
+              "allOf": [{ "$ref": "#/definitions/text" }],
+              "description": "Must exactly match a declared option value, including an empty string when declared."
+            },
+            "options": {
+              "description": "Options in authored order. Values must be unique ignoring ASCII case. Empty values are allowed.",
+              "oneOf": [
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "$ref": "#/definitions/text" }
+                },
+                {
+                  "type": "object",
+                  "minProperties": 1,
+                  "propertyNames": { "$ref": "#/definitions/text" },
+                  "additionalProperties": {
+                    "type": "string",
+                    "description": "Display label. An empty label falls back to the option value."
+                  }
+                }
+              ]
+            },
+            "optionLabels": false
+          }
+        },
+        {
+          "title": "String setting",
+          "properties": {
+            "type": { "const": "string" },
+            "default": { "$ref": "#/definitions/text4096" },
+            "maxLength": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096,
+              "default": 256,
+              "description": "Maximum UTF-8 bytes, not characters. The default must fit this limit."
+            }
+          }
+        },
+        {
+          "title": "Key setting",
+          "properties": {
+            "type": { "const": "key" },
+            "default": {
+              "description": "Recognized native key name (case-insensitive) or bindable Windows virtual-key integer. 255/UNBOUND means unbound; mouse buttons need allowMouse.",
+              "oneOf": [
+                { "$ref": "#/definitions/nonEmptyText" },
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 255,
+                  "not": { "const": 27 }
+                }
+              ],
+              "examples": ["F4", "UNBOUND", "MOUSE1", 115]
+            },
+            "allowUnbound": {
+              "type": "boolean",
+              "default": true,
+              "description": "Allow clearing the binding."
+            },
+            "allowMouse": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow MOUSE1-MOUSE5 (VK 1, 2, 4, 5, 6)."
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "required": ["allowUnbound"],
+                "properties": { "allowUnbound": { "const": false } }
+              },
+              "then": {
+                "properties": {
+                  "default": {
+                    "not": {
+                      "anyOf": [
+                        { "const": 255 },
+                        { "type": "string", "pattern": "^[Uu][Nn][Bb][Oo][Uu][Nn][Dd]$" }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "required": ["allowMouse"],
+                "properties": { "allowMouse": { "const": true } }
+              },
+              "else": {
+                "properties": {
+                  "default": {
+                    "not": {
+                      "anyOf": [
+                        { "enum": [1, 2, 4, 5, 6] },
+                        { "type": "string", "pattern": "^[Mm][Oo][Uu][Ss][Ee][1-5]$" }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "action": {
+      "type": "object",
+      "required": ["type", "id", "label"],
+      "properties": {
+        "type": { "const": "action" },
+        "id": {
+          "allOf": [
+            { "$ref": "#/definitions/identifier" },
+            { "maxLength": 128 }
+          ],
+          "description": "Action ID, unique across all groups ignoring ASCII case."
+        },
+        "label": {
+          "allOf": [
+            { "$ref": "#/definitions/text256" },
+            { "minLength": 1 }
+          ]
+        },
+        "hint": { "$ref": "#/definitions/text4096" },
+        "confirmation": {
+          "allOf": [
+            { "$ref": "#/definitions/text4096" },
+            { "minLength": 1 }
+          ],
+          "description": "Ask for confirmation before invoking. Omit to invoke immediately."
+        },
+        "group": false,
+        "key": false,
+        "default": false,
+        "value": false,
+        "requires": false
+      }
+    },
+    "hotkey": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "id": false,
+        "label": { "$ref": "#/definitions/nonEmptyText" },
+        "default": {
+          "allOf": [{ "$ref": "#/definitions/nonEmptyText" }],
+          "description": "Native keyboard key name, matched without case sensitivity. Omit to start unbound.",
+          "examples": ["F6"]
+        },
+        "menu": {
+          "allOf": [{ "$ref": "#/definitions/nonEmptyText" }],
+          "description": "Registered native menu to open. Omit for a C++ or Papyrus callback."
+        },
+        "group": {
+          "allOf": [{ "$ref": "#/definitions/nonEmptyText" }],
+          "description": "Must match an existing group name. Omit to use the first group, or General when groups is empty."
+        }
+      }
+    },
+    "menu": {
+      "type": "object",
+      "required": ["title", "menu"],
+      "properties": {
+        "id": false,
+        "title": {
+          "allOf": [
+            { "$ref": "#/definitions/text256" },
+            { "minLength": 1 }
+          ]
+        },
+        "description": { "$ref": "#/definitions/text4096" },
+        "menu": {
+          "allOf": [
+            { "$ref": "#/definitions/text256" },
+            { "minLength": 1, "not": { "const": "OSFSettingsMenu" } }
+          ],
+          "description": "Exact name registered with RE::UI. A launcher cannot open OSFSettingsMenu itself."
+        }
+      }
+    }
+  }
+}

@@ -3,6 +3,9 @@ package
     // Numeric binding policy shared by the page and offline fixture checks.
     public final class KeybindingsData
     {
+        // This menu's own hotkey, named here because the page, Home and the join all pin it.
+        public static const SELF_MOD:String = "osfsettings";
+        public static const OPEN_MENU:String = "openMenu";
         public static function bound(code:uint):Boolean { return code != 255 && code != 0xFFFFFFFF && code != 0x7FFFFFFF; }
         public static function modified(code:uint):Boolean { return code != 0 && bound(code); }
         public static function identity(context:uint, action:String):String { return context + ":" + action; }
@@ -85,6 +88,12 @@ package
                 var text:String = names.join(" + ");
                 binding.aPCKeyName = [binding.aPCKeyName.length ? binding.aPCKeyName[0] + " / " + text : text];
                 row.value = bindingText(row.binding.MainBinding); row.alternate = bindingText(row.binding.AltBinding);
+            }
+            // The key that opens this menu leads the list; the rest keeps Controls order.
+            for (var index:int = 0; index < result.length; ++index) {
+                if (result[index].mod == SELF_MOD && result[index].key == OPEN_MENU) {
+                    result.unshift(result.splice(index, 1)[0]); break;
+                }
             }
             return result;
         }

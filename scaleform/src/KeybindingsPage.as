@@ -6,7 +6,6 @@ package
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.text.TextField;
-    import flash.text.TextFormat;
     import flash.ui.Keyboard;
     import flash.utils.getTimer;
 
@@ -40,7 +39,7 @@ package
         private var changed:Function;
         private var leaveSearch:Function;
         private var definitions:Array = [];
-        private var sources:Array = [{id:"all",title:tr("bindings.allSources")},{id:"game",title:tr("bindings.game")}];
+        private var sources:Array = defaultSources();
         private var generation:uint;
         private var revision:uint;
         private var requestedAt:int;
@@ -83,8 +82,7 @@ package
             var bindingX:Number = MenuStyle.LEFT + MenuStyle.CONTROL_X;
             for each (var label:String in [tr("bindings.primary"), tr("bindings.alternate")]) {
                 var heading:TextField = field(label,bindingX,COLUMNS_TOP,MenuStyle.BINDING_WIDTH,MenuStyle.SMALL_SIZE + 12,MenuStyle.SMALL_SIZE,MenuStyle.MUTED);
-                var format:TextFormat = heading.defaultTextFormat; format.align = "center";
-                heading.defaultTextFormat = format; MenuStyle.fit(heading,label);
+                MenuStyle.align(heading,"center"); MenuStyle.fit(heading,label);
                 headings.push(heading);
                 bindingX += MenuStyle.BINDING_WIDTH + MenuStyle.BINDING_GAP;
             }
@@ -102,6 +100,12 @@ package
             content.addChild(wrapper); wrapper.addChild(field); return wrapper;
         }
         public function get searching():Boolean { return visible && stage && stage.focus == search; }
+        // Filters wait while a refresh or native rebind owns the page.
+        private function get locked():Boolean { return frozen || editor.busy || editor.saving; }
+        private static function defaultSources():Array
+        {
+            return [{id:"all",title:tr("bindings.allSources")},{id:"game",title:tr("bindings.game")}];
+        }
         public function open(metadata:Array):void
         {
             definitions = metadata; visible = true; rows = []; editor.open(); request();
@@ -144,7 +148,7 @@ package
         }
         private function updateSources():void
         {
-            sources = [{id:"all",title:tr("bindings.allSources")},{id:"game",title:tr("bindings.game")}];
+            sources = defaultSources();
             var seen:Object = {};
             for each (var row:Object in rows) if (row.mod && !seen[row.mod]) {
                 sources.push({id:row.mod,title:row.source}); seen[row.mod] = true;
@@ -200,27 +204,27 @@ package
         }
         private function selectKey(key:int):void
         {
-            if (frozen || editor.busy || editor.saving) return;
+            if (locked) return;
             selectedKey = selectedKey == key ? -1 : key; changed();
         }
         private function clearKey(event:MouseEvent):void
         {
-            if (frozen || editor.busy || editor.saving) return;
+            if (locked) return;
             selectedKey = -1; changed();
         }
         private function nextSource(event:MouseEvent):void
         {
-            if (frozen || editor.busy || editor.saving) return;
+            if (locked) return;
             for (var i:int = 0; i < sources.length; ++i) if (sources[i].id == source) {
                 source = sources[(i + 1) % sources.length].id; changed(); return;
             }
         }
         private function clearFilters(event:MouseEvent = null):void
         {
-            if (frozen || editor.busy || editor.saving) return;
+            if (locked) return;
             search.text = ""; source = "all"; selectedKey = -1; changed();
         }
-        private function filtersChanged(event:Event):void { if (!frozen && !editor.busy && !editor.saving) changed(); }
+        private function filtersChanged(event:Event):void { if (!locked) changed(); }
         private function focusChanged(event:FocusEvent):void
         {
             var active:Boolean = searching;

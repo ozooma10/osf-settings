@@ -1,0 +1,11 @@
+{
+  "title": "My dependent mod",
+  "version": "1.0.0",
+  "dependencies": {
+    "osfsettings": "1.1.2",
+    "osfui": "2.1.0",
+    "osf.animation.engine": "1.5.0",
+    "sample-pack": "1.2.0"
+  },
+  "groups": {}
+}

@@ -13,6 +13,17 @@ package
         public static const WARNING:uint = 0xE7B566;
 
         public static function color(severity:String):uint { return severity == "ERROR" ? ERROR : WARNING; }
+        // Native supplies the translated severity; older rows fall back to the movie's catalog.
+        public static function label(row:Object):String
+        {
+            return row.severityLabel || tr(row.severity == "ERROR" ? "issues.error" : "issues.warning");
+        }
+        // The mods a report affects; older rows fall back to the reporting mod.
+        public static function affected(row:Object):String
+        {
+            var names:Array = row.affected as Array;
+            return names && names.length ? names.join(", ") : row.modTitle || row.mod || "";
+        }
 
         public static function icon(g:Graphics, x:Number, y:Number, error:Boolean, radius:Number = 18):void
         {

@@ -18,8 +18,7 @@ package
             mouseEnabled = false; mouseChildren = false;
             title = MenuStyle.field("", 16, 0, 650, MenuStyle.BODY_SIZE + 14, MenuStyle.BODY_SIZE);
             value = MenuStyle.field("", 0, 0, 150, MenuStyle.BODY_SIZE + 14, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true);
-            var centered:TextFormat = value.defaultTextFormat; centered.align = "center";
-            value.defaultTextFormat = centered; addChild(title); addChild(value);
+            MenuStyle.align(value, "center"); addChild(title); addChild(value);
             source = MenuStyle.field("", 16, 0, 510, MenuStyle.SMALL_SIZE + 10, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true); addChild(source);
             heading = MenuStyle.field("", 16, 0, 600, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true); addChild(heading);
         }

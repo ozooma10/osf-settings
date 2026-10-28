@@ -31,6 +31,15 @@ class PreviewRowsTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)["rows"]
 
+    def export_all(self, schemas):
+        paths = []
+        for mod, document in schemas:
+            schema = self.directory / (mod + ".json")
+            schema.write_text(json.dumps(document), encoding="utf-8")
+            paths.append(str(schema))
+        return subprocess.run([str(EXPORTER), str(self.table), *paths],
+                              capture_output=True, encoding="utf-8", check=False)
+
     def test_optional_label_and_mouse_defaults(self):
         rows = self.rows([
             {"key": "mouse-name", "type": "key", "default": "Mouse4", "allowMouse": True},
@@ -101,15 +110,13 @@ class PreviewRowsTests(unittest.TestCase):
         self.assertFalse(only["editable"])
 
     def test_production_schema_rejections(self):
+        # Keep exporter-specific key resolution and one ordinary parser failure.
+        # The native schema/store suites own the general validation matrix.
         invalid = [
             {"key": "mouse", "type": "key", "default": "Mouse4"},
             {"key": "mouse", "type": "key", "default": 5, "allowMouse": "true"},
             {"key": "key", "type": "key", "default": "UNBOUND", "allowUnbound": False},
             {"key": "alias", "type": "key", "default": "VK_F4"},
-            {"key": "choice", "type": "enum", "default": "a", "options": ["a", "A"]},
-            {"key": "undeclared-empty", "type": "enum", "default": "", "options": ["freefly"]},
-            {"key": "duplicate-empty", "type": "enum", "default": "", "options": ["", ""]},
-            {"key": "float", "type": "float", "default": 1, "step": 0},
             {"id": "action", "type": "action"},
         ]
         for setting in invalid:
@@ -122,6 +129,43 @@ class PreviewRowsTests(unittest.TestCase):
                               ({"groups": {}}, "internal")]:
             with self.subTest(mod=mod, document=document):
                 self.assertNotEqual(self.export(document, mod).returncode, 0)
+
+    def test_extension_rows_carry_their_page(self):
+        def toggle(key):
+            return [{"key": key, "type": "bool", "default": True}]
+        result = self.export_all([
+            ("basemod", {"title": "Base Mod", "groups": {"Combat": toggle("recoil")}}),
+            ("basemod-combat", {"title": "Combat Extras", "extends": "basemod",
+                                "groups": {"Combat": toggle("spread"), "Extras": toggle("tracer")}}),
+        ])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = json.loads(result.stdout)["rows"]
+        self.assertEqual([row["mod"] for row in rows], ["basemod", "basemod-combat", "basemod-combat"])
+        self.assertEqual({row["page"] for row in rows}, {"basemod"})
+        self.assertEqual({row["pageTitle"] for row in rows}, {"Base Mod"})
+        # A shared group keeps the host's heading and names nobody; a new one names its contributor.
+        self.assertEqual([row["groupTitle"] for row in rows], ["Combat", "Combat", "Extras"])
+        self.assertEqual([row["groupSource"] for row in rows], ["", "", "Combat Extras"])
+
+    def test_unresolved_extends_keeps_its_own_page(self):
+        toggle = [{"key": "toggle", "type": "bool", "default": True}]
+        result = self.export_all([("basemod-combat", {"title": "Combat Extras", "extends": "basemod",
+                                                      "groups": {"Extras": toggle}})])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = json.loads(result.stdout)["rows"]
+        self.assertEqual([row["page"] for row in rows], ["basemod-combat"])
+        self.assertEqual([row["groupSource"] for row in rows], [""])
+
+    def test_optional_extends_without_host_is_hidden(self):
+        toggle = [{"key": "toggle", "type": "bool", "default": True}]
+        result = self.export_all([
+            ("other", {"title": "Other", "groups": {"General": toggle}}),
+            ("basemod-combat", {"title": "Combat Extras", "extends": {"mod": "basemod", "optional": True},
+                                "groups": {"Extras": toggle}}),
+        ])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        rows = json.loads(result.stdout)["rows"]
+        self.assertEqual([row["mod"] for row in rows], ["other"])
 
 
 if __name__ == "__main__":

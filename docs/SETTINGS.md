@@ -10,6 +10,7 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/ozooma10/osf-settings-slim/main/sdk/osf-settings.schema.json",
   "title": "My mod",
   "groups": {
     "General": [
@@ -37,11 +38,11 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 
 ### Schema fields and types
 
-- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present.
+- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present. `extends` puts the controls on [another mod's page](#extend-another-mods-page).
 - The mod ID comes from the schema filename without `.json`.
 - Mod IDs use 1–128 lowercase ASCII letters, digits, `.`, `_`, or `-`; `.` and `..` are invalid. Windows device names such as `con`, `nul`, `com1`, and `lpt1` are rejected, including names followed by an extension such as `nul.extra`.
 - Group names become headings. Groups and their controls appear in authored order.
-- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod. API lookups use exact, case-sensitive keys.
+- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod, ignoring ASCII case. API lookups use exact, case-sensitive keys.
 - Optional `label` defaults to the key. `hint` adds help text.
 
 | Type | Default example | Additional fields |
@@ -57,7 +58,7 @@ Defaults must satisfy the setting's type and limits.
 
 Float `step` controls the editor increment; writes need not be multiples of it.
 
-Enum option values are unique, nonempty strings; the default and API values must match a value exactly. Options appear in authored order. Use an object to give each value a display label:
+Enum option values are strings, unique ignoring ASCII case; the default and API values must match a value exactly. An empty string is allowed when explicitly declared as an option. Options appear in authored order. Use an object to give each value a display label:
 
 ```json
 {
@@ -188,6 +189,38 @@ Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 - Papyrus integers are 32-bit and floats are single precision. Reads that overflow return the fallback; float precision may be reduced.
 
 See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../examples/papyrus/OSFSettingsExampleGlobal.psc) examples, with their [schema](../examples/papyrus/papyrusexample.json), for all value types, hotkeys, and action callbacks.
+
+## Extend another mod's page
+
+A mod that builds on another mod can put its settings on that mod's page instead of a page of its own. Add a root `extends` naming the host's mod ID:
+
+```json
+//Starfield/OSF/Settings/basemod_combatextras.json
+{
+  "title": "Base Mod - Combat Extras",
+  "extends": "basemod",
+  "groups": {
+    "Combat": [
+      { "key": "recoil", "type": "float", "default": 0.5, "label": "Extra recoil" }
+    ]
+  }
+}
+```
+
+Only the page changes, Your mod ID is still your filename, your values still live in `<modId>.json`, and use your own ID in API calls: `GetFloat("basemod_combatextras", "recoil")`.
+
+`extends` makes the host a dependency: if it is not installed, your settings appear on their own page and Mod Issues reports the host as missing.
+Add an explicit `dependencies` entry when you need a minimum version instead. A mod cannot extend itself, and a loop of mods extending each other leaves each on its own page with an issue reported.
+
+### Optional integrations
+
+For settings that only matter when the host is installed, make the host optional:
+
+```json
+"extends": { "mod": "basemod", "optional": true }
+```
+
+With the host installed this behaves exactly like `"extends": "basemod"`. Without it, nothing is reported and your mod is hidden. Your schema still loads, so `Get*`/`Set*` calls keep working and saved values are kept. 
 
 ## Action buttons
 
