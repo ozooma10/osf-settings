@@ -45,6 +45,7 @@ try {
 }
 
 $licenses = Join-Path $stage 'SFSE/Plugins/OSF/Settings/licenses'
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.txt'), (Join-Path $PSScriptRoot 'RELEASE_NOTES.txt') -Destination $stage
 New-Item -ItemType Directory -Path $licenses -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'EXCEPTIONS') -Destination $licenses
 Copy-Item -LiteralPath (Join-Path $repo 'lib/commonlibsf/COPYING') -Destination (Join-Path $licenses 'CommonLibSF-COPYING')

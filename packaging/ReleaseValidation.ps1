@@ -14,6 +14,7 @@ function Get-ReleaseRevision([string]$Repository) {
 
 function Get-ReleasePayloadPaths {
     return @(
+        'README.txt', 'RELEASE_NOTES.txt',
         'SFSE/Plugins/OSF/Settings/licenses/CommonLibSF-COPYING', 'SFSE/Plugins/OSF/Settings/licenses/CommonLibSF-EXCEPTIONS',
         'SFSE/Plugins/OSF/Settings/licenses/CommonLibShared-EXCEPTIONS', 'SFSE/Plugins/OSF/Settings/licenses/CommonLibShared-LICENSE',
         'SFSE/Plugins/OSF/Settings/licenses/EXCEPTIONS', 'SFSE/Plugins/OSF/Settings/licenses/LICENSE',

@@ -4,6 +4,11 @@ A shared Starfield menu for mod settings, interface launchers, keybindings, and 
 
 For mod authors, start with [Settings](docs/SETTINGS.md) to define a page and connect it to C++ or Papyrus.
 
+Version 1.2.0 adds [shared pages for add-ons](docs/SETTINGS.md#extend-another-mods-page),
+[dependency checks](docs/SETTINGS.md#versions-and-dependencies), clearer issue
+details, and launchers on mod pages. See the [release notes](packaging/RELEASE_NOTES.txt)
+and [installation guide](packaging/README.txt).
+
 | Guide | Use it to |
 | --- | --- |
 | [Settings](docs/SETTINGS.md) | Define settings and action buttons, read and write values, and respond to changes |
@@ -42,3 +47,6 @@ pwsh -NoProfile -File packaging/build-archive.ps1
 ```
 
 Builds a production ZIP, checksum and manifest in isolated staging under `build/packages`.
+Packaging requires a clean, committed checkout. Use the
+[release validation guide](docs/RELEASE_VALIDATION.md) and
+[1.2.0 checklist](RELEASE_CHECKLIST.md) to validate a candidate before publishing.

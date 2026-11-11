@@ -135,7 +135,7 @@ Preview, large-text and harness flags participate in movie fingerprints.
 ## Game acceptance
 
 For a single automated development entrypoint, including uncommitted changes,
-use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame`. The
+use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame -Interactive`. The
 [release validation guide](../docs/RELEASE_VALIDATION.md) describes coverage, isolation, report
 formats and remaining acceptance gaps. Omit `-RunGame` for an offline run.
 
@@ -160,7 +160,7 @@ automatic cancellation on focus loss is not established. Preview deactivation
 checks cover cleanup only when Flash receives `Event.DEACTIVATE`.
 
 Focused development
-runs use the sibling `Test-Starfield.ps1 -Scenario SettingsSmoke -Acceptance
+runs use the sibling `Test-Starfield.ps1 -Scenario SettingsSmoke -Interactive -Acceptance
 -AcceptancePhase Features` (add `-LargeText` for accessibility text).
 When the opening hotkey is unbound, game scenarios enter through Pause and assign
 a temporary unused key with native capture. They stop the owned session and
@@ -180,7 +180,8 @@ The smoke and release runners include the native preview-exporter regression
 checks in their normal-preview stage after executing the Ruffle preview.
 
 Native assertions and Ruffle previews do not replace input, controller, lifecycle
-or menu-handoff acceptance in Starfield. Add `-RunGame` to run the harness suite
+or menu-handoff acceptance in Starfield. With an idle desktop and explicit interactive-testing authorization, add
+`-RunGame -Interactive` to run the harness suite
 as the `runtime` stage (`-Harness` points at a checkout other than the sibling
 `OSF Test Harness`). The suite receives `-ResultPath` and writes its JSON summary
 there; the stage requires a fresh build of the packaged commit and matching source

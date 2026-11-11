@@ -2,6 +2,7 @@
 [CmdletBinding()]
 param(
     [switch]$RunGame,
+    [switch]$Interactive,
     [switch]$Plan,
     [switch]$ForceVerification,
     [string]$Harness = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'OSF Test Harness'),
@@ -10,6 +11,9 @@ param(
     [string]$OutputDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
+if ($RunGame -and -not $Interactive -and -not $Plan) {
+    throw '[blocked] Game acceptance requires -RunGame -Interactive and an idle desktop.'
+}
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'packaging/ReleaseValidation.ps1')
@@ -23,7 +27,7 @@ $unverified = @('Physical controller input', 'Visual review of retained screensh
     'Automatic editor/capture cancellation on Windows focus loss and Main Menu/Continue limitations',
     'Unmodified production ZIP: clean mod-manager installation, real consumer, restart and upgrade in-game',
     'External OSF UI provider handoff')
-if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame)") + $unverified }
+if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame -Interactive)") + $unverified }
 if ($Plan) {
     # The harness owns the case list; ask it rather than advertising a copy here.
     [string[]]$runtimeCases = @(if ($suiteFound) {
@@ -152,13 +156,13 @@ try {
         $report.runtime = $receipt
         $runtimePlan = & pwsh -NoProfile -File $suite -Plan | ConvertFrom-Json
         if ($LASTEXITCODE) { throw 'Cannot read runtime suite plan.' }
-        Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-ExpectedSettingsProject',$repo,'-ResultPath',$receipt)
+        Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-Interactive','-ExpectedSettingsProject',$repo,'-ResultPath',$receipt)
         $runtime = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json -AsHashtable
         Test-SmokeRuntimeReceipt $runtime @($runtimePlan.cases) $source.sha256
         if ($runtime.revision -cne $report.revision) { throw 'Runtime suite tested a different commit than this candidate.' }
         Complete-ReleaseStage "$($runtime.runs.Count) fresh-session cases passed: $($runtime.cases -join ', ')"
     } else {
-        $script:active.status = 'not-run'; $script:active.message = 'Use -RunGame to run the harness suite'
+        $script:active.status = 'not-run'; $script:active.message = 'Use -RunGame -Interactive to run the harness suite'
         Save-ReleaseReport
     }
     Start-ReleaseStage 'source-unchanged'

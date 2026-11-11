@@ -10,7 +10,7 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/ozooma10/osf-settings-slim/main/sdk/osf-settings.schema.json",
+  "$schema": "https://raw.githubusercontent.com/ozooma10/osf-settings/dev/sdk/osf-settings.schema.json",
   "title": "My mod",
   "groups": {
     "General": [
@@ -37,6 +37,11 @@ A schema that fails to load is shown as an error in the menu's **Mod Issues** ta
 Display text can be translated with separate [localization catalogs](LOCALIZATION.md) without modifying the schema. IDs and stored values remain unchanged.
 
 ### Schema fields and types
+
+The [JSON Schema](../sdk/osf-settings.schema.json) supplies editor completion and
+validation. The URL above follows the development branch; pin a released tag for
+reproducible authoring. Runtime validation additionally checks identifiers,
+cross-field relationships and UTF-8 byte limits.
 
 - The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present. `extends` puts the controls on [another mod's page](#extend-another-mods-page).
 - The mod ID comes from the schema filename without `.json`.
@@ -190,12 +195,48 @@ Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 
 See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../examples/papyrus/OSFSettingsExampleGlobal.psc) examples, with their [schema](../examples/papyrus/papyrusexample.json), for all value types, hotkeys, and action callbacks.
 
+## Versions and dependencies
+
+OSF Settings 1.2.0 can report missing or outdated supporting mods. Declare your
+own version and minimum dependency versions in the schema:
+
+```json
+{
+  "title": "My mod",
+  "version": "1.0.0",
+  "nexusModId": 12345,
+  "dependencies": {
+    "osfsettings": "1.2.0",
+    "basemod": "2.0.0"
+  },
+  "groups": {}
+}
+```
+
+- `version` and dependency versions are numeric `major.minor.patch` strings.
+  Prerelease labels and version ranges are not supported.
+- Dependency keys are settings mod IDs (schema filenames), not DLL or plugin
+  filenames. Only loaded schemas/runtime providers participate; this is not a
+  scan of every installed mod. A metadata-only schema can use `"groups": {}`.
+- A missing dependency produces a warning. An installed dependency with a
+  declared version is compared against the requested minimum. An installed
+  dependency without a version cannot be compared and produces no version warning.
+  OSF Settings uses its running DLL version for its own comparison.
+- Warnings do not disable the consumer's settings or enforce a load order.
+  Reports refresh when runtime providers change. Valid dependency metadata can
+  still appear in Mod Issues when the rest of a schema fails validation.
+- `nexusModId` is your mod's numeric Starfield Nexus ID (replace the example).
+  Omit it or use `0` if unavailable. Issue details can open the provider's Nexus
+  page when that provider's schema supplies an ID; a missing provider has no
+  metadata from which to obtain its link.
+
+See the [dependency examples](../examples/dependencies/osf-stack.json).
+
 ## Extend another mod's page
 
 A mod that builds on another mod can put its settings on that mod's page instead of a page of its own. Add a root `extends` naming the host's mod ID:
 
 ```json
-//Starfield/OSF/Settings/basemod_combatextras.json
 {
   "title": "Base Mod - Combat Extras",
   "extends": "basemod",
@@ -207,7 +248,12 @@ A mod that builds on another mod can put its settings on that mod's page instead
 }
 ```
 
-Only the page changes, Your mod ID is still your filename, your values still live in `<modId>.json`, and use your own ID in API calls: `GetFloat("basemod_combatextras", "recoil")`.
+Save this as `Data/SFSE/Plugins/OSF/Settings/schemas/basemod_combatextras.json`.
+This feature requires OSF Settings 1.2.0. Only the page changes: your mod ID is
+still your filename, your values still live in `<modId>.json`, and API calls use
+your own ID: `GetFloat("basemod_combatextras", "recoil")`. Actions and hotkeys also
+retain their original owner. Contributed settings identify their source in the
+details pane.
 
 `extends` makes the host a dependency: if it is not installed, your settings appear on their own page and Mod Issues reports the host as missing.
 Add an explicit `dependencies` entry when you need a minimum version instead. A mod cannot extend itself, and a loop of mods extending each other leaves each on its own page with an issue reported.
@@ -220,7 +266,11 @@ For settings that only matter when the host is installed, make the host optional
 "extends": { "mod": "basemod", "optional": true }
 ```
 
-With the host installed this behaves exactly like `"extends": "basemod"`. Without it, nothing is reported and your mod is hidden. Your schema still loads, so `Get*`/`Set*` calls keep working and saved values are kept. 
+With the host installed this behaves exactly like `"extends": "basemod"`.
+Without it, no missing-host warning is reported and your controls, hotkeys and
+launchers are hidden. Your schema still loads, so `Get*`/`Set*` calls keep working
+and saved values are kept. Other declared dependencies are still checked. An
+explicit minimum for the optional host is checked when that host is installed.
 
 ## Action buttons
 

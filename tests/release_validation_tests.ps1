@@ -53,7 +53,7 @@ function New-Candidate([string]$Name, [string]$Fault = '') {
 }
 $good = New-Candidate 'valid'
 $candidate = Test-ReleaseArchive $good
-Check ($candidate.files -eq 14) 'Valid archive has all expected payloads'
+Check ($candidate.files -eq 16) 'Valid archive has all expected payloads including installation and release notes'
 $preserved = Test-ReleaseReinstall $candidate.archive (Join-Path $scratch 'reinstall')
 Check ($preserved.Count -eq 4) 'Archive overlay preserves simulated Documents state and another mod schema'
 foreach ($fault in @(
@@ -178,6 +178,14 @@ Check (@($coverage.runtime | Where-Object { $_ -notin $cases }).Count -eq 0) 'Ev
 $unattendedReceipt = Join-Path $scratch 'unattended-result.json'
 & pwsh -NoProfile -File (Join-Path $fake 'Test-SettingsRelease.ps1') -ResultPath $unattendedReceipt > (Join-Path $scratch 'unattended.log') 2>&1
 Check ($LASTEXITCODE -ne 0 -and -not (Test-Path $unattendedReceipt)) 'Interactive suite rejects unattended invocation before running fixtures'
+
+foreach ($wrapper in 'test-release.ps1', 'test-smoke.ps1') {
+    $blockedOutput = Join-Path $scratch ("unattended-" + $wrapper)
+    $blockedLog = Join-Path $scratch ("unattended-" + $wrapper + '.log')
+    & pwsh -NoProfile -File (Join-Path $repo "tools/$wrapper") -RunGame -Harness $fake -OutputDirectory $blockedOutput > $blockedLog 2>&1
+    Check ($LASTEXITCODE -ne 0 -and -not (Test-Path $blockedOutput) -and
+        (Get-Content $blockedLog -Raw).Contains('requires -RunGame -Interactive')) "$wrapper rejects game input without explicit interactive opt-in before starting work"
+}
 $oldMode = $env:OSF_RELEASE_SELFTEST_MODE
 try {
     foreach ($mode in @('passed', 'filtered', 'failed', 'blocked', 'crashed', 'build-fail', 'source-changed', 'harness-changed',

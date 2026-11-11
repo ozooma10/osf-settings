@@ -1,4 +1,4 @@
-OSF Settings - Native MCM and Keybindings
+OSF Settings 1.2.0 - Native MCM and Keybindings
 
 Requirements: Starfield 1.16.244.0 (Steam), matching SFSE, and Address Library
 for SFSE Plugins with the 1.16.244.0 database (v21). OSF UI and WebView2 are
@@ -22,6 +22,11 @@ restores the mod author's default. Text drafts save with Enter/SAVE and can be
 cancelled. A setting marked as requiring a restart takes effect when its owning
 mod applies it after restarting Starfield.
 
+Add-ons can contribute controls to another mod's page; the details identify
+their source. Optional integrations can hide their controls while their host
+is absent, keeping saved values. A mod's interface launchers also appear on
+its settings page above the settings groups.
+
 The Starfield entry contains Gameplay Options from the base game and official
 content, using the game's own values and saves. Third-party Gameplay Options
 appear under their respective mods.
@@ -29,8 +34,11 @@ appear under their respective mods.
 KEYBINDINGS searches native MainGameplay keyboard/mouse actions and registered
 mod hotkeys, with primary/alternate slots.
 It cannot discover every mod's privately implemented hotkeys. MOD ISSUES shows
-settings files that failed to load and reports supplied by supporting mods; an
-empty page is not a health check of every installed mod. Physical controller
+settings files that failed to load, declared missing/outdated dependencies,
+and reports supplied by supporting mods. Dependency details show the required
+version and can open a Nexus page when the provider supplies its ID. These
+checks rely on participating mods' metadata; an empty page is not a health
+check of every installed mod. Physical controller
 operation remains unverified, and text entry requires a keyboard.
 
 Settings persist in Documents/My Games/Starfield/OSF/Settings, shared
@@ -54,7 +62,7 @@ For a report, include the game/SFSE/mod versions, reproduction steps and the
 OSF Settings/SFSE logs under Documents/My Games/Starfield/SFSE/Logs.
 
 Source and mod author guide:
-https://github.com/ozooma10/osf-settings-slim
+https://github.com/ozooma10/osf-settings
 
 This archive contains a production build. Acceptance fixtures, sample mods,
 debug symbols and personal settings are excluded. License notices are in

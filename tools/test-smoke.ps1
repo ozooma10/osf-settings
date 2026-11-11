@@ -2,12 +2,16 @@
 [CmdletBinding()]
 param(
     [switch]$RunGame,
+    [switch]$Interactive,
     [switch]$Plan,
     [switch]$ForceVerification,
     [string]$Harness = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'OSF Test Harness'),
     [string]$OutputDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
+if ($RunGame -and -not $Interactive -and -not $Plan) {
+    throw '[blocked] Game acceptance requires -RunGame -Interactive and an idle desktop.'
+}
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'SmokeBench.ps1')
@@ -27,8 +31,8 @@ $previewVariants = @('normal','large','bindings-normal','bindings-large')
 $unverified = @('Physical controller input and visual review of retained screenshots.',
     'External OSF UI handoff and integration with third-party consumer mods.',
     'Automatic editor/capture cancellation on Windows focus loss and Main Menu/Continue remain documented acceptance gaps.',
-    'Production ZIP install, upgrade, and restart in game: use tools/test-release.ps1 -RunGame on a committed candidate.')
-if (-not $RunGame) { $unverified = @('All in-game cases were skipped; rerun with -RunGame.') + $unverified }
+    'Production ZIP install, upgrade, and restart in game requires separate acceptance; tools/test-release.ps1 -RunGame -Interactive tests an instrumented build of the committed source.')
+if (-not $RunGame) { $unverified = @('All in-game cases were skipped; rerun with -RunGame -Interactive.') + $unverified }
 if ($Plan) {
     Test-SmokeCoverage $coverage $defined $previewVariants $runtimeCases
     [ordered]@{ stages=$names; runGame=[bool]$RunGame; runtimeCases=$runtimeCases; coverage=$coverage; unverified=$unverified } | ConvertTo-Json -Depth 10
@@ -132,13 +136,13 @@ try {
         } else {
             Invoke-SmokeStage 'runtime' {
                 $report.runtime = Join-Path $directory 'runtime-result.json'
-                Invoke-SmokeCommand 'pwsh' @('-NoProfile','-File',$suite,'-WorkingTree','-ExpectedSettingsProject',$repo,'-ResultPath',$report.runtime)
+                Invoke-SmokeCommand 'pwsh' @('-NoProfile','-File',$suite,'-Interactive','-WorkingTree','-ExpectedSettingsProject',$repo,'-ResultPath',$report.runtime)
                 $receipt = Get-Content -LiteralPath $report.runtime -Raw | ConvertFrom-Json
                 Test-SmokeRuntimeReceipt $receipt $runtimeCases $identity.sha256
                 $script:stage.message = "$($receipt.runs.Count) fresh game cases passed; $($report.runtime)"
             }
         }
-    } else { $report.stages[8].message = 'Use -RunGame for automated real-input game scenarios.' }
+    } else { $report.stages[8].message = 'Use -RunGame -Interactive for automated real-input game scenarios.' }
     Invoke-SmokeStage 'source-unchanged' {
         if ((Get-SmokeSourceIdentity $repo).sha256 -cne $identity.sha256) { throw '[blocked] Source changed during this run; rerun against fixed content.' }
     }
