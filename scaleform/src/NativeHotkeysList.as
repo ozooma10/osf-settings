@@ -6,6 +6,8 @@ package
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.geom.Rectangle;
+    import flash.text.TextField;
+    import flash.text.TextFieldAutoSize;
     import flash.utils.Dictionary;
 
     // Adapts vanilla binding rows to the same scrolling list as ordinary settings.
@@ -16,6 +18,7 @@ package
         private var create:Function;
         private var views:Dictionary = new Dictionary(true);
         public var popup:Object;
+        private var confirmationLabelBounds:Rectangle;
         public var busy:Boolean = false;
         public var saving:Boolean = false;
         private var dataManager:Object;
@@ -54,6 +57,8 @@ package
             dataManager = definition("Shared.AS3.Data.BSUIDataManager");
             global = definition("Shared.GlobalFunc");
             popup = create("RemapConfirmation");
+            var label:TextField = popup.ControlInfo_mc.Label_mc.Text_tf;
+            confirmationLabelBounds = new Rectangle(label.x, label.y, label.width, label.height);
             // The popup's authored button-bar anchor is at the center of its box.
             popup.PopulateButtonBar(definition("Shared.Components.ButtonControls.ButtonBar.ButtonBar").JUSTIFY_CENTER, 38);
             popup.active = false;
@@ -344,9 +349,17 @@ package
         {
             if (!busy) { popup.active = false; return; }
             var data:Object = Object(event).data;
+            var label:TextField = popup.ControlInfo_mc.Label_mc.Text_tf;
+            var title:String = label.text;
             for each (var row:Object in definitions) {
-                if (row.action == data.sUserEvent) global.SetText(popup.ControlInfo_mc.Label_mc.Text_tf, row.title);
+                if (row.action == data.sUserEvent) title = row.title;
             }
+            // Vanilla right-autosizes this label, letting long translated mod names
+            // extend beyond the dialog. Keep the authored space beside the key glyph.
+            label.autoSize = TextFieldAutoSize.NONE;
+            label.x = confirmationLabelBounds.x;
+            label.width = confirmationLabelBounds.width;
+            MenuStyle.fit(label, title);
         }
 
         public function dispose():void
