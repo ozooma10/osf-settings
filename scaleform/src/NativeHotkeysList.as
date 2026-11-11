@@ -59,6 +59,11 @@ package
             popup = create("RemapConfirmation");
             var label:TextField = popup.ControlInfo_mc.Label_mc.Text_tf;
             confirmationLabelBounds = new Rectangle(label.x, label.y, label.width, label.height);
+            // The authored field is only as wide as its short placeholder. Use the
+            // left half of the dialog while preserving its right edge beside the glyph.
+            var labelWidth:Number = Math.max(label.width, popup.getBounds(popup).width / 2 - 24);
+            confirmationLabelBounds.x -= labelWidth - label.width;
+            confirmationLabelBounds.width = labelWidth;
             // The popup's authored button-bar anchor is at the center of its box.
             popup.PopulateButtonBar(definition("Shared.Components.ButtonControls.ButtonBar.ButtonBar").JUSTIFY_CENTER, 38);
             popup.active = false;
