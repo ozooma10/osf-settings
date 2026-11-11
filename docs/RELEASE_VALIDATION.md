@@ -60,6 +60,12 @@ uses disposable profiles/values/saves, and records fresh process, source and res
 identities. A missing, stale, contradictory or partial receipt cannot establish
 a complete suite. Stop and investigate blocked cases; never relabel them passed.
 
+On Starfield 1.16.244.0, the locked-save failed-load injection also aborts with
+OSF Settings absent. The harness blocks that injection before mutating a save;
+it cannot establish recovery from a recoverable engine load failure. Retain the
+blocked receipt and compare supported case results separately. The packaged
+README records this unverified boundary.
+
 ## Acceptance beyond automated checks
 
 - Review retained normal/large-text screenshots, including Mod Issues, dependency
