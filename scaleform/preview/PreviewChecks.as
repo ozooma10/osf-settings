@@ -1035,6 +1035,17 @@ package
                 require(localization.text("probe", {count:3}) == "設定3件 / 拡張3件 / {unknown}", "multibyte labels preserve text around repeated counts");
                 require(localization.text("braces", {count:3}) == "{3} {} {bad-name} {count", "invalid and incomplete tokens remain literal");
             } finally { localization.initialize(null); }
+            var detailClass:Class = menu.loaderInfo.applicationDomain.getDefinition("HomeDetails") as Class;
+            var details:Object = new detailClass();
+            details.show({type:"mod", mod:"layout-test", title:"Badge layout", hint:"",
+                chips:["ALPHA SETTINGS 12345", "BETA ACTIONS 67890", "GAMMA INTERFACES 12345"], hotkeys:[]}, 100);
+            var firstChip:TextField = findText(details as DisplayObjectContainer, "ALPHA SETTINGS 12345");
+            var lastChip:TextField = findText(details as DisplayObjectContainer, "GAMMA INTERFACES 12345");
+            require(firstChip != null && lastChip != null && lastChip.y > firstChip.y,
+                "wide Home badges wrap without shortening labels that fit individually");
+            var style:Object = menu.loaderInfo.applicationDomain.getDefinition("MenuStyle");
+            require(details.getBounds(details).right <= style.DETAIL_WIDTH + 1,
+                "wrapped Home badges remain inside the detail panel");
         }
         // The detail pane repeats some footer labels, so footer checks search only the button bar.
         private function footerShows(text:String):Boolean
