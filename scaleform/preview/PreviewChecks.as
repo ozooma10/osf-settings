@@ -1031,6 +1031,9 @@ package
                 require(localization.text("probe", {name:"$& $1 {count} 日本語", count:0, empty:""}) ==
                     "$& $1 {count} 日本語: 0/0; {missing}; .", "repeated tokens, literal values, empty values and unknown tokens are preserved");
                 require(localization.text("counts.mods", {count:3}) == "Mods: 3", "missing translation uses English with parameters");
+                localization.initialize({probe:"設定{count}件 / 拡張{count}件 / {unknown}", braces:"{{count}} {} {bad-name} {count"});
+                require(localization.text("probe", {count:3}) == "設定3件 / 拡張3件 / {unknown}", "multibyte labels preserve text around repeated counts");
+                require(localization.text("braces", {count:3}) == "{3} {} {bad-name} {count", "invalid and incomplete tokens remain literal");
             } finally { localization.initialize(null); }
         }
         // The detail pane repeats some footer labels, so footer checks search only the button bar.
