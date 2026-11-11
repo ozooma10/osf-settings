@@ -50,7 +50,7 @@ package
             var limit:Number = height - PAD;
             var chips:Array = [];
             var chipX:Number = PAD, chipY:Number = 0;
-            var measure:TextField = MenuStyle.field("", 0, 0, WIDTH - PAD * 2 - 28, 40,
+            var measure:TextField = MenuStyle.field("", 0, 0, WIDTH - PAD * 2 - 20, 40,
                 MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true);
             for each (var chip:String in detail.chips) {
                 MenuStyle.fit(measure, chip);
@@ -127,7 +127,7 @@ package
 
         private function tag(value:String, left:Number, top:Number, width:Number):void
         {
-            var label:TextField = text(value, left + 10, top + 3, width - 28, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true, 1);
+            var label:TextField = text(value, left + 10, top + 3, width - 20, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true, 1);
             label.width = Math.min(width - 20, label.textWidth + 8);
             graphics.lineStyle(1, MenuStyle.LINE); graphics.drawRect(left, top, label.width + 18, 28); graphics.lineStyle();
         }
