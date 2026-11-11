@@ -12,6 +12,7 @@ package
         private var cardWidth:Number;
         private var cardHeight:Number;
         private var badge:Badge;
+        private var diameter:Number;
         private var tint:uint;
         private var title:TextField;
         private var tag:TextField;
@@ -27,8 +28,7 @@ package
             wasLoading = Boolean(row.loading);
             addEventListener(MouseEvent.ROLL_OVER, hover); addEventListener(MouseEvent.ROLL_OUT, hover);
             name = "launcher_" + position; mouseChildren = false; buttonMode = Boolean(row.editable);
-            var large:Boolean = CONFIG::largeText;
-            var diameter:Number = large ? 82 : 70;
+            diameter = CONFIG::largeText ? 82 : 70;
             tint = row.more ? MenuStyle.ACCENT : Badge.color(row.mod + "/" + row.key);
             badge = new Badge(row.more ? "" : Badge.initials(String(row.title)), diameter);
             badge.x = 20; badge.y = (height - diameter) / 2; addChild(badge);
@@ -80,7 +80,6 @@ package
             graphics.lineStyle();
             badge.paint(accent);
             if (row.more) {
-                var diameter:Number = CONFIG::largeText ? 82 : 70;
                 graphics.beginFill(accent);
                 for (var i:int = 0; i < 4; ++i)
                     graphics.drawRect(badge.x + diameter / 2 - 10 + i % 2 * 12, cardHeight / 2 - 10 + int(i / 2) * 12, 8, 8);

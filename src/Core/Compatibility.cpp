@@ -1,55 +1,48 @@
 #include "Compatibility.h"
 #include "Diagnostics/DiagnosticsService.h"
-#include "Settings/Localization.h"
 #include "Settings/SettingsService.h"
+#include "SFSE/API.h"
+#include "Harness/Performance.h"
 
-#include <Windows.h>
+#include <mutex>
 
 namespace OSFSettings
 {
-    namespace
-    {
-        std::optional<REL::Version> InstalledOSFUIVersion()
-        {
-            const std::filesystem::path game{ REX::FModule::GetExecutingModule().GetFileName() };
-            const auto dll = game.parent_path() / "Data" / "SFSE" / "Plugins" / "OSFUI.dll";
-            const auto size = GetFileVersionInfoSizeW(dll.c_str(), nullptr);
-            if (!size) return std::nullopt;
-            std::vector<std::byte> data(size);
-            if (!GetFileVersionInfoW(dll.c_str(), 0, size, data.data())) return std::nullopt;
-            void* value{};
-            UINT length{};
-            if (!VerQueryValueW(data.data(), L"\\", &value, &length) || length < sizeof(VS_FIXEDFILEINFO)) return std::nullopt;
-            const auto& info = *static_cast<const VS_FIXEDFILEINFO*>(value);
-            if (info.dwSignature != 0xFEEF04BD) return std::nullopt;
-            return REL::Version{ HIWORD(info.dwFileVersionMS), LOWORD(info.dwFileVersionMS),
-                HIWORD(info.dwFileVersionLS), LOWORD(info.dwFileVersionLS) };
-        }
-    }
-
     void ReportCompatibilityIssues()
     {
-        const auto installed = SFSE::GetPluginVersion();
-        const SettingsVersion settingsVersion{ { installed[0], installed[1], installed[2] } };
-        auto& diagnostics = DiagnosticsService::Get();
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::Compatibility);
+        // Serialize startup/localization and dispatcher reports so an older snapshot cannot win.
+        static std::mutex mutex;
+        static std::optional<std::uint64_t> reportedRevision;
+        std::lock_guard lock(mutex);
         auto& settings = SettingsService::Get();
-        if (auto issue = SettingsUpdateIssue(settings.Snapshot(), settings.LoadErrors(), settingsVersion)) {
-            diagnostics.Report(std::move(*issue));
-        } else {
-            diagnostics.Clear("osfsettings", "settings-update-recommended");
+        const auto revision = settings.SchemaRevision();
+        if (reportedRevision == revision) return;
+        auto& diagnostics = DiagnosticsService::Get();
+        auto mods = settings.Snapshot();
+        // The running plugin, not its manifest, is the installed OSF Settings version.
+        const auto installed = SFSE::GetPluginVersion();
+        for (auto& mod : mods) {
+            if (mod.schema.id == "osfsettings") {
+                mod.schema.version = SettingsVersion{ { installed[0], installed[1], installed[2] } };
+            }
         }
 
-        // Read the active game's virtual Data path once, without loading the plugin.
-        static const auto version = InstalledOSFUIVersion();
-        if (!version || *version >= REL::Version{ 2, 0, 0, 0 }) return;
-        DiagnosticsService::Get().Report({
-            .modId = "osfsettings",
-            .id = "osfui-update-required",
-            .severity = IssueSeverity::Warning,
-            .title = tr("issues.osfuiUpdate"),
-            .impact = tr("issues.osfuiUpdateImpact", {{ "version", version->string() }}),
-            .nextSteps = tr("issues.osfuiUpdateNextSteps"),
-            .nexusModId = 17711
-        });
+        // Clear only resolved dependency and extension reports so unchanged ones keep their place.
+        auto dependencies = DependencyIssues(mods, settings.LoadErrors());
+        for (auto& issue : ExtensionIssues(mods)) {
+            dependencies.push_back(std::move(issue));
+        }
+        for (const auto& old : diagnostics.Snapshot()) {
+            if (old.modId == "osfsettings" && (old.id.starts_with("dependency:") || old.id.starts_with("extension:")) &&
+                std::ranges::none_of(dependencies, [&](const ModIssue& issue) { return issue.id == old.id; })) {
+                diagnostics.Clear(old.modId, old.id);
+            }
+        }
+        for (auto& issue : dependencies) {
+            diagnostics.Report(std::move(issue));
+        }
+        // Read before Snapshot: a concurrent provider change must still trigger the next pass.
+        reportedRevision = revision;
     }
 }

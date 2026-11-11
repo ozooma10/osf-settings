@@ -47,6 +47,26 @@ int main()
         settings.pop_back();
         check(IssueModName(issue, settings) == "sample", "unrelated schemas do not supply a display name");
 
+        const auto has = [](const std::string& text, const char* part) { return text.find(part) != std::string::npos; };
+        const ModIssue dependency{ .modId = "osfsettings", .id = "dependency:osfui", .title = "OSF UI update recommended",
+            .impact = "First paragraph.\n\nSecond paragraph.", .nextSteps = "Update OSF UI to 2.1.0 or later.", .nexusModId = 17711,
+            .note = "Advisory check.", .affectedMods = { "OSF Animation", "Navigation Tools" },
+            .installedVersion = "2.0.0", .requiredVersion = "2.1.0" };
+        const auto fullReport = IssueReport(dependency, {}, "1.0.0");
+        check(has(fullReport, "Title: OSF UI update recommended\n") && has(fullReport, "Severity: Warning\n") &&
+            has(fullReport, "Affects: OSF Animation, Navigation Tools\n") && has(fullReport, "Issue ID: osfsettings/dependency:osfui\n") &&
+            has(fullReport, "Impact: First paragraph.\n  \n  Second paragraph.\n") && has(fullReport, "To fix: Update OSF UI") &&
+            has(fullReport, "Installed version: 2.0.0\nRequired version: 2.1.0\n") && has(fullReport, "Note: Advisory check.\n") &&
+            has(fullReport, "Mod page: https://www.nexusmods.com/starfield/mods/17711\n") &&
+            has(fullReport, "OSF Settings version: 1.0.0\n") && !has(fullReport, "Reason:"),
+            "a copied report includes every populated field and indents multi-line text");
+        const auto plainReport = IssueReport({ .modId = "sample", .id = "missing-pack", .severity = IssueSeverity::Error, .title = "Scenes unavailable" },
+            settings, "1.0.0");
+        check(has(plainReport, "Severity: Error\n") && has(plainReport, "Affects: Other Mod\n") == false &&
+            has(plainReport, "Affects: sample\n") && has(plainReport, "Reported by: sample\n") &&
+            !has(plainReport, "Impact:") && !has(plainReport, "Installed version:") && !has(plainReport, "Mod page:"),
+            "a minimal report names its mod and omits empty fields");
+
         const std::vector<SettingsLoadError> loadErrors{
             { "schemas/broken.json", "unexpected end of input", true },
             { "values/sample.json", "saved value does not match the setting's type or validation rules: gain" },
@@ -60,6 +80,9 @@ int main()
             schemaIssues[0].reason == loadErrors[0].message && !schemaIssues[0].nextSteps.empty() &&
             schemaIssues[0].impact.find(loadErrors[0].message) == std::string::npos,
             "a schema issue names the file, separates the exact reason from impact, and says what to do");
+        check(schemaIssues[0].affectedMods.size() == 1 && schemaIssues[0].affectedMods[0].find("broken.json") != std::string::npos &&
+            schemaIssues[0].note.find("OSF Settings.log") != std::string::npos,
+            "a schema issue is attributed to its file and points to the log as reference");
         check(schemaIssues[1].id == "schema:Not A Mod ID.json", "files whose names are not valid mod IDs are still reported");
         IssueRegistry schemaRegistry;
         check(schemaRegistry.Report(schemaIssues[0]) && schemaRegistry.Report(schemaIssues[1]) && schemaRegistry.Report(schemaIssues[0]) &&

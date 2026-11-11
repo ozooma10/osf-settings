@@ -18,6 +18,8 @@ package
         private var defaultValue:TextField;
         private var rangeLabel:TextField;
         private var rangeValue:TextField;
+        private var sourceLabel:TextField;
+        private var sourceValue:TextField;
         private var detailOptions:Sprite = new Sprite();
         private var selected:Object;
         private var selectedValue:*;
@@ -40,16 +42,18 @@ package
             descriptionFormat.leading = CONFIG::largeText ? 8 : 6; detailHint.defaultTextFormat = descriptionFormat;
             detailHint.addEventListener(MouseEvent.MOUSE_WHEEL, scrollDescription);
             defaultLabel = label(tr("menu.default"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            defaultValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(defaultValue);
+            defaultValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(defaultValue, "right");
             rangeLabel = label(tr("menu.range"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
-            rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); alignRight(rangeValue);
+            rangeValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(rangeValue, "right");
+            sourceLabel = label(tr("menu.providedBy"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
+            sourceValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(sourceValue, "right");
             detailOptions.x = MenuStyle.DETAIL_X; detailOptions.mouseEnabled = detailOptions.mouseChildren = false; addChild(detailOptions);
             // The changed marker only means something beside settings, so it closes the detail column.
             var legend:TextField = label(tr("menu.changed"), MenuStyle.DETAIL_X, MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 14, detailWidth,
                 MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
             changedLegend.mouseEnabled = false; changedLegend.mouseChildren = false;
             addChild(changedLegend); changedLegend.addChild(legend);
-            alignRight(legend);
+            MenuStyle.align(legend, "right");
             MenuStyle.diamond(changedLegend.graphics, MenuStyle.RIGHT - legend.textWidth - 22, legend.y + legend.height / 2 - 1, MenuStyle.ACCENT);
         }
         CONFIG::testHarness { public function get hintText():String { return visible ? detailHint.text : ""; } }
@@ -58,11 +62,6 @@ package
         {
             var field:TextField = MenuStyle.field(text, x, y, width, height, size, color, isLabel);
             addChild(field); return field;
-        }
-        private function alignRight(field:TextField):void
-        {
-            var format:TextFormat = field.defaultTextFormat; format.align = "right";
-            field.defaultTextFormat = format; field.setTextFormat(format);
         }
         public function show(row:Object, top:Number, editing:Boolean):void
         {
@@ -98,6 +97,11 @@ package
             rangeLabel.visible = rangeValue.visible = Boolean(range);
             rangeLabel.y = cursor; rangeValue.y = cursor - 1; MenuStyle.fit(rangeValue, range);
             if (range) cursor += MenuStyle.VALUE_SIZE + 16;
+            // Rows another mod contributed to this page say so, whatever group they landed in.
+            var source:String = row && row.page && row.page != row.mod ? String(row.modTitle || row.mod) : "";
+            sourceLabel.visible = sourceValue.visible = Boolean(source);
+            sourceLabel.y = cursor; sourceValue.y = cursor - 1; MenuStyle.fit(sourceValue, source);
+            if (source) cursor += MenuStyle.VALUE_SIZE + 16;
             showOptions(enumRow ? row : null, cursor);
             editorTop = cursor + 6;
             detailDecoration.graphics.clear();
@@ -135,7 +139,7 @@ package
                 detailOptions.addChild(option); MenuStyle.fit(option, String(labels[i]));
                 if (row.options[i].value === row.defaultValue) {
                     var tag:TextField = MenuStyle.field(tr("menu.default"), columnWidth - 160, line + 2, 160, pitch, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true);
-                    alignRight(tag); detailOptions.addChild(tag);
+                    MenuStyle.align(tag, "right"); detailOptions.addChild(tag);
                 }
             }
             if (shown < labels.length)

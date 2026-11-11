@@ -57,6 +57,8 @@ namespace OSFSettings::NativeHotkeys
         //Need to build hotkey definitions that will get pre-pended to vanilla binding map
         HotkeyInputState::Declarations declarations;
         for (const auto& mod : SettingsService::Get().Snapshot()) {
+            // A hidden integration's hotkeys could be neither seen nor rebound.
+            if (mod.schema.hidden) continue;
             auto& targets = declarations[mod.schema.id];
             for (const auto& hotkey : mod.schema.hotkeys) {
                 const auto event = EventName(mod.schema.id, hotkey.id);

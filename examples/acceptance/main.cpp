@@ -256,8 +256,10 @@ namespace
         try {
             ++handoffCount;
             Event(std::format("After-close handoff: {} request={}",id,request));
+            // Use a menu that accepts a plain Show message. Inventory needs
+            // engine-owned setup data and crashed this fixture's generic open.
             RE::BSService::TaskQueue::GetSingleton()->AddTask([] {
-                if (auto* queue = RE::UIMessageQueue::GetSingleton()) queue->AddMessage(RE::BSFixedString("InventoryMenu"),RE::UI_MESSAGE_TYPE::kShow);
+                if (auto* queue = RE::UIMessageQueue::GetSingleton()) queue->AddMessage(RE::BSFixedString("PauseMenu"),RE::UI_MESSAGE_TYPE::kShow);
             });
         } catch (...) {}
     }
@@ -298,7 +300,7 @@ namespace
         for (const auto* action : {"success","confirmed","failure","delayed","duplicate","readback","status","invalid","registry","reset",
                 "providerRegister","providerReplace","providerRemove","rejectSaves","observer","subscription","block","issues","replaceIssue","clearIssue","clearIssues","availability","papyrusInit"})
             Require(settings.RegisterAction(Mod,action,OnAction,nullptr));
-        for (const auto& [id,title] : {std::pair{"success","TEST: callback -> Inventory"}, {"delay","TEST: 5-second handoff / cancel"},
+        for (const auto& [id,title] : {std::pair{"success","TEST: callback -> Pause menu"}, {"delay","TEST: 5-second handoff / cancel"},
                 {"reject","TEST: rejected launcher"},{"timeout","TEST: 30-second timeout"},{"late","TEST: completion after timeout"},{"toggle","TEST: toggle availability"}}) {
             Require(launchers.Register({.modId=Mod,.id=id,.modTitle="OSF Settings Test Mod",.title=title,
                 .description="Intentional launcher acceptance case. Read the test mod checklist for expected behavior.",.open=OnLaunch}));

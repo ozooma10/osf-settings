@@ -282,7 +282,6 @@ namespace OSFSettings::Papyrus
         RE::TESLoadGameEvent::GetEventSource()->RegisterSink(events);
         RE::UI::GetSingleton()->RegisterSink<RE::MenuOpenCloseEvent>(events);
         installed = true;
-        return;
     }
 
 }

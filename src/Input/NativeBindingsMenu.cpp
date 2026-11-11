@@ -10,7 +10,6 @@
 #include "Harness/TranslationRegistration.h"
 
 #include <algorithm>
-#include <cctype>
 #include <map>
 #include <optional>
 
@@ -48,12 +47,7 @@ namespace OSFSettings::NativeBindingsMenu
 
         void BuildLabels(std::vector<ModSettings> mods)
         {
-            const auto titleKey = [](const ModSettings& mod) {
-                auto title = mod.schema.title;
-                std::ranges::transform(title, title.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                return std::pair{ std::move(title), mod.schema.id };
-            };
-            std::ranges::sort(mods, {}, titleKey);
+            std::ranges::sort(mods, {}, [](const ModSettings& mod) { return std::pair{ FoldAscii(mod.schema.title), std::string_view(mod.schema.id) }; });
             g_order.clear();
             g_translations.clear();
             g_labels.clear();

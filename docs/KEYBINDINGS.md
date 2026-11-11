@@ -52,6 +52,8 @@ See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../e
 
 To open a native menu instead, add `"menu": "MyModMenu"` to the declaration. Your plugin must register that name with `RE::UI::RegisterMenu`. Menu hotkeys cannot also register callbacks.
 
+The menu must support a plain `kShow` message without additional initialization data. Use a callback with the destination owner's opening API otherwise; do not assume a registered built-in menu such as Inventory supports a generic open.
+
 ## Block hotkeys while capturing input
 
 For a custom view that captures input, acquire a block before granting focus:

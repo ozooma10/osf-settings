@@ -44,19 +44,32 @@ int wmain(int argc, wchar_t** argv)
             throw std::runtime_error("Cannot read UTF-16 keyboard table");
 
         nlohmann::json output{ { "rows", nlohmann::json::array() }, { "titles", nlohmann::json::object() } };
+        std::vector<OSFSettings::ModSchema> loaded;
         for (int index = 2; index < argc; ++index) {
             const std::filesystem::path path(argv[index]);
             std::ifstream input(path);
             if (!input) throw std::runtime_error("Cannot open schema: " + path.string());
             std::string error;
-            const auto schema = OSFSettings::SettingsJson::ParseSchema(input, path.stem().string(), error);
+            auto schema = OSFSettings::SettingsJson::ParseSchema(input, path.stem().string(), error);
             if (!schema) throw std::runtime_error(path.string() + ": " + error);
+            loaded.push_back(std::move(*schema));
+        }
+        // The exporter sees every schema at once, so it resolves pages the way the store does.
+        std::vector<OSFSettings::ModSchema*> mutableSchemas;
+        mutableSchemas.reserve(loaded.size());
+        for (auto& schema : loaded) mutableSchemas.push_back(&schema);
+        OSFSettings::ResolvePages(mutableSchemas);
+        const std::vector<const OSFSettings::ModSchema*> schemas(mutableSchemas.begin(), mutableSchemas.end());
+        for (const auto index : OSFSettings::PageOrder(schemas)) {
+            const auto* schema = schemas[index];
             output["titles"][schema->id] = schema->title;
             for (const auto& group : schema->groups) {
+                const auto framing = OSFSettings::FrameGroup(schemas, *schema, group);
                 for (const auto& control : group.controls) {
                     nlohmann::json row{
                         { "mod", schema->id }, { "modTitle", schema->title }, { "modDescription", schema->description },
-                        { "group", group.id }, { "groupTitle", group.label }
+                        { "page", framing.page->id }, { "pageTitle", framing.page->title },
+                        { "group", group.id }, { "groupTitle", framing.label }, { "groupSource", framing.source }
                     };
                     if (const auto* setting = std::get_if<OSFSettings::SettingDefinition>(&control)) {
                         row["key"] = setting->key;

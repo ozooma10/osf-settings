@@ -27,7 +27,7 @@ Repeat the normal menu checks with **Large text** off and on in OSF Settings. Se
 | Reset | Reset an individual value, then confirm Reset this test page | Defaults restored; other mods and provider values unaffected |
 | Validation / registry | Run Check invalid API writes and Inspect public registry | Both report PASS; invalid writes do not alter the values |
 | Persistence | Edit values, change saves, restart the game | Static values and provider values remain; native counters reset |
-| Native hotkeys | Bind both callback hotkeys and menu hotkey; test keyboard, alternate slot, mouse where offered, and controller | One callback per press, no repeat while held; menu binding opens Inventory on release |
+| Native hotkeys | Bind both callback hotkeys and menu hotkey; test keyboard, alternate slot, mouse where offered, and controller | One callback per press, no repeat while held; menu binding opens Pause menu on release |
 | Conflicts | Bind the second callback to an occupied key/button; cancel, then confirm; clear/reset | Correct conflict text and device; cancellation preserves bindings; restart preserves accepted binding |
 | Key values | Rebind Observed key to keyboard and mouse; clear it; try clearing Required key | Observer tracks new binding; clearing stops it; Required key cannot be cleared; these are keyboard/mouse values, not controller hotkeys |
 | Observer lifecycle | Toggle key observer off/on, press in gameplay | Counter stops while unsubscribed and resumes after resubscribe |
@@ -42,11 +42,11 @@ Repeat the normal menu checks with **Large text** off and on in OSF Settings. Se
 | Provider lifecycle | Edit values; replace definition; remove page; register again | Replacement retains valid values and adds a field; removal hides page; re-register restores saved values |
 | Provider key observer | Bind Provider observed key; press in gameplay; remove provider and press; register again and press | Provider observer counter increments only while its definition exists; saved binding and observation resume after registration |
 | Issues | Report; inspect long detail through paragraph 12; replace warning; clear one; clear all | Error/warning styling, scrolling, replacement and clearing work; schema-less mod appears |
-| Native launcher | Open TEST: schema → Inventory from gameplay and Pause | Settings/Pause hand off to Inventory; closing restores normal input; recency updates |
-| Callback launcher | Open TEST: callback → Inventory | After-close counter increments once; Inventory appears |
-| Delayed / cancellation | Open 5-second launcher; allow completion, then repeat and cancel during wait | Success hands off; canceled request never opens Inventory; late completion logs nonzero status |
+| Native launcher | Open TEST: schema → Pause menu from gameplay and Pause | Settings/Pause hand off to Pause menu; closing restores normal input; recency updates |
+| Callback launcher | Open TEST: callback → Pause menu | After-close counter increments once; Pause menu appears |
+| Delayed / cancellation | Open 5-second launcher; allow completion, then repeat and cancel during wait | Success hands off; canceled request never opens Pause menu; late completion logs nonzero status |
 | Rejection | Open rejected launcher | Intentional reason shown; Settings stays open |
-| Timeout / late completion | Run 30-second timeout and then 35-second late-completion case | Settings recovers at its 30-second deadline; late callback cannot open Inventory |
+| Timeout / late completion | Run 30-second timeout and then 35-second late-completion case | Settings recovers at its 30-second deadline; late callback cannot open Pause menu |
 | Availability | Inspect missing native-menu card; toggle availability of toggle card | Missing menu stays unavailable; toggle card follows its current availability/reason |
 | Papyrus actions | Initialize if needed; immediate alias, deferred Global, typed read/write, reset | Actual script completion; typed test writes false / 7 / 0.65 / quiet / Papyrus typed values; Native readback agrees |
 | Papyrus hotkeys / notifications | Bind alias and Global hotkeys; edit native values | Correct script counter/status changes; one activation per press |
@@ -57,6 +57,8 @@ Repeat the normal menu checks with **Large text** off and on in OSF Settings. Se
 | Production install | Install/reinstall the actual OSF Settings ZIP with this consumer enabled | Test mod's files remain separate; static/provider values and Controls survive; no test plugin or fixture in production package |
 
 Timeouts are real-time. Native delayed jobs continue while Settings pauses the game. Papyrus uses `Utility.WaitMenuPause`; bootstrap or other VM work may need gameplay to resume.
+
+Native-menu examples target Pause. A generic `kShow` message is not a substitute for a menu's engine-specific initialization: the former Inventory example crashed on Starfield 1.16.244 even with Settings 1.1.2. Use the destination owner's supported opening path when it requires additional data.
 
 The fixture exposes manual cases; it does not certify them automatically. Failed-load recovery needs an independently reproducible load failure. Do not deliberately damage a normal save. Framework-wide failure recovery, supported legacy consumers and mod-manager upgrade acceptance still require their corresponding real scenarios. The external panel tests the current OSF UI integration, not legacy migration.
 

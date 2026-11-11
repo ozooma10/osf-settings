@@ -40,6 +40,8 @@ namespace OSFSettings
         const std::vector<SettingsLoadError>& LoadErrors() const { return m_loadErrors; }
 
     private:
+        // Points every schema's page at the mod that owns the page its controls appear on.
+        void ResolvePages();
         SetResult Commit(ModSettings& mod, SettingValues proposed, bool changed);
         std::vector<ModSettings> m_mods;
         std::vector<SettingsLoadError> m_loadErrors;

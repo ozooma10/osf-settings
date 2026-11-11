@@ -1,5 +1,7 @@
 #include "Settings/Localization.h"
+#include "Core/LanguageSetting.h"
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -23,6 +25,18 @@ int main()
         ~Cleanup() { std::error_code error; std::filesystem::remove_all(root, error); }
     } cleanup{ root };
     try {
+        struct EngineLanguage
+        {
+            std::string_view key, value;
+            EngineLanguage* GetSetting(std::string_view name) { return key == name ? this : nullptr; }
+        };
+        EngineLanguage unchanged{ "sLanguage:General", "en" };
+        EngineLanguage overridden{ "SLanguage:General", "ja" };
+        EngineLanguage unrelated{ "sOther:General", "de" };
+        check(Localization::FindLanguageSetting(&unchanged)->value == "en", "static engine language remains available");
+        check(Localization::FindLanguageSetting(&overridden)->value == "ja", "dynamic INI language uses its actual value instead of the English fallback");
+        check(!Localization::FindLanguageSetting(&unrelated), "unrelated string does not supply the language");
+        check(!Localization::FindLanguageSetting(static_cast<EngineLanguage*>(nullptr)), "missing INI collection allows the English fallback");
         const auto write = [&](const char* language, const char* mod, const nlohmann::json& json) {
             std::filesystem::create_directories(root / language);
             std::ofstream(root / language / (std::string(mod) + ".json"), std::ios::binary) << json.dump();
@@ -73,6 +87,32 @@ int main()
         german.Apply(registered);
         check(registered.title == "Deutsch" && registered.description == "Registered again" && registered.hotkeys[0].defaultKey == "F11"
             && registered.FindAction("later") && registered.groups[0].label == "Allgemein", "catalogs overlay the live schema instead of replacing it");
+        auto changed = mod.schema;
+        auto* changedSetting = changed.FindSetting(setting.key);
+        std::get<EnumDefinition>(changedSetting->definition).options = {{"fast", "New fast"}, {"added", "Added"}};
+        changed.FindAction("run")->confirmation.clear();
+        std::ranges::reverse(changed.groups[0].controls);
+        german.Apply(changed);
+        const auto& changedEnum = std::get<EnumDefinition>(changed.FindSetting(setting.key)->definition);
+        check(changedEnum.options[0].value == "fast" && changedEnum.options[0].label == "Schnell" &&
+            changedEnum.options[1].label == "Added", "reordered/replaced enum keeps live values and unknown-label fallback");
+        check(changed.FindAction("run")->label == "Ausführen" && changed.FindAction("run")->confirmation.empty(),
+            "replay cannot restore a removed confirmation requirement");
+        changed.FindSetting(setting.key)->definition = BoolDefinition{true};
+        german.Apply(changed);
+        check(changed.FindSetting(setting.key)->label == "Modus" &&
+            std::get<BoolDefinition>(changed.FindSetting(setting.key)->definition).defaultValue,
+            "replay handles enum becoming a boolean without retaining options or changing defaults");
+        write("de", "future", {{"settings",{{"later",{{"label","Translated later"}}}}},
+            {"actions",{{"run",{{"confirmation","Confirm later"}}}}}});
+        ModSettings future{.schema={.id="future"}};
+        Localization::Catalog futureCatalog(root, "de", std::span(&future, 1));
+        check(futureCatalog.Errors().size() == 2, "unknown future controls report diagnostics at catalog load");
+        future.schema.groups = {{"new", "New", {SettingDefinition{.key="later", .label="Later", .definition=BoolDefinition{false}},
+            ActionDefinition{"run", "Run", "", "Confirm"}}}};
+        futureCatalog.Apply(future.schema);
+        check(future.schema.FindSetting("later")->label == "Translated later" && future.schema.FindAction("run")->confirmation == "Confirm later",
+            "previously unknown translation keys apply when a provider later adds matching controls");
         Localization::Catalog english(root, "fr", mods);
         translated = mod.schema;
         english.Apply(translated);

@@ -17,6 +17,7 @@
 namespace OSFSettings::TestHarness
 {
     nlohmann::json TranslationRegistrationSnapshot();
+    nlohmann::json PerformanceSnapshot();
     namespace
     {
         using Json = nlohmann::json;
@@ -214,6 +215,7 @@ namespace OSFSettings::TestHarness
             result["learning"] = std::move(values);
             result["translationRegistration"] = TranslationRegistrationSnapshot();
             result["acceptance"] = AcceptanceSnapshot();
+            result["performance"] = PerformanceSnapshot();
             const auto text = result.dump();
             const auto required = static_cast<std::uint32_t>(text.size() + 1);
             if (buffer && capacity >= required) std::memcpy(buffer, text.c_str(), required);

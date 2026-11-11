@@ -100,11 +100,8 @@ package
                     focused:stage && stage.focus == input, maxLength:row ? row.maxLength : 0};
             }
         }
-        public function get valid():Boolean
-        {
-            var bytes:int = byteLength(input.text);
-            return row && bytes >= 0 && bytes <= int(row.maxLength);
-        }
+        public function get valid():Boolean { return row && withinLimit(byteLength(input.text)); }
+        private function withinLimit(bytes:int):Boolean { return bytes >= 0 && bytes <= int(row.maxLength); }
         public function showError(message:String):void
         {
             feedback.textColor = MenuStyle.ACCENT; MenuStyle.setText(feedback, message);
@@ -113,7 +110,7 @@ package
         {
             if (!row) return;
             var bytes:int = byteLength(input.text);
-            feedback.textColor = valid ? MenuStyle.MUTED : MenuStyle.ACCENT;
+            feedback.textColor = withinLimit(bytes) ? MenuStyle.MUTED : MenuStyle.ACCENT;
             MenuStyle.setText(feedback, bytes < 0 ? tr("strings.invalid") :
                 tr("strings.bytes", {bytes:bytes, limit:row.maxLength}));
         }

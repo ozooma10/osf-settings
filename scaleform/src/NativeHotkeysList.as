@@ -6,15 +6,19 @@ package
     import flash.events.KeyboardEvent;
     import flash.events.MouseEvent;
     import flash.geom.Rectangle;
+    import flash.text.TextField;
+    import flash.text.TextFieldAutoSize;
     import flash.utils.Dictionary;
 
     // Adapts vanilla binding rows to the same scrolling list as ordinary settings.
     public final class NativeHotkeysList
     {
+        private static const MOUSE_EVENTS:Array = [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL];
         private var list:Object;
         private var create:Function;
         private var views:Dictionary = new Dictionary(true);
         public var popup:Object;
+        private var confirmationLabelBounds:Rectangle;
         public var busy:Boolean = false;
         public var saving:Boolean = false;
         private var dataManager:Object;
@@ -22,6 +26,8 @@ package
         private var bridge:Object;
         private var changed:Function;
         private var entries:Array = [];
+        // The first MainGameplay entry for each action name, rebuilt with entries.
+        private var actions:Object = {};
         private var definitions:Array = [];
         private var seenRemapping:Boolean = false;
         private var cancelled:Boolean = false;
@@ -34,7 +40,6 @@ package
         public function get secondary():Boolean { return showAlternate; }
         public var revision:uint = 0;
         public var ready:Boolean = false;
-        public var fullPage:Boolean = false;
         private var labelEntry:Object;
 
         public function get bindings():Array { return entries; }
@@ -52,6 +57,13 @@ package
             dataManager = definition("Shared.AS3.Data.BSUIDataManager");
             global = definition("Shared.GlobalFunc");
             popup = create("RemapConfirmation");
+            var label:TextField = popup.ControlInfo_mc.Label_mc.Text_tf;
+            confirmationLabelBounds = new Rectangle(label.x, label.y, label.width, label.height);
+            // The authored field is only as wide as its short placeholder. Use the
+            // left half of the dialog while preserving its right edge beside the glyph.
+            var labelWidth:Number = Math.max(label.width, popup.getBounds(popup).width / 2 - 24);
+            confirmationLabelBounds.x -= labelWidth - label.width;
+            confirmationLabelBounds.width = labelWidth;
             // The popup's authored button-bar anchor is at the center of its box.
             popup.PopulateButtonBar(definition("Shared.Components.ButtonControls.ButtonBar.ButtonBar").JUSTIFY_CENTER, 38);
             popup.active = false;
@@ -60,8 +72,7 @@ package
             dataManager.Subscribe("RemapConfirmationData", confirmationChanged);
             dataManager.Subscribe("FireForgetEventData", saved);
             dataManager.addEventListener("SettingsPanel_RemapConfirmed", remapConfirmed);
-            for each (var type:String in [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL])
-                list.addEventListener(type, blockMouse, true, 100);
+            for each (var type:String in MOUSE_EVENTS) list.addEventListener(type, blockMouse, true, 100);
         }
 
         public function open():void
@@ -78,12 +89,7 @@ package
             definitions = rows;
             for each (var row:Object in rows) {
                 if (row.type != "hotkey") continue;
-                var native:Object = null;
-                for each (var entry:Object in entries) {
-                    if (!entry.bIsDivider && entry.uContextID == 0 && entry.sInputName == row.action) {
-                        native = entry; break;
-                    }
-                }
+                var native:Object = actions.hasOwnProperty(row.action) ? actions[row.action] : null;
                 row.editable = Boolean(native && !native.bReadOnly);
                 row.value = native ? KeybindingsData.bindingText(native.MainBinding) : "";
                 row.alternate = native && showAlternate ? KeybindingsData.bindingText(native.AltBinding) : "";
@@ -130,10 +136,10 @@ package
             }
             var alternate:Boolean = showAlternate;
             // Native rollover/listening frames can change bounds; idle cells cannot.
-            if (!bindingChanged && view.height == height && view.alternate == alternate && view.fullPage == fullPage &&
+            if (!bindingChanged && view.height == height && view.alternate == alternate &&
                 view.frame == clip.currentFrame && view.mainFrame == clip.MainBinding_mc.currentFrame && view.altFrame == clip.AltBinding_mc.currentFrame)
                 return clip as DisplayObject;
-            view.height = height; view.alternate = alternate; view.fullPage = fullPage;
+            view.height = height; view.alternate = alternate;
             view.frame = clip.currentFrame; view.mainFrame = clip.MainBinding_mc.currentFrame; view.altFrame = clip.AltBinding_mc.currentFrame;
             // The outer SettingsRow supplies the label, background and row hit area.
             for (var i:int = 0; i < clip.numChildren; ++i) {
@@ -233,9 +239,10 @@ package
 
         public function get canClear():Boolean
         {
-            if (busy || saving || !currentClip || !list.selectedEntry.row.editable) return false;
-            var binding:Object = currentClip.activePriority == 0 ? list.selectedEntry.row.binding.MainBinding :
-                showAlternate && currentClip.activePriority == 1 ? list.selectedEntry.row.binding.AltBinding : null;
+            var clip:Object = currentClip;
+            if (busy || saving || !clip || !list.selectedEntry.row.editable) return false;
+            var binding:Object = clip.activePriority == 0 ? list.selectedEntry.row.binding.MainBinding :
+                showAlternate && clip.activePriority == 1 ? list.selectedEntry.row.binding.AltBinding : null;
             return Boolean(binding && (binding.aPCKeyName.length || binding.aButtonName.length));
         }
 
@@ -289,8 +296,14 @@ package
         {
             if (!pending || busy || saving) return;
             entries = pending.entries; showAlternate = pending.secondary; pending = null;
-            // Empty publications retain the last device family until rows arrive.
-            for each (var entry:Object in entries) if (!entry.bIsDivider) { gamepad = Boolean(entry.bGamepadEntry); break; }
+            actions = {};
+            var first:Boolean = true;
+            for each (var entry:Object in entries) {
+                if (entry.bIsDivider) continue;
+                // Empty publications retain the last device family until rows arrive.
+                if (first) { gamepad = Boolean(entry.bGamepadEntry); first = false; }
+                if (entry.uContextID == 0 && !actions.hasOwnProperty(entry.sInputName)) actions[entry.sInputName] = entry;
+            }
             ready = true; ++revision;
             changed("", true);
         }
@@ -341,9 +354,17 @@ package
         {
             if (!busy) { popup.active = false; return; }
             var data:Object = Object(event).data;
+            var label:TextField = popup.ControlInfo_mc.Label_mc.Text_tf;
+            var title:String = label.text;
             for each (var row:Object in definitions) {
-                if (row.action == data.sUserEvent) global.SetText(popup.ControlInfo_mc.Label_mc.Text_tf, row.title);
+                if (row.action == data.sUserEvent) title = row.title;
             }
+            // Vanilla right-autosizes this label, letting long translated mod names
+            // extend beyond the dialog. Keep the authored space beside the key glyph.
+            label.autoSize = TextFieldAutoSize.NONE;
+            label.x = confirmationLabelBounds.x;
+            label.width = confirmationLabelBounds.width;
+            MenuStyle.fit(label, title);
         }
 
         public function dispose():void
@@ -354,8 +375,7 @@ package
             dataManager.Unsubscribe("RemapConfirmationData", confirmationChanged);
             dataManager.Unsubscribe("FireForgetEventData", saved);
             dataManager.removeEventListener("SettingsPanel_RemapConfirmed", remapConfirmed);
-            for each (var type:String in [MouseEvent.MOUSE_DOWN, MouseEvent.CLICK, MouseEvent.MOUSE_OVER, MouseEvent.MOUSE_OUT, MouseEvent.MOUSE_WHEEL])
-                list.removeEventListener(type, blockMouse, true);
+            for each (var type:String in MOUSE_EVENTS) list.removeEventListener(type, blockMouse, true);
             for each (var view:Object in views) view.clip.removeEventListener(MouseEvent.CLICK, beforeBindingClick, true);
         }
     }

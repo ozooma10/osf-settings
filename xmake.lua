@@ -3,7 +3,7 @@ includes("lib/commonlibsf")
 
 -- set project constants
 set_project("OSF Settings")
-set_version("1.1.2")
+set_version("1.2.0")
 set_license("GPL-3.0")
 set_languages("c++23")
 set_warnings("allextra")
@@ -46,6 +46,7 @@ target("OSF Settings")
     add_includedirs("src", "build/generated")
     set_pcxxheader("src/pch.h")
     add_packages("nlohmann_json")
+    add_syslinks("ole32", "oleaut32", "uuid", "shlwapi", "user32")
     if has_config("test_harness") then
         add_defines("OSFSETTINGS_TEST_HARNESS")
         add_files("tests/harness/*.cpp")
@@ -68,4 +69,5 @@ target("OSF Settings")
     add_installfiles("data/SFSE/Plugins/OSF/Settings/translations/ja/osfsettings.json", { prefixdir = "SFSE/Plugins/OSF/Settings/translations/ja" })
     add_installfiles("data/Scripts/Source/OSFSettings.psc", { prefixdir = "Scripts/Source" })
     add_installfiles("build/papyrus/OSFSettings.pex", { prefixdir = "Scripts" })
-    add_installfiles("build/scaleform/OSFSettingsMenu.swf", "build/scaleform/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })
+    local movieDir = has_config("test_harness") and "build/scaleform/harness" or "build/scaleform"
+    add_installfiles(movieDir .. "/OSFSettingsMenu.swf", movieDir .. "/OSFSettingsMenu_LRG.swf", { prefixdir = "Interface" })

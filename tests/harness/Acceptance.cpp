@@ -6,6 +6,7 @@
 #include "Actions/ActionService.h"
 #include "Launcher/LauncherService.h"
 #include "Settings/SettingsService.h"
+#include "RE/U/UIMessageQueue.h"
 #include "RE/B/BSScriptUtil.h"
 #include "RE/V/VirtualMachine.h"
 #include "RE/E/Events.h"
@@ -113,7 +114,12 @@ namespace OSFSettings::TestHarness
             API::Client settings;
             if (!settings.Init() || !settings.IsReady()) throw std::runtime_error("settings-not-ready");
             const auto operation = args.at("operation").get<std::string>();
-            if (operation.starts_with("provider")) {
+            if (operation == "performanceMenu") {
+                auto* queue = RE::UIMessageQueue::GetSingleton();
+                if (!queue) throw std::runtime_error("menu-queue-unavailable");
+                queue->AddMessage(RE::BSFixedString("OSFSettingsMenu"), args.at("open").get<bool>() ?
+                    RE::UI_MESSAGE_TYPE::kShow : RE::UI_MESSAGE_TYPE::kHide);
+            } else if (operation.starts_with("provider")) {
                 ProviderCommand(args);
             } else if (operation == "registry") {
                 struct Copy { std::string caption; bool valid{}; } copy;

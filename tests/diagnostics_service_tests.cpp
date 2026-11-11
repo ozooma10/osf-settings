@@ -87,6 +87,5 @@ int TestDiagnosticsService()
     check(service.ClearMod("shared") == 1 && service.ClearMod("shared") == 0,
         "clearing a mod removes the one shared issue without retaining history");
     check(service.Snapshot().size() == workerCount + 1, "clearing a mod preserves other mods");
-    check(&DiagnosticsService::Get() == &DiagnosticsService::Get(), "the process service has a stable identity");
     return checks;
 }

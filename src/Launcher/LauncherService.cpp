@@ -144,11 +144,6 @@ namespace OSFSettings
     bool LauncherService::RecordOpened(std::string_view mod, std::string_view id)
     {
         std::lock_guard lock(m_mutex);
-        return RecordOpenedLocked(mod, id);
-    }
-
-    bool LauncherService::RecordOpenedLocked(std::string_view mod, std::string_view id)
-    {
         const auto entry = std::ranges::find_if(m_destinations, [&](const auto& value) { return value.mod == mod && value.id == id; });
         if (entry == m_destinations.end() || !entry->available) return false;
         const auto identity = std::pair{ std::string(mod), std::string(id) };

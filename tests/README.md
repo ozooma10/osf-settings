@@ -57,6 +57,24 @@ Preview fixtures explicitly mark required keys with `allowUnbound: false`.
 Checks use throwing functions or explicit failure counters and remain active with
 `NDEBUG` in `releasedbg`; passing tests are not disabled C assertions.
 
+## Coverage ownership
+
+The October 2026 audit retained all 24 native suites and removed repeated cases
+within them. Keep shared behavior in its owning fixture:
+
+- `default_inheritance_tests.cpp` covers unchanged writes and actual `Reset` /
+  `ResetMod` behavior across every setting type and schema updates. Repeating
+  `Set(default)` in each type fixture adds no reset coverage.
+- `native/settings_tests.cpp` keeps type-specific validation and serialization,
+  plus a shared store save-failure/retry case. Service and API tests retain their
+  distinct error mapping, notification and snapshot checks.
+- `security_tests.cpp` checks real temporary-file cleanup by enumerating the
+  directory. The writer uses unique `.tmp.*` names; checking that a fixed `.tmp`
+  path is absent does not prove cleanup. Stale-file preservation stays covered.
+- Schema/store tests own general parsing rules, including version syntax, enum
+  collisions and NUL rejection. Preview-exporter tests focus on row output, key
+  resolution and propagation of representative parser failures.
+
 ## Menu previews
 
 Install the optional preview dependency once with
@@ -77,7 +95,8 @@ pwsh -NoProfile -File tools/preview-menu.ps1 -BuildOnly
 ```
 
 Exporter regressions include declared empty enum choices/defaults, their labels,
-single-choice editability and rejection of undeclared or duplicate empty values.
+and single-choice editability. Native store tests cover rejection of undeclared
+or duplicate empty values.
 The Papyrus suite also checks empty choices through getters, setters, invalid-write
 preservation and reload with a non-empty schema default.
 
@@ -116,11 +135,11 @@ Preview, large-text and harness flags participate in movie fingerprints.
 ## Game acceptance
 
 For a single automated development entrypoint, including uncommitted changes,
-use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame`. The
+use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame -Interactive`. The
 [release validation guide](../docs/RELEASE_VALIDATION.md) describes coverage, isolation, report
 formats and remaining acceptance gaps. Omit `-RunGame` for an offline run.
 
-`smoke-coverage.json` inventories 19 feature areas across all 24 native suites,
+`smoke-coverage.json` inventories 21 feature areas across all 24 native suites,
 four preview variants and 13 game cases. The coverage stage rejects empty or
 duplicate feature entries, unknown references and unmapped tests in any layer.
 JSON and Markdown reports show each feature's native, preview and game result
@@ -129,6 +148,9 @@ separately; an offline pass leaves its game checks `not-run`.
 This inventory maps features to suites; it is not a measured line/branch coverage
 percentage or a claim that every behavior in a feature has been tested. In
 particular, Gameplay Options currently has preview coverage only.
+The shared-pages mapping includes the native row-exporter tests run in the normal
+preview stage; it does not claim rendered shared-page or in-game acceptance.
+Dependency versions and shared pages have no dedicated game cases in this inventory.
 
 The normal/large Features cases exercise value editors, action consumers,
 launcher handoff and runtime providers through real game input. They include a
@@ -141,11 +163,22 @@ automatic cancellation on focus loss is not established. Preview deactivation
 checks cover cleanup only when Flash receives `Event.DEACTIVATE`.
 
 Focused development
-runs use the sibling `Test-Starfield.ps1 -Scenario SettingsSmoke -Acceptance
+runs use the sibling `Test-Starfield.ps1 -Scenario SettingsSmoke -Interactive -Acceptance
 -AcceptancePhase Features` (add `-LargeText` for accessibility text).
 When the opening hotkey is unbound, game scenarios enter through Pause and assign
 a temporary unused key with native capture. They stop the owned session and
 restore the original Controls bytes afterward, including on failure.
+
+On Starfield 1.16.244, the locked-save failed-load injection is blocked: the
+same fatal stack was reproduced with OSFSettings.dll absent. It is not a passing
+recovery case. Keep its crash comparison with the release evidence, and leave
+recovery from an in-progress engine load failure unverified until a recoverable
+failure can be reproduced independently.
+
+Production localization acceptance must use the engine's observed language,
+not just an edited INI. Starfield represents overridden string settings with an
+uppercase `S` prefix (`SLanguage:General`); the language lookup regression covers
+both the default and overridden forms.
 
 The [release runner](../tools/test-release.ps1) combines native and preview
 checks, production archive verification, disposable reinstall checks, and a
@@ -161,7 +194,8 @@ The smoke and release runners include the native preview-exporter regression
 checks in their normal-preview stage after executing the Ruffle preview.
 
 Native assertions and Ruffle previews do not replace input, controller, lifecycle
-or menu-handoff acceptance in Starfield. Add `-RunGame` to run the harness suite
+or menu-handoff acceptance in Starfield. With an idle desktop and explicit interactive-testing authorization, add
+`-RunGame -Interactive` to run the harness suite
 as the `runtime` stage (`-Harness` points at a checkout other than the sibling
 `OSF Test Harness`). The suite receives `-ResultPath` and writes its JSON summary
 there; the stage requires a fresh build of the packaged commit and matching source
