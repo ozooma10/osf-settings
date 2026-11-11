@@ -1,4 +1,5 @@
 #include "Settings/Localization.h"
+#include "Core/LanguageSetting.h"
 
 #include <algorithm>
 #include <chrono>
@@ -24,6 +25,18 @@ int main()
         ~Cleanup() { std::error_code error; std::filesystem::remove_all(root, error); }
     } cleanup{ root };
     try {
+        struct EngineLanguage
+        {
+            std::string_view key, value;
+            EngineLanguage* GetSetting(std::string_view name) { return key == name ? this : nullptr; }
+        };
+        EngineLanguage unchanged{ "sLanguage:General", "en" };
+        EngineLanguage overridden{ "SLanguage:General", "ja" };
+        EngineLanguage unrelated{ "sOther:General", "de" };
+        check(Localization::FindLanguageSetting(&unchanged)->value == "en", "static engine language remains available");
+        check(Localization::FindLanguageSetting(&overridden)->value == "ja", "dynamic INI language uses its actual value instead of the English fallback");
+        check(!Localization::FindLanguageSetting(&unrelated), "unrelated string does not supply the language");
+        check(!Localization::FindLanguageSetting(static_cast<EngineLanguage*>(nullptr)), "missing INI collection allows the English fallback");
         const auto write = [&](const char* language, const char* mod, const nlohmann::json& json) {
             std::filesystem::create_directories(root / language);
             std::ofstream(root / language / (std::string(mod) + ".json"), std::ios::binary) << json.dump();

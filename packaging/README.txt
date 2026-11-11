@@ -40,6 +40,9 @@ version and can open a Nexus page when the provider supplies its ID. These
 checks rely on participating mods' metadata; an empty page is not a health
 check of every installed mod. Physical controller
 operation remains unverified, and text entry requires a keyboard.
+Recovery after an in-progress engine load failure remains unverified. On
+Starfield 1.16.244, the locked-save test also crashes with Settings absent;
+it is not a valid recovery test on that runtime.
 
 Settings persist in Documents/My Games/Starfield/OSF/Settings, shared
 across saves, mod-manager profiles and game installations using that Documents

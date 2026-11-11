@@ -169,6 +169,17 @@ When the opening hotkey is unbound, game scenarios enter through Pause and assig
 a temporary unused key with native capture. They stop the owned session and
 restore the original Controls bytes afterward, including on failure.
 
+On Starfield 1.16.244, the locked-save failed-load injection is blocked: the
+same fatal stack was reproduced with OSFSettings.dll absent. It is not a passing
+recovery case. Keep its crash comparison with the release evidence, and leave
+recovery from an in-progress engine load failure unverified until a recoverable
+failure can be reproduced independently.
+
+Production localization acceptance must use the engine's observed language,
+not just an edited INI. Starfield represents overridden string settings with an
+uppercase `S` prefix (`SLanguage:General`); the language lookup regression covers
+both the default and overridden forms.
+
 The [release runner](../tools/test-release.ps1) combines native and preview
 checks, production archive verification, disposable reinstall checks, and a
 clean-commit check. Commit first: uncommitted or untracked files block packaging

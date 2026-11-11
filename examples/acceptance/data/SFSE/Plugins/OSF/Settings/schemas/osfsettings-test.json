@@ -331,8 +331,8 @@
       "group": "Input and subscriptions"
     },
     "nativeMenu": {
-      "label": "TEST native menu -> Inventory",
-      "menu": "InventoryMenu",
+      "label": "TEST native menu -> Pause menu",
+      "menu": "PauseMenu",
       "group": "Input and subscriptions"
     },
     "papyrusAlias": {
@@ -346,9 +346,9 @@
   },
   "menus": {
     "inventory": {
-      "title": "TEST: schema -> Inventory",
-      "menu": "InventoryMenu",
-      "description": "Opens the game's existing Inventory menu through a schema launcher."
+      "title": "TEST: schema -> Pause menu",
+      "menu": "PauseMenu",
+      "description": "Opens the game's existing Pause menu menu through a schema launcher."
     },
     "missing": {
       "title": "TEST: unavailable native menu",

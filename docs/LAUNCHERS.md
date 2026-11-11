@@ -21,6 +21,7 @@ Add a `menus` object keyed by ID to `Data/SFSE/Plugins/OSF/Settings/schemas/mymo
 - Each key is the card's `id`: nonempty, single-line, case-sensitive and unique within the mod.
 - `title` and `menu` are required. `description` is optional.
 - `menu` is the exact, case-sensitive name your mod registers with `RE::UI`. If the menu isn't registered, the card shows as unavailable.
+- The destination must accept a plain `kShow` message without extra initialization data. For menus with an owner-specific opening path, register a callback and invoke that path after Settings closes. Registration alone does not establish that a built-in game menu can open this way; the Inventory menu is not a suitable generic example.
 
 [`examples/launchers/absolute-control.json`](../examples/launchers/absolute-control.json) adds Absolute Control's `AbsoluteControlPanelMenu`.
 

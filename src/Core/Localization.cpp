@@ -1,4 +1,5 @@
 #include "Runtime.h"
+#include "LanguageSetting.h"
 #include "Settings/Localization.h"
 #include "Settings/SettingsService.h"
 #include "Utils/Paths.h"
@@ -13,7 +14,7 @@ namespace OSFSettings::Localization
         static std::once_flag initialized;
         std::call_once(initialized, [] {
             auto* ini = RE::INISettingCollection::GetSingleton();
-            const auto* setting = ini ? ini->GetSetting("sLanguage:General") : nullptr;
+            const auto* setting = FindLanguageSetting(ini);
             const auto language = setting && setting->GetType() == RE::Setting::Type::kString ? setting->GetString() : std::string_view("en");
             auto& settings = SettingsService::Get();
             settings.Localize(Paths::LocalizationDir(), language);
