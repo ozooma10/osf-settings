@@ -22,6 +22,11 @@ OSF Settings 1.2.0
   and shared-page declarations. Existing integrations must opt in to these
   features; OSF Settings does not inspect every installed mod's dependencies.
 
+For mod authors: replace expectedSettingsVersion with a dependencies.osfsettings
+minimum. The old field is ignored in 1.2.0; it can remain alongside dependencies
+for older hosts. The former special-case OSF UI DLL version check is removed;
+consumers now declare that dependency using the osfui settings mod ID.
+
 Upgrade by replacing the previous OSF Settings installation. Keep existing
 settings and Starfield Controls files. Restart Starfield after updating.
 OSF UI is not required. See README.txt for requirements and known limitations.

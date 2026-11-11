@@ -11,15 +11,19 @@ Publication is intentionally pending; preparing a candidate does not authorize i
 - [x] Author guide covers versions, dependencies, Nexus IDs and required/optional shared pages.
 - [x] Installation guide describes shared pages and metadata-based issue reporting.
 - [x] Restore the release validation guide and document explicit interactive opt-in.
-- [ ] Candidate source committed and clean; record revision with preserved evidence.
+- [x] Candidate source committed and clean; record revision with preserved evidence.
 
 ## Automated validation
 
-- [ ] All native suites pass, including dependency and extension-page coverage.
-- [ ] All four menu preview variants and preview-exporter regressions pass.
-- [ ] Smoke, release and preview-workflow contract checks pass.
-- [ ] Production ZIP, checksum and manifest pass payload and source checks.
-- [ ] Disposable reinstall preserves simulated settings and unrelated mod content.
+The first offline candidate, `b786e93`, passed these checks on 2026-11-11.
+Final candidate identity and current results belong in its preserved release record;
+rerun the release validator after any committed source or documentation change.
+
+- [x] All native suites pass, including dependency and extension-page coverage.
+- [x] All four menu preview variants and preview-exporter regressions pass.
+- [x] Smoke, release and preview-workflow contract checks pass.
+- [x] Production ZIP, checksum and manifest pass payload and source checks.
+- [x] Disposable reinstall preserves simulated settings and unrelated mod content.
 - [ ] Review fresh normal/large-text preview captures.
 - [ ] Full interactive game suite passes against the candidate source; document blocked cases honestly.
 

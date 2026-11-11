@@ -1,4 +1,6 @@
 [
+  {"id":"dependencies", "feature":"Declared minimum versions, missing providers and dependency issue presentation", "native":["schema"], "preview":["normal","large"], "runtime":[]},
+  {"id":"shared-pages", "feature":"Required/optional extension resolution, cycles, independent values and exported row ownership", "native":["schema"], "preview":["normal"], "runtime":[]},
   {"id":"schema", "feature":"Schema types, order, limits, versions and default inheritance", "native":["schema","store"], "preview":[], "runtime":["smoke-normal","smoke-large"]},
   {"id":"value-editors", "feature":"Boolean, integer, float and enum editing, reset and persistence", "native":["store","service"], "preview":["normal","large"], "runtime":["smoke-normal","smoke-large","features-normal","features-large"]},
   {"id":"strings", "feature":"String editing, Unicode, byte limits, cancellation and failed-save recovery", "native":["string"], "preview":[], "runtime":["acceptance-normal","acceptance-large"]},

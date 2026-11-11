@@ -139,7 +139,7 @@ use `pwsh -NoProfile -File tools/test-smoke.ps1 -RunGame -Interactive`. The
 [release validation guide](../docs/RELEASE_VALIDATION.md) describes coverage, isolation, report
 formats and remaining acceptance gaps. Omit `-RunGame` for an offline run.
 
-`smoke-coverage.json` inventories 19 feature areas across all 24 native suites,
+`smoke-coverage.json` inventories 21 feature areas across all 24 native suites,
 four preview variants and 13 game cases. The coverage stage rejects empty or
 duplicate feature entries, unknown references and unmapped tests in any layer.
 JSON and Markdown reports show each feature's native, preview and game result
@@ -148,6 +148,9 @@ separately; an offline pass leaves its game checks `not-run`.
 This inventory maps features to suites; it is not a measured line/branch coverage
 percentage or a claim that every behavior in a feature has been tested. In
 particular, Gameplay Options currently has preview coverage only.
+The shared-pages mapping includes the native row-exporter tests run in the normal
+preview stage; it does not claim rendered shared-page or in-game acceptance.
+Dependency versions and shared pages have no dedicated game cases in this inventory.
 
 The normal/large Features cases exercise value editors, action consumers,
 launcher handoff and runtime providers through real game input. They include a

@@ -232,6 +232,18 @@ own version and minimum dependency versions in the schema:
 
 See the [dependency examples](../examples/dependencies/osf-stack.json).
 
+### Migrating older version declarations
+
+The former `expectedSettingsVersion` field is ignored in 1.2.0. Replace
+`"expectedSettingsVersion": "1.1.2"` with
+`"dependencies": { "osfsettings": "1.2.0" }` when adopting the new features.
+For a schema that still supports older OSF Settings releases, keep the old field
+alongside `dependencies` so those older releases retain their version warning.
+The new `version` field describes your own mod, not the required OSF Settings
+version. The former special-case OSF UI DLL version check has also been removed;
+declare an `osfui` dependency when your mod needs it, and have the provider publish
+its version through a schema or runtime registration.
+
 ## Extend another mod's page
 
 A mod that builds on another mod can put its settings on that mod's page instead of a page of its own. Add a root `extends` naming the host's mod ID:
