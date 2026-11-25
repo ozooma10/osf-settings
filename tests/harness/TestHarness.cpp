@@ -208,6 +208,7 @@ namespace OSFSettings::TestHarness
                     std::visit([&](const auto& current) {
                         if constexpr (std::is_same_v<std::decay_t<decltype(current)>, KeyBinding>) values[key] = current.keyCode;
                         else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) values[key] = current.value;
+                        else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, ColorValue>) values[key] = FormatColor(current, true);
                         else values[key] = current;
                     }, *value);
                 }
