@@ -36,6 +36,8 @@ package
         private static const PALETTE_COLUMNS:int = 12;
         private static const BUTTON_WIDTH:Number = LARGE ? 210 : 190;
         private static const BUTTON_HEIGHT:Number = LARGE ? 56 : 50;
+        // The game events the editor acts on; it declines the rest.
+        private static const NAMED_EVENTS:Object = {Accept:true, Cancel:true, Up:true, Down:true, Left:true, Right:true, LShoulder:true, RShoulder:true};
         // White and the primaries, their darker shades, then neutrals and the menu's own palette.
         private static const PALETTE:Array = [
             0xFFFFFF, 0xFF0000, 0xFF8000, 0xFFFF00, 0x80FF00, 0x00FF00, 0x00FF80, 0x00FFFF, 0x0080FF, 0x0000FF, 0x8000FF, 0xFF00FF,
@@ -224,6 +226,9 @@ package
         public function userEvent(name:String, pressed:Boolean, event:KeyboardEvent = null):Boolean
         {
             if (!visible) return false;
+            // Decline every other named event: a mouse button arrives as one, and only a declined
+            // event reaches the movie as a real click. Keys that native then forwards land here with event set.
+            if (!event && !typing && !NAMED_EVENTS[name]) return false;
             if (typing) {
                 if (!event) {
                     // Text input context: native forwards characters and editing keys to the field.
