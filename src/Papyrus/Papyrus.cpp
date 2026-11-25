@@ -99,6 +99,12 @@ namespace OSFSettings::Papyrus
             return String(Access().Read("GetString", mod.c_str(), key.c_str(), std::string(fallback.c_str()))); 
         }
 
+        // Colors cross Papyrus as text: Int is signed 32-bit and Papyrus has no unsigned shifts. Reads always return "#RRGGBBAA".
+        String GetColor(VM&, std::uint32_t, std::monostate, String mod, String key, String fallback) {
+            const auto color = Access().TryRead<ColorValue>("GetColor", mod.c_str(), key.c_str());
+            return color ? String(FormatColor(*color, true)) : fallback;
+        }
+
         bool SetBool(VM&, std::uint32_t, std::monostate, String mod, String key, bool value) { 
             return Access().Write("SetBool", mod.c_str(), key.c_str(), value); 
         }
@@ -113,6 +119,11 @@ namespace OSFSettings::Papyrus
         }
         bool SetString(VM&, std::uint32_t, std::monostate, String mod, String key, String value) { 
             return Access().Write("SetString", mod.c_str(), key.c_str(), std::string(value.c_str())); 
+        }
+        bool SetColor(VM&, std::uint32_t, std::monostate, String mod, String key, String value) {
+            const auto color = ParseColor(value.c_str());
+            if (!color) return Report("SetColor", mod.c_str(), key.c_str(), SettingsError::InvalidValue);
+            return Access().Write("SetColor", mod.c_str(), key.c_str(), *color);
         }
         bool Reset(VM&, std::uint32_t, std::monostate, String mod, String key) { 
             return Access().Reset(mod.c_str(), key.c_str()); 
@@ -204,11 +215,13 @@ namespace OSFSettings::Papyrus
             vm.BindNativeMethod(Script, "GetFloat", &GetFloat, false, false);
             vm.BindNativeMethod(Script, "GetEnum", &GetEnum, false, false);
             vm.BindNativeMethod(Script, "GetString", &GetString, false, false);
+            vm.BindNativeMethod(Script, "GetColor", &GetColor, false, false);
             vm.BindNativeMethod(Script, "SetBool", &SetBool, false, false);
             vm.BindNativeMethod(Script, "SetInt", &SetInt, false, false);
             vm.BindNativeMethod(Script, "SetFloat", &SetFloat, false, false);
             vm.BindNativeMethod(Script, "SetEnum", &SetEnum, false, false);
             vm.BindNativeMethod(Script, "SetString", &SetString, false, false);
+            vm.BindNativeMethod(Script, "SetColor", &SetColor, false, false);
             vm.BindNativeMethod(Script, "Reset", &Reset, false, false);
             vm.BindNativeMethod(Script, "ResetMod", &ResetMod, false, false);
             vm.BindNativeMethod(Script, "RegisterForChanges", &RegisterForChanges, false, false);

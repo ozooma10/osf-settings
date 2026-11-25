@@ -58,6 +58,7 @@ cross-field relationships and UTF-8 byte limits.
 | `enum` | `"normal"` | Required `options`: value-to-label object or string array |
 | `string` | `"auto"` | `maxLength`: 1–4096 UTF-8 bytes; defaults to 256 |
 | `key` | `"F4"` | `allowUnbound` defaults to true; C++ reads/writes keyboard VK codes |
+| `color` | `"#336699"` | `alpha` defaults to false. Added in settings ABI 1.1 |
 
 Defaults must satisfy the setting's type and limits.
 
@@ -90,6 +91,15 @@ Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, a
 
 A `key` setting stores a value for your own input handler. Use [hotkeys](KEYBINDINGS.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers. Unbinding and `"UNBOUND"` / `255` defaults are allowed unless `allowUnbound` is explicitly `false`. `allowMouse: true` also permits the five physical mouse buttons (`MOUSE1` through `MOUSE5`, VK `1, 2, 4, 5, 6`). [Runtime providers](PROVIDERS.md) can observe key settings without consuming input.
 
+A `color` default is `"#RRGGBB"` or `"#RRGGBBAA"`, with hex digits in either case. Without `"alpha": true` the setting is opaque: only `#RRGGBB` or an alpha of `FF` is accepted, and the editor hides opacity. Saved values use uppercase `#RRGGBB` for opaque colors and `#RRGGBBAA` otherwise.
+
+In the menu, a color row shows a swatch and its hex code. Accept opens a color editor with a saturation/brightness field, hue and opacity bars, hue/saturation/brightness and red/green/blue rows, a hex field and basic colors. It works with the mouse, keyboard and controller, and saves only when the player confirms.
+
+```json
+{ "key": "markerTint", "type": "color", "label": "Marker tint", "default": "#FF8000" },
+{ "key": "glow", "type": "color", "label": "Glow", "default": "#FF800080", "alpha": true }
+```
+
 Add `"requires": "restart"` to show a restart notice. This is only a notice: values still save immediately, and your mod decides when to apply them.
 
 ## C++ integration
@@ -121,8 +131,18 @@ Initialize before sharing the client across threads. This example reads once; su
 | `GetEnum` / `SetEnum` | Option ID string |
 | `GetString` / `SetString` | Free-form UTF-8 string |
 | `GetKey` / `SetKey` | `std::uint32_t` keyboard VK code; `kUnboundKey` is 255 |
+| `GetColor` / `SetColor` | `std::uint32_t` packed `0xRRGGBBAA`, or `Rgba` channels (`UnpackColor` / `PackColor`) |
 
 Scalar getters take an output pointer. Enum/string getters also accept an owning `std::string&`; setters accept strings directly. Getter/setter types must match exactly.
+
+Color calls are part of settings ABI 1.1. Through `Client` they return `Unsupported` when the installed OSF Settings only provides 1.0; check `settings.Has(OSFSettings::API::kColorVersion)` to fall back early.
+
+```cpp
+OSFSettings::API::Rgba tint;
+if (settings.GetColor("mymod", "markerTint", &tint) == OSFSettings::API::Status::Ok) {
+    // tint.r, tint.g, tint.b, tint.a are 0-255; a is 255 unless the setting allows alpha.
+}
+```
 
 ```cpp
 auto status = settings.SetBool("mymod", "enabled", false);
@@ -187,10 +207,11 @@ Bool enabled = OSFSettings.GetBool("mymod", "enabled", true)
 Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 ```
 
-- Reads: `GetBool`, `GetInt`, `GetFloat`, `GetEnum`, `GetString`. Each takes `(modId, key, fallback)` and returns the fallback on failure.
+- Reads: `GetBool`, `GetInt`, `GetFloat`, `GetEnum`, `GetString`, `GetColor`. Each takes `(modId, key, fallback)` and returns the fallback on failure.
 - Writes: matching `Set*` functions take `(modId, key, value)`. `Reset(modId, key)` and `ResetMod(modId)` restore defaults.
 - Writes/resets return `true` when saved; failure leaves the old value unchanged. Check the result; failures are logged in `OSF Settings.log`.
 - IDs, keys, and enum options use the schema's exact spelling. Enums and strings are distinct types. There are no Papyrus `GetKey` / `SetKey` functions.
+- Colors are text in Papyrus: `GetColor` always returns `"#RRGGBBAA"`, and `SetColor` accepts `"#RRGGBB"` or `"#RRGGBBAA"`.
 - Papyrus integers are 32-bit and floats are single precision. Reads that overflow return the fallback; float precision may be reduced.
 
 See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../examples/papyrus/OSFSettingsExampleGlobal.psc) examples, with their [schema](../examples/papyrus/papyrusexample.json), for all value types, hotkeys, and action callbacks.

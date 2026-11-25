@@ -30,6 +30,7 @@ package
             var section:Boolean = row.type == "section";
             var changed:Boolean = !modList && !section && row.defaultKnown !== false && row.type != "hotkey" && row.type != "action" && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
+            var swatch:Object = !modList && row.type == "color" ? ColorSetting.parse(String(row.value)) : null;
             var displayValue:String = section ? "" : modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
             graphics.clear();
             heading.visible = section;
@@ -61,12 +62,19 @@ package
             title.textColor = color; value.textColor = modList ? (selected ? 0x3D4F58 : MenuStyle.MUTED) : color;
             title.width = modList ? rowWidth - 576 : MenuStyle.CONTROL_X - 70;
             // Mod rows summarize what each mod adds, right-aligned before the chevron.
-            var format:TextFormat = value.defaultTextFormat; format.align = modList ? "right" : "center";
+            var format:TextFormat = value.defaultTextFormat; format.align = modList ? "right" : swatch ? "left" : "center";
             format.size = modList ? MenuStyle.SMALL_SIZE + 1 : MenuStyle.VALUE_SIZE; value.defaultTextFormat = format;
             value.x = modList ? rowWidth - 546 : MenuStyle.CONTROL_X +
                 (slider ? MenuStyle.CONTROL_WIDTH - MenuStyle.SLIDER_VALUE_WIDTH : MenuStyle.VALUE_INSET);
             value.y = (rowHeight - Number(format.size)) / 2 - 3;
             value.width = modList ? 500 : slider ? MenuStyle.SLIDER_VALUE_WIDTH : MenuStyle.VALUE_WIDTH;
+            if (swatch) {
+                // A color shows its swatch, then its hex code.
+                var swatchHeight:Number = rowHeight - 16;
+                var swatchWidth:Number = Math.round(swatchHeight * 1.75);
+                ColorSetting.drawSwatch(graphics, MenuStyle.CONTROL_X + MenuStyle.VALUE_INSET, 8, swatchWidth, swatchHeight, swatch, selected ? MenuStyle.INK : MenuStyle.LINE);
+                value.x += swatchWidth + 14; value.width -= swatchWidth + 14;
+            }
             MenuStyle.fit(title, String(row.title));
             MenuStyle.fit(value, displayValue);
             var center:Number = rowHeight / 2;

@@ -100,7 +100,7 @@ package
                 }
                 var value:*;
                 if (String(row.@type) == "float" || String(row.@type) == "key") value = Number(row.@value);
-                else if (String(row.@type) == "int" || String(row.@type) == "enum" || String(row.@type) == "string") value = String(row.@value);
+                else if (String(row.@type) == "int" || String(row.@type) == "enum" || String(row.@type) == "string" || String(row.@type) == "color") value = String(row.@value);
                 else value = String(row.@value) == "true";
                 var choices:Array = [];
                 for each (var option:XML in row.option) choices.push({value:String(option.@value), label:String(option.@label)});
@@ -109,7 +109,7 @@ package
                     mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint),
                     requiresRestart:String(row.@requiresRestart) == "true", maxLength:int(row.@maxLength),
                     type:String(row.@type), editable:String(row.@editable) == "true", allowUnbound:String(row.@allowUnbound) == "true",
-                    allowMouse:String(row.@allowMouse) == "true",
+                    allowMouse:String(row.@allowMouse) == "true", alpha:String(row.@alpha) == "true",
                     minimum:String(row.@minimum), maximum:String(row.@maximum), value:value, defaultValue:value, options:choices,
                     valueName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",
                     defaultName:String(row.@type) == "key" ? previewKeyName(uint(value)) : "",
@@ -171,7 +171,7 @@ package
         {
             menu = event.target.content;
             menu.BGSCodeObj = {getRows:getRows, getIssues:getIssues, openIssueModPage:openIssueModPage,
-                copyIssue:function(mod:String, id:String):Boolean { return true; }, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, close:closeMenu,
+                copyIssue:function(mod:String, id:String):Boolean { return true; }, setBool:setBool, setInt:setInt, setFloat:setFloat, setEnum:setEnum, setString:setString, setColor:setColor, close:closeMenu,
                 revision:function():String { return "0:0:0"; }, invokeAction:invokeAction, reset:resetSetting,
                 launch:function(mod:String, id:String):Boolean {
                     trace("[preview] launch " + mod + "/" + id);
@@ -392,6 +392,19 @@ package
                 }
             }
             return {ok:false, error:"Invalid preview string setting."};
+        }
+        private function setColor(mod:String, key:String, value:String):Object
+        {
+            // The loaded menu owns the same parsing as the in-game picker; native stores eight uppercase digits.
+            var colors:Class = domain.getDefinition("ColorSetting") as Class;
+            var color:Object = Object(colors).parse(value);
+            for each (var row:Object in rows) {
+                if (row.mod == mod && row.key == key && row.type == "color" && color && (row.alpha || color.a == 255)) {
+                    row.value = Object(colors).format(color); trace("[preview] " + mod + "/" + key + " = " + row.value);
+                    return {ok:true, error:""};
+                }
+            }
+            return {ok:false, error:"Invalid preview color setting."};
         }
         private function beginKeyCapture(mod:String, key:String):Object
         {

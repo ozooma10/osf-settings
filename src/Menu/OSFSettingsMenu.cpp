@@ -32,7 +32,7 @@ namespace OSFSettings
         enum class Function : std::uintptr_t { GetRows = 1, SetBool, SetInt, SetFloat, SetEnum, Close, Startup, StartupFailed,
             SetKey, BeginKeyCapture, PollKeyCapture, CommitKeyCapture, CancelKeyCapture, BeginNativeBinding, EndNativeBinding, GetIssues,
             RequestBindings, PollBindings, TextInput, SetString, InvokeAction, Revision, Launch, GetLocalization, PollLaunch, OpenIssueModPage, Reset, GetGameplaySources,
-            CommitGameplayChange, CopyIssue };
+            CommitGameplayChange, CopyIssue, SetColor };
         // Movie-callable names and the dispatch id each one carries into Call.
         constexpr std::pair<const char*, Function> kMovieFunctions[]{
             { "getLocalization", Function::GetLocalization }, { "getRows", Function::GetRows },
@@ -44,6 +44,7 @@ namespace OSFSettings
             { "textInput", Function::TextInput },
             { "setBool", Function::SetBool }, { "setInt", Function::SetInt }, { "setFloat", Function::SetFloat },
             { "setEnum", Function::SetEnum }, { "setString", Function::SetString }, { "setKey", Function::SetKey },
+            { "setColor", Function::SetColor },
             { "reset", Function::Reset },
             { "beginKeyCapture", Function::BeginKeyCapture }, { "pollKeyCapture", Function::PollKeyCapture },
             { "commitKeyCapture", Function::CommitKeyCapture }, { "cancelKeyCapture", Function::CancelKeyCapture },
@@ -552,7 +553,8 @@ namespace OSFSettings
         case Function::SetFloat:
         case Function::SetEnum:
         case Function::SetString:
-        case Function::SetKey: {
+        case Function::SetKey:
+        case Function::SetColor: {
             auto result = SettingsError::InvalidArgument;
             const auto expectedArgs = function == Function::Reset ? 2u : function == Function::SetString ? 4u : 3u;
             if (params.argCount == expectedArgs && params.args[0].IsString() && params.args[1].IsString()) {
@@ -573,6 +575,10 @@ namespace OSFSettings
                     auto text = ArgString(params, 2);
                     if (params.args[3].GetNumber() == static_cast<double>(text.size())) {
                         result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), std::move(text));
+                    }
+                } else if (function == Function::SetColor && params.args[2].IsString()) {
+                    if (const auto color = ParseColor(ArgString(params, 2))) {
+                        result = Runtime::SetValue(ArgString(params, 0), ArgString(params, 1), *color);
                     }
                 } else if (function == Function::SetKey && params.args[2].IsNumber()) {
                     const auto code = params.args[2].GetNumber();

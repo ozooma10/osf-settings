@@ -11,11 +11,27 @@ namespace OSFSettings::API
 {
     // Packed major.minor ABI versions, independent of the plugin release version.
     // The initial contract stays at 1.0 until launch. After launch, existing slots, signatures and status values are frozen; additions require a minor bump.
-    inline constexpr std::uint32_t kVersion = 0x00010000u;
+    inline constexpr std::uint32_t kVersion = 0x00010001u;
     inline constexpr std::uint32_t kBaseVersion = 0x00010000u;
+    // 1.1 adds color settings: GetColor/SetColor and SettingType::Color.
+    inline constexpr std::uint32_t kColorVersion = 0x00010001u;
     inline constexpr wchar_t kModuleName[] = L"OSFSettings.dll";
     inline constexpr char kRequestExportName[] = "OSFSettings_RequestAPI";
     inline constexpr std::uint32_t kUnboundKey = 0xFF; // Allowed only when the schema permits unbinding.
+
+    // Colors cross the ABI packed as 0xRRGGBBAA, the byte order of their "#RRGGBBAA" schema text. Opaque is alpha 0xFF.
+    struct Rgba
+    {
+        std::uint8_t r{}, g{}, b{}, a{ 0xFF };
+    };
+    constexpr Rgba UnpackColor(std::uint32_t rgba) noexcept
+    {
+        return { static_cast<std::uint8_t>(rgba >> 24), static_cast<std::uint8_t>(rgba >> 16), static_cast<std::uint8_t>(rgba >> 8), static_cast<std::uint8_t>(rgba) };
+    }
+    constexpr std::uint32_t PackColor(Rgba color) noexcept
+    {
+        return (std::uint32_t(color.r) << 24) | (std::uint32_t(color.g) << 16) | (std::uint32_t(color.b) << 8) | color.a;
+    }
 
     constexpr bool Supports(std::uint32_t have, std::uint32_t need) noexcept
     {
@@ -54,7 +70,8 @@ namespace OSFSettings::API
         AlreadyRegistered = 14,
         UnknownInvocation = 15,
         UnknownLauncher = 16,
-        UnknownLaunchRequest = 17
+        UnknownLaunchRequest = 17,
+        Unsupported = 18 // Returned by Client: the loaded OSF Settings predates the call's ABI minor version.
     };
 
     using Subscription = std::uint64_t; // Zero is never a valid subscription.
@@ -129,6 +146,11 @@ namespace OSFSettings::API
         virtual Status CompleteAction(Invocation invocation, bool succeeded, const char* message) noexcept = 0;
 
         virtual Status GetLanguage(char* out, std::uint32_t capacity, std::uint32_t* required) noexcept = 0;
+
+        // 1.1. Packed 0xRRGGBBAA. Settings without "alpha": true accept only opaque values (alpha 0xFF).
+        // Call through Client, or check the negotiated version: a 1.0 service does not have these slots.
+        virtual Status GetColor(const char* mod, const char* key, std::uint32_t* out) noexcept = 0;
+        virtual Status SetColor(const char* mod, const char* key, std::uint32_t rgba) noexcept = 0;
 
     protected:
         ~ISettings() = default;
@@ -285,6 +307,28 @@ namespace OSFSettings::API
         Status GetLanguage(std::string& out) const noexcept
         {
             return ReadText(out, [&](char* data, std::uint32_t capacity, std::uint32_t* required) { return GetLanguage(data, capacity, required); });
+        }
+
+        // Unsupported when the loaded service is 1.0; *out is then unchanged.
+        Status GetColor(const char* mod, const char* key, std::uint32_t* out) const noexcept
+        {
+            return !m_api ? Status::NotReady : !Has(kColorVersion) ? Status::Unsupported : m_api->GetColor(mod, key, out);
+        }
+        Status GetColor(const char* mod, const char* key, Rgba* out) const noexcept
+        {
+            if (!out) return Status::InvalidArgument;
+            std::uint32_t packed{};
+            const auto status = GetColor(mod, key, &packed);
+            if (status == Status::Ok) *out = UnpackColor(packed);
+            return status;
+        }
+        Status SetColor(const char* mod, const char* key, std::uint32_t rgba) const noexcept
+        {
+            return !m_api ? Status::NotReady : !Has(kColorVersion) ? Status::Unsupported : m_api->SetColor(mod, key, rgba);
+        }
+        Status SetColor(const char* mod, const char* key, Rgba color) const noexcept
+        {
+            return SetColor(mod, key, PackColor(color));
         }
 
     private:

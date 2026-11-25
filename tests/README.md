@@ -15,7 +15,7 @@ xmake test -j4 'osfsettings-launcher-tests/*'
 
 | Group | Coverage |
 | --- | --- |
-| `tests/settings` | Localization, schema, store, service, SDK, runtime providers, strings, registry, filename validation and file-link regression checks |
+| `tests/settings` | Localization, schema, store, service, SDK, runtime providers, strings, colors, registry, filename validation and file-link regression checks |
 | `tests/input` | Keys, registration, saved binding migration, input routing, lifecycle, binding editor/menu/snapshots, blocks, callbacks |
 | `tests/launcher` | Launcher registry and recency |
 | `tests/actions` | Action registration, dispatch and completion |

@@ -40,6 +40,7 @@ namespace
         case API::SettingType::Enum:
         case API::SettingType::String: return Text(value.text);
         case API::SettingType::Key: return value.key;
+        case API::SettingType::Color: return value.color;
         }
         throw std::runtime_error("unknown public setting type");
     }
@@ -80,6 +81,7 @@ namespace
                             if (setting.type == API::SettingType::Float) item["step"] = setting.step;
                             if (setting.type == API::SettingType::String) item["maxLength"] = setting.maxLength;
                             if (setting.type == API::SettingType::Key) item["allowUnbound"] = setting.allowUnbound;
+                            if (setting.type == API::SettingType::Color) item["alpha"] = setting.alpha;
                             if (setting.type == API::SettingType::Enum) {
                                 item["options"] = TestJson::array();
                                 for (std::uint32_t o = 0; o < setting.optionCount; ++o) {
@@ -162,13 +164,15 @@ int main()
                 {"key":"scale","type":"float","default":0.15,"min":-1.25,"max":2.5,"step":0.125},
                 {"key":"mode","type":"enum","default":"quiet","options":{"verbose":"Verbose label","quiet":"Quiet label"}},
                 {"key":"key","type":"key","default":"UNBOUND"},
-                {"key":"text","type":"string","default":"Original text","maxLength":32}
+                {"key":"text","type":"string","default":"Original text","maxLength":32},
+                {"key":"tint","type":"color","default":"#80ff0040","alpha":true}
             ],"first":[],"extra":[
                 {"key":"unbounded","type":"int","default":0},
                 {"key":"lower","type":"float","default":0,"min":-1},
                 {"key":"upper","type":"int","default":0,"max":1},
                 {"key":"empty","type":"string","default":""},
-                {"key":"bound","type":"key","default":115,"allowUnbound":false}
+                {"key":"bound","type":"key","default":115,"allowUnbound":false},
+                {"key":"solid","type":"color","default":"#ABCDEF"}
             ]}
         })");
         const std::string embedded("prefix\0suffix", 13);
@@ -186,7 +190,7 @@ int main()
         Write(schemas / "alpha.json", schema);
         Write(schemas / "beta.json", TestJson::parse(R"({"schemaVersion":1,"id":"beta","groups":{}})"));
         Write(schemas / "hotkeys.json", TestJson::parse(R"({"schemaVersion":1,"id":"hotkeys","groups":{},"hotkeys":{"open":{"label":"Open","default":"F10"}}})"));
-        Write(values / "alpha.json", {{"formatVersion",1},{"values",{{"enabled",true},{"count",9007199254740993LL},{"scale",1.75},{"mode","verbose"},{"key",65},{"text",unicode}}}});
+        Write(values / "alpha.json", {{"formatVersion",1},{"values",{{"enabled",true},{"count",9007199254740993LL},{"scale",1.75},{"mode","verbose"},{"key",65},{"text",unicode},{"tint","#11223344"}}}});
 
         OSFSettings::SettingsService backend;
         API::SettingsApi adapter(backend);
@@ -226,8 +230,8 @@ int main()
         check(mod["title"] == embedded && mod["description"] == unicode && groups[1]["id"] == unicode && groups[1]["label"] == unicode,
             "length-aware mod and group text");
         check(groups[0]["id"] == "First group" && groups[0]["label"] == "First group" && groups[2]["id"] == "extra" && groups[1]["settings"].empty(), "group order and action-only groups expose no value records");
-        const std::array types{API::SettingType::Bool, API::SettingType::Int, API::SettingType::Float, API::SettingType::Enum, API::SettingType::Key, API::SettingType::String};
-        const std::array keys{"enabled", "count", "scale", "mode", "key", "text"};
+        const std::array types{API::SettingType::Bool, API::SettingType::Int, API::SettingType::Float, API::SettingType::Enum, API::SettingType::Key, API::SettingType::String, API::SettingType::Color};
+        const std::array keys{"enabled", "count", "scale", "mode", "key", "text", "tint"};
         for (std::size_t i = 0; i < types.size(); ++i) check(settings[i]["type"] == types[i] && settings[i]["key"] == keys[i], "setting identity, type and authored order");
         check(settings[0]["value"] == true && settings[0]["default"] == false && settings[0]["requiresRestart"] == true &&
             settings[0]["label"] == embedded && settings[0]["hint"] == unicode, "bool metadata and distinct persisted value");
@@ -240,11 +244,13 @@ int main()
             settings[3]["options"][0]["label"] == "Verbose label" && settings[3]["options"][1]["label"] == embedded, "enum identifiers, labels and option order");
         check(settings[4]["value"] == 65 && settings[4]["default"] == API::kUnboundKey && settings[4]["allowUnbound"] == true, "resolved native key values");
         check(settings[5]["value"] == unicode && settings[5]["default"] == "Original text" && settings[5]["maxLength"] == 32, "string current/default bytes and limit");
+        check(settings[6]["value"] == 0x11223344u && settings[6]["default"] == 0x80FF0040u && settings[6]["alpha"] == true, "packed color current/default and alpha flag");
         const auto& extra = groups[2]["settings"];
         check(!extra[0].contains("min") && !extra[0].contains("max") && extra[1]["min"] == -1 && !extra[1].contains("max") &&
             !extra[2].contains("min") && extra[2]["max"] == 1, "absent and one-sided bounds");
         check(extra[1]["step"] == 0.1 && extra[3]["value"] == "" && extra[3]["maxLength"] == 256 &&
-            extra[4]["value"] == 115 && extra[4]["allowUnbound"] == false, "parsed metadata defaults");
+            extra[4]["value"] == 115 && extra[4]["allowUnbound"] == false &&
+            extra[5]["value"] == 0xABCDEFFFu && extra[5]["alpha"] == false, "parsed metadata defaults");
         check(!settings[0].contains("min") && !settings[0].contains("max") && !settings[0].contains("options") && !settings[1]["requiresRestart"].get<bool>(), "type-specific metadata stays absent");
 
         backend.DispatchChanges();
@@ -254,7 +260,9 @@ int main()
         check(consumer.Start() == Status::Ok, "SDK-only example starts");
         const auto owned = consumer.Snapshot();
         check(owned.size() == 3 && std::get<std::string>(owned.at("alpha").at("text").value) == unicode &&
-            owned.at("alpha").at("mode").type == API::SettingType::Enum && owned.at("beta").empty(), "example retains owned typed values and empty mods");
+            owned.at("alpha").at("mode").type == API::SettingType::Enum && owned.at("beta").empty() &&
+            owned.at("alpha").at("tint").type == API::SettingType::Color && std::get<std::uint32_t>(owned.at("alpha").at("tint").value) == 0x11223344u,
+            "example retains owned typed values and empty mods");
         backend.DispatchChanges();
         check(consumer.LastRefresh() == Status::Ok, "example handles initial null notifications");
 

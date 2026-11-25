@@ -60,6 +60,12 @@ namespace OSFSettings
         std::uint32_t maxLength{ DefaultMaxLength }; // UTF-8 bytes, excluding NUL.
     };
 
+    struct ColorDefinition
+    {
+        ColorValue defaultValue;
+        bool alpha{}; // Whether the editor exposes alpha; without it every value is opaque.
+    };
+
     struct HotkeyDefinition
     {
         std::string id;
@@ -91,7 +97,7 @@ namespace OSFSettings
         std::string label;
         std::string hint;
         bool requiresRestart{};
-        std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition, KeyDefinition, StringDefinition> definition;
+        std::variant<BoolDefinition, IntDefinition, FloatDefinition, EnumDefinition, KeyDefinition, StringDefinition, ColorDefinition> definition;
 
         SettingValue DefaultValue() const;
     };

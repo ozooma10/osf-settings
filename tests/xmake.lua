@@ -117,6 +117,9 @@ target("osfsettings-hotkey-callback-tests")
 test_target("osfsettings-string-tests", "settings", true)
     add_files("string_settings_tests.cpp")
 
+test_target("osfsettings-color-tests", "settings", true)
+    add_files("color_settings_tests.cpp")
+
 test_target("osfsettings-registry-tests", "settings", true)
     add_files("registry_api_tests.cpp")
     add_includedirs("../sdk", "../examples/registry")

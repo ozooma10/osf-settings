@@ -41,6 +41,8 @@ namespace OSFSettings::API
         Status RegisterAction(const char* mod, const char* id, ActionFn callback, void* context) noexcept override;
         Status CompleteAction(Invocation invocation, bool succeeded, const char* message) noexcept override;
         Status GetLanguage(char* out, std::uint32_t capacity, std::uint32_t* required) noexcept override;
+        Status GetColor(const char* mod, const char* key, std::uint32_t* out) noexcept override;
+        Status SetColor(const char* mod, const char* key, std::uint32_t rgba) noexcept override;
 
     private:
         template <class T> Status Read(const char* mod, const char* key, T* out) noexcept;

@@ -328,6 +328,34 @@
               }
             }
           ]
+        },
+        {
+          "title": "Color setting",
+          "properties": {
+            "type": { "const": "color" },
+            "default": {
+              "type": "string",
+              "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$",
+              "description": "\"#RRGGBB\" (opaque) or \"#RRGGBBAA\". Without alpha, the alpha digits must be FF.",
+              "examples": ["#336699", "#FF800080"]
+            },
+            "alpha": {
+              "type": "boolean",
+              "default": false,
+              "description": "Let players edit transparency. Without it, every value is opaque."
+            }
+          },
+          "if": {
+            "not": {
+              "required": ["alpha"],
+              "properties": { "alpha": { "const": true } }
+            }
+          },
+          "then": {
+            "properties": {
+              "default": { "pattern": "^#[0-9A-Fa-f]{6}([Ff]{2})?$" }
+            }
+          }
         }
       ]
     },

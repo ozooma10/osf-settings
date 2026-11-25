@@ -21,6 +21,7 @@ package
         private var sourceLabel:TextField;
         private var sourceValue:TextField;
         private var detailOptions:Sprite = new Sprite();
+        private var defaultSwatch:Sprite = new Sprite();
         private var selected:Object;
         private var selectedValue:*;
         private var wasEditing:Boolean;
@@ -48,6 +49,7 @@ package
             sourceLabel = label(tr("menu.providedBy"), MenuStyle.DETAIL_X, 0, 240, MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE + 1, MenuStyle.MUTED, true);
             sourceValue = label("", MenuStyle.RIGHT - 300, 0, 300, MenuStyle.VALUE_SIZE + 12, MenuStyle.VALUE_SIZE, MenuStyle.WHITE, true); MenuStyle.align(sourceValue, "right");
             detailOptions.x = MenuStyle.DETAIL_X; detailOptions.mouseEnabled = detailOptions.mouseChildren = false; addChild(detailOptions);
+            defaultSwatch.mouseEnabled = false; addChild(defaultSwatch);
             // The changed marker only means something beside settings, so it closes the detail column.
             var legend:TextField = label(tr("menu.changed"), MenuStyle.DETAIL_X, MenuStyle.LIST_BOTTOM - MenuStyle.SMALL_SIZE - 14, detailWidth,
                 MenuStyle.SMALL_SIZE + 12, MenuStyle.SMALL_SIZE, MenuStyle.MUTED, true);
@@ -92,6 +94,11 @@ package
             if (row && (row.type == "action" || row.defaultKnown === false)) { detailDivider.visible = false; changedLegend.visible = false; }
             defaultLabel.y = cursor; defaultValue.y = cursor - 1;
             MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? NumericSetting.text(row, row.defaultValue) : "");
+            // A color default also shows its swatch, left of its hex code.
+            defaultSwatch.graphics.clear();
+            var defaultColor:Object = row && row.type == "color" && defaultValue.visible ? ColorSetting.parse(String(row.defaultValue)) : null;
+            if (defaultColor) ColorSetting.drawSwatch(defaultSwatch.graphics, MenuStyle.RIGHT - defaultValue.textWidth - 18 - 40, cursor + 2,
+                40, MenuStyle.VALUE_SIZE + 4, defaultColor, MenuStyle.LINE);
             if (defaultLabel.visible) cursor += MenuStyle.VALUE_SIZE + 16;
             var range:String = row ? NumericSetting.range(row) : "";
             rangeLabel.visible = rangeValue.visible = Boolean(range);

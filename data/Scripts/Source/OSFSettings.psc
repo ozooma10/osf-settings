@@ -11,6 +11,8 @@ Int Function GetInt(String modId, String key, Int fallback = 0) Global Native
 Float Function GetFloat(String modId, String key, Float fallback = 0.0) Global Native
 String Function GetEnum(String modId, String key, String fallback = "") Global Native
 String Function GetString(String modId, String key, String fallback = "") Global Native
+; Color settings read as "#RRGGBBAA" (alpha FF when opaque).
+String Function GetColor(String modId, String key, String fallback = "") Global Native
 
 ; True means success, with the value already saved. Failures leave values unchanged.
 Bool Function SetBool(String modId, String key, Bool value) Global Native
@@ -18,6 +20,8 @@ Bool Function SetInt(String modId, String key, Int value) Global Native
 Bool Function SetFloat(String modId, String key, Float value) Global Native
 Bool Function SetEnum(String modId, String key, String value) Global Native
 Bool Function SetString(String modId, String key, String value) Global Native
+; Accepts "#RRGGBB" or "#RRGGBBAA". Settings without alpha accept only opaque colors.
+Bool Function SetColor(String modId, String key, String value) Global Native
 Bool Function Reset(String modId, String key) Global Native
 Bool Function ResetMod(String modId) Global Native
 
