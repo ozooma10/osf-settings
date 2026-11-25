@@ -16,6 +16,7 @@ namespace OSFSettings::Runtime
                 using T = std::decay_t<decltype(current)>;
                 if constexpr (std::is_same_v<T, KeyBinding>) return std::to_string(current.keyCode);
                 else if constexpr (std::is_same_v<T, EnumValue>) return current.value;
+                else if constexpr (std::is_same_v<T, ColorValue>) return FormatColor(current, true);
                 else return std::format("{}", current);
             }, value);
         }

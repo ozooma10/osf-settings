@@ -27,6 +27,8 @@ namespace
             std::string enumValue{ "quiet" };
             std::string nextEnumValue;
             Status enumCopyStatus{ Status::Ok };
+            std::uint32_t color{ 0x336699FFu };
+            int colorCalls{};
             bool IsReady() noexcept override { return ready; }
             Status GetBool(const char*, const char*, bool* out) noexcept override
             {
@@ -78,6 +80,20 @@ namespace
                 if (!out || capacity < *required) return Status::BufferTooSmall;
                 language.copy(out, language.size());
                 out[language.size()] = '\0';
+                return Status::Ok;
+            }
+            Status GetColor(const char*, const char*, std::uint32_t* out) noexcept override
+            {
+                ++colorCalls;
+                if (!ready) return Status::NotReady;
+                *out = color;
+                return Status::Ok;
+            }
+            Status SetColor(const char*, const char*, std::uint32_t rgba) noexcept override
+            {
+                ++colorCalls;
+                if (!ready) return Status::NotReady;
+                color = rgba;
                 return Status::Ok;
             }
         } provider;
@@ -136,6 +152,29 @@ namespace
         client.Attach(&provider);
         Check(!client.Attach(nullptr) && !client && client.Version() == 0,
             "null SDK attachment clears an existing service");
+
+        static_assert(kColorVersion == 0x00010001u && Supports(kVersion, kColorVersion) && !Supports(kBaseVersion, kColorVersion));
+        static_assert(PackColor({ 0x12, 0x34, 0x56, 0x78 }) == 0x12345678u && UnpackColor(0xFF8000C0u).r == 0xFF &&
+            UnpackColor(0xFF8000C0u).g == 0x80 && UnpackColor(0xFF8000C0u).b == 0x00 && UnpackColor(0xFF8000C0u).a == 0xC0);
+        static_assert(Rgba{}.a == 0xFF, "a default Rgba is opaque");
+        std::uint32_t packed = 7;
+        Rgba rgba{ 1, 2, 3, 4 };
+        client.Attach(nullptr);
+        Check(client.GetColor("learning", "tint", &packed) == Status::NotReady && packed == 7 &&
+            client.SetColor("learning", "tint", 0u) == Status::NotReady, "detached SDK color calls report NotReady");
+        client.Attach(&provider, kBaseVersion);
+        provider.colorCalls = 0;
+        Check(client.GetColor("learning", "tint", &packed) == Status::Unsupported && packed == 7 &&
+            client.GetColor("learning", "tint", &rgba) == Status::Unsupported && rgba.r == 1 &&
+            client.SetColor("learning", "tint", 0u) == Status::Unsupported && provider.colorCalls == 0,
+            "a 1.0 service never receives calls to the 1.1 color slots");
+        client.Attach(&provider, kColorVersion);
+        Check(client.GetColor("learning", "tint", &packed) == Status::Ok && packed == 0x336699FFu &&
+            client.GetColor("learning", "tint", &rgba) == Status::Ok && rgba.r == 0x33 && rgba.g == 0x66 && rgba.b == 0x99 && rgba.a == 0xFF,
+            "1.1 color reads return the packed value and its channels");
+        Check(client.SetColor("learning", "tint", Rgba{ 0xAB, 0xCD, 0xEF, 0x80 }) == Status::Ok && provider.color == 0xABCDEF80u &&
+            client.GetColor("learning", "tint", static_cast<Rgba*>(nullptr)) == Status::InvalidArgument,
+            "1.1 color writes pack channels as 0xRRGGBBAA");
 
         std::uint32_t actual = 42;
         Check(RequestInterface(kBaseVersion, &actual) == nullptr && actual == 0,

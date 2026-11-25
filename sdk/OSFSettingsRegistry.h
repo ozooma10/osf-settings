@@ -19,10 +19,12 @@ namespace OSFSettings::API
         Float = 2,
         Enum = 3,
         Key = 4,
-        String = 5
+        String = 5,
+        Color = 6 // 1.1. Readers built for 1.0 should skip types they do not know.
     };
 
-    // The containing SettingView::type selects the active member, including for defaultValue. Enum and String use text; Key uses a native VK / kUnboundKey.
+    // The containing SettingView::type selects the active member, including for defaultValue. Enum and String use text; Key uses a native VK / kUnboundKey;
+    // Color uses color, packed 0xRRGGBBAA (see UnpackColor).
     union RegistryValue
     {
         bool boolean{};
@@ -30,6 +32,7 @@ namespace OSFSettings::API
         double number;
         TextView text;
         std::uint32_t key;
+        std::uint32_t color;
     };
 
     struct EnumOptionView
@@ -59,6 +62,7 @@ namespace OSFSettings::API
         std::uint32_t maxLength{}; // String only; UTF-8 bytes, excluding NUL.
         bool allowUnbound{}; // Key only.
         bool allowMouse{}; // Key only; permits the five physical mouse buttons.
+        bool alpha{}; // Color only; false means every value is opaque. Added in 1.1 within existing padding, so the stride is unchanged.
     };
 
     struct GroupView

@@ -60,6 +60,8 @@ namespace OSFSettings::SettingsJson
                     encoded[key] = current.keyCode;
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, EnumValue>) {
                     encoded[key] = current.value;
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(current)>, ColorValue>) {
+                    encoded[key] = FormatColor(current);
                 } else {
                     encoded[key] = current;
                 }

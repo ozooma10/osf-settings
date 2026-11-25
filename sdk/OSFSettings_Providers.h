@@ -10,7 +10,7 @@ namespace OSFSettings::API::Providers
 
     using Registration = std::uint64_t;
     // Called synchronously before publishing an edit. valuesJson is a complete
-    // key/value object (key setting values are VK integers). Return false to reject the edit.
+    // key/value object (key setting values are VK integers; colors are "#RRGGBB" or "#RRGGBBAA"). Return false to reject the edit.
     // Runs under the settings transaction lock: do not call Settings APIs here.
     using SaveFn = bool (*)(const char* mod, const char* valuesJson, void* context) noexcept;
 

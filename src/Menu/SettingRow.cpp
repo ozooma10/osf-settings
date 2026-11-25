@@ -52,6 +52,13 @@ namespace OSFSettings
             fields.emplace_back("editable", true);
             fields.emplace_back("allowUnbound", binding->allowUnbound);
             fields.emplace_back("allowMouse", binding->allowMouse);
+        } else if (const auto* color = std::get_if<ColorDefinition>(&setting.definition)) {
+            // Always eight digits so the movie parses one fixed form; writes go back through setColor.
+            fields.emplace_back("type", std::string("color"));
+            fields.emplace_back("value", FormatColor(std::get<ColorValue>(value), true));
+            fields.emplace_back("defaultValue", FormatColor(color->defaultValue, true));
+            fields.emplace_back("alpha", color->alpha);
+            fields.emplace_back("editable", true);
         } else if (const auto* enumeration = std::get_if<EnumDefinition>(&setting.definition)) {
             fields.emplace_back("type", std::string("enum"));
             fields.emplace_back("value", std::get<EnumValue>(value).value);

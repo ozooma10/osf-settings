@@ -62,6 +62,7 @@ namespace OSFSettings::API
             else if constexpr (std::is_same_v<T, double>) return { .number = value };
             else if constexpr (std::is_same_v<T, EnumValue>) return { .text = Text(value.value) };
             else if constexpr (std::is_same_v<T, KeyBinding>) return { .key = value.keyCode };
+            else if constexpr (std::is_same_v<T, ColorValue>) return { .color = value.rgba };
             else return { .text = Text(value) };
         }
 
@@ -93,6 +94,9 @@ namespace OSFSettings::API
                 } else if constexpr (std::is_same_v<Definition, StringDefinition>) {
                     view.type = SettingType::String;
                     view.maxLength = definition.maxLength;
+                } else if constexpr (std::is_same_v<Definition, ColorDefinition>) {
+                    view.type = SettingType::Color;
+                    view.alpha = definition.alpha;
                 }
                 if constexpr (std::is_same_v<Definition, IntDefinition> || std::is_same_v<Definition, FloatDefinition>) {
                     view.hasMinimum = definition.minimum.has_value();
@@ -235,6 +239,20 @@ namespace OSFSettings::API
     Status SettingsApi::SetKey(const char* mod, const char* key, std::uint32_t value) noexcept
     {
         return Write(mod, key, KeyBinding{ value });
+    }
+
+    Status SettingsApi::GetColor(const char* mod, const char* key, std::uint32_t* out) noexcept
+    {
+        if (!out) return Status::InvalidArgument;
+        ColorValue color;
+        const auto status = Read(mod, key, &color);
+        if (status == Status::Ok) *out = color.rgba;
+        return status;
+    }
+
+    Status SettingsApi::SetColor(const char* mod, const char* key, std::uint32_t rgba) noexcept
+    {
+        return Write(mod, key, ColorValue{ rgba });
     }
 
     template <class T>

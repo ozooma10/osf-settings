@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <type_traits>
 
 namespace OSFSettings::Papyrus
@@ -36,15 +37,23 @@ namespace OSFSettings::Papyrus
     public:
         explicit Values(SettingsService& service) : m_service(service) {}
 
+        // Reports and returns nullopt on failure, for callers whose fallback is not a T.
         template <class T>
-        T Read(std::string_view function, std::string_view mod, std::string_view key, T fallback) const
+        std::optional<T> TryRead(std::string_view function, std::string_view mod, std::string_view key) const
         {
             const auto result = Resolve(mod, key)
                 .and_then([&](const auto& resolved) { return m_service.GetValue(resolved.first, resolved.second); })
                 .and_then(&Convert<T>);
             if (result) return *result;
             Report(function, mod, key, result.error());
-            return fallback;
+            return std::nullopt;
+        }
+
+        template <class T>
+        T Read(std::string_view function, std::string_view mod, std::string_view key, T fallback) const
+        {
+            auto result = TryRead<T>(function, mod, key);
+            return result ? std::move(*result) : std::move(fallback);
         }
 
         bool Write(std::string_view function, std::string_view mod, std::string_view key, SettingValue value)

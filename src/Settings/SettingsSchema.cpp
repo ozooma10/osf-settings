@@ -84,6 +84,10 @@ namespace OSFSettings
             const auto* option = std::get_if<EnumValue>(&value);
             return option && std::ranges::find(definition->options, option->value, &EnumOption::value) != definition->options.end();
         }
+        if (const auto* definition = std::get_if<ColorDefinition>(&setting.definition)) {
+            const auto* color = std::get_if<ColorValue>(&value);
+            return color && (definition->alpha || color->Opaque());
+        }
         if (const auto* definition = std::get_if<KeyDefinition>(&setting.definition)) {
             const auto* key = std::get_if<KeyBinding>(&value);
             return key && (key->keyCode == KeyBinding::Unbound ? definition->allowUnbound :

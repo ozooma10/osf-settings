@@ -100,6 +100,7 @@ namespace RegistryExample
                                 case API::SettingType::Enum:
                                 case API::SettingType::String: owned.value = Copy(setting.value.text); break;
                                 case API::SettingType::Key: owned.value = setting.value.key; break;
+                                case API::SettingType::Color: owned.value = setting.value.color; break; // Packed 0xRRGGBBAA; needs settings 1.1.
                                 default: return; // Cannot publish an incomplete capture.
                                 }
                                 values.emplace(Copy(setting.key), std::move(owned));

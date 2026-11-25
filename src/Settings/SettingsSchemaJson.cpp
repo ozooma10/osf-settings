@@ -228,7 +228,8 @@ namespace OSFSettings::SettingsJson
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(setting.key.find('\0') == std::string::npos, "setting key must not contain NUL");
                     Require(settingKeys.insert(FoldAscii(setting.key)).second, "duplicate setting key: " + setting.key);
-                    Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key" || type == "string", "only types bool, int, float, enum, key, and string are supported: " + setting.key);
+                    Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key" || type == "string" || type == "color",
+                        "only types bool, int, float, enum, key, string, and color are supported: " + setting.key);
                     std::string defaultError = "default must be a boolean: ";
                     if (type == "string") {
                         defaultError = "default must be valid single-line UTF-8 within maxLength bytes: ";
@@ -236,6 +237,13 @@ namespace OSFSettings::SettingsJson
                         const auto limit = ReadInteger(sourceSetting, "maxLength").value_or(StringDefinition::DefaultMaxLength);
                         Require(limit >= 1 && limit <= StringDefinition::MaxLength, "maxLength must be an integer from 1 to 4096 UTF-8 bytes: " + setting.key);
                         definition.maxLength = static_cast<std::uint32_t>(limit);
+                        setting.definition = definition;
+                    } else if (type == "color") {
+                        defaultError = "default must be \"#RRGGBB\", or \"#RRGGBBAA\" when alpha is true: ";
+                        ColorDefinition definition;
+                        const auto alpha = sourceSetting.find("alpha");
+                        Require(alpha == sourceSetting.end() || alpha->is_boolean(), "alpha must be a boolean: " + setting.key);
+                        if (alpha != sourceSetting.end()) definition.alpha = alpha->get<bool>();
                         setting.definition = definition;
                     } else if (type == "int") {
                         defaultError = "default must be an integer within its bounds: ";
