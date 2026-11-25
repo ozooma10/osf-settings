@@ -85,6 +85,11 @@ namespace OSFSettings
         return issues;
     }
 
+    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings)
+    {
+        return DependencyIssues(settings, std::span<const SettingsLoadError>{});
+    }
+
     std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings, std::span<const SettingsLoadError> errors)
     {
         struct Consumer
