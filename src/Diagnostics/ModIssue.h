@@ -43,7 +43,10 @@ namespace OSFSettings
     // OSF owns these reports so a mod's own ClearMod cannot hide a broken schema.
     std::vector<ModIssue> SchemaLoadIssues(std::span<const SettingsLoadError> errors);
     // One warning per declared dependency whose manifest is missing or older than a consumer asks for.
-    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings, std::span<const SettingsLoadError> errors = {});
+    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings, std::span<const SettingsLoadError> errors);
+    // Overload rather than a default argument: MSVC 14.44 instantiates span's iterator checks for "= {}",
+    // which needs SettingsLoadError complete wherever this header is included.
+    std::vector<ModIssue> DependencyIssues(std::span<const ModSettings> settings);
     // One warning per mod whose extends names an installed mod but still could not join its page.
     std::vector<ModIssue> ExtensionIssues(std::span<const ModSettings> settings);
 }
