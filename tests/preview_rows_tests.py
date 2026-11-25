@@ -71,6 +71,19 @@ class PreviewRowsTests(unittest.TestCase):
         self.assertIs(rows[3]["value"], False)
         self.assertTrue(rows[3]["requiresRestart"])
 
+    def test_color_rows(self):
+        rows = self.rows([
+            {"key": "tint", "type": "color", "default": "#ff8000"},
+            {"key": "glow", "type": "color", "default": "#FF800080", "alpha": True},
+        ])
+        self.assertEqual([row["type"] for row in rows], ["color", "color"])
+        # The movie always receives eight uppercase digits.
+        self.assertEqual((rows[0]["value"], rows[0]["defaultValue"]), ("#FF8000FF", "#FF8000FF"))
+        self.assertFalse(rows[0]["alpha"])
+        self.assertEqual(rows[1]["value"], "#FF800080")
+        self.assertTrue(rows[1]["alpha"])
+        self.assertTrue(rows[0]["editable"] and rows[1]["editable"])
+
     def test_slider_coordinates_and_read_only_ranges(self):
         rows = self.rows([
             {"key": "fraction", "type": "float", "default": 0.0, "min": -0.5, "max": 1, "step": 0.2},

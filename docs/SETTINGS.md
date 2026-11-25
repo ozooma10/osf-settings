@@ -91,7 +91,9 @@ Strings are single-line UTF-8. Empty text is allowed; NUL, control characters, a
 
 A `key` setting stores a value for your own input handler. Use [hotkeys](KEYBINDINGS.md) for OSF-dispatched actions. Key defaults accept recognized names or bindable VK integers. Unbinding and `"UNBOUND"` / `255` defaults are allowed unless `allowUnbound` is explicitly `false`. `allowMouse: true` also permits the five physical mouse buttons (`MOUSE1` through `MOUSE5`, VK `1, 2, 4, 5, 6`). [Runtime providers](PROVIDERS.md) can observe key settings without consuming input.
 
-A `color` default is `"#RRGGBB"` or `"#RRGGBBAA"`, with hex digits in either case. Without `"alpha": true` the setting is opaque: only `#RRGGBB` or an alpha of `FF` is accepted, and the picker hides transparency. Saved values use uppercase `#RRGGBB` for opaque colors and `#RRGGBBAA` otherwise.
+A `color` default is `"#RRGGBB"` or `"#RRGGBBAA"`, with hex digits in either case. Without `"alpha": true` the setting is opaque: only `#RRGGBB` or an alpha of `FF` is accepted, and the editor hides opacity. Saved values use uppercase `#RRGGBB` for opaque colors and `#RRGGBBAA` otherwise.
+
+In the menu, a color row shows a swatch and its hex code. Accept opens a color editor with a saturation/brightness field, hue and opacity bars, hue/saturation/brightness and red/green/blue rows, a hex field and basic colors. It works with the mouse, keyboard and controller, and saves only when the player confirms.
 
 ```json
 { "key": "markerTint", "type": "color", "label": "Marker tint", "default": "#FF8000" },

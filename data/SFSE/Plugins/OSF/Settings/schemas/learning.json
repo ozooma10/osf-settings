@@ -54,6 +54,21 @@
         "hint": "Choose a keyboard key or clear the binding. This test setting has no gameplay behavior.",
         "default": "F4",
         "allowUnbound": true
+      },
+      {
+        "key": "notificationColor",
+        "type": "color",
+        "label": "Notification color",
+        "hint": "Choose an opaque color. This test setting has no gameplay behavior.",
+        "default": "#DE9D65"
+      },
+      {
+        "key": "highlightColor",
+        "type": "color",
+        "label": "Highlight color",
+        "hint": "Choose a color and its opacity. This test setting has no gameplay behavior.",
+        "default": "#719EB580",
+        "alpha": true
       }
     ]
   }

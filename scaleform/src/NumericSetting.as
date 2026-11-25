@@ -48,6 +48,7 @@ package
         public static function text(row:Object, value:*):String
         {
             if (row.type == "bool") return value ? tr("values.on") : tr("values.off");
+            if (row.type == "color") return ColorSetting.text(row, value);
             if (row.type == "key") {
                 if (Number(value) == 255) return tr("values.unbound");
                 if (value == row.value && row.valueName) return String(row.valueName);

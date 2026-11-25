@@ -22,7 +22,7 @@ package
         private static const LEFT_BRACKET:uint = 219;
         private static const RIGHT_BRACKET:uint = 221;
         // Other row types have their own editor or action.
-        private static const ACCEPT_TYPES:Object = {bool:true, "enum":true, key:true, hotkey:true, string:true, action:true};
+        private static const ACCEPT_TYPES:Object = {bool:true, "enum":true, key:true, hotkey:true, string:true, action:true, color:true};
         public var BGSCodeObj:Object = {};
         public var startupPhase:String = "document constructed";
         private var bridgeReady:Boolean = false;
@@ -48,6 +48,7 @@ package
         private var keybindings:KeybindingsPage;
         private var stringEditor:StringSetting;
         private var actionConfirmation:ActionConfirmation;
+        private var colorPicker:ColorPicker;
         private var actionAcceptHeld:Boolean = false;
         private var revision:String = "";
         private var launcher:LauncherPage;
@@ -235,6 +236,8 @@ package
             popup.y = (1080 - bounds.height) / 2 - bounds.y;
             startupPhase = "build action confirmation";
             actionConfirmation = new ActionConfirmation(finishActionConfirmation); addChild(actionConfirmation);
+            startupPhase = "build color picker";
+            colorPicker = new ColorPicker(BGSCodeObj, colorFinished); addChild(colorPicker);
             menuStage.stageFocusRect = false;
             menuStage.addEventListener(Event.RESIZE, resizeBackground); resizeBackground();
             menuStage.addEventListener(Event.DEACTIVATE, focusLost);
@@ -300,8 +303,9 @@ package
         private function searching():Boolean { return keybindings && keybindings.searching; }
         private function editingString():Boolean { return stringEditor && stringEditor.visible; }
         private function confirmingAction():Boolean { return actionConfirmation && actionConfirmation.visible; }
-        // A key capture, native rebind, text editor or confirmation owns input until it finishes.
-        private function modalBusy():Boolean { return Boolean(captureRow) || bindingBusy() || editingString() || confirmingAction(); }
+        private function editingColor():Boolean { return colorPicker && colorPicker.visible; }
+        // A key capture, native rebind, text or color editor, or confirmation owns input until it finishes.
+        private function modalBusy():Boolean { return Boolean(captureRow) || bindingBusy() || editingString() || confirmingAction() || editingColor(); }
         // Changing page also waits for search, a pending refresh and any drag.
         private function pageLocked():Boolean { return modalBusy() || searching() || requestedRefresh || settingsList.dragging; }
         private function inputCoolingDown():Boolean { return frame <= inputBlockedThroughFrame; }
@@ -706,13 +710,14 @@ package
         }
         private function syncInput():void
         {
-            var modal:Boolean = Boolean(captureRow) || editingString() || confirmingAction();
+            var modal:Boolean = Boolean(captureRow) || editingString() || confirmingAction() || editingColor();
             var disabled:Boolean = closing || modal || bindingBusy() || nav.focused || launcherPage();
             options.disableInput = disabled || searching();
             options.disableSelection = disabled;
             MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = !modal;
-            nav.mouseChildren = !editingString() && !confirmingAction();
-            MovieClip(bar).visible = !confirmingAction();
+            nav.mouseChildren = !editingString() && !confirmingAction() && !editingColor();
+            // The confirmation and the color picker draw their own buttons over the footer.
+            MovieClip(bar).visible = !confirmingAction() && !editingColor();
         }
         private function updateSelection():void
         {
@@ -745,6 +750,7 @@ package
             if (row) switch (row.type) {
                 case "action": return tr(row.launcher ? "buttons.open" : "buttons.runAction");
                 case "string": return tr("buttons.editText");
+                case "color": return tr("buttons.editColor");
                 case "key":
                 case "hotkey": return tr("buttons.changeBinding");
                 case "enum": return tr("buttons.nextChoice");
@@ -835,7 +841,7 @@ package
         }
         private function accept():void
         {
-            if (confirmingAction() || (launcherPage() || launcherAction()) && launcher.acceptHeld) return;
+            if (confirmingAction() || editingColor() || (launcherPage() || launcherAction()) && launcher.acceptHeld) return;
             if (editingString()) { stringEditor.save(frame); return; }
             if (bindingBusy() || searching() || inputCoolingDown()) return;
             if (captureRow) { confirmBinding(); return; }
@@ -855,6 +861,7 @@ package
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
             else if (row.type == "string" && row.editable) beginString(row);
+            else if (row.type == "color" && row.editable) beginColor(row);
             else if (row.type == "action" && row.editable) beginAction(row);
             else if (row.type == "enum" && row.editable) {
                 var clip:Object = options.FindClipForEntry(options.selectedIndex);
@@ -864,7 +871,7 @@ package
         private function reset():void
         {
             var row:Object = current();
-            if (searching() || editingString() || confirmingAction() || row && row.type == "action") return;
+            if (searching() || editingString() || confirmingAction() || editingColor() || row && row.type == "action") return;
             if (issuesPage()) { issueDetails.toggleDetails(); return; }
             if (captureRow || bindingBusy() || row && row.type == "hotkey") return;
             if (closing || refreshing || requestedRefresh || settingsList.dragging || !modID || !row || !row.editable) return;
@@ -963,6 +970,18 @@ package
             refresh();
             setStatus(cancel ? tr("strings.unchanged") : tr("menu.autoSave"));
         }
+        private function beginColor(row:Object):void
+        {
+            menuStage.focus = null;
+            colorPicker.open(row, actionAcceptHeld);
+            syncInput(); updateSelection();
+        }
+        private function colorFinished(saved:Boolean):void
+        {
+            deferInput(); activationFrame = frame;
+            refresh();
+            setStatus(saved ? tr("menu.autoSave") : tr("colors.unchanged"));
+        }
         // Native is closing the menu (or handing off to a launched one); take no more input.
         private function lockForClose():void
         {
@@ -972,6 +991,7 @@ package
         private function back():void
         {
             if (confirmingAction()) { actionConfirmation.cancel(); return; }
+            if (editingColor()) { colorPicker.cancel(); return; }
             if (editingString()) { stringEditor.cancel(); return; }
             if (nativeHotkeys.busy) { nativeHotkeys.cancel(); return; }
             if (nativeHotkeys.saving) return;
@@ -1088,6 +1108,7 @@ package
                 if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
                 return actionConfirmation.userEvent(name, pressed);
             }
+            if (editingColor()) return colorPicker.userEvent(name, pressed, event);
             if (editingString()) return stringEditor.userEvent(name, pressed, frame, event);
             if (bindingBusy()) return nativeHotkeys.userEvent(name, pressed, event);
             if (captureRow) {
@@ -1226,7 +1247,7 @@ package
                 syncInput();
                 if (footerDirty) updateFooter(current());
                 if (captureRow) pollBinding();
-                else if (!editingString() && !confirmingAction()) {
+                else if (!editingString() && !confirmingAction() && !editingColor()) {
                     if (getTimer() >= nextRevisionPoll && !bindingBusy() && !settingsList.dragging && !searching()) {
                         nextRevisionPoll = getTimer() + 250;
                         if (String(BGSCodeObj.revision()) != revision) requestedRefresh = true;
@@ -1242,7 +1263,7 @@ package
         }
         private function clearBinding():void
         {
-            if (searching() || editingString() || confirmingAction()) return;
+            if (searching() || editingString() || confirmingAction() || editingColor()) return;
             if (issuesPage()) {
                 if (!issueDetails.detailsExpanded) issueDetails.scrollOn();
                 else if (issueDetails.atEnd) copyIssue(current());
@@ -1296,6 +1317,7 @@ package
             actionAcceptHeld = false;
             launcher.releaseAccept();
             if (confirmingAction()) actionConfirmation.cancel();
+            colorPicker.cancel();
             stringEditor.cancel();
             nativeHotkeys.cancel();
             if (searching()) focusResults();
@@ -1331,6 +1353,7 @@ package
         {
             if (event.target != this) return;
             if (stringEditor) stringEditor.close();
+            if (colorPicker) colorPicker.close();
             if (nativeHotkeys) nativeHotkeys.dispose();
             if (gameplayOptions) gameplayOptions.dispose();
             if (captureRow) BGSCodeObj.cancelKeyCapture();
