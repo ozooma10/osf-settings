@@ -6,7 +6,7 @@
 #include "Launcher/LauncherService.h"
 #include "Utils/Paths.h"
 
-namespace OSFSettings
+namespace OSFSettings::Runtime
 {
     namespace
     {
@@ -21,13 +21,7 @@ namespace OSFSettings
         }
     }
 
-    Runtime &Runtime::Get()
-    {
-        static Runtime instance;
-        return instance;
-    }
-
-    bool Runtime::Initialize() noexcept
+    bool Initialize() noexcept
     {
         if (!Paths::Initialize()) return false;
         const auto schemaDir = Paths::SchemasDir();
@@ -65,7 +59,7 @@ namespace OSFSettings
         return true;
     }
 
-    void Runtime::ReportLoadIssues()
+    void ReportLoadIssues()
     {
         ReportCompatibilityIssues();
         for (auto& issue : SchemaLoadIssues(SettingsService::Get().LoadErrors())) {
@@ -75,7 +69,7 @@ namespace OSFSettings
         }
     }
 
-    SettingsError Runtime::SetValue(std::string_view mod, std::string_view key, SettingValue value)
+    SettingsError SetValue(std::string_view mod, std::string_view key, SettingValue value)
     {
         const auto result = SettingsService::Get().SetValue(mod, key, value);
         if (result == SettingsError::None) {

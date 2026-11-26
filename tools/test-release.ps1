@@ -2,17 +2,23 @@
 [CmdletBinding()]
 param(
     [switch]$RunGame,
+    [switch]$Interactive,
     [switch]$Plan,
+    [switch]$ForceVerification,
     [string]$Harness = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'OSF Test Harness'),
     [string]$Manifest = '',
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]*$')][string]$Label = 'final-smoke',
     [string]$OutputDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
+if ($RunGame -and -not $Interactive -and -not $Plan) {
+    throw '[blocked] Game acceptance requires -RunGame -Interactive and an idle desktop.'
+}
 Set-StrictMode -Version Latest
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'packaging/ReleaseValidation.ps1')
 . (Join-Path $PSScriptRoot 'SmokeBench.ps1')
+. (Join-Path $PSScriptRoot 'WorkflowChecks.ps1')
 $stages = @('release-contracts', 'native', 'preview-normal', 'preview-large', 'preview-bindings-normal', 'preview-bindings-large', 'package', 'package-integrity', 'reinstall-preservation', 'runtime', 'source-unchanged')
 $suite = Join-Path $Harness 'Test-SettingsRelease.ps1'
 $suiteFound = Test-Path -LiteralPath $suite -PathType Leaf
@@ -21,7 +27,7 @@ $unverified = @('Physical controller input', 'Visual review of retained screensh
     'Automatic editor/capture cancellation on Windows focus loss and Main Menu/Continue limitations',
     'Unmodified production ZIP: clean mod-manager installation, real consumer, restart and upgrade in-game',
     'External OSF UI provider handoff')
-if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame)") + $unverified }
+if (-not $RunGame) { $unverified = @("In-game acceptance via $suite (use -RunGame -Interactive)") + $unverified }
 if ($Plan) {
     # The harness owns the case list; ask it rather than advertising a copy here.
     [string[]]$runtimeCases = @(if ($suiteFound) {
@@ -55,6 +61,7 @@ $report = [ordered]@{
 }
 $exitCode = 2
 $active = $null
+$workflowLock = $null
 
 function Save-ReleaseReport {
     $path = Join-Path $directory 'result.json'
@@ -94,33 +101,36 @@ function Invoke-ReleaseProcess([string]$Program, [string[]]$Arguments) {
 
 Push-Location $repo
 try {
+    [IO.Directory]::CreateDirectory((Join-Path $repo 'build')) | Out-Null
+    $workflowLock = [IO.File]::Open((Join-Path $repo 'build/smoke.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
     $report.revision = Get-ReleaseRevision $repo
     $source = Get-SmokeSourceIdentity $repo
     Start-ReleaseStage 'release-contracts'
-    Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',(Join-Path $repo 'tests/smoke_bench_tests.ps1'))
-    Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',(Join-Path $repo 'tests/release_validation_tests.ps1'),'-Harness',$Harness)
+    $script:active.log = Join-Path $directory 'release-contracts.log'
+    Invoke-SettingsContractChecks $repo $Harness $script:active.log -Force:$ForceVerification
     Complete-ReleaseStage 'Package and runtime evidence contract checks'
     Start-ReleaseStage 'native'
     Invoke-ReleaseProcess 'xmake' @('test','-j4','-v')
     $expectedNative = @([regex]::Matches((Get-Content (Join-Path $repo 'tests/xmake.lua') -Raw), '"osfsettings-([a-z-]+)-tests"') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique).Count
     Test-SmokeNativeSummary (Get-Content $script:active.log -Raw) $expectedNative
     Complete-ReleaseStage 'All native suites'
-    foreach ($variant in @(@{name='normal';args=@()}, @{name='large';args=@('-LargeText')},
-        @{name='bindings-normal';args=@('-Bindings')}, @{name='bindings-large';args=@('-Bindings','-LargeText')})) {
+    foreach ($variant in @(@{name='normal';args=@()}, @{name='bindings-normal';args=@('-Bindings')},
+        @{name='large';args=@('-LargeText')}, @{name='bindings-large';args=@('-Bindings','-LargeText')})) {
         Start-ReleaseStage ('preview-' + $variant.name)
-        $previewStarted = [DateTime]::UtcNow
-        $arguments = @('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture') + $variant.args
+        $previewReceipt = Join-Path $directory ("preview-" + $variant.name + ".json")
+        $arguments = @('-NoProfile','-File',(Join-Path $PSScriptRoot 'test-menu-preview.ps1'),'-Capture','-ResultPath',$previewReceipt) + $variant.args
+        if ($ForceVerification) { $arguments += '-Force' }
         Invoke-ReleaseProcess 'pwsh' $arguments
         if ($variant.name -eq 'normal') {
             Invoke-ReleaseProcess 'python' @('-B', (Join-Path $repo 'tests/preview_rows_tests.py'))
         }
-        $prefix = if ($variant.name -like '*large') { 'large' } else { 'normal' }
-        $captures = @(Get-ChildItem -LiteralPath (Join-Path $repo 'build/preview') -Filter "$prefix-*.png" -File | Where-Object LastWriteTimeUtc -ge $previewStarted)
-        if (-not $captures.Count) { throw 'Preview passed without fresh screenshots.' }
+        $verification = Get-Content -LiteralPath $previewReceipt -Raw | ConvertFrom-Json
+        $captures = @($verification.outputs | Where-Object { $_ -like '*.png' } | Get-Item)
+        if (-not $captures.Count) { throw 'Preview returned without verified captures.' }
         $captureDirectory = Join-Path $directory $script:active.name
         [IO.Directory]::CreateDirectory($captureDirectory) | Out-Null
         $captures | Copy-Item -Destination $captureDirectory
-        Complete-ReleaseStage "$($captures.Count) fresh screenshots retained"
+        Complete-ReleaseStage "$($captures.Count) verified screenshots retained; tested $($verification.completedUtc)"
     }
     Start-ReleaseStage 'package'
     if ($Manifest) { $Manifest = [IO.Path]::GetFullPath($Manifest); Complete-ReleaseStage 'Explicit existing candidate; its commit is checked next' }
@@ -146,13 +156,13 @@ try {
         $report.runtime = $receipt
         $runtimePlan = & pwsh -NoProfile -File $suite -Plan | ConvertFrom-Json
         if ($LASTEXITCODE) { throw 'Cannot read runtime suite plan.' }
-        Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-ExpectedSettingsProject',$repo,'-ResultPath',$receipt)
+        Invoke-ReleaseProcess 'pwsh' @('-NoProfile','-File',$suite,'-Interactive','-ExpectedSettingsProject',$repo,'-ResultPath',$receipt)
         $runtime = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json -AsHashtable
         Test-SmokeRuntimeReceipt $runtime @($runtimePlan.cases) $source.sha256
         if ($runtime.revision -cne $report.revision) { throw 'Runtime suite tested a different commit than this candidate.' }
         Complete-ReleaseStage "$($runtime.runs.Count) fresh-session cases passed: $($runtime.cases -join ', ')"
     } else {
-        $script:active.status = 'not-run'; $script:active.message = 'Use -RunGame to run the harness suite'
+        $script:active.status = 'not-run'; $script:active.message = 'Use -RunGame -Interactive to run the harness suite'
         Save-ReleaseReport
     }
     Start-ReleaseStage 'source-unchanged'
@@ -171,6 +181,7 @@ try {
 } finally {
     $report.finishedUtc = [DateTime]::UtcNow.ToString('o')
     Save-ReleaseReport
+    if ($workflowLock) { $workflowLock.Dispose() }
     Pop-Location
     Write-Host "Release report: $(Join-Path $directory 'report.md')"
 }

@@ -150,3 +150,27 @@ Run the sibling harness's `Test-SettingsRelease.ps1` for the complete automated
 suite, or `tools/test-release.ps1 -RunGame` to run it as the release runner's
 `runtime` stage. See [game acceptance](../README.md#game-acceptance) for the
 receipt contract and the remaining manual gates.
+
+## Performance captures
+
+`Harness/Performance.h` scopes compile to no-ops in production. The test DLL
+aggregates inclusive wall time by call site and calling thread, in 128 fixed
+slots. Its snapshot includes counts, total/max nanoseconds, power-of-two latency
+bins and dropped-slot counts. No event ring wraps; the last histogram bin is
+overflow. Snapshot/GetRows and compatibility/snapshot timings are nested: do
+not add them. The aggregation mutex runs after a scope's timer stops, but nested
+instrumentation still affects its parent. These are not CPU or rendered-frame
+measurements. `get_value` includes the harness's own snapshot reads.
+
+After staging a SettingsSmoke build, `pwsh tools/profile-runtime.ps1 -Label NAME`
+runs background startup, ten seconds idle, eight menu open/close cycles, provider
+replacement/removal and an observed save/load, followed by a final menu open.
+`-Fixture DIRECTORY` adds host-profiler schemas/catalogs in a registered temporary
+MO2 mod. It uses the sibling runner lock, PID/start-time ownership, private save
+directory, temporary profile and cleanup journal. It never injects input or
+requests focus. The narrow `performanceMenu` test operation queues show/hide on
+the already-guarded native lane; movie snapshots and WGC prove completion. This
+does **not** validate hotkey, navigation, editor or controller input.
+
+`countText` remains an empty compatibility observation: the old separate count
+widget was removed; current counts live in sidebar/Home labels.

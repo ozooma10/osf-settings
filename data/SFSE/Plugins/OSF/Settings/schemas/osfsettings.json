@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "title": "OSF Settings",
+  "nexusModId": 18326,
   "groups": {},
   "hotkeys": {
     "openMenu": {

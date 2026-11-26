@@ -1,9 +1,12 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <filesystem>
+#include <map>
+#include <span>
 #include <vector>
 
 #include "SettingValue.h"
@@ -75,6 +78,31 @@ namespace OSFSettings
         std::string confirmation; // Empty means invoke without a confirmation dialog.
     };
 
+    enum class PlacementResize : std::uint8_t { None, Scale, Free };
+
+    // Setting roles a placement can drive, in the order PlacementDefinition::bindings stores them.
+    inline constexpr std::array<std::string_view, 9> PlacementRoles{ "x", "y", "left", "top", "right", "bottom", "width", "height", "scale" };
+    enum class PlacementRole : std::uint8_t { X, Y, Left, Top, Right, Bottom, Width, Height, Scale };
+
+    // A visual editor for a rectangle on a reference screen. It owns no value: every role it
+    // drives is an int or float setting in the same schema, so saved values stay ordinary settings.
+    struct PlacementDefinition
+    {
+        std::string id;
+        std::string label;
+        std::string hint;
+        double screenWidth{ 1920.0 }; // Coordinate space of the bound settings; also sets the preview's aspect ratio.
+        double screenHeight{ 1080.0 };
+        double width{}; // Size at scale 1, used for whichever of width/height is not bound.
+        double height{};
+        double originX{}; // Fraction of the rectangle the x/y roles refer to: 0 = left/top, 0.5 = centre, 1 = right/bottom.
+        double originY{};
+        PlacementResize resize{ PlacementResize::None };
+        std::array<std::string, PlacementRoles.size()> bindings; // Setting key per role; empty means not bound.
+
+        const std::string& Binding(PlacementRole role) const { return bindings[static_cast<std::size_t>(role)]; }
+    };
+
     struct MenuDefinition
     {
         std::string id;
@@ -106,8 +134,10 @@ namespace OSFSettings
     {
         std::string id;
         std::string label;
-        std::vector<std::variant<SettingDefinition, ActionDefinition>> controls;
+        std::vector<std::variant<SettingDefinition, ActionDefinition, PlacementDefinition>> controls;
     };
+
+    using DependencyVersions = std::map<std::string, SettingsVersion>;
 
     struct ModSchema
     {
@@ -117,13 +147,38 @@ namespace OSFSettings
         std::vector<SettingsGroup> groups;
         std::vector<HotkeyDefinition> hotkeys;
         std::vector<MenuDefinition> menus;
-        std::optional<SettingsVersion> expectedSettingsVersion;
+        std::optional<SettingsVersion> version; // This mod's own release; omitted means unknown.
+        std::uint32_t nexusModId{};
+        DependencyVersions dependencies; // Minimum versions keyed by settings mod id.
+        std::string extends; // Settings mod id whose page shows this mod's controls; empty means its own.
+        bool extendsOptional{}; // The host may be absent; this mod is then hidden instead of reported.
+        std::string page; // Resolved page owner; equals id unless extends resolved to another mod.
+        bool hidden{}; // Resolved: an optional extension whose host is not installed shows nowhere.
         SettingDefinition* FindSetting(std::string_view key);
         const SettingDefinition* FindSetting(std::string_view key) const;
         ActionDefinition* FindAction(std::string_view actionId);
         const ActionDefinition* FindAction(std::string_view actionId) const;
         SettingValues DefaultValues() const;
     };
+
+    // How one group's rows are framed on the page they appear on.
+    struct GroupFraming
+    {
+        const ModSchema* page{}; // Page owner; the mod itself unless its controls were contributed.
+        std::string label; // Heading label, taken from the host when the group merges into one.
+        std::string source; // Contributing mod's title when it alone provides the group; otherwise empty.
+    };
+    // Schemas are the complete set of loaded mods, so the page owner can be looked up by id.
+    GroupFraming FrameGroup(std::span<const ModSchema* const> schemas, const ModSchema& mod, const SettingsGroup& group);
+    // Longest chain of extends links followed before a page is treated as unresolvable.
+    inline constexpr int MaxPageDepth = 8;
+    // Points each schema's page at the mod whose page shows its controls, following extends to the first schema that does not extend another. 
+    // A missing host, a cycle or a longer chain keeps the schema on its own page; both cases are reported as issues rather than failing the load.
+    // An optional extension whose host is missing is hidden instead, and nothing is reported.
+    void ResolvePages(std::span<ModSchema* const> schemas);
+    // Indexes into schemas in load order, with each page owner followed by its contributors, so a page's own groups always come before the ones another mod added to it. 
+    // Hidden schemas are left out.
+    std::vector<std::size_t> PageOrder(std::span<const ModSchema* const> schemas);
 
     struct ModSettings
     {
@@ -139,6 +194,6 @@ namespace OSFSettings
         std::filesystem::path file;
         std::string message;
         bool schema{}; // The schema file or directory failed, so the mod has no page.
-        std::optional<SettingsVersion> expectedSettingsVersion; // Retained even if newer controls cannot load.
+        DependencyVersions dependencies; // Valid metadata survives unsupported controls/formats.
     };
 }

@@ -16,12 +16,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 . "$PSScriptRoot/BuildCache.ps1"
-$output = Join-Path $repo 'build/preview'
+$output = Join-Path $repo $(if ($LargeText) { 'build/preview/large' } else { 'build/preview/normal' })
 $ruffle = Join-Path $repo 'external/ruffle/ruffle.exe'
 $flex = Join-Path $repo 'external/flex'
 $compiler = Join-Path $flex 'bin/mxmlc.bat'
 $player = Join-Path $flex 'frameworks/libs/player/10.3/playerglobal.swc'
-$exporter = Join-Path $output 'osfsettings-preview-rows.exe'
+$exporter = Join-Path $repo 'build/preview/osfsettings-preview-rows.exe'
 if (-not $GameExecutable) { $GameExecutable = Join-Path (Split-Path (Split-Path $InterfaceArchive -Parent) -Parent) 'Starfield.exe' }
 $schemas = @((Join-Path $repo 'data/SFSE/Plugins/OSF/Settings/schemas/learning.json'))
 if ($Design) { $schemas = @((Join-Path $repo 'tests/menu/design-preview.json')) }

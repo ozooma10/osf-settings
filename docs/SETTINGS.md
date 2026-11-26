@@ -1,6 +1,6 @@
 # Settings
 
-Define settings and [action buttons](#action-buttons) in one JSON schema, then connect them to your mod through [C++](#c-integration) or [Papyrus](#papyrus-integration).
+Define settings, [action buttons](#action-buttons) and [placement editors](#placement-editors) in one JSON schema, then connect them to your mod through [C++](#c-integration) or [Papyrus](#papyrus-integration).
 
 OSF Settings provides a centralized interface for users to view and edit those settings.
 
@@ -10,6 +10,7 @@ Ship `Data/SFSE/Plugins/OSF/Settings/schemas/mymod.json` with your mod:
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/ozooma10/osf-settings/dev/sdk/osf-settings.schema.json",
   "title": "My mod",
   "groups": {
     "General": [
@@ -37,11 +38,16 @@ Display text can be translated with separate [localization catalogs](LOCALIZATIO
 
 ### Schema fields and types
 
-- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present.
+The [JSON Schema](../sdk/osf-settings.schema.json) supplies editor completion and
+validation. The URL above follows the development branch; pin a released tag for
+reproducible authoring. Runtime validation additionally checks identifiers,
+cross-field relationships and UTF-8 byte limits.
+
+- The required root field is `groups`. `title` defaults to the mod ID; `description` is optional. `schemaVersion` is optional and must be `1` when present. `extends` puts the controls on [another mod's page](#extend-another-mods-page).
 - The mod ID comes from the schema filename without `.json`.
 - Mod IDs use 1–128 lowercase ASCII letters, digits, `.`, `_`, or `-`; `.` and `..` are invalid. Windows device names such as `con`, `nul`, `com1`, and `lpt1` are rejected, including names followed by an extension such as `nul.extra`.
 - Group names become headings. Groups and their controls appear in authored order.
-- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod. API lookups use exact, case-sensitive keys.
+- Every setting needs `key`, `type`, and `default`. Keys must be nonempty and unique across the mod, ignoring ASCII case. API lookups use exact, case-sensitive keys.
 - Optional `label` defaults to the key. `hint` adds help text.
 
 | Type | Default example | Additional fields |
@@ -57,7 +63,7 @@ Defaults must satisfy the setting's type and limits.
 
 Float `step` controls the editor increment; writes need not be multiples of it.
 
-Enum option values are unique, nonempty strings; the default and API values must match a value exactly. Options appear in authored order. Use an object to give each value a display label:
+Enum option values are strings, unique ignoring ASCII case; the default and API values must match a value exactly. An empty string is allowed when explicitly declared as an option. Options appear in authored order. Use an object to give each value a display label:
 
 ```json
 {
@@ -189,6 +195,95 @@ Bool saved = OSFSettings.SetBool("mymod", "enabled", !enabled)
 
 See the [instance](../examples/papyrus/OSFSettingsExample.psc) and [Global](../examples/papyrus/OSFSettingsExampleGlobal.psc) examples, with their [schema](../examples/papyrus/papyrusexample.json), for all value types, hotkeys, and action callbacks.
 
+## Versions and dependencies
+
+OSF Settings 1.2.0 can report missing or outdated supporting mods. Declare your
+own version and minimum dependency versions in the schema:
+
+```json
+{
+  "title": "My mod",
+  "version": "1.0.0",
+  "nexusModId": 12345,
+  "dependencies": {
+    "osfsettings": "1.2.0",
+    "basemod": "2.0.0"
+  },
+  "groups": {}
+}
+```
+
+- `version` and dependency versions are numeric `major.minor.patch` strings.
+  Prerelease labels and version ranges are not supported.
+- Dependency keys are settings mod IDs (schema filenames), not DLL or plugin
+  filenames. Only loaded schemas/runtime providers participate; this is not a
+  scan of every installed mod. A metadata-only schema can use `"groups": {}`.
+- A missing dependency produces a warning. An installed dependency with a
+  declared version is compared against the requested minimum. An installed
+  dependency without a version cannot be compared and produces no version warning.
+  OSF Settings uses its running DLL version for its own comparison.
+- Warnings do not disable the consumer's settings or enforce a load order.
+  Reports refresh when runtime providers change. Valid dependency metadata can
+  still appear in Mod Issues when the rest of a schema fails validation.
+- `nexusModId` is your mod's numeric Starfield Nexus ID (replace the example).
+  Omit it or use `0` if unavailable. Issue details can open the provider's Nexus
+  page when that provider's schema supplies an ID; a missing provider has no
+  metadata from which to obtain its link.
+
+See the [dependency examples](../examples/dependencies/osf-stack.json).
+
+### Migrating older version declarations
+
+The former `expectedSettingsVersion` field is ignored in 1.2.0. Replace
+`"expectedSettingsVersion": "1.1.2"` with
+`"dependencies": { "osfsettings": "1.2.0" }` when adopting the new features.
+For a schema that still supports older OSF Settings releases, keep the old field
+alongside `dependencies` so those older releases retain their version warning.
+The new `version` field describes your own mod, not the required OSF Settings
+version. The former special-case OSF UI DLL version check has also been removed;
+declare an `osfui` dependency when your mod needs it, and have the provider publish
+its version through a schema or runtime registration.
+
+## Extend another mod's page
+
+A mod that builds on another mod can put its settings on that mod's page instead of a page of its own. Add a root `extends` naming the host's mod ID:
+
+```json
+{
+  "title": "Base Mod - Combat Extras",
+  "extends": "basemod",
+  "groups": {
+    "Combat": [
+      { "key": "recoil", "type": "float", "default": 0.5, "label": "Extra recoil" }
+    ]
+  }
+}
+```
+
+Save this as `Data/SFSE/Plugins/OSF/Settings/schemas/basemod_combatextras.json`.
+This feature requires OSF Settings 1.2.0. Only the page changes: your mod ID is
+still your filename, your values still live in `<modId>.json`, and API calls use
+your own ID: `GetFloat("basemod_combatextras", "recoil")`. Actions and hotkeys also
+retain their original owner. Contributed settings identify their source in the
+details pane.
+
+`extends` makes the host a dependency: if it is not installed, your settings appear on their own page and Mod Issues reports the host as missing.
+Add an explicit `dependencies` entry when you need a minimum version instead. A mod cannot extend itself, and a loop of mods extending each other leaves each on its own page with an issue reported.
+
+### Optional integrations
+
+For settings that only matter when the host is installed, make the host optional:
+
+```json
+"extends": { "mod": "basemod", "optional": true }
+```
+
+With the host installed this behaves exactly like `"extends": "basemod"`.
+Without it, no missing-host warning is reported and your controls, hotkeys and
+launchers are hidden. Your schema still loads, so `Get*`/`Set*` calls keep working
+and saved values are kept. Other declared dependencies are still checked. An
+explicit minimum for the optional host is checked when that host is installed.
+
 ## Action buttons
 
 Declare a `type: "action"` control inside a group in your `schemas/mymod.json` settings schema:
@@ -258,6 +353,59 @@ Repeating the same receiver registration succeeds without adding another handler
 
 The [instance example](../examples/papyrus/OSFSettingsExample.psc) includes an immediate reset, and the [Global example](../examples/papyrus/OSFSettingsExampleGlobal.psc) has an action that completes after `Utility.WaitMenuPause`.
 Gameplay-dependent script work may remain pending until gameplay resumes.
+
+## Placement editors
+
+A `type: "placement"` control lets players position and size something on screen, such as a HUD widget, by dragging a rectangle instead of typing numbers. It opens a near-full-screen editor with a scaled copy of the screen, guides showing the distance to each edge, and snapping to the edges, the centre and the page's other placements.
+
+A placement has no value of its own. It reads and writes ordinary `int` and `float` settings in the same schema, which your mod reads like any other setting:
+
+```json
+{
+  "title": "My HUD",
+  "groups": {
+    "Compass": [
+      {
+        "type": "placement",
+        "id": "compass",
+        "label": "Compass placement",
+        "size": { "width": 640, "height": 72 },
+        "origin": { "x": 0.5, "y": 0 },
+        "bind": { "x": "compassX", "top": "compassTop", "scale": "compassScale" }
+      },
+      { "key": "compassX", "type": "int", "label": "Compass centre", "default": 960, "min": 0, "max": 1920 },
+      { "key": "compassTop", "type": "int", "label": "Compass top margin", "default": 32, "min": 0, "max": 1080 },
+      { "key": "compassScale", "type": "float", "label": "Compass scale", "default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05 }
+    ]
+  }
+}
+```
+
+`type`, `id`, `label` and `bind` are required; `hint` is optional. Ids are unique among the schema's placements, ignoring ASCII case.
+
+| Field | Meaning |
+| --- | --- |
+| `screen` | `{ "width", "height" }` of the coordinate space your settings use. Defaults to 1920 x 1080. Its aspect ratio is the preview's. |
+| `size` | `{ "width", "height" }` of the rectangle at scale 1. Required unless both axes bind their size. |
+| `origin` | `{ "x", "y" }` fractions of the rectangle that `x` and `y` refer to: `0` is the left or top edge, `0.5` the centre, `1` the right or bottom edge. Defaults to `0, 0`. |
+| `resize` | `"none"`, `"scale"` (proportional, from the corners) or `"free"` (width and height separately). Defaults to `free` when a size is bound, `scale` when `scale` is bound, otherwise `none`. |
+| `bind` | Setting keys by role, described below. Each setting fills one role. |
+
+| Role | Setting | Value saved |
+| --- | --- | --- |
+| `x`, `y` | `int` or `float` | Position of the origin point from the screen's left or top edge |
+| `left`, `top` | `int` or `float` | Margin from the screen's left or top edge to the rectangle |
+| `right`, `bottom` | `int` or `float` | Margin from the rectangle to the screen's right or bottom edge |
+| `width`, `height` | `int` or `float` | Size of the rectangle |
+| `scale` | `float` with a positive default | Size divided by `size`; cannot be combined with another size binding |
+
+Bind whichever roles your mod already uses; a save writes all of them. An axis with no position role keeps its position, and both margins of an axis (`left` and `right`, or `top` and `bottom`) also carry its size. The editor keeps the rectangle on screen and every bound value within its setting's `min` and `max`, and rounds `int` settings to whole units and `float` settings to their step's decimal places.
+
+Reset on a placement row restores all of its settings' defaults. Each saved setting notifies its own subscribers, so a mod that applies changes live sees them as separate updates. The page's other placements on the same screen appear in the editor for reference.
+
+Players can drag the rectangle and its handles, use the wheel to scale it, or use the keyboard or a controller: the arrows move it (or resize it after pressing X), `[` and `]` or the shoulder buttons shrink and grow it, B on the keyboard or Y on a controller loads the defaults, and Accept saves. Holding Shift while dragging skips snapping.
+
+See the [example schema](../examples/placement/osfsettings-placement-example.json), with a compass, a quest tracker and a health bar.
 
 ## Related features
 

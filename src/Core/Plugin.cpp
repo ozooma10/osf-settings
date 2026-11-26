@@ -31,7 +31,7 @@ namespace OSFSettings::Plugin
     bool OnLoad()
     {
         const auto* messaging = SFSE::GetMessagingInterface();
-        if (!messaging || !Runtime::Get().Initialize() || !messaging->RegisterListener(OnMessage)) return false;
+        if (!messaging || !Runtime::Initialize() || !messaging->RegisterListener(OnMessage)) return false;
         if (!Papyrus::Install()) REX::ERROR("Papyrus native registration hook is unavailable");
         if (!PauseMenu::Install()) REX::ERROR("Pause menu hook is unavailable");
         if (!NativeHotkeys::Install()) REX::ERROR("Native hotkey registration is unavailable");

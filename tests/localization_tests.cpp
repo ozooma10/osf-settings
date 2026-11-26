@@ -1,5 +1,7 @@
 #include "Settings/Localization.h"
+#include "Core/LanguageSetting.h"
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -23,6 +25,18 @@ int main()
         ~Cleanup() { std::error_code error; std::filesystem::remove_all(root, error); }
     } cleanup{ root };
     try {
+        struct EngineLanguage
+        {
+            std::string_view key, value;
+            EngineLanguage* GetSetting(std::string_view name) { return key == name ? this : nullptr; }
+        };
+        EngineLanguage unchanged{ "sLanguage:General", "en" };
+        EngineLanguage overridden{ "SLanguage:General", "ja" };
+        EngineLanguage unrelated{ "sOther:General", "de" };
+        check(Localization::FindLanguageSetting(&unchanged)->value == "en", "static engine language remains available");
+        check(Localization::FindLanguageSetting(&overridden)->value == "ja", "dynamic INI language uses its actual value instead of the English fallback");
+        check(!Localization::FindLanguageSetting(&unrelated), "unrelated string does not supply the language");
+        check(!Localization::FindLanguageSetting(static_cast<EngineLanguage*>(nullptr)), "missing INI collection allows the English fallback");
         const auto write = [&](const char* language, const char* mod, const nlohmann::json& json) {
             std::filesystem::create_directories(root / language);
             std::ofstream(root / language / (std::string(mod) + ".json"), std::ios::binary) << json.dump();
@@ -37,6 +51,12 @@ int main()
         mod.schema.hotkeys = {{ "open", "Open", "F10", "Menu", "General / group" }};
         mod.schema.groups[0].controls.emplace_back(ActionDefinition{ "run", "Run", "Hint", "Really run?" });
         mod.schema.groups[0].controls.emplace_back(ActionDefinition{ "quick", "Quick", "", "" });
+        mod.schema.groups[0].controls.emplace_back(PlacementDefinition{ .id = "compass", .label = "Compass", .hint = "Drag it." });
+        const auto placementOf = [](const ModSchema& schema) -> const PlacementDefinition& {
+            for (const auto& control : schema.groups[0].controls)
+                if (const auto* placement = std::get_if<PlacementDefinition>(&control)) return *placement;
+            throw std::runtime_error("placement missing");
+        };
         mod.values.emplace(setting.key, EnumValue{ "slow" });
         std::vector mods{mod};
         check(Localization::NormalizeLanguage("PTBR") == "ptbr", "game language codes normalize");
@@ -52,7 +72,8 @@ int main()
             {"groups",{{"General / group",{{"label","Allgemein"}}}}},
             {"settings",{{setting.key,{{"label","Modus"},{"optionLabels",{{"slow","Langsam"},{"fast","Schnell"}}}}}}},
             {"hotkeys",{{"open",{{"label","Öffnen"}}}}},
-            {"actions",{{"run",{{"label","Ausführen"},{"confirmation","Wirklich ausführen?"}}}}}});
+            {"actions",{{"run",{{"label","Ausführen"},{"confirmation","Wirklich ausführen?"}}}}},
+            {"placements",{{"compass",{{"label","Kompass"}}}}}});
         Localization::Catalog german(root, "DE", mods);
         translated = mod.schema;
         german.Apply(translated);
@@ -66,6 +87,7 @@ int main()
         check(IsValidValue(current, EnumValue{"slow"}) && !IsValidValue(current, EnumValue{"Langsam"}), "setters still validate stored enum values");
         check(translated.hotkeys[0].label == "Öffnen" && translated.hotkeys[0].defaultKey == "F10" && translated.hotkeys[0].menu == "Menu", "hotkey localization does not change registration");
         check(translated.FindAction("run")->confirmation == "Wirklich ausführen?" && translated.FindAction("quick")->confirmation.empty(), "confirmation translation preserves enabled state");
+        check(placementOf(translated).label == "Kompass" && placementOf(translated).hint == "Drag it.", "placements translate by id with authored fallback");
         auto registered = mod.schema;
         registered.description = "Registered again";
         registered.hotkeys[0].defaultKey = "F11";
@@ -73,6 +95,33 @@ int main()
         german.Apply(registered);
         check(registered.title == "Deutsch" && registered.description == "Registered again" && registered.hotkeys[0].defaultKey == "F11"
             && registered.FindAction("later") && registered.groups[0].label == "Allgemein", "catalogs overlay the live schema instead of replacing it");
+        auto changed = mod.schema;
+        auto* changedSetting = changed.FindSetting(setting.key);
+        std::get<EnumDefinition>(changedSetting->definition).options = {{"fast", "New fast"}, {"added", "Added"}};
+        changed.FindAction("run")->confirmation.clear();
+        std::ranges::reverse(changed.groups[0].controls);
+        german.Apply(changed);
+        const auto& changedEnum = std::get<EnumDefinition>(changed.FindSetting(setting.key)->definition);
+        check(changedEnum.options[0].value == "fast" && changedEnum.options[0].label == "Schnell" &&
+            changedEnum.options[1].label == "Added", "reordered/replaced enum keeps live values and unknown-label fallback");
+        check(changed.FindAction("run")->label == "Ausführen" && changed.FindAction("run")->confirmation.empty(),
+            "replay cannot restore a removed confirmation requirement");
+        check(placementOf(changed).label == "Kompass", "replay translates placements in the live schema");
+        changed.FindSetting(setting.key)->definition = BoolDefinition{true};
+        german.Apply(changed);
+        check(changed.FindSetting(setting.key)->label == "Modus" &&
+            std::get<BoolDefinition>(changed.FindSetting(setting.key)->definition).defaultValue,
+            "replay handles enum becoming a boolean without retaining options or changing defaults");
+        write("de", "future", {{"settings",{{"later",{{"label","Translated later"}}}}},
+            {"actions",{{"run",{{"confirmation","Confirm later"}}}}}});
+        ModSettings future{.schema={.id="future"}};
+        Localization::Catalog futureCatalog(root, "de", std::span(&future, 1));
+        check(futureCatalog.Errors().size() == 2, "unknown future controls report diagnostics at catalog load");
+        future.schema.groups = {{"new", "New", {SettingDefinition{.key="later", .label="Later", .definition=BoolDefinition{false}},
+            ActionDefinition{"run", "Run", "", "Confirm"}}}};
+        futureCatalog.Apply(future.schema);
+        check(future.schema.FindSetting("later")->label == "Translated later" && future.schema.FindAction("run")->confirmation == "Confirm later",
+            "previously unknown translation keys apply when a provider later adds matching controls");
         Localization::Catalog english(root, "fr", mods);
         translated = mod.schema;
         english.Apply(translated);
@@ -80,11 +129,13 @@ int main()
 
         write("de", "example", {{"version",1},{"title",23},{"description",""},
             {"settings",{{setting.key,{{"hint","Mehrere\nZeilen"},{"label",std::string("bad\0label",9)},{"default","bad"}}},{"missing",{{"label","No"}}}}},
-            {"actions",{{"run",{{"confirmation",""}}},{"quick",{{"confirmation","Must not add a dialog"}}}}}});
+            {"actions",{{"run",{{"confirmation",""}}},{"quick",{{"confirmation","Must not add a dialog"}}}}},
+            {"placements",{{"compass",{{"label","Kompass"},{"confirmation","Placements have none"}}}}}});
         Localization::Catalog invalid(root, "de", mods);
         translated = mod.schema;
         invalid.Apply(translated);
-        check(invalid.Errors().size() == 6, "bad entries and unknown fields report diagnostics");
+        check(invalid.Errors().size() == 7, "bad entries and unknown fields report diagnostics");
+        check(placementOf(translated).label == "Kompass", "an unknown placement field does not reject its valid label");
         check(translated.title == "English title" && translated.description.empty(), "bad title falls back and optional text can be cleared");
         check(std::get<SettingDefinition>(translated.groups[0].controls[0]).label == "Mode" && std::get<SettingDefinition>(translated.groups[0].controls[0]).hint == "Mehrere\nZeilen", "invalid NUL rejected and valid multiline sibling retained");
         check(translated.FindAction("run")->confirmation == "Really run?" && translated.FindAction("quick")->confirmation.empty(), "catalog cannot remove or add confirmation requirement");

@@ -39,9 +39,9 @@ namespace OSFSettings::Papyrus
         template <class T>
         T Read(std::string_view function, std::string_view mod, std::string_view key, T fallback) const
         {
-            const auto resolved = Resolve(mod, key);
-            const auto value = resolved ? m_service.GetValue(resolved->first, resolved->second) : std::expected<SettingValue, SettingsError>(std::unexpected(resolved.error()));
-            const auto result = value ? Convert<T>(*value) : std::expected<T, SettingsError>(std::unexpected(value.error()));
+            const auto result = Resolve(mod, key)
+                .and_then([&](const auto& resolved) { return m_service.GetValue(resolved.first, resolved.second); })
+                .and_then(&Convert<T>);
             if (result) return *result;
             Report(function, mod, key, result.error());
             return fallback;
@@ -63,7 +63,9 @@ namespace OSFSettings::Papyrus
         }
 
     private:
-        std::expected<std::pair<std::string, std::string>, SettingsError> Resolve(std::string_view mod, std::string_view key, SettingValue* value = nullptr) const;
+        // Authored mod id and setting key for identifiers the VM pools without case sensitivity.
+        using Resolved = std::expected<std::pair<std::string, std::string>, SettingsError>;
+        Resolved Resolve(std::string_view mod, std::string_view key, SettingValue* value = nullptr) const;
         SettingsService& m_service;
     };
 }

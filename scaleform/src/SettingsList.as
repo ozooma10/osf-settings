@@ -50,12 +50,14 @@ package
                     // Only IDs using "Tab - Section" opt into abbreviated labels.
                     var title:String = String(row.groupTitle), split:int = title.indexOf(" - ");
                     if (section && String(row.group).indexOf(" - ") > 0 && split > 0) title = title.substr(split + 3);
+                    // A group only another mod provides names it here; a shared one has no single owner.
+                    if (row.groupSource) title = tr("menu.groupFrom", {group:title, mod:row.groupSource});
                     data.push({row:{type:"section", title:title, mod:row.mod, id:"@section/" + row.group, group:row.group, editable:false},
                         sText:"", uID:data.length, bDisabled:true, bShowSpinner:false, uCategory:0, bEnabled:false, bSubSetting:false,
                         uType:types.SDT_LINK, sliderData:{fValue:0, sDisplayValue:""}, stepperData:{aStepperOptions:[], uIndex:0}, checkBoxData:{bChecked:false}});
                 }
                 var slider:Boolean = settings && NumericSetting.isSlider(row);
-                var text:String = String(row.title).split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;");
+                var text:String = String(row.title).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 // The vanilla entry multiplies fValue by 100; our slider stores integer offsets.
                 data.push({row:row, sText:text, uID:data.length, bDisabled:false, bShowSpinner:false,
                     uCategory:0, bEnabled:!settings || row.editable, bSubSetting:false,
@@ -115,8 +117,10 @@ package
             var modList:Boolean = !settings && !bindings;
             for (var i:int = 0; i < list.totalEntryClips; ++i) {
                 var clip:MovieClip = list.GetClipByIndex(i) as MovieClip;
-                if (!clip || Object(clip).itemIndex < 0) continue;
-                var item:Object = list.GetDataForEntry(Object(clip).itemIndex);
+                if (!clip) continue;
+                var index:int = Object(clip).itemIndex;
+                if (index < 0) continue;
+                var item:Object = list.GetDataForEntry(index);
                 if (!item) continue;
                 var row:Object = item.row;
                 var issue:Boolean = row.type == "issue";
@@ -135,14 +139,14 @@ package
                     else clip.addEventListener(MouseEvent.MOUSE_OVER, list.onEntryRollover);
                     view.settings = settings;
                 }
-                var selected:Boolean = Object(clip).itemIndex == list.selectedIndex && focused;
-                var editing:Boolean = selected && Object(clip).itemIndex == editingIndex;
+                var selected:Boolean = index == list.selectedIndex && focused;
+                var editing:Boolean = selected && index == editingIndex;
                 var binding:DisplayObject = hotkeys.decorate(clip, row, selected, height);
                 var slider:Object = Object(clip).Slider_mc;
                 var showSlider:Boolean = settings && NumericSetting.isSlider(row);
                 var showStepper:Boolean = settings && row.type == "enum" && row.editable;
                 var sliderDragging:Boolean = showSlider && slider.dragging;
-                var hovered:Boolean = Object(clip).itemIndex == hoverIndex && !selected;
+                var hovered:Boolean = index == hoverIndex && !selected;
                 var capturing:Boolean = Boolean(row.capturing);
                 // Poll only the state vanilla can change under us; stable clips keep their layout.
                 if (view.row != row || view.value !== row.value || view.frame != clip.currentFrame ||
@@ -181,7 +185,10 @@ package
                     if (border.height != height) { border.height = height; needsLayout = true; }
                     view.content.update(row, selected, modList, height, hovered);
                 }
-                clip.x = 0; clip.y = (Object(clip).itemIndex - list.scrollPosition) * (height + MenuStyle.ROW_GAP);
+                // Vanilla repositions clips on scroll; write only when it has.
+                var top:Number = (index - list.scrollPosition) * (height + MenuStyle.ROW_GAP);
+                if (clip.x != 0) clip.x = 0;
+                if (clip.y != top) clip.y = top;
             }
             if (needsLayout && !dragging) {
                 list.UpdateContainerRect();

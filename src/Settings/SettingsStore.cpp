@@ -38,10 +38,10 @@ namespace OSFSettings
                 continue;
             }
             std::string message;
-            std::optional<SettingsVersion> expectedSettingsVersion;
-            auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message, &expectedSettingsVersion);
+            DependencyVersions dependencies;
+            auto schema = SettingsJson::ParseSchema(input, path.stem().string(), message, &dependencies);
             if (!schema) {
-                m_loadErrors.push_back({ path, std::move(message), true, expectedSettingsVersion });
+                m_loadErrors.push_back({ path, std::move(message), true, std::move(dependencies) });
                 continue;
             }
 
@@ -49,8 +49,16 @@ namespace OSFSettings
             mod.schema = std::move(*schema);
             mod.values = SettingsJson::LoadValues(m_valuesDir / (mod.schema.id + ".json"), mod.schema, m_loadErrors);
             m_mods.push_back(std::move(mod));
-
         }
+        ResolvePages();
+    }
+
+    void SettingsStore::ResolvePages()
+    {
+        std::vector<ModSchema*> schemas;
+        schemas.reserve(m_mods.size());
+        for (auto& mod : m_mods) schemas.push_back(&mod.schema);
+        OSFSettings::ResolvePages(schemas);
     }
 
     std::optional<SettingValue> SettingsStore::GetValue(std::string_view mod, std::string_view key) const
@@ -92,10 +100,15 @@ namespace OSFSettings
         const auto owner = m_providers.find(mod.schema.id);
         if (existing) {
             if (owner == m_providers.end() || !registration || owner->second.token != registration) return Error::AlreadyRegistered;
-            for (auto& [key, value] : mod.values) {
-                const auto old = existing->values.find(key);
-                const auto* setting = mod.schema.FindSetting(key);
-                if (old != existing->values.end() && setting && IsValidValue(*setting, old->second)) value = old->second;
+            // Registered schemas have unique setting keys. Walk the definitions
+            // once instead of searching the entire schema for each incoming value.
+            for (const auto& group : mod.schema.groups) for (const auto& control : group.controls) {
+                const auto* setting = std::get_if<SettingDefinition>(&control);
+                if (!setting) continue;
+                const auto value = mod.values.find(setting->key);
+                if (value == mod.values.end()) continue;
+                const auto old = existing->values.find(setting->key);
+                if (old != existing->values.end() && IsValidValue(*setting, old->second)) value->second = old->second;
             }
             *existing = std::move(mod);
             owner->second.save = std::move(save);
@@ -105,6 +118,8 @@ namespace OSFSettings
             m_providers.emplace(mod.schema.id, Provider{ registration, std::move(save) });
             m_mods.push_back(std::move(mod));
         }
+        // A provider can host a page or extend one, so every registration re-resolves them.
+        ResolvePages();
         return Error::None;
     }
 
@@ -115,6 +130,7 @@ namespace OSFSettings
         const auto id = found->first;
         std::erase_if(m_mods, [&](const auto& mod) { return mod.schema.id == id; });
         m_providers.erase(found);
+        ResolvePages();
         return id;
     }
 

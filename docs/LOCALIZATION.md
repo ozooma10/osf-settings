@@ -27,12 +27,13 @@ Data/SFSE/Plugins/OSF/Settings/translations/<language>/<modId>.json
   "hotkeys": { "open": { "label": "Einstellungen öffnen" } },
   "actions": {
     "reset": { "label": "Zurücksetzen", "hint": "Den Zustand zurücksetzen.", "confirmation": "Wirklich zurücksetzen?" }
-  }
+  },
+  "placements": { "compass": { "label": "Kompass", "hint": "Position und Größe des Kompasses." } }
 }
 ```
 
-- Entries are keyed by the schema's IDs: group names, setting keys, hotkey and action IDs, and enum option values. They are exact and case-sensitive. A group OSF creates automatically is `General`.
-- Actions go in `actions` no matter which group they appear in.
+- Entries are keyed by the schema's IDs: group names, setting keys, hotkey, action and placement IDs, and enum option values. They are exact and case-sensitive. A group OSF creates automatically is `General`.
+- Actions go in `actions` and placements in `placements`, no matter which group they appear in.
 - Labels must be nonempty and single-line. Hints, descriptions and confirmations may contain `\n`. A confirmation can only be translated if the schema has one, and it can't be empty.
 
 An invalid entry falls back on its own. Invalid JSON or duplicate keys reject the whole file. Errors are logged to `OSF Settings.log` with the file and field.

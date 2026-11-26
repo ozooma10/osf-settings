@@ -195,9 +195,13 @@ def prepare(archive_path, output, schema_paths, large, menu_path, exporter, exec
         for report in sorted(reports, key=lambda report: report["severity"] != "ERROR"):
             issue = ET.SubElement(issues, "issue", mod=report["modId"], id=report["id"],
                                   modTitle=titles.get(report["modId"], report["modId"]), severity=report["severity"],
-                                  nexusModId=str(report.get("nexusModId", 0)))
-            for field in ("title", "reason", "impact", "nextSteps"):
+                                  nexusModId=str(report.get("nexusModId", 0)),
+                                  installedVersion=report.get("installedVersion", ""),
+                                  requiredVersion=report.get("requiredVersion", ""))
+            for field in ("title", "reason", "impact", "nextSteps", "note"):
                 ET.SubElement(issue, field).text = report.get(field, "")
+            for name in report.get("affectedMods", []):
+                ET.SubElement(issue, "affected").text = name
     ET.indent(config)
     ET.ElementTree(config).write(output / "preview.xml", encoding="utf-8", xml_declaration=True)
 

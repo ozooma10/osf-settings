@@ -2,7 +2,6 @@ package
 {
     import flash.display.Sprite;
     import flash.text.TextField;
-    import flash.text.TextFormat;
 
     // The round initials badge shared by interface cards and Home's detail card.
     public final class Badge extends Sprite
@@ -16,8 +15,7 @@ package
         {
             diameter = size; mouseEnabled = false; mouseChildren = false;
             label = MenuStyle.field(text, 9, 0, size - 18, size, size * 0.32, MORE, true);
-            var format:TextFormat = label.defaultTextFormat; format.align = "center";
-            label.defaultTextFormat = format; label.setTextFormat(format);
+            MenuStyle.align(label, "center");
             label.y = (size - label.textHeight) / 2 - 2; addChild(label);
         }
         public static function color(identity:String):uint

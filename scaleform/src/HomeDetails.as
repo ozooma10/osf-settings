@@ -48,7 +48,18 @@ package
             // Content flows top-down. Hotkeys get the room left after the chips and, when there
             // is one, a line of description; the description takes the rest.
             var limit:Number = height - PAD;
-            var chipBlock:Number = detail.chips.length ? 44 : 0;
+            var chips:Array = [];
+            var chipX:Number = PAD, chipY:Number = 0;
+            var measure:TextField = MenuStyle.field("", 0, 0, WIDTH - PAD * 2 - 20, 40,
+                MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true);
+            for each (var chip:String in detail.chips) {
+                MenuStyle.fit(measure, chip);
+                var chipWidth:Number = Math.min(WIDTH - PAD * 2, measure.textWidth + 28);
+                if (chipX > PAD && chipX + chipWidth > WIDTH - PAD) { chipX = PAD; chipY += 38; }
+                chips.push({value:chip, x:chipX, y:chipY, width:chipWidth});
+                chipX += chipWidth + 10;
+            }
+            var chipBlock:Number = chips.length ? chipY + 44 : 0;
             var hotkeys:Array = detail.hotkeys || [];
             var rowHeight:Number = large ? 42 : 36;
             var reserve:Number = detail.warning || detail.description ? 50 : 0;
@@ -63,8 +74,7 @@ package
                     detail.warning ? MenuStyle.ACCENT : MenuStyle.MUTED, false, 0, space - 16);
                 cursor = body.y + body.height + 12;
             }
-            var chipX:Number = PAD;
-            for each (var chip:String in detail.chips) chipX = tag(chip, chipX, cursor) + 10;
+            for each (var placement:Object in chips) tag(placement.value, placement.x, cursor + placement.y, placement.width);
             cursor += chipBlock;
             if (shown || more) {
                 graphics.lineStyle(1, 0x34424B); graphics.moveTo(PAD, cursor); graphics.lineTo(WIDTH - PAD, cursor); graphics.lineStyle();
@@ -115,12 +125,11 @@ package
             return field;
         }
 
-        private function tag(value:String, left:Number, top:Number):Number
+        private function tag(value:String, left:Number, top:Number, width:Number):void
         {
-            var label:TextField = text(value, left + 10, top + 3, 400, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true, 1);
-            label.width = label.textWidth + 8;
+            var label:TextField = text(value, left + 10, top + 3, width - 20, MenuStyle.SMALL_SIZE - 1, MenuStyle.MUTED, true, 1);
+            label.width = Math.min(width - 20, label.textWidth + 8);
             graphics.lineStyle(1, MenuStyle.LINE); graphics.drawRect(left, top, label.width + 18, 28); graphics.lineStyle();
-            return left + label.width + 20;
         }
 
         private function keycap(value:String, top:Number):TextField

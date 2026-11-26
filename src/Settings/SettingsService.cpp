@@ -1,5 +1,6 @@
 #include "SettingsService.h"
 #include "Localization.h"
+#include "Harness/Performance.h"
 #include "REX/LOG.h"
 
 #include <utility>
@@ -12,7 +13,6 @@ namespace OSFSettings
         {
             return !key.empty() && key.find('\0') == std::string_view::npos;
         }
-
     }
 
     SettingsService& SettingsService::Get()
@@ -23,10 +23,12 @@ namespace OSFSettings
 
     void SettingsService::Load(const std::filesystem::path& schemas, const std::filesystem::path& values)
     {
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::Load);
         std::lock_guard lock(m_mutex);
         if (m_loaded) return;
         m_store.LoadAll(schemas, values);
         m_loaded = true;
+        ++m_schemaRevision;
     }
 
     bool SettingsService::Start()
@@ -41,11 +43,13 @@ namespace OSFSettings
 
     std::vector<ModSettings> SettingsService::Snapshot() const
     {
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::Snapshot);
         std::lock_guard lock(m_mutex);
-        auto mods = m_store.Mods();
+        std::vector<ModSettings> mods;
+        mods.reserve(m_store.Mods().size());
         const auto catalog = Localization::Get();
-        for (auto& mod : mods) {
-            mod.values = mod.ResolvedValues();
+        for (const auto& stored : m_store.Mods()) {
+            auto& mod = mods.emplace_back(ModSettings{ stored.schema, stored.ResolvedValues() });
             catalog->Apply(mod.schema);
         }
         return mods;
@@ -53,19 +57,21 @@ namespace OSFSettings
 
     std::optional<ModSettings> SettingsService::FindMod(std::string_view mod) const
     {
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::FindMod);
         std::lock_guard lock(m_mutex);
         const auto* stored = m_store.FindMod(mod);
         if (!stored) return std::nullopt;
-        auto copy = *stored;
-        copy.values = copy.ResolvedValues();
+        ModSettings copy{ stored->schema, stored->ResolvedValues() };
         Localization::Get()->Apply(copy.schema);
         return copy;
     }
 
     void SettingsService::Localize(const std::filesystem::path& directory, std::string_view language)
     {
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::Localize);
         std::lock_guard lock(m_mutex);
         Localization::Publish(std::make_shared<Localization::Catalog>(directory, language, m_store.Mods()));
+        ++m_schemaRevision;
         for (const auto& mod : m_store.Mods()) {
             Notify(mod.schema.id, std::nullopt);
         }
@@ -79,6 +85,7 @@ namespace OSFSettings
 
     std::expected<SettingValue, SettingsError> SettingsService::GetValue(std::string_view mod, std::string_view key) const
     {
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::GetValue);
         if (!IsValidModId(mod) || !ValidKey(key)) return std::unexpected(SettingsError::InvalidArgument);
         std::lock_guard lock(m_mutex);
         if (!IsReady()) return std::unexpected(SettingsError::NotReady);
@@ -145,7 +152,10 @@ namespace OSFSettings
         if (!IsReady()) return SettingsError::NotReady;
         const auto id = mod.schema.id;
         const auto result = m_store.RegisterProvider(std::move(mod), std::move(save), registration);
-        if (result == SettingsError::None) Notify(id, std::nullopt);
+        if (result == SettingsError::None) {
+            ++m_schemaRevision;
+            Notify(id, std::nullopt);
+        }
         return result;
     }
 
@@ -153,6 +163,7 @@ namespace OSFSettings
     {
         std::lock_guard lock(m_mutex);
         if (const auto id = m_store.UnregisterProvider(registration)) {
+            ++m_schemaRevision;
             Notify(*id, std::nullopt);
             return SettingsError::None;
         }
@@ -211,6 +222,7 @@ namespace OSFSettings
 
     void SettingsService::DispatchChanges() noexcept
     {
+        TestHarness::PerformanceScope profile(TestHarness::PerformancePoint::Dispatch);
         if (m_dispatching.exchange(true, std::memory_order_acq_rel)) {
             return;
         }
