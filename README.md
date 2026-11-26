@@ -11,7 +11,7 @@ and [installation guide](packaging/README.txt).
 
 | Guide | Use it to |
 | --- | --- |
-| [Settings](docs/SETTINGS.md) | Define settings and action buttons, read and write values, and respond to changes |
+| [Settings](docs/SETTINGS.md) | Define settings, action buttons and placement editors, read and write values, and respond to changes |
 | [Hotkeys](docs/KEYBINDINGS.md) | Register rebindable actions or open a menu |
 | [Issue reporting](docs/DIAGNOSTICS.md) | Report and clear problems shown in Mod Issues |
 

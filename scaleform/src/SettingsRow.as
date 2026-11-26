@@ -30,7 +30,9 @@ package
             var section:Boolean = row.type == "section";
             var changed:Boolean = !modList && !section && row.defaultKnown !== false && row.type != "hotkey" && row.type != "action" && row.value != row.defaultValue;
             var slider:Boolean = !modList && NumericSetting.isSlider(row);
-            var displayValue:String = section ? "" : modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) : NumericSetting.text(row, row.value);
+            var placement:Boolean = !modList && row.type == "placement";
+            var displayValue:String = section ? "" : modList ? String(row.summary) : row.type == "action" ? row.actionState : row.type == "enum" ? EnumSetting.text(row, row.value) :
+                placement ? String(row.valueText || "") : NumericSetting.text(row, row.value);
             graphics.clear();
             heading.visible = section;
             title.visible = value.visible = !section;
@@ -61,12 +63,17 @@ package
             title.textColor = color; value.textColor = modList ? (selected ? 0x3D4F58 : MenuStyle.MUTED) : color;
             title.width = modList ? rowWidth - 576 : MenuStyle.CONTROL_X - 70;
             // Mod rows summarize what each mod adds, right-aligned before the chevron.
-            var format:TextFormat = value.defaultTextFormat; format.align = modList ? "right" : "center";
+            var format:TextFormat = value.defaultTextFormat; format.align = modList ? "right" : placement ? "left" : "center";
             format.size = modList ? MenuStyle.SMALL_SIZE + 1 : MenuStyle.VALUE_SIZE; value.defaultTextFormat = format;
             value.x = modList ? rowWidth - 546 : MenuStyle.CONTROL_X +
                 (slider ? MenuStyle.CONTROL_WIDTH - MenuStyle.SLIDER_VALUE_WIDTH : MenuStyle.VALUE_INSET);
             value.y = (rowHeight - Number(format.size)) / 2 - 3;
             value.width = modList ? 500 : slider ? MenuStyle.SLIDER_VALUE_WIDTH : MenuStyle.VALUE_WIDTH;
+            if (placement) {
+                // A small copy of the screen, then the rectangle's position and size.
+                var thumbnail:Number = Placement.thumbnail(graphics, MenuStyle.CONTROL_X + 16, 8, rowHeight - 16, row, selected);
+                value.x = MenuStyle.CONTROL_X + 16 + thumbnail + 14; value.width = MenuStyle.CONTROL_X + MenuStyle.CONTROL_WIDTH - value.x;
+            }
             MenuStyle.fit(title, String(row.title));
             MenuStyle.fit(value, displayValue);
             var center:Number = rowHeight / 2;

@@ -78,6 +78,12 @@ package
             detailTitle.height = detailTitle.textHeight + 8;
             var hint:String = row ? String(row.hint || "") : "";
             if (row && row.type == "action" && row.message) hint += (hint ? "\n\n" : "") + row.message;
+            if (row && row.type == "placement" && row.bound) {
+                // A placement saves other settings; name them so their rows are easy to find.
+                var names:Array = [];
+                for each (var role:String in Placement.ROLES) if (row.bound[role]) names.push(String(row.bound[role].title));
+                if (names.length) hint += (hint ? "\n\n" : "") + tr("placement.savesTo", {settings:names.join(", ")});
+            }
             hint = (row && row.requiresRestart ? tr("menu.restart") + (hint ? "\n\n" : "") : "") + hint;
             detailHint.y = detailTitle.y + detailTitle.height + 4;
             MenuStyle.setText(detailHint, hint);
@@ -91,7 +97,8 @@ package
             if (row && row.type == "action" || enumRow) defaultLabel.visible = defaultValue.visible = false;
             if (row && (row.type == "action" || row.defaultKnown === false)) { detailDivider.visible = false; changedLegend.visible = false; }
             defaultLabel.y = cursor; defaultValue.y = cursor - 1;
-            MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row ? NumericSetting.text(row, row.defaultValue) : "");
+            MenuStyle.fit(defaultValue, row && row.type == "hotkey" ? row.defaultName : row && row.type == "placement" ? String(row.defaultText || "") :
+                row ? NumericSetting.text(row, row.defaultValue) : "");
             if (defaultLabel.visible) cursor += MenuStyle.VALUE_SIZE + 16;
             var range:String = row ? NumericSetting.range(row) : "";
             rangeLabel.visible = rangeValue.visible = Boolean(range);

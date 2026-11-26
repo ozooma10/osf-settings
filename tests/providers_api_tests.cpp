@@ -166,6 +166,21 @@ int main()
             settings.Reset("osf.animation", "launch.camera") == Status::Ok);
         check(client.GetEnum("osf.animation", "launch.camera", camera) == Status::Ok && camera.empty());
         check(api->Unregister(animationToken) == Status::Ok);
+        // A placement only edits the provider's own settings, so a provider may declare one; actions still need their own API.
+        const char* placementSchema = R"({"groups":{"HUD":[
+            {"type":"placement","id":"panel","label":"Panel","size":{"width":200,"height":100},"bind":{"left":"panelLeft"}},
+            {"key":"panelLeft","type":"int","default":10,"min":0,"max":1920}
+        ]}})";
+        Persistence placementSave;
+        API::Providers::Registration placementToken{};
+        check(api->Register("placement.provider", placementSchema, "{}", save, &placementSave, &placementToken) == Status::Ok && placementToken);
+        std::int64_t panelLeft{};
+        check(settings.GetInt("placement.provider", "panelLeft", &panelLeft) == Status::Ok && panelLeft == 10);
+        check(settings.SetInt("placement.provider", "panelLeft", 40) == Status::Ok && nlohmann::json::parse(placementSave.values) == nlohmann::json({{"panelLeft", 40}}));
+        check(api->Unregister(placementToken) == Status::Ok);
+        const char* actionSchema = R"({"groups":{"General":[{"type":"action","id":"run","label":"Run"}]}})";
+        API::Providers::Registration actionToken{};
+        check(api->Register("action.provider", actionSchema, "{}", save, &placementSave, &actionToken) == Status::InvalidArgument && !actionToken);
         API::Providers::Registration replacementToken{};
         check(api->Register("replacement", schema, R"({"enabled":false,"count":8,"mode":"b","caption":"Saved"})", save, &persistence, &replacementToken) == Status::Ok);
         auto detached = backend.FindMod("replacement");

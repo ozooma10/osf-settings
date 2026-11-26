@@ -22,7 +22,7 @@ package
         private static const LEFT_BRACKET:uint = 219;
         private static const RIGHT_BRACKET:uint = 221;
         // Other row types have their own editor or action.
-        private static const ACCEPT_TYPES:Object = {bool:true, "enum":true, key:true, hotkey:true, string:true, action:true};
+        private static const ACCEPT_TYPES:Object = {bool:true, "enum":true, key:true, hotkey:true, string:true, action:true, placement:true};
         public var BGSCodeObj:Object = {};
         public var startupPhase:String = "document constructed";
         private var bridgeReady:Boolean = false;
@@ -48,6 +48,7 @@ package
         private var keybindings:KeybindingsPage;
         private var stringEditor:StringSetting;
         private var actionConfirmation:ActionConfirmation;
+        private var placementEditor:PlacementEditor;
         private var actionAcceptHeld:Boolean = false;
         private var revision:String = "";
         private var launcher:LauncherPage;
@@ -235,6 +236,8 @@ package
             popup.y = (1080 - bounds.height) / 2 - bounds.y;
             startupPhase = "build action confirmation";
             actionConfirmation = new ActionConfirmation(finishActionConfirmation); addChild(actionConfirmation);
+            startupPhase = "build placement editor";
+            placementEditor = new PlacementEditor(BGSCodeObj, placementFinished); addChild(placementEditor);
             menuStage.stageFocusRect = false;
             menuStage.addEventListener(Event.RESIZE, resizeBackground); resizeBackground();
             menuStage.addEventListener(Event.DEACTIVATE, focusLost);
@@ -300,8 +303,9 @@ package
         private function searching():Boolean { return keybindings && keybindings.searching; }
         private function editingString():Boolean { return stringEditor && stringEditor.visible; }
         private function confirmingAction():Boolean { return actionConfirmation && actionConfirmation.visible; }
-        // A key capture, native rebind, text editor or confirmation owns input until it finishes.
-        private function modalBusy():Boolean { return Boolean(captureRow) || bindingBusy() || editingString() || confirmingAction(); }
+        private function editingPlacement():Boolean { return placementEditor && placementEditor.visible; }
+        // A key capture, native rebind, text or placement editor, or confirmation owns input until it finishes.
+        private function modalBusy():Boolean { return Boolean(captureRow) || bindingBusy() || editingString() || confirmingAction() || editingPlacement(); }
         // Changing page also waits for search, a pending refresh and any drag.
         private function pageLocked():Boolean { return modalBusy() || searching() || requestedRefresh || settingsList.dragging; }
         private function inputCoolingDown():Boolean { return frame <= inputBlockedThroughFrame; }
@@ -494,6 +498,7 @@ package
             issues = BGSCodeObj.getIssues() as Array || [];
             allRows = BGSCodeObj.getRows() as Array || [];
             if (gameplayOptions) allRows = allRows.concat(gameplayOptions.rows);
+            Placement.annotate(allRows);
             mods = []; var seen:Dictionary = new Dictionary();
             for each (var row:Object in allRows) {
                 if (row.type == "launcher") continue;
@@ -509,7 +514,8 @@ package
                 else if (mod.contributors.indexOf(row.modTitle) < 0) mod.contributors.push(row.modTitle);
                 if (row.type == "hotkey") mod.hotkeys.push(row);
                 else if (row.type == "action") mod.actions++;
-                else mod.settings++;
+                // A placement edits settings the page already counts.
+                else if (row.type != "placement") mod.settings++;
             }
             for each (row in allRows) if (row.type == "launcher" && seen[pageOf(row)]) seen[pageOf(row)].interfaces++;
             // OSF Settings' only entry is the key that opens this menu, which Home's header
@@ -706,13 +712,14 @@ package
         }
         private function syncInput():void
         {
-            var modal:Boolean = Boolean(captureRow) || editingString() || confirmingAction();
+            var modal:Boolean = Boolean(captureRow) || editingString() || confirmingAction() || editingPlacement();
             var disabled:Boolean = closing || modal || bindingBusy() || nav.focused || launcherPage();
             options.disableInput = disabled || searching();
             options.disableSelection = disabled;
             MovieClip(options).mouseEnabled = MovieClip(options).mouseChildren = !modal;
-            nav.mouseChildren = !editingString() && !confirmingAction();
-            MovieClip(bar).visible = !confirmingAction();
+            nav.mouseChildren = !editingString() && !confirmingAction() && !editingPlacement();
+            // The confirmation and the placement editor draw their own buttons over the footer.
+            MovieClip(bar).visible = !confirmingAction() && !editingPlacement();
         }
         private function updateSelection():void
         {
@@ -745,6 +752,7 @@ package
             if (row) switch (row.type) {
                 case "action": return tr(row.launcher ? "buttons.open" : "buttons.runAction");
                 case "string": return tr("buttons.editText");
+                case "placement": return tr("buttons.editPlacement");
                 case "key":
                 case "hotkey": return tr("buttons.changeBinding");
                 case "enum": return tr("buttons.nextChoice");
@@ -835,7 +843,7 @@ package
         }
         private function accept():void
         {
-            if (confirmingAction() || (launcherPage() || launcherAction()) && launcher.acceptHeld) return;
+            if (confirmingAction() || editingPlacement() || (launcherPage() || launcherAction()) && launcher.acceptHeld) return;
             if (editingString()) { stringEditor.save(frame); return; }
             if (bindingBusy() || searching() || inputCoolingDown()) return;
             if (captureRow) { confirmBinding(); return; }
@@ -855,6 +863,7 @@ package
             else if (row.type == "key" && row.editable) beginBinding(row);
             else if (row.type == "hotkey" && row.editable) nativeHotkeys.press();
             else if (row.type == "string" && row.editable) beginString(row);
+            else if (row.type == "placement" && row.editable) beginPlacement(row);
             else if (row.type == "action" && row.editable) beginAction(row);
             else if (row.type == "enum" && row.editable) {
                 var clip:Object = options.FindClipForEntry(options.selectedIndex);
@@ -864,16 +873,30 @@ package
         private function reset():void
         {
             var row:Object = current();
-            if (searching() || editingString() || confirmingAction() || row && row.type == "action") return;
+            if (searching() || editingString() || confirmingAction() || editingPlacement() || row && row.type == "action") return;
             if (issuesPage()) { issueDetails.toggleDetails(); return; }
             if (captureRow || bindingBusy() || row && row.type == "hotkey") return;
             if (closing || refreshing || requestedRefresh || settingsList.dragging || !modID || !row || !row.editable) return;
             if (row.defaultKnown === false) return;
             activationFrame = frame;
+            if (row.type == "placement") { resetPlacement(row); return; }
             // Equal values can still have a saved override that reset must remove.
             var result:Object = BGSCodeObj.reset(row.mod, row.key);
             if (result && result.ok) setStatus(tr("menu.autoSave"));
             else setStatus(result ? result.error : tr("errors.save"), true);
+            requestedRefresh = true;
+        }
+        // A placement's default is its bound settings' defaults.
+        private function resetPlacement(row:Object):void
+        {
+            var failed:String = "";
+            for each (var role:String in Placement.ROLES) {
+                var target:Object = row.bound[role];
+                if (!target) continue;
+                var result:Object = BGSCodeObj.reset(target.mod, target.key);
+                if (!result || !result.ok) failed = result && result.error ? String(result.error) : tr("errors.save");
+            }
+            if (failed) setStatus(failed, true); else setStatus(tr("menu.autoSave"));
             requestedRefresh = true;
         }
         private function valueChanged(event:Event):void
@@ -957,6 +980,25 @@ package
             updateSelection();
             setStatus(tr("strings.hint"));
         }
+        private function beginPlacement(row:Object):void
+        {
+            // The page's other placements on the same screen are shown, and snapped to, for reference.
+            var others:Array = [];
+            for each (var other:Object in allRows) {
+                if (other.type != "placement" || other == row || pageOf(other) != pageOf(row) || !other.rect) continue;
+                if (Number(other.screenWidth) != Number(row.screenWidth) || Number(other.screenHeight) != Number(row.screenHeight)) continue;
+                others.push(other);
+            }
+            menuStage.focus = null;
+            placementEditor.open(row, others, actionAcceptHeld);
+            syncInput(); updateSelection();
+        }
+        private function placementFinished(saved:Boolean):void
+        {
+            deferInput(); activationFrame = frame;
+            refresh();
+            setStatus(saved ? tr("menu.autoSave") : tr("placement.unchanged"));
+        }
         private function stringFinished(cancel:Boolean):void
         {
             deferInput(); activationFrame = frame;
@@ -972,6 +1014,7 @@ package
         private function back():void
         {
             if (confirmingAction()) { actionConfirmation.cancel(); return; }
+            if (editingPlacement()) { placementEditor.cancel(); return; }
             if (editingString()) { stringEditor.cancel(); return; }
             if (nativeHotkeys.busy) { nativeHotkeys.cancel(); return; }
             if (nativeHotkeys.saving) return;
@@ -1088,6 +1131,7 @@ package
                 if (event) { event.stopImmediatePropagation(); event.preventDefault(); }
                 return actionConfirmation.userEvent(name, pressed);
             }
+            if (editingPlacement()) return placementEditor.userEvent(name, pressed, event);
             if (editingString()) return stringEditor.userEvent(name, pressed, frame, event);
             if (bindingBusy()) return nativeHotkeys.userEvent(name, pressed, event);
             if (captureRow) {
@@ -1226,7 +1270,7 @@ package
                 syncInput();
                 if (footerDirty) updateFooter(current());
                 if (captureRow) pollBinding();
-                else if (!editingString() && !confirmingAction()) {
+                else if (!editingString() && !confirmingAction() && !editingPlacement()) {
                     if (getTimer() >= nextRevisionPoll && !bindingBusy() && !settingsList.dragging && !searching()) {
                         nextRevisionPoll = getTimer() + 250;
                         if (String(BGSCodeObj.revision()) != revision) requestedRefresh = true;
@@ -1242,7 +1286,7 @@ package
         }
         private function clearBinding():void
         {
-            if (searching() || editingString() || confirmingAction()) return;
+            if (searching() || editingString() || confirmingAction() || editingPlacement()) return;
             if (issuesPage()) {
                 if (!issueDetails.detailsExpanded) issueDetails.scrollOn();
                 else if (issueDetails.atEnd) copyIssue(current());
@@ -1296,6 +1340,7 @@ package
             actionAcceptHeld = false;
             launcher.releaseAccept();
             if (confirmingAction()) actionConfirmation.cancel();
+            placementEditor.cancel();
             stringEditor.cancel();
             nativeHotkeys.cancel();
             if (searching()) focusResults();
@@ -1331,6 +1376,7 @@ package
         {
             if (event.target != this) return;
             if (stringEditor) stringEditor.close();
+            if (placementEditor) placementEditor.close();
             if (nativeHotkeys) nativeHotkeys.dispose();
             if (gameplayOptions) gameplayOptions.dispose();
             if (captureRow) BGSCodeObj.cancelKeyCapture();

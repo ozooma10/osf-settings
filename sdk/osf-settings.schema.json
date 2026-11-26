@@ -398,7 +398,7 @@
         "size": {
           "type": "object",
           "required": ["width", "height"],
-          "description": "Size of the rectangle at scale 1, in screen units. Required unless both width and height are bound.",
+          "description": "Size of the rectangle at scale 1, in screen units. Required unless both axes bind their size: width (or both left and right) and height (or both top and bottom).",
           "properties": {
             "width": { "type": "number", "exclusiveMinimum": 0 },
             "height": { "type": "number", "exclusiveMinimum": 0 }
@@ -417,7 +417,7 @@
         },
         "resize": {
           "enum": ["none", "scale", "free"],
-          "description": "How the rectangle can be resized: not at all, proportionally, or width and height independently. Defaults to free when width or height is bound, scale when scale is bound, otherwise none."
+          "description": "How the rectangle can be resized: not at all, proportionally, or width and height independently. Defaults to free when a size is bound (width, height, or both margins of an axis), scale when scale is bound, otherwise none."
         },
         "bind": {
           "type": "object",
@@ -432,13 +432,15 @@
             "bottom": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Margin between the rectangle and the screen's bottom edge." },
             "width": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Rectangle width." },
             "height": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Rectangle height." },
-            "scale": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Multiplier applied to size. Cannot be combined with width or height." }
+            "scale": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Multiplier applied to size. Cannot be combined with another size binding: width, height, or both margins of an axis." }
           },
           "additionalProperties": false,
           "not": {
             "anyOf": [
               { "required": ["scale", "width"] },
-              { "required": ["scale", "height"] }
+              { "required": ["scale", "height"] },
+              { "required": ["scale", "left", "right"] },
+              { "required": ["scale", "top", "bottom"] }
             ]
           }
         },
@@ -449,9 +451,17 @@
         "requires": false
       },
       "if": {
-        "properties": { "bind": { "not": { "required": ["width", "height"] } } }
+        "required": ["bind"],
+        "properties": {
+          "bind": {
+            "allOf": [
+              { "anyOf": [{ "required": ["width"] }, { "required": ["left", "right"] }] },
+              { "anyOf": [{ "required": ["height"] }, { "required": ["top", "bottom"] }] }
+            ]
+          }
+        }
       },
-      "then": { "required": ["size"] }
+      "else": { "required": ["size"] }
     },
     "hotkey": {
       "type": "object",

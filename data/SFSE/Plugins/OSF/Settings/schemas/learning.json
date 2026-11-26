@@ -55,6 +55,97 @@
         "default": "F4",
         "allowUnbound": true
       }
+    ],
+    "HUD layout": [
+      {
+        "type": "placement",
+        "id": "testPanel",
+        "label": "Test panel placement",
+        "hint": "Drag the panel, or resize it from its edges and corners. This test placement has no gameplay behavior.",
+        "bind": {
+          "right": "panelRight",
+          "top": "panelTop",
+          "width": "panelWidth",
+          "height": "panelHeight"
+        }
+      },
+      {
+        "key": "panelRight",
+        "type": "int",
+        "label": "Panel right margin",
+        "default": 64,
+        "min": 0,
+        "max": 1920
+      },
+      {
+        "key": "panelTop",
+        "type": "int",
+        "label": "Panel top margin",
+        "default": 180,
+        "min": 0,
+        "max": 1080
+      },
+      {
+        "key": "panelWidth",
+        "type": "int",
+        "label": "Panel width",
+        "default": 420,
+        "min": 120,
+        "max": 1920
+      },
+      {
+        "key": "panelHeight",
+        "type": "int",
+        "label": "Panel height",
+        "default": 260,
+        "min": 80,
+        "max": 1080
+      },
+      {
+        "type": "placement",
+        "id": "testCompass",
+        "label": "Test compass placement",
+        "hint": "Drag the compass, or resize it from a corner to change its scale. This test placement has no gameplay behavior.",
+        "size": {
+          "width": 640,
+          "height": 72
+        },
+        "origin": {
+          "x": 0.5,
+          "y": 0
+        },
+        "bind": {
+          "x": "compassX",
+          "top": "compassTop",
+          "scale": "compassScale"
+        }
+      },
+      {
+        "key": "compassX",
+        "type": "int",
+        "label": "Compass center",
+        "default": 960,
+        "min": 0,
+        "max": 1920
+      },
+      {
+        "key": "compassTop",
+        "type": "float",
+        "label": "Compass top margin",
+        "default": 32.0,
+        "min": 0.0,
+        "max": 1080.0,
+        "step": 1.0
+      },
+      {
+        "key": "compassScale",
+        "type": "float",
+        "label": "Compass scale",
+        "default": 1.0,
+        "min": 0.5,
+        "max": 2.0,
+        "step": 0.05
+      }
     ]
   }
 }

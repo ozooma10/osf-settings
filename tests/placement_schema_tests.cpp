@@ -77,6 +77,17 @@ int TestPlacements()
             "an explicit resize mode overrides the default");
     }
     {
+        // Both margins of an axis carry its size, so a stretched panel needs no width binding.
+        auto stretched = compass;
+        stretched.erase("size");
+        stretched["bind"] = {{ "left", "compassX" }, { "right", "panelWidth" }, { "top", "compassTop" }, { "bottom", "panelHeight" }};
+        const auto parsed = SettingsJson::ParseSchema(schema(stretched), "placements", error);
+        check(parsed && std::get<PlacementDefinition>(parsed->groups[0].controls.back()).resize == PlacementResize::Free,
+            "both margins of each axis make size optional and allow free resizing: " + error);
+        stretched["bind"]["scale"] = "compassScale";
+        rejects(stretched, "bind either scale or a size", "scale cannot be combined with margins that carry the size");
+    }
+    {
         auto moveOnly = compass;
         moveOnly["bind"] = {{ "right", "compassX" }};
         const auto parsed = SettingsJson::ParseSchema(schema(moveOnly), "placements", error);
@@ -100,13 +111,13 @@ int TestPlacements()
     bad["bind"] = {{ "scale", "negativeScale" }};
     rejects(bad, "must allow a positive scale", "scale must default to a positive value");
     bad["bind"] = {{ "scale", "compassScale" }, { "width", "panelWidth" }};
-    rejects(bad, "bind either scale or width/height", "scale cannot be combined with width or height");
+    rejects(bad, "bind either scale or a size", "scale cannot be combined with width or height");
     bad = compass;
     bad.erase("size");
     rejects(bad, "size is required", "size is required without width and height bindings");
     bad = compass;
     bad["resize"] = "free";
-    rejects(bad, "resize free needs width or height bound", "free resizing needs a width or height binding");
+    rejects(bad, "resize free needs a size bound", "free resizing needs a size binding");
     bad["resize"] = "stretch";
     rejects(bad, "resize must be", "unknown resize modes are rejected");
     bad = compass;

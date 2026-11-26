@@ -167,6 +167,25 @@ class PreviewRowsTests(unittest.TestCase):
         rows = json.loads(result.stdout)["rows"]
         self.assertEqual([row["mod"] for row in rows], ["other"])
 
+    def test_placement_rows_describe_geometry_and_bindings(self):
+        rows = self.rows([
+            {"key": "x", "type": "int", "default": 960, "min": 0, "max": 1920},
+            {"key": "top", "type": "float", "default": 24, "min": 0, "max": 1080, "step": 1},
+            {"key": "scale", "type": "float", "default": 1, "min": 0.5, "max": 2, "step": 0.05},
+            {"type": "placement", "id": "compass", "label": "Compass", "size": {"width": 400, "height": 120},
+             "origin": {"x": 0.5, "y": 0}, "bind": {"x": "x", "top": "top", "scale": "scale"}},
+        ])
+        placement = rows[-1]
+        self.assertEqual(placement["type"], "placement")
+        self.assertEqual((placement["key"], placement["title"]), ("compass", "Compass"))
+        self.assertEqual((placement["screenWidth"], placement["screenHeight"]), (1920, 1080))
+        self.assertEqual((placement["sizeWidth"], placement["sizeHeight"]), (400, 120))
+        self.assertEqual((placement["originX"], placement["originY"]), (0.5, 0))
+        self.assertEqual(placement["resize"], "scale")
+        self.assertEqual((placement["bindX"], placement["bindTop"], placement["bindScale"]), ("x", "top", "scale"))
+        self.assertNotIn("bindLeft", placement)
+        self.assertNotIn("value", placement)
+
 
 if __name__ == "__main__":
     unittest.main()

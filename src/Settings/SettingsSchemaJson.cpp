@@ -125,14 +125,17 @@ namespace OSFSettings::SettingsJson
                 placement.bindings[static_cast<std::size_t>(found - PlacementRoles.begin())] = name;
             }
             const auto bound = [&](PlacementRole role) { return !placement.Binding(role).empty(); };
-            const bool width = bound(PlacementRole::Width), height = bound(PlacementRole::Height), scale = bound(PlacementRole::Scale);
-            Require(!(scale && (width || height)), "bind either scale or width/height, not both: " + id);
+            // An axis saves its size through its size role, or through both of its margins.
+            const bool width = bound(PlacementRole::Width) || (bound(PlacementRole::Left) && bound(PlacementRole::Right));
+            const bool height = bound(PlacementRole::Height) || (bound(PlacementRole::Top) && bound(PlacementRole::Bottom));
+            const bool scale = bound(PlacementRole::Scale);
+            Require(!(scale && (width || height)), "bind either scale or a size (width, height, or both margins of an axis), not both: " + id);
             if (const auto size = ReadPair(source, "size", "width", "height")) {
                 Require(size->first > 0.0 && size->second > 0.0 && size->first <= limit && size->second <= limit,
                     "size width and height must be positive: " + id);
                 std::tie(placement.width, placement.height) = *size;
             } else {
-                Require(width && height, "size is required unless both width and height are bound: " + id);
+                Require(width && height, "size is required unless both axes bind their size: " + id);
             }
             placement.resize = width || height ? PlacementResize::Free : scale ? PlacementResize::Scale : PlacementResize::None;
             if (const auto resize = source.find("resize"); resize != source.end()) {
@@ -141,8 +144,8 @@ namespace OSFSettings::SettingsJson
                 Require(mode == "none" || mode == "scale" || mode == "free", "resize must be \"none\", \"scale\", or \"free\": " + id);
                 placement.resize = mode == "free" ? PlacementResize::Free : mode == "scale" ? PlacementResize::Scale : PlacementResize::None;
             }
-            Require(placement.resize != PlacementResize::Free || width || height, "resize free needs width or height bound: " + id);
-            Require(placement.resize != PlacementResize::Scale || scale || width || height, "resize scale needs scale, width, or height bound: " + id);
+            Require(placement.resize != PlacementResize::Free || width || height, "resize free needs a size bound (width, height, or both margins of an axis): " + id);
+            Require(placement.resize != PlacementResize::Scale || scale || width || height, "resize scale needs scale or a size bound: " + id);
             return placement;
         }
 

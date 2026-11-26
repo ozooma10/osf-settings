@@ -1,6 +1,6 @@
 # Settings
 
-Define settings and [action buttons](#action-buttons) in one JSON schema, then connect them to your mod through [C++](#c-integration) or [Papyrus](#papyrus-integration).
+Define settings, [action buttons](#action-buttons) and [placement editors](#placement-editors) in one JSON schema, then connect them to your mod through [C++](#c-integration) or [Papyrus](#papyrus-integration).
 
 OSF Settings provides a centralized interface for users to view and edit those settings.
 
@@ -353,6 +353,59 @@ Repeating the same receiver registration succeeds without adding another handler
 
 The [instance example](../examples/papyrus/OSFSettingsExample.psc) includes an immediate reset, and the [Global example](../examples/papyrus/OSFSettingsExampleGlobal.psc) has an action that completes after `Utility.WaitMenuPause`.
 Gameplay-dependent script work may remain pending until gameplay resumes.
+
+## Placement editors
+
+A `type: "placement"` control lets players position and size something on screen, such as a HUD widget, by dragging a rectangle instead of typing numbers. It opens a near-full-screen editor with a scaled copy of the screen, guides showing the distance to each edge, and snapping to the edges, the centre and the page's other placements.
+
+A placement has no value of its own. It reads and writes ordinary `int` and `float` settings in the same schema, which your mod reads like any other setting:
+
+```json
+{
+  "title": "My HUD",
+  "groups": {
+    "Compass": [
+      {
+        "type": "placement",
+        "id": "compass",
+        "label": "Compass placement",
+        "size": { "width": 640, "height": 72 },
+        "origin": { "x": 0.5, "y": 0 },
+        "bind": { "x": "compassX", "top": "compassTop", "scale": "compassScale" }
+      },
+      { "key": "compassX", "type": "int", "label": "Compass centre", "default": 960, "min": 0, "max": 1920 },
+      { "key": "compassTop", "type": "int", "label": "Compass top margin", "default": 32, "min": 0, "max": 1080 },
+      { "key": "compassScale", "type": "float", "label": "Compass scale", "default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05 }
+    ]
+  }
+}
+```
+
+`type`, `id`, `label` and `bind` are required; `hint` is optional. Ids are unique among the schema's placements, ignoring ASCII case.
+
+| Field | Meaning |
+| --- | --- |
+| `screen` | `{ "width", "height" }` of the coordinate space your settings use. Defaults to 1920 x 1080. Its aspect ratio is the preview's. |
+| `size` | `{ "width", "height" }` of the rectangle at scale 1. Required unless both axes bind their size. |
+| `origin` | `{ "x", "y" }` fractions of the rectangle that `x` and `y` refer to: `0` is the left or top edge, `0.5` the centre, `1` the right or bottom edge. Defaults to `0, 0`. |
+| `resize` | `"none"`, `"scale"` (proportional, from the corners) or `"free"` (width and height separately). Defaults to `free` when a size is bound, `scale` when `scale` is bound, otherwise `none`. |
+| `bind` | Setting keys by role, described below. Each setting fills one role. |
+
+| Role | Setting | Value saved |
+| --- | --- | --- |
+| `x`, `y` | `int` or `float` | Position of the origin point from the screen's left or top edge |
+| `left`, `top` | `int` or `float` | Margin from the screen's left or top edge to the rectangle |
+| `right`, `bottom` | `int` or `float` | Margin from the rectangle to the screen's right or bottom edge |
+| `width`, `height` | `int` or `float` | Size of the rectangle |
+| `scale` | `float` with a positive default | Size divided by `size`; cannot be combined with another size binding |
+
+Bind whichever roles your mod already uses; a save writes all of them. An axis with no position role keeps its position, and both margins of an axis (`left` and `right`, or `top` and `bottom`) also carry its size. The editor keeps the rectangle on screen and every bound value within its setting's `min` and `max`, and rounds `int` settings to whole units and `float` settings to their step's decimal places.
+
+Reset on a placement row restores all of its settings' defaults. Each saved setting notifies its own subscribers, so a mod that applies changes live sees them as separate updates. The page's other placements on the same screen appear in the editor for reference.
+
+Players can drag the rectangle and its handles, use the wheel to scale it, or use the keyboard or a controller: the arrows move it (or resize it after pressing X), `[` and `]` or the shoulder buttons shrink and grow it, B on the keyboard or Y on a controller loads the defaults, and Accept saves. Holding Shift while dragging skips snapping.
+
+See the [example schema](../examples/placement/osfsettings-placement-example.json), with a compass, a quest tracker and a health bar.
 
 ## Related features
 
