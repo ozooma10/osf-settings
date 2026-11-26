@@ -98,6 +98,19 @@ package
                         message:String(row.@message)});
                     continue;
                 }
+                if (String(row.@type) == "placement") {
+                    // The geometry and bindings the menu reads; bound settings are rows of their own.
+                    var placement:Object = {modTitle:String(row.@modTitle), modDescription:String(row.@modDescription),
+                        group:String(row.@group), groupTitle:String(row.@groupTitle), title:String(row.@title),
+                        mod:String(row.@mod), key:String(row.@key), hint:String(row.@hint), type:"placement",
+                        editable:String(row.@editable) == "true", resize:String(row.@resize)};
+                    for each (var measure:String in ["screenWidth", "screenHeight", "sizeWidth", "sizeHeight", "originX", "originY"])
+                        placement[measure] = Number(row.attribute(measure));
+                    for each (var binding:String in ["bindX", "bindY", "bindLeft", "bindTop", "bindRight", "bindBottom", "bindWidth", "bindHeight", "bindScale"])
+                        if (row.attribute(binding).length()) placement[binding] = String(row.attribute(binding));
+                    rows.push(placement);
+                    continue;
+                }
                 var value:*;
                 if (String(row.@type) == "float" || String(row.@type) == "key") value = Number(row.@value);
                 else if (String(row.@type) == "int" || String(row.@type) == "enum" || String(row.@type) == "string") value = String(row.@value);
