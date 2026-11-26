@@ -61,4 +61,27 @@ namespace OSFSettings
         }
         return row;
     }
+
+    SettingRow MakePlacementRow(const PlacementDefinition& placement)
+    {
+        // Field names the movie reads for each role, in PlacementRoles order.
+        static constexpr std::array<const char*, PlacementRoles.size()> bindFields{
+            "bindX", "bindY", "bindLeft", "bindTop", "bindRight", "bindBottom", "bindWidth", "bindHeight", "bindScale"
+        };
+        SettingRow row;
+        auto& fields = row.fields;
+        fields.emplace_back("type", std::string("placement"));
+        fields.emplace_back("editable", true);
+        fields.emplace_back("screenWidth", placement.screenWidth);
+        fields.emplace_back("screenHeight", placement.screenHeight);
+        fields.emplace_back("sizeWidth", placement.width);
+        fields.emplace_back("sizeHeight", placement.height);
+        fields.emplace_back("originX", placement.originX);
+        fields.emplace_back("originY", placement.originY);
+        fields.emplace_back("resize", std::string(placement.resize == PlacementResize::Free ? "free" : placement.resize == PlacementResize::Scale ? "scale" : "none"));
+        for (std::size_t role = 0; role < bindFields.size(); ++role) {
+            if (!placement.bindings[role].empty()) fields.emplace_back(bindFields[role], placement.bindings[role]);
+        }
+        return row;
+    }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -77,6 +78,31 @@ namespace OSFSettings
         std::string confirmation; // Empty means invoke without a confirmation dialog.
     };
 
+    enum class PlacementResize : std::uint8_t { None, Scale, Free };
+
+    // Setting roles a placement can drive, in the order PlacementDefinition::bindings stores them.
+    inline constexpr std::array<std::string_view, 9> PlacementRoles{ "x", "y", "left", "top", "right", "bottom", "width", "height", "scale" };
+    enum class PlacementRole : std::uint8_t { X, Y, Left, Top, Right, Bottom, Width, Height, Scale };
+
+    // A visual editor for a rectangle on a reference screen. It owns no value: every role it
+    // drives is an int or float setting in the same schema, so saved values stay ordinary settings.
+    struct PlacementDefinition
+    {
+        std::string id;
+        std::string label;
+        std::string hint;
+        double screenWidth{ 1920.0 }; // Coordinate space of the bound settings; also sets the preview's aspect ratio.
+        double screenHeight{ 1080.0 };
+        double width{}; // Size at scale 1, used for whichever of width/height is not bound.
+        double height{};
+        double originX{}; // Fraction of the rectangle the x/y roles refer to: 0 = left/top, 0.5 = centre, 1 = right/bottom.
+        double originY{};
+        PlacementResize resize{ PlacementResize::None };
+        std::array<std::string, PlacementRoles.size()> bindings; // Setting key per role; empty means not bound.
+
+        const std::string& Binding(PlacementRole role) const { return bindings[static_cast<std::size_t>(role)]; }
+    };
+
     struct MenuDefinition
     {
         std::string id;
@@ -108,7 +134,7 @@ namespace OSFSettings
     {
         std::string id;
         std::string label;
-        std::vector<std::variant<SettingDefinition, ActionDefinition>> controls;
+        std::vector<std::variant<SettingDefinition, ActionDefinition, PlacementDefinition>> controls;
     };
 
     using DependencyVersions = std::map<std::string, SettingsVersion>;

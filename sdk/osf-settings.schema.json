@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/ozooma10/osf-settings/dev/sdk/osf-settings.schema.json",
   "title": "OSF Settings mod definition schema",
-  "description": "Settings, action buttons, hotkeys, launchers, and dependency versions. Save as Data/SFSE/Plugins/OSF/Settings/schemas/<modId>.json.",
+  "description": "Settings, action buttons, placement editors, hotkeys, launchers, and dependency versions. Save as Data/SFSE/Plugins/OSF/Settings/schemas/<modId>.json.",
   "$comment": "Unknown properties are allowed, as in the runtime parser. Runtime validation additionally checks filenames, case-insensitive uniqueness, cross-field relationships, UTF-8 byte lengths, native key names, and integer JSON syntax. See docs/SETTINGS.md.",
   "type": "object",
   "required": ["groups"],
@@ -68,7 +68,8 @@
         "items": {
           "oneOf": [
             { "$ref": "#/definitions/setting" },
-            { "$ref": "#/definitions/action" }
+            { "$ref": "#/definitions/action" },
+            { "$ref": "#/definitions/placement" }
           ]
         }
       }
@@ -363,6 +364,94 @@
         "value": false,
         "requires": false
       }
+    },
+    "placement": {
+      "type": "object",
+      "required": ["type", "id", "label", "bind"],
+      "description": "A drag-and-drop editor for a rectangle on a reference screen. It has no value of its own: it writes the int and float settings named in bind.",
+      "properties": {
+        "type": { "const": "placement" },
+        "id": {
+          "allOf": [
+            { "$ref": "#/definitions/identifier" },
+            { "maxLength": 128 }
+          ],
+          "description": "Placement ID, unique across all groups ignoring ASCII case."
+        },
+        "label": {
+          "allOf": [
+            { "$ref": "#/definitions/text256" },
+            { "minLength": 1 }
+          ]
+        },
+        "hint": { "$ref": "#/definitions/text4096" },
+        "screen": {
+          "type": "object",
+          "required": ["width", "height"],
+          "description": "Coordinate space the bound settings use. Its aspect ratio is the preview's. Defaults to 1920 x 1080.",
+          "properties": {
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "height": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "size": {
+          "type": "object",
+          "required": ["width", "height"],
+          "description": "Size of the rectangle at scale 1, in screen units. Required unless both width and height are bound.",
+          "properties": {
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "height": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "origin": {
+          "type": "object",
+          "required": ["x", "y"],
+          "description": "Point of the rectangle that x and y refer to, as fractions of its size: 0 is the left or top edge, 0.5 the centre, 1 the right or bottom edge. Defaults to 0, 0.",
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "resize": {
+          "enum": ["none", "scale", "free"],
+          "description": "How the rectangle can be resized: not at all, proportionally, or width and height independently. Defaults to free when width or height is bound, scale when scale is bound, otherwise none."
+        },
+        "bind": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Setting keys in this schema that the editor reads and writes. Positions and sizes are int or float settings in screen units; scale is a float setting. Each setting can fill only one role.",
+          "properties": {
+            "x": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Horizontal position of the origin point from the left edge." },
+            "y": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Vertical position of the origin point from the top edge." },
+            "left": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Margin between the screen's left edge and the rectangle." },
+            "top": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Margin between the screen's top edge and the rectangle." },
+            "right": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Margin between the rectangle and the screen's right edge." },
+            "bottom": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Margin between the rectangle and the screen's bottom edge." },
+            "width": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Rectangle width." },
+            "height": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Rectangle height." },
+            "scale": { "allOf": [{ "$ref": "#/definitions/nonEmptyText" }], "description": "Multiplier applied to size. Cannot be combined with width or height." }
+          },
+          "additionalProperties": false,
+          "not": {
+            "anyOf": [
+              { "required": ["scale", "width"] },
+              { "required": ["scale", "height"] }
+            ]
+          }
+        },
+        "group": false,
+        "key": false,
+        "default": false,
+        "value": false,
+        "requires": false
+      },
+      "if": {
+        "properties": { "bind": { "not": { "required": ["width", "height"] } } }
+      },
+      "then": { "required": ["size"] }
     },
     "hotkey": {
       "type": "object",

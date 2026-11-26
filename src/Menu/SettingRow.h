@@ -16,4 +16,6 @@ namespace OSFSettings
     };
 
     SettingRow MakeSettingRow(const SettingDefinition& setting, const SettingValue& value);
+    // The editor reads and writes the bound setting rows, so a placement row only describes the geometry.
+    SettingRow MakePlacementRow(const PlacementDefinition& placement);
 }

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <set>
 #include <stdexcept>
+#include <tuple>
 #include <utility>
 #include <nlohmann/json.hpp>
 
@@ -70,6 +71,102 @@ namespace OSFSettings::SettingsJson
                 }
             }
             return result;
+        }
+
+        // Reads an optional {name: number, ...} object such as a placement's screen or size.
+        std::optional<std::pair<double, double>> ReadPair(const nlohmann::ordered_json& object, const char* key, const char* first, const char* second)
+        {
+            const auto field = object.find(key);
+            if (field == object.end()) return std::nullopt;
+            Require(field->is_object(), std::string(key) + " must be an object with " + first + " and " + second);
+            const auto a = ReadFloat(*field, first);
+            const auto b = ReadFloat(*field, second);
+            Require(a && b, std::string(key) + " must have numeric " + first + " and " + second);
+            return std::pair{ *a, *b };
+        }
+
+        PlacementDefinition ReadPlacement(const nlohmann::ordered_json& source)
+        {
+            PlacementDefinition placement;
+            placement.id = RequiredText(source, "id");
+            Require(placement.id.size() <= 128 && IsValidIdentifier(placement.id),
+                "placement id must use 1-128 ASCII letters, digits, underscores, or hyphens");
+            const auto& id = placement.id;
+            placement.label = RequiredText(source, "label");
+            placement.hint = OptionalText(source, "hint");
+            Require(IsValidString(placement.label, 256) && IsValidString(placement.hint, 4096),
+                "placement text must be single-line UTF-8 (label: 256 bytes; hint: 4096 bytes): " + id);
+            Require(!source.contains("group"), "placements use their containing group; remove the group field: " + id);
+            Require(!source.contains("key"), "placements use id, not a setting key: " + id);
+            Require(!source.contains("default") && !source.contains("value"), "placements have no value of their own; their bound settings keep the defaults: " + id);
+            Require(!source.contains("requires"), "placements do not take requires; mark the bound settings instead: " + id);
+            constexpr double limit = 1e9;
+            if (const auto screen = ReadPair(source, "screen", "width", "height")) {
+                Require(screen->first > 0.0 && screen->second > 0.0 && screen->first <= limit && screen->second <= limit,
+                    "screen width and height must be positive: " + id);
+                std::tie(placement.screenWidth, placement.screenHeight) = *screen;
+                const auto aspect = placement.screenWidth / placement.screenHeight;
+                Require(aspect >= 0.25 && aspect <= 8.0, "screen aspect ratio must be between 1:4 and 8:1: " + id);
+            }
+            if (const auto origin = ReadPair(source, "origin", "x", "y")) {
+                Require(origin->first >= 0.0 && origin->first <= 1.0 && origin->second >= 0.0 && origin->second <= 1.0,
+                    "origin x and y must be fractions from 0 to 1: " + id);
+                std::tie(placement.originX, placement.originY) = *origin;
+            }
+            const auto bind = source.find("bind");
+            Require(bind != source.end() && bind->is_object() && !bind->empty(), "bind must be a non-empty object mapping roles to setting keys: " + id);
+            std::set<std::string> keys;
+            for (const auto& [role, key] : bind->items()) {
+                const auto found = std::ranges::find(PlacementRoles, role);
+                Require(found != PlacementRoles.end(), "unknown placement role '" + role + "' (use x, y, left, top, right, bottom, width, height, or scale): " + id);
+                Require(key.is_string() && !key.get_ref<const std::string&>().empty(), "bind." + role + " must name a setting key: " + id);
+                const auto& name = key.get_ref<const std::string&>();
+                Require(keys.insert(FoldAscii(name)).second, "bind uses setting " + name + " for more than one role: " + id);
+                placement.bindings[static_cast<std::size_t>(found - PlacementRoles.begin())] = name;
+            }
+            const auto bound = [&](PlacementRole role) { return !placement.Binding(role).empty(); };
+            const bool width = bound(PlacementRole::Width), height = bound(PlacementRole::Height), scale = bound(PlacementRole::Scale);
+            Require(!(scale && (width || height)), "bind either scale or width/height, not both: " + id);
+            if (const auto size = ReadPair(source, "size", "width", "height")) {
+                Require(size->first > 0.0 && size->second > 0.0 && size->first <= limit && size->second <= limit,
+                    "size width and height must be positive: " + id);
+                std::tie(placement.width, placement.height) = *size;
+            } else {
+                Require(width && height, "size is required unless both width and height are bound: " + id);
+            }
+            placement.resize = width || height ? PlacementResize::Free : scale ? PlacementResize::Scale : PlacementResize::None;
+            if (const auto resize = source.find("resize"); resize != source.end()) {
+                Require(resize->is_string(), "resize must be \"none\", \"scale\", or \"free\": " + id);
+                const auto& mode = resize->get_ref<const std::string&>();
+                Require(mode == "none" || mode == "scale" || mode == "free", "resize must be \"none\", \"scale\", or \"free\": " + id);
+                placement.resize = mode == "free" ? PlacementResize::Free : mode == "scale" ? PlacementResize::Scale : PlacementResize::None;
+            }
+            Require(placement.resize != PlacementResize::Free || width || height, "resize free needs width or height bound: " + id);
+            Require(placement.resize != PlacementResize::Scale || scale || width || height, "resize scale needs scale, width, or height bound: " + id);
+            return placement;
+        }
+
+        // Bindings name settings anywhere in the schema, so they are checked once every group has loaded.
+        void CheckPlacementBindings(const ModSchema& mod)
+        {
+            for (const auto& group : mod.groups) for (const auto& control : group.controls) {
+                const auto* placement = std::get_if<PlacementDefinition>(&control);
+                if (!placement) continue;
+                for (std::size_t role = 0; role < PlacementRoles.size(); ++role) {
+                    const auto& key = placement->bindings[role];
+                    if (key.empty()) continue;
+                    const auto* setting = mod.FindSetting(key);
+                    const auto where = "bind." + std::string(PlacementRoles[role]) + " of placement " + placement->id;
+                    Require(setting, where + " names no setting in this schema: " + key);
+                    Require(std::holds_alternative<IntDefinition>(setting->definition) || std::holds_alternative<FloatDefinition>(setting->definition),
+                        where + " must name an int or float setting: " + key);
+                    if (role == static_cast<std::size_t>(PlacementRole::Scale)) {
+                        const auto* floating = std::get_if<FloatDefinition>(&setting->definition);
+                        Require(floating, where + " must name a float setting: " + key);
+                        Require(floating->defaultValue > 0.0 && (!floating->maximum || *floating->maximum > 0.0), where + " must allow a positive scale: " + key);
+                    }
+                }
+            }
         }
 
         std::optional<SettingValue> DecodeDefault(const nlohmann::ordered_json& value, const SettingDefinition& setting)
@@ -194,6 +291,7 @@ namespace OSFSettings::SettingsJson
             Require(groups != document.end() && groups->is_object(), "groups must be an object");
             std::set<std::string> settingKeys;
             std::set<std::string> actionIds;
+            std::set<std::string> placementIds;
             for (const auto& [name, settings] : groups->items()) {
                 Require(!name.empty(), "group name must not be empty");
                 Require(name.find('\0') == std::string::npos, "group name must not contain NUL");
@@ -205,6 +303,12 @@ namespace OSFSettings::SettingsJson
                 for (const auto& sourceSetting : settings) {
                     Require(sourceSetting.is_object(), "each control must be an object");
                     const auto type = RequiredText(sourceSetting, "type");
+                    if (type == "placement") {
+                        auto placement = ReadPlacement(sourceSetting);
+                        Require(placementIds.insert(FoldAscii(placement.id)).second, "duplicate placement id: " + placement.id);
+                        group.controls.emplace_back(std::move(placement));
+                        continue;
+                    }
                     if (type == "action") {
                         ActionDefinition action;
                         action.id = RequiredText(sourceSetting, "id");
@@ -228,7 +332,7 @@ namespace OSFSettings::SettingsJson
                     setting.key = RequiredText(sourceSetting, "key");
                     Require(setting.key.find('\0') == std::string::npos, "setting key must not contain NUL");
                     Require(settingKeys.insert(FoldAscii(setting.key)).second, "duplicate setting key: " + setting.key);
-                    Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key" || type == "string", "only types bool, int, float, enum, key, and string are supported: " + setting.key);
+                    Require(type == "bool" || type == "int" || type == "float" || type == "enum" || type == "key" || type == "string", "only types bool, int, float, enum, key, string, action, and placement are supported: " + setting.key);
                     std::string defaultError = "default must be a boolean: ";
                     if (type == "string") {
                         defaultError = "default must be valid single-line UTF-8 within maxLength bytes: ";
@@ -305,6 +409,7 @@ namespace OSFSettings::SettingsJson
                 }
                 mod.groups.push_back(std::move(group));
             }
+            CheckPlacementBindings(mod);
             if (const auto hotkeys = document.find("hotkeys"); hotkeys != document.end()) {
                 Require(hotkeys->is_object(), "hotkeys must be an object keyed by id");
                 std::set<std::string> ids;

@@ -29,6 +29,8 @@ namespace OSFSettings::API::Providers
                     ModSettings record{ .schema = std::move(*schema) };
                     for (const auto& group : record.schema.groups) {
                         for (const auto& control : group.controls) {
+                            // Placements only edit the provider's own settings, so they need no runtime of their own.
+                            if (std::holds_alternative<PlacementDefinition>(control)) continue;
                             const auto* setting = std::get_if<SettingDefinition>(&control);
                             if (!setting) return Status::InvalidArgument;
                             auto value = setting->DefaultValue();

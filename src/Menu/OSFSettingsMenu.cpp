@@ -438,7 +438,7 @@ namespace OSFSettings
             std::vector<const ModSchema*> schemas;
             schemas.reserve(settings.size());
             for (const auto& mod : settings) schemas.push_back(&mod.schema);
-            // Fields shared by setting, action, and hotkey rows. The page is where the row is shown;
+            // Fields shared by setting, action, placement, and hotkey rows. The page is where the row is shown;
             // the mod is who owns it, which every read, write and reset still goes through.
             const auto modRow = [root, &schemas](const ModSettings& mod, const SettingsGroup& group, const std::string& key, const std::string& title) {
                 const auto framing = FrameGroup(schemas, mod.schema, group);
@@ -455,6 +455,18 @@ namespace OSFSettings
                 Text(row, "key", key);
                 Text(row, "title", title);
                 return row;
+            };
+            const auto copyFields = [](RE::Scaleform::GFx::Value& row, const SettingRow& presentation) {
+                for (const auto& [name, field] : presentation.fields) {
+                    std::visit([&](const auto& content) {
+                        using T = std::decay_t<decltype(content)>;
+                        if constexpr (std::is_same_v<T, std::string>) {
+                            Text(row, name, content);
+                        } else {
+                            row.SetMember(name, RE::Scaleform::GFx::Value(content));
+                        }
+                    }, field);
+                }
             };
             for (const auto index : PageOrder(schemas)) {
                 const auto& mod = settings[index];
@@ -473,22 +485,20 @@ namespace OSFSettings
                             params.ret->PushBack(row);
                             continue;
                         }
+                        if (const auto* placement = std::get_if<PlacementDefinition>(&control)) {
+                            auto row = modRow(mod, group, placement->id, placement->label);
+                            Text(row, "hint", placement->hint);
+                            copyFields(row, MakePlacementRow(*placement));
+                            params.ret->PushBack(row);
+                            continue;
+                        }
                         const auto& setting = std::get<SettingDefinition>(control);
                         const auto value = mod.values.find(setting.key);
                         if (value == mod.values.end()) continue;
                         auto row = modRow(mod, group, setting.key, setting.label);
                         Text(row, "hint", setting.hint);
                         const auto presentation = MakeSettingRow(setting, value->second);
-                        for (const auto& [name, field] : presentation.fields) {
-                            std::visit([&](const auto& content) {
-                                using T = std::decay_t<decltype(content)>;
-                                if constexpr (std::is_same_v<T, std::string>) {
-                                    Text(row, name, content);
-                                } else {
-                                    row.SetMember(name, RE::Scaleform::GFx::Value(content));
-                                }
-                            }, field);
-                        }
+                        copyFields(row, presentation);
                         if (const auto* binding = std::get_if<KeyDefinition>(&setting.definition)) {
                             Text(row, "valueName", KeyName(std::get<KeyBinding>(value->second).keyCode));
                             Text(row, "defaultName", KeyName(binding->defaultValue.keyCode));

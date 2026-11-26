@@ -90,11 +90,14 @@ namespace OSFSettings::Localization
                 // temporary index once per overlay, preserving first-match lookup.
                 std::map<std::string_view, SettingDefinition*, std::less<>> settings;
                 std::map<std::string_view, ActionDefinition*, std::less<>> actions;
+                std::map<std::string_view, PlacementDefinition*, std::less<>> placements;
                 const bool hasSettings = document.contains("settings");
                 const bool hasActions = document.contains("actions");
-                if (hasSettings || hasActions) for (auto& group : mod.groups) for (auto& control : group.controls) {
+                const bool hasPlacements = document.contains("placements");
+                if (hasSettings || hasActions || hasPlacements) for (auto& group : mod.groups) for (auto& control : group.controls) {
                     if (auto* setting = std::get_if<SettingDefinition>(&control); setting && hasSettings) settings.try_emplace(setting->key, setting);
                     if (auto* action = std::get_if<ActionDefinition>(&control); action && hasActions) actions.try_emplace(action->id, action);
+                    if (auto* placement = std::get_if<PlacementDefinition>(&control); placement && hasPlacements) placements.try_emplace(placement->id, placement);
                 }
                 Text(document, "title", mod.title, "");
                 Text(document, "description", mod.description, "", true, true);
@@ -152,6 +155,14 @@ namespace OSFSettings::Localization
                     }
                     return true;
                 });
+                Entries(document, "placements", "", [&](const auto& id, const auto& entry, const auto& field) {
+                    const auto found = placements.find(id);
+                    if (found == placements.end()) return false;
+                    Fields(entry, { "label", "hint" }, field);
+                    Text(entry, "label", found->second->label, field);
+                    Text(entry, "hint", found->second->hint, field, true, true);
+                    return true;
+                });
             }
 
             // Diagnostics were emitted when the catalog loaded. Walk the current
@@ -171,9 +182,10 @@ namespace OSFSettings::Localization
                 const auto* groups = object(&document, "groups");
                 const auto* settings = object(&document, "settings");
                 const auto* actions = object(&document, "actions");
+                const auto* placements = object(&document, "placements");
                 for (auto& group : mod.groups) {
                     if (const auto* entry = object(groups, group.id)) Text(*entry, "label", group.label, "");
-                    if (!settings && !actions) continue;
+                    if (!settings && !actions && !placements) continue;
                     for (auto& control : group.controls) {
                         if (auto* setting = std::get_if<SettingDefinition>(&control)) {
                             const auto* entry = object(settings, setting->key);
@@ -192,6 +204,11 @@ namespace OSFSettings::Localization
                             Text(*entry, "label", action->label, "");
                             Text(*entry, "hint", action->hint, "", true, true);
                             if (!action->confirmation.empty()) Text(*entry, "confirmation", action->confirmation, "", true);
+                        } else if (auto* placement = std::get_if<PlacementDefinition>(&control)) {
+                            const auto* entry = object(placements, placement->id);
+                            if (!entry) continue;
+                            Text(*entry, "label", placement->label, "");
+                            Text(*entry, "hint", placement->hint, "", true, true);
                         }
                     }
                 }
@@ -298,7 +315,7 @@ namespace OSFSettings::Localization
                         m_errors.push_back({ file, "translation version must be integer 1" }); continue;
                     }
                     Overlay overlay{ file, &m_errors };
-                    overlay.Fields(document, { "version", "title", "description", "groups", "settings", "hotkeys", "actions", "ui" }, "");
+                    overlay.Fields(document, { "version", "title", "description", "groups", "settings", "hotkeys", "actions", "placements", "ui" }, "");
                     overlay.Interface(document, id, m_ui);
                     if (interfaceOnly && id == "osfsettings") continue;
                     document.erase("ui");

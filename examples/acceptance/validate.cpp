@@ -22,15 +22,16 @@ int main()
         std::string error;
         auto schema = OSFSettings::SettingsJson::ParseSchema(file,"osfsettings-test",error);
         if (!schema) throw std::runtime_error(error);
-        std::size_t settings{}, actions{};
+        std::size_t settings{}, actions{}, placements{};
         for (const auto& group : schema->groups) {
             for (const auto& control : group.controls) {
                 if (std::holds_alternative<OSFSettings::SettingDefinition>(control)) ++settings;
-                else ++actions;
+                else if (std::holds_alternative<OSFSettings::ActionDefinition>(control)) ++actions;
+                else ++placements;
             }
         }
         std::cout << "Production schema parser accepted " << settings << " settings, " << actions
-                  << " actions, " << schema->hotkeys.size() << " hotkeys, " << schema->menus.size() << " native launchers.\n";
+                  << " actions, " << placements << " placements, " << schema->hotkeys.size() << " hotkeys, " << schema->menus.size() << " native launchers.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Acceptance asset validation failed: " << error.what() << '\n';

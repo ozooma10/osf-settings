@@ -83,6 +83,10 @@ int wmain(int argc, wchar_t** argv)
                             for (const auto& option : presentation.options)
                                 row["options"].push_back({ { "value", option.value }, { "label", option.label } });
                         }
+                    } else if (const auto* placement = std::get_if<OSFSettings::PlacementDefinition>(&control)) {
+                        row.update({ { "key", placement->id }, { "title", placement->label }, { "hint", placement->hint } });
+                        for (const auto& [name, field] : OSFSettings::MakePlacementRow(*placement).fields)
+                            std::visit([&](const auto& value) { row[name] = value; }, field);
                     } else {
                         const auto& action = std::get<OSFSettings::ActionDefinition>(control);
                         row.update({ { "key", action.id }, { "title", action.label }, { "hint", action.hint },
